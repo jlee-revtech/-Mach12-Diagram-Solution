@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -59,14 +59,49 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
     }
   }, [diagramId, loadDiagram, seedFromStore])
 
-  // Debounced sync to Yjs — only fires after user stops making changes
+  // Autosave status
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSaveRef = useRef<string>('')
+
+  // Debounced sync to Yjs + autosave to Supabase on ANY change
   useEffect(() => {
-    const timer = setTimeout(() => {
+    // Build a fingerprint of current state to detect real changes
+    const fingerprint = JSON.stringify({ n: nodes, e: edges })
+    if (fingerprint === lastSaveRef.current) return
+
+    setSaveStatus('unsaved')
+
+    // Sync to Yjs quickly (300ms) for real-time collaboration
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = setTimeout(() => {
       syncToYjs()
     }, 300)
-    return () => clearTimeout(timer)
+
+    // Autosave to Supabase after changes settle (2s debounce)
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      if (!user) return
+      setSaveStatus('saving')
+      try {
+        await useDiagramStore.getState().saveDiagram(user.id)
+        lastSaveRef.current = JSON.stringify({
+          n: useDiagramStore.getState().nodes,
+          e: useDiagramStore.getState().edges,
+        })
+        setSaveStatus('saved')
+      } catch {
+        setSaveStatus('unsaved')
+      }
+    }, 2000)
+
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes.length, edges.length])
+  }, [nodes, edges, user])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -138,6 +173,19 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
               </span>
             </div>
           )}
+          {/* Autosave indicator */}
+          <div className="flex items-center gap-1.5 px-2 py-1">
+            <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
+              saveStatus === 'saved' ? 'bg-[#10B981]' :
+              saveStatus === 'saving' ? 'bg-[#EAB308] animate-pulse' :
+              'bg-[#64748B]'
+            }`} />
+            <span className="text-[9px] text-[#64748B] font-[family-name:var(--font-space-mono)]">
+              {saveStatus === 'saved' ? 'Saved' :
+               saveStatus === 'saving' ? 'Saving...' :
+               'Unsaved changes'}
+            </span>
+          </div>
         </div>
 
         <Toolbar onAiOpen={() => setAiOpen(true)} onHelpOpen={() => setHelpOpen(true)} onShareOpen={() => setShareOpen(true)} />
