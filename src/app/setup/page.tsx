@@ -55,7 +55,7 @@ export default function SetupPage() {
           <span className="text-[#64748B] text-xl">.AI</span>
           <h2 className="text-lg font-semibold text-[#F8FAFC] mt-4">Set Up Your Organization</h2>
           <p className="text-sm text-[#64748B] mt-1">
-            Create a new organization or join an existing one with an invite code.
+            Create a new organization or join an existing one by name or invite code.
           </p>
         </div>
 
@@ -70,7 +70,7 @@ export default function SetupPage() {
                   : 'text-[#64748B] hover:text-[#CBD5E1]'
               }`}
             >
-              Create Org
+              Create / Join Org
             </button>
             <button
               onClick={() => { setMode('join'); setError(null) }}
@@ -125,7 +125,7 @@ export default function SetupPage() {
                 disabled={submitting}
                 className="w-full bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
               >
-                {submitting ? 'Creating...' : 'Create Organization'}
+                {submitting ? 'Joining...' : 'Create / Join Organization'}
               </button>
             </form>
           ) : (
