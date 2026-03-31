@@ -69,7 +69,7 @@ export async function saveDiagram(
     title?: string
     description?: string
     process_context?: string
-    canvas_data?: { nodes: unknown[]; edges: unknown[]; notes?: string }
+    canvas_data?: { nodes: unknown[]; edges: unknown[]; notes?: string; artifacts?: unknown[] }
   }
 ): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/diagrams?id=eq.${id}`, {

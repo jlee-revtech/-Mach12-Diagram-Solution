@@ -10,9 +10,9 @@ interface OnboardingGuideProps {
 const STEPS = [
   {
     title: 'Add Systems',
-    subtitle: 'Build your architecture',
+    subtitle: 'Build your enterprise architecture',
     description:
-      'Use the Systems panel on the right to add enterprise systems like ERP, CRM, PLM, and more. Click any system type to place it on the canvas.',
+      'Open the Systems tab in the right sidebar and click any system type (ERP, CRM, PLM, MES, etc.) to place it on the canvas. Each system appears as a card showing its name, physical system, and type. You can add 13 different system types to model your complete data landscape.',
     icon: (
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
         <rect x="8" y="10" width="32" height="28" rx="6" stroke="#2563EB" strokeWidth="2" />
@@ -21,14 +21,14 @@ const STEPS = [
         <rect x="28" y="24" width="6" height="3" rx="1" fill="#64748B" />
       </svg>
     ),
-    keys: [],
+    keys: ['Systems tab', 'Click to add'],
     color: '#2563EB',
   },
   {
     title: 'Connect Systems',
-    subtitle: 'Define data flows',
+    subtitle: 'Define data flows between systems',
     description:
-      'Click the Connect button in the toolbar, then click a source system followed by a target system. A data flow line is created automatically. You can also drag from the connection dots that appear when you hover over a system.',
+      'Two ways to connect: (1) Click the Connect button in the toolbar, then click a source system followed by a target — the connection is created automatically with smart handle placement. (2) Hover over any system to reveal connection dots, then drag from a dot to another system. Connections show directional arrows and can be set to bidirectional.',
     icon: (
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
         <rect x="4" y="16" width="16" height="16" rx="4" stroke="#06B6D4" strokeWidth="2" />
@@ -38,14 +38,14 @@ const STEPS = [
         <circle cx="28" cy="24" r="2.5" fill="#06B6D4" />
       </svg>
     ),
-    keys: ['Connect button', 'or drag handles'],
+    keys: ['Connect button', 'Drag handles', 'Esc to cancel'],
     color: '#06B6D4',
   },
   {
-    title: 'Add Data Elements',
-    subtitle: 'Describe what flows between systems',
+    title: 'Data Elements & Technical Details',
+    subtitle: 'Document what flows between systems',
     description:
-      'Click on any connection line to select it, then use the Data tab in the sidebar to add data elements like transactions, master data, and documents that flow between systems.',
+      'Click any connection line to select it, then use the Data tab to add data elements (transactions, master data, documents, events). Each element has an expandable Technical Details section where you can record Source System ID, Table, Field, Transaction Code, BAPI/API, IDoc Type, and more. Use the quick-add buttons to populate common fields instantly.',
     icon: (
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
         <path d="M8 24H40" stroke="#64748B" strokeWidth="2" strokeLinecap="round" />
@@ -57,14 +57,45 @@ const STEPS = [
         <rect x="24" y="27" width="6" height="2" rx="1" fill="#64748B" />
       </svg>
     ),
-    keys: ['Click a line', 'Data tab'],
+    keys: ['Click a line', 'Data tab', 'Technical Details'],
     color: '#10B981',
   },
   {
-    title: 'Use AI Assistant',
-    subtitle: 'Generate diagrams instantly',
+    title: 'Output Artifacts',
+    subtitle: 'Define deliverables and trace data lineage',
     description:
-      'Press Ctrl+K to open the AI assistant. Describe your architecture in plain English or upload a screenshot, and AI will generate the diagram for you — complete with systems, connections, and data elements.',
+      'In the Data tab (with no connection selected), define Output Artifacts — deliverables like Approved Budget, Production Schedule, or Cost Estimate. Then select any connection and tag which artifacts that data flow contributes to. Click an artifact name to Spotlight it — all related data flows light up while everything else dims, showing the complete data lineage for that deliverable.',
+    icon: (
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect x="10" y="8" width="28" height="32" rx="4" stroke="#F97316" strokeWidth="2" />
+        <path d="M16 16h16M16 22h12M16 28h8" stroke="#F97316" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="36" cy="12" r="6" fill="#F97316" fillOpacity="0.2" stroke="#F97316" strokeWidth="1.5" />
+        <path d="M34 12h4M36 10v4" stroke="#F97316" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+    keys: ['Data tab', 'Tag connections', 'Click to spotlight'],
+    color: '#F97316',
+  },
+  {
+    title: 'Spotlight Mode',
+    subtitle: 'Focus on what matters',
+    description:
+      'Click any system to automatically spotlight it — all connected systems and data flows stay bright while everything else fades to 20% opacity. This lets you instantly see every data flow touching that system. Click the canvas background to exit spotlight. The Connect button is disabled during spotlight to prevent accidental changes.',
+    icon: (
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="16" stroke="#EAB308" strokeWidth="2" strokeDasharray="4 3" />
+        <circle cx="24" cy="24" r="8" fill="#EAB308" fillOpacity="0.2" stroke="#EAB308" strokeWidth="2" />
+        <circle cx="24" cy="24" r="3" fill="#EAB308" />
+      </svg>
+    ),
+    keys: ['Click a system', 'Click canvas to exit'],
+    color: '#EAB308',
+  },
+  {
+    title: 'AI Assistant',
+    subtitle: 'Generate and analyze diagrams',
+    description:
+      'Press Ctrl+K to open the AI assistant. In Generate mode, describe your architecture in plain English (e.g., "Procure to Pay with SAP S/4HANA and Ariba") or upload a screenshot — AI creates the full diagram. In Analyze mode, AI reviews your diagram for completeness, missing systems, data governance gaps, and gives a score with recommendations.',
     icon: (
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
         <rect x="8" y="12" width="32" height="24" rx="6" stroke="#8B5CF6" strokeWidth="2" />
@@ -73,29 +104,47 @@ const STEPS = [
         <text x="36" y="19" textAnchor="middle" fill="#8B5CF6" fontSize="8" fontWeight="bold">AI</text>
       </svg>
     ),
-    keys: ['Ctrl + K'],
+    keys: ['Ctrl + K', 'Generate', 'Analyze'],
     color: '#8B5CF6',
   },
   {
-    title: 'Organize & Edit',
-    subtitle: 'Refine your diagram',
+    title: 'Auto Layout & Navigation',
+    subtitle: 'Organize and explore your diagram',
     description:
-      'Drag systems to reposition them. Double-click a system name to rename it. Select a system and use the Properties tab to set the physical system (e.g., SAP S/4HANA). Use scroll to zoom, and drag the canvas to pan.',
+      'Click the Auto Layout button (tree icon) to automatically reorganize all systems into clean columns grouped by type, with connections flowing clearly between them. Use Fit View to see everything, zoom with scroll wheel, and pan by dragging the canvas. The minimap in the bottom-right shows an overview for quick navigation.',
     icon: (
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-        <path d="M24 8v8M24 32v8M8 24h8M32 24h8" stroke="#F97316" strokeWidth="2" strokeLinecap="round" />
-        <rect x="16" y="16" width="16" height="16" rx="4" stroke="#F97316" strokeWidth="2" />
-        <path d="M20 24h8M24 20v8" stroke="#F97316" strokeWidth="1.5" strokeLinecap="round" />
+        <rect x="4" y="14" width="12" height="8" rx="2" stroke="#14B8A6" strokeWidth="1.5"/>
+        <rect x="4" y="28" width="12" height="8" rx="2" stroke="#14B8A6" strokeWidth="1.5"/>
+        <rect x="32" y="10" width="12" height="8" rx="2" stroke="#14B8A6" strokeWidth="1.5"/>
+        <rect x="32" y="22" width="12" height="8" rx="2" stroke="#14B8A6" strokeWidth="1.5"/>
+        <rect x="32" y="34" width="12" height="8" rx="2" stroke="#14B8A6" strokeWidth="1.5"/>
+        <path d="M16 18h16M16 32h10l6-6M16 32h10l6 6" stroke="#14B8A6" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     ),
-    keys: ['Drag', 'Double-click', 'Scroll'],
-    color: '#F97316',
+    keys: ['Auto Layout', 'Fit View', 'Scroll to zoom'],
+    color: '#14B8A6',
   },
   {
-    title: 'Save & Share',
-    subtitle: 'Collaborate with your team',
+    title: 'Connections Catalog',
+    subtitle: 'Browse and filter all data flows',
     description:
-      'Click the Save button to persist your diagram. Use the Share button to invite team members as viewers or editors. All changes sync in real-time when collaborating.',
+      'In the Data tab with no connection selected, the Connections Catalog shows every data flow in your diagram. Filter by system name (with physical system references) or search by data element name. Each row shows source, target, physical systems, and a preview of data elements. Click any row to jump to editing that connection.',
+    icon: (
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect x="8" y="8" width="32" height="32" rx="4" stroke="#64748B" strokeWidth="2" />
+        <path d="M8 18h32M8 28h32" stroke="#64748B" strokeWidth="1.5" />
+        <path d="M20 8v32" stroke="#64748B" strokeWidth="1.5" />
+      </svg>
+    ),
+    keys: ['Data tab', 'Filter by system', 'Search'],
+    color: '#64748B',
+  },
+  {
+    title: 'Save, Share & Export',
+    subtitle: 'Collaborate and deliver',
+    description:
+      'Click Save to persist your diagram to the cloud. Use Share to generate invite links (editor or viewer access, expires in 7 days). Export your diagram as PNG, SVG, PDF, JSON, or BPMN format. All changes sync in real-time when multiple collaborators are editing — you\'ll see their cursors and a presence indicator showing who\'s online.',
     icon: (
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
         <circle cx="24" cy="14" r="6" stroke="#EC4899" strokeWidth="2" />
@@ -104,7 +153,7 @@ const STEPS = [
         <path d="M24 20v6M18 29l-3 1M30 29l3 1" stroke="#EC4899" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     ),
-    keys: ['Save', 'Share'],
+    keys: ['Save', 'Share', 'Export'],
     color: '#EC4899',
   },
 ]
