@@ -178,25 +178,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       'Prefer': 'return=representation',
     }
 
-    // Create org
-    const orgRes = await fetch(`${url}/rest/v1/organizations`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ name, slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-') }),
-    })
-    const orgData = await orgRes.json()
-    if (!orgRes.ok) return { error: orgData.message || 'Failed to create org' }
-    const org = Array.isArray(orgData) ? orgData[0] : orgData
+    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-')
 
-    // Create org_members entry
+    // Try to find existing org by slug first
+    const lookupRes = await fetch(
+      `${url}/rest/v1/organizations?slug=eq.${cleanSlug}&select=*`,
+      { headers: apiHeaders(currentSession.access_token) }
+    )
+    let org: { id: string; name: string; slug: string }
+    const existing = lookupRes.ok ? await lookupRes.json() : []
+
+    if (existing.length > 0) {
+      // Org exists — join it instead of creating
+      org = existing[0]
+    } else {
+      // Create new org
+      const orgRes = await fetch(`${url}/rest/v1/organizations`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ name, slug: cleanSlug }),
+      })
+      const orgData = await orgRes.json()
+      if (!orgRes.ok) return { error: orgData.message || 'Failed to create org' }
+      org = Array.isArray(orgData) ? orgData[0] : orgData
+    }
+
+    // Create org_members entry (upsert — skip if already a member)
     const memberRes = await fetch(`${url}/rest/v1/org_members`, {
       method: 'POST',
-      headers: { ...apiHeaders(currentSession.access_token), 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ user_id: currentUser.id, organization_id: org.id, role: 'admin' }),
+      headers: { ...apiHeaders(currentSession.access_token), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: currentUser.id, organization_id: org.id, role: existing.length > 0 ? 'member' : 'admin' }),
     })
     if (!memberRes.ok) {
-      const err = await memberRes.json()
-      return { error: err.message || 'Failed to add membership' }
+      const err = await memberRes.json().catch(() => ({}))
+      if (!err.message?.includes('duplicate')) {
+        return { error: err.message || 'Failed to add membership' }
+      }
     }
 
     // Set as active org on profile
