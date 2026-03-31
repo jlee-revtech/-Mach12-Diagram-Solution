@@ -55,6 +55,7 @@ interface DiagramState {
   updateDataElement: (edgeId: string, elementId: string, updates: Partial<DataElement>) => void
   removeDataElement: (edgeId: string, elementId: string) => void
   reorderDataElements: (edgeId: string, fromIndex: number, toIndex: number) => void
+  toggleElementArtifact: (edgeId: string, elementId: string, artifactId: string) => void
   // Data object attribute actions
   addAttribute: (edgeId: string, elementId: string, attr: Omit<DataObjectAttribute, 'id'>) => void
   removeAttribute: (edgeId: string, elementId: string, attrId: string) => void
@@ -354,6 +355,29 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     })
   },
 
+  toggleElementArtifact: (edgeId, elementId, artifactId) => {
+    set({
+      edges: get().edges.map((e) => {
+        if (e.id !== edgeId || !e.data) return e
+        return {
+          ...e,
+          data: {
+            ...e.data,
+            dataElements: e.data.dataElements.map((el) => {
+              if (el.id !== elementId) return el
+              const ids = el.outputArtifactIds ?? []
+              const has = ids.includes(artifactId)
+              return {
+                ...el,
+                outputArtifactIds: has ? ids.filter((id) => id !== artifactId) : [...ids, artifactId],
+              }
+            }),
+          },
+        }
+      }),
+    })
+  },
+
   addAttribute: (edgeId, elementId, attr) => {
     set({
       edges: get().edges.map((e) =>
@@ -425,14 +449,21 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   removeArtifact: (artifactId) => {
-    // Remove from diagram list and untag from all edges
+    // Remove from diagram list and untag from all edges + elements
     set({
       artifacts: get().artifacts.filter((a) => a.id !== artifactId),
-      edges: get().edges.map((e) =>
-        e.data?.outputArtifactIds?.includes(artifactId)
-          ? { ...e, data: { ...e.data!, outputArtifactIds: e.data!.outputArtifactIds!.filter((id) => id !== artifactId) } }
-          : e
-      ),
+      edges: get().edges.map((e) => {
+        if (!e.data) return e
+        const edgeIds = e.data.outputArtifactIds?.includes(artifactId)
+          ? e.data.outputArtifactIds.filter((id) => id !== artifactId)
+          : e.data.outputArtifactIds
+        const dataElements = e.data.dataElements.map((el) =>
+          el.outputArtifactIds?.includes(artifactId)
+            ? { ...el, outputArtifactIds: el.outputArtifactIds.filter((id) => id !== artifactId) }
+            : el
+        )
+        return { ...e, data: { ...e.data, outputArtifactIds: edgeIds, dataElements } }
+      }),
     })
   },
 
@@ -471,7 +502,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const edgeIds = new Set<string>()
     const nodeIds = new Set<string>()
     for (const e of edges) {
-      if (e.data?.outputArtifactIds?.includes(artifactId)) {
+      const edgeTagged = e.data?.outputArtifactIds?.includes(artifactId)
+      const elementTagged = e.data?.dataElements.some((el) => el.outputArtifactIds?.includes(artifactId))
+      if (edgeTagged || elementTagged) {
         edgeIds.add(e.id)
         nodeIds.add(e.source)
         nodeIds.add(e.target)

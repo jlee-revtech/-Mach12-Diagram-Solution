@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useCallback, useMemo } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -64,6 +64,11 @@ function DataFlowEdgeComponent({
 
   const dataElements = data?.dataElements ?? []
   const isBidirectional = data?.direction === 'bidirectional'
+  const [expanded, setExpanded] = useState(false)
+  const VISIBLE_LIMIT = 10
+  const hasOverflow = dataElements.length > VISIBLE_LIMIT
+  const visibleElements = expanded ? dataElements : dataElements.slice(0, VISIBLE_LIMIT)
+  const hiddenCount = dataElements.length - VISIBLE_LIMIT
 
   const highlight = selected || isSpotlit
   const endMarker = useMemo(
@@ -127,7 +132,7 @@ function DataFlowEdgeComponent({
               }`}
             >
               <div className="flex flex-col gap-1">
-                {dataElements.map((el) => (
+                {visibleElements.map((el) => (
                   <div key={el.id}>
                     <div className="flex items-center gap-1.5">
                       <div
@@ -157,6 +162,20 @@ function DataFlowEdgeComponent({
                     )}
                   </div>
                 ))}
+                {hasOverflow && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
+                    className="flex items-center gap-1 mt-0.5 text-[10px] text-[#06B6D4] hover:text-[#67E8F9] transition-colors font-[family-name:var(--font-space-mono)]"
+                  >
+                    <svg
+                      width="10" height="10" viewBox="0 0 10 10" fill="none"
+                      className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+                    >
+                      <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {expanded ? 'Show less' : `+${hiddenCount} more`}
+                  </button>
+                )}
               </div>
             </div>
           </div>

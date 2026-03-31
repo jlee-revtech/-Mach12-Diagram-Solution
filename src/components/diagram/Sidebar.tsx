@@ -300,12 +300,17 @@ function ArtifactsManager() {
     setNewName('')
   }, [newName, addArtifact])
 
-  // Count tagged edges per artifact
+  // Count tagged edges + elements per artifact
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const e of edges) {
       for (const aid of e.data?.outputArtifactIds ?? []) {
         counts.set(aid, (counts.get(aid) ?? 0) + 1)
+      }
+      for (const el of e.data?.dataElements ?? []) {
+        for (const aid of el.outputArtifactIds ?? []) {
+          counts.set(aid, (counts.get(aid) ?? 0) + 1)
+        }
       }
     }
     return counts
@@ -733,6 +738,8 @@ function ElementsTab() {
   const removeTechnicalProperty = useDiagramStore((s) => s.removeTechnicalProperty)
   const updateTechnicalProperty = useDiagramStore((s) => s.updateTechnicalProperty)
   const reorderDataElements = useDiagramStore((s) => s.reorderDataElements)
+  const toggleElementArtifact = useDiagramStore((s) => s.toggleElementArtifact)
+  const artifacts = useDiagramStore((s) => s.artifacts)
   const addOutputArtifact = useDiagramStore((s) => s.addOutputArtifact)
   const removeOutputArtifact = useDiagramStore((s) => s.removeOutputArtifact)
   const updateOutputArtifact = useDiagramStore((s) => s.updateOutputArtifact)
@@ -743,6 +750,7 @@ function ElementsTab() {
   const [expandedProps, setExpandedProps] = useState<Set<string>>(new Set())
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [showAllElements, setShowAllElements] = useState(false)
 
   const toggleProps = useCallback((elementId: string) => {
     setExpandedProps((prev) => {
@@ -780,6 +788,10 @@ function ElementsTab() {
   }
 
   const dataElements = selectedEdge.data?.dataElements ?? []
+  const SIDEBAR_VISIBLE_LIMIT = 10
+  const hasSidebarOverflow = dataElements.length > SIDEBAR_VISIBLE_LIMIT
+  const visibleDataElements = showAllElements ? dataElements : dataElements.slice(0, SIDEBAR_VISIBLE_LIMIT)
+  const sidebarHiddenCount = dataElements.length - SIDEBAR_VISIBLE_LIMIT
 
   return (
     <div>
@@ -791,7 +803,7 @@ function ElementsTab() {
 
       {/* Existing elements (drag to reorder) */}
       <div className="space-y-2 mb-4">
-        {dataElements.map((el, idx) => (
+        {visibleDataElements.map((el, idx) => (
           <div
             key={el.id}
             draggable
@@ -988,8 +1000,56 @@ function ElementsTab() {
                 </div>
               </div>
             )}
+
+            {/* Per-element artifact tags */}
+            {artifacts.length > 0 && (
+              <div className="mt-2">
+                <div className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] font-bold mb-1">
+                  Artifacts
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {artifacts.map((art) => {
+                    const isTagged = (el.outputArtifactIds ?? []).includes(art.id)
+                    return (
+                      <button
+                        key={art.id}
+                        onClick={() => toggleElementArtifact(selectedEdge.id, el.id, art.id)}
+                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] transition-all ${
+                          isTagged
+                            ? 'bg-[#F97316]/15 border border-[#F97316]/40 text-[#FB923C] font-medium'
+                            : 'bg-[#151E2E] border border-[#374A5E]/30 text-[#64748B] hover:border-[#F97316]/30 hover:text-[#F97316]/70'
+                        }`}
+                      >
+                        {isTagged && (
+                          <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                        {art.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         ))}
+        {hasSidebarOverflow && (
+          <button
+            onClick={() => setShowAllElements(!showAllElements)}
+            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-[#374A5E]/40 hover:border-[#06B6D4]/40 text-[#64748B] hover:text-[#06B6D4] transition-all"
+          >
+            <svg
+              width="10" height="10" viewBox="0 0 10 10" fill="none"
+              className={`transition-transform ${showAllElements ? 'rotate-180' : ''}`}
+            >
+              <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-[10px] font-medium font-[family-name:var(--font-space-mono)]">
+              {showAllElements ? 'Show less' : `Show ${sidebarHiddenCount} more element${sidebarHiddenCount !== 1 ? 's' : ''}`}
+            </span>
+          </button>
+        )}
         {dataElements.length === 0 && (
           <div className="text-xs text-[#374A5E] text-center py-3 border border-dashed border-[#374A5E]/40 rounded-lg">
             No data elements yet

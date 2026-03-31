@@ -54,6 +54,7 @@ export interface DataElement {
   processContext?: string
   attributes?: DataObjectAttribute[]
   technicalProperties?: TechnicalProperty[]
+  outputArtifactIds?: string[]
 }
 
 // ─── Output Artifacts ──────────────────────────────────
