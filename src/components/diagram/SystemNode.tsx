@@ -43,9 +43,13 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
   const updateSystemLabel = useDiagramStore((s) => s.updateSystemLabel)
   const setSelectedNode = useDiagramStore((s) => s.setSelectedNode)
   const setSidebarTab = useDiagramStore((s) => s.setSidebarTab)
+  const connectMode = useDiagramStore((s) => s.connectMode)
+  const handleConnectModeClick = useDiagramStore((s) => s.handleConnectModeClick)
+  const pendingConnectionSource = useDiagramStore((s) => s.pendingConnectionSource)
 
   const color = SYSTEM_COLORS[data.systemType]
   const icon = SYSTEM_ICONS[data.systemType]
+  const isPendingSource = pendingConnectionSource === id
 
   const handleDoubleClick = useCallback(() => {
     setEditValue(data.label)
@@ -72,53 +76,80 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
   )
 
   const handleClick = useCallback(() => {
+    if (connectMode) {
+      handleConnectModeClick(id)
+      return
+    }
     setSelectedNode(id)
     setSidebarTab('properties')
-  }, [id, setSelectedNode, setSidebarTab])
+  }, [id, connectMode, handleConnectModeClick, setSelectedNode, setSidebarTab])
+
+  // Primary handles (one per side at midpoint) — visible on hover
+  // Secondary handles — invisible but functional for drag connections
+  const primaryHandle = `!border-2 transition-all duration-200 !rounded-full`
+  const primaryVisible = `!w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#2563EB] hover:!border-[#2563EB] hover:!w-4 hover:!h-4`
+  const primarySelected = `!w-3.5 !h-3.5 !bg-[#06B6D4]/20 !border-[#06B6D4] hover:!bg-[#06B6D4] hover:!w-4 hover:!h-4`
+  const secondaryHandle = `!border transition-all duration-200`
+  const secondaryVisible = `!w-2 !h-2 !bg-[#1F2C3F] !border-[#374A5E] hover:!bg-[#2563EB] hover:!border-[#2563EB] hover:!w-3 hover:!h-3`
+  const secondaryHidden = `!w-3 !h-3 !bg-transparent !border-transparent`
 
   return (
     <div
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       style={{
-        borderColor: selected ? '#06B6D4' : color + '60',
-        boxShadow: selected
-          ? `0 0 20px ${color}40, 0 0 40px ${color}15`
-          : `0 2px 12px rgba(0,0,0,0.3)`,
+        borderColor: isPendingSource
+          ? '#2563EB'
+          : selected
+            ? '#06B6D4'
+            : connectMode
+              ? color + '80'
+              : color + '60',
+        boxShadow: isPendingSource
+          ? `0 0 24px #2563EB50, 0 0 48px #2563EB20`
+          : selected
+            ? `0 0 20px ${color}40, 0 0 40px ${color}15`
+            : `0 2px 12px rgba(0,0,0,0.3)`,
       }}
-      className="relative bg-[#1F2C3F] border-2 rounded-xl px-5 py-4 min-w-[180px] max-w-[240px] cursor-pointer transition-all duration-200 hover:scale-[1.02]"
+      className={`group relative bg-[#1F2C3F] border-2 rounded-xl px-5 py-4 min-w-[180px] max-w-[240px] cursor-pointer transition-all duration-200 hover:scale-[1.02] ${connectMode ? 'hover:!border-[#2563EB] hover:shadow-[0_0_20px_rgba(37,99,235,0.3)]' : ''}`}
     >
-      {/* Connection handles — 6 per side (3 src + 3 tgt) = 24 total */}
-      {/* Visible only when selected; always in DOM for connectivity */}
-      {/* Top handles */}
-      <Handle type="source" position={Position.Top} id="top-s1" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '15%' }} />
-      <Handle type="target" position={Position.Top} id="top-t1" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '30%' }} />
-      <Handle type="source" position={Position.Top} id="top-s2" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '45%' }} />
-      <Handle type="target" position={Position.Top} id="top-t2" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '60%' }} />
-      <Handle type="source" position={Position.Top} id="top-s3" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '75%' }} />
-      <Handle type="target" position={Position.Top} id="top-t3" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '90%' }} />
+      {/* ── Primary handles: 1 per side at midpoint, visible on hover ── */}
+      <Handle type="source" position={Position.Top} id="top-s2"
+        className={`${primaryHandle} ${selected ? primarySelected : primaryVisible} ${!selected ? 'opacity-0 group-hover:opacity-100' : ''}`}
+        style={{ left: '50%' }} />
+      <Handle type="source" position={Position.Bottom} id="bot-s2"
+        className={`${primaryHandle} ${selected ? primarySelected : primaryVisible} ${!selected ? 'opacity-0 group-hover:opacity-100' : ''}`}
+        style={{ left: '50%' }} />
+      <Handle type="source" position={Position.Left} id="left-s2"
+        className={`${primaryHandle} ${selected ? primarySelected : primaryVisible} ${!selected ? 'opacity-0 group-hover:opacity-100' : ''}`}
+        style={{ top: '50%' }} />
+      <Handle type="source" position={Position.Right} id="right-s2"
+        className={`${primaryHandle} ${selected ? primarySelected : primaryVisible} ${!selected ? 'opacity-0 group-hover:opacity-100' : ''}`}
+        style={{ top: '50%' }} />
 
-      {/* Bottom handles */}
-      <Handle type="source" position={Position.Bottom} id="bot-s1" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '15%' }} />
-      <Handle type="target" position={Position.Bottom} id="bot-t1" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '30%' }} />
-      <Handle type="source" position={Position.Bottom} id="bot-s2" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '45%' }} />
-      <Handle type="target" position={Position.Bottom} id="bot-t2" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '60%' }} />
-      <Handle type="source" position={Position.Bottom} id="bot-s3" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '75%' }} />
-      <Handle type="target" position={Position.Bottom} id="bot-t3" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ left: '90%' }} />
-
-      {/* Left handles */}
-      <Handle type="source" position={Position.Left} id="left-s1" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '15%' }} />
-      <Handle type="target" position={Position.Left} id="left-t1" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '35%' }} />
-      <Handle type="source" position={Position.Left} id="left-s2" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '55%' }} />
-      <Handle type="target" position={Position.Left} id="left-t2" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '75%' }} />
-      <Handle type="source" position={Position.Left} id="left-s3" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '90%' }} />
-
-      {/* Right handles */}
-      <Handle type="source" position={Position.Right} id="right-s1" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '15%' }} />
-      <Handle type="target" position={Position.Right} id="right-t1" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '35%' }} />
-      <Handle type="source" position={Position.Right} id="right-s2" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '55%' }} />
-      <Handle type="target" position={Position.Right} id="right-t2" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#06B6D4] hover:!bg-[#06B6D4]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '75%' }} />
-      <Handle type="source" position={Position.Right} id="right-s3" className={`!border transition-all ${selected ? '!w-2 !h-2 !bg-[#374A5E] !border-[#2563EB] hover:!bg-[#2563EB]' : '!w-3 !h-3 !bg-transparent !border-transparent'}`} style={{ top: '90%' }} />
+      {/* ── Secondary handles: additional connection points ── */}
+      {/* Top */}
+      <Handle type="source" position={Position.Top} id="top-s1" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '15%' }} />
+      <Handle type="target" position={Position.Top} id="top-t1" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '30%' }} />
+      <Handle type="target" position={Position.Top} id="top-t2" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '60%' }} />
+      <Handle type="source" position={Position.Top} id="top-s3" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '75%' }} />
+      <Handle type="target" position={Position.Top} id="top-t3" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '90%' }} />
+      {/* Bottom */}
+      <Handle type="source" position={Position.Bottom} id="bot-s1" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '15%' }} />
+      <Handle type="target" position={Position.Bottom} id="bot-t1" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '30%' }} />
+      <Handle type="target" position={Position.Bottom} id="bot-t2" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '60%' }} />
+      <Handle type="source" position={Position.Bottom} id="bot-s3" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '75%' }} />
+      <Handle type="target" position={Position.Bottom} id="bot-t3" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ left: '90%' }} />
+      {/* Left */}
+      <Handle type="source" position={Position.Left} id="left-s1" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ top: '15%' }} />
+      <Handle type="target" position={Position.Left} id="left-t1" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ top: '35%' }} />
+      <Handle type="target" position={Position.Left} id="left-t2" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ top: '75%' }} />
+      <Handle type="source" position={Position.Left} id="left-s3" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ top: '90%' }} />
+      {/* Right */}
+      <Handle type="source" position={Position.Right} id="right-s1" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ top: '15%' }} />
+      <Handle type="target" position={Position.Right} id="right-t1" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ top: '35%' }} />
+      <Handle type="target" position={Position.Right} id="right-t2" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ top: '75%' }} />
+      <Handle type="source" position={Position.Right} id="right-s3" className={`${secondaryHandle} ${selected ? secondaryVisible : secondaryHidden}`} style={{ top: '90%' }} />
 
       {/* Icon badge */}
       <div className="flex items-center gap-3">

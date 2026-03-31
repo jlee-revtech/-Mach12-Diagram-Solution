@@ -47,6 +47,11 @@ interface DiagramState {
   addAttribute: (edgeId: string, elementId: string, attr: Omit<DataObjectAttribute, 'id'>) => void
   removeAttribute: (edgeId: string, elementId: string, attrId: string) => void
   updateAttribute: (edgeId: string, elementId: string, attrId: string, updates: Partial<DataObjectAttribute>) => void
+  // Connect mode (click source, click target)
+  connectMode: boolean
+  pendingConnectionSource: string | null
+  toggleConnectMode: () => void
+  handleConnectModeClick: (nodeId: string) => void
   // Selection
   setSelectedNode: (id: string | null) => void
   setSelectedEdge: (id: string | null) => void
@@ -77,6 +82,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
   sidebarTab: 'palette',
+  connectMode: false,
+  pendingConnectionSource: null,
 
   // ─── React Flow Handlers ──────────────────────────────
   onNodesChange: (changes) => {
@@ -269,6 +276,61 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     })
   },
 
+  // ─── Connect Mode ─────────────────────────────────────
+  toggleConnectMode: () => {
+    const current = get().connectMode
+    set({ connectMode: !current, pendingConnectionSource: null })
+  },
+
+  handleConnectModeClick: (nodeId: string) => {
+    const { pendingConnectionSource, nodes } = get()
+    if (!pendingConnectionSource) {
+      // First click — set as source
+      set({ pendingConnectionSource: nodeId })
+      return
+    }
+    if (pendingConnectionSource === nodeId) {
+      // Clicked same node — cancel
+      set({ pendingConnectionSource: null })
+      return
+    }
+    // Second click — pick best handles based on relative position
+    const sourceNode = nodes.find((n) => n.id === pendingConnectionSource)
+    const targetNode = nodes.find((n) => n.id === nodeId)
+    if (!sourceNode || !targetNode) {
+      set({ pendingConnectionSource: null })
+      return
+    }
+    const dx = targetNode.position.x - sourceNode.position.x
+    const dy = targetNode.position.y - sourceNode.position.y
+    let sourceHandle: string
+    let targetHandle: string
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal: source's right → target's left, or vice versa
+      sourceHandle = dx > 0 ? 'right-s2' : 'left-s2'
+      targetHandle = dx > 0 ? 'left-t1' : 'right-t1'
+    } else {
+      // Vertical: source's bottom → target's top, or vice versa
+      sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
+      targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
+    }
+    const newEdge: DataFlowEdge = {
+      id: `edge-${uuid()}`,
+      type: 'dataFlow',
+      source: pendingConnectionSource,
+      target: nodeId,
+      sourceHandle,
+      targetHandle,
+      data: { label: '', dataElements: [], direction: 'forward' },
+    }
+    set({
+      edges: [...get().edges, newEdge],
+      pendingConnectionSource: null,
+      selectedEdgeId: newEdge.id,
+      sidebarTab: 'elements',
+    })
+  },
+
   // ─── Selection ────────────────────────────────────────
   setSelectedNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
   setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
@@ -300,6 +362,38 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const row = await getDiagram(id)
     if (!row) return false
     const canvas = row.canvas_data as { nodes: SystemNode[]; edges: DataFlowEdge[]; notes?: string }
+    const nodes = canvas.nodes ?? []
+    let edges = canvas.edges ?? []
+
+    // Repair edges with invalid handle IDs (e.g. 'right-src', 'left-tgt')
+    const validHandles = new Set([
+      'top-s1','top-t1','top-s2','top-t2','top-s3','top-t3',
+      'bot-s1','bot-t1','bot-s2','bot-t2','bot-s3','bot-t3',
+      'left-s1','left-t1','left-s2','left-t2','left-s3',
+      'right-s1','right-t1','right-s2','right-t2','right-s3',
+    ])
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+    edges = edges.map((e) => {
+      const srcNode = nodeMap.get(e.source)
+      const tgtNode = nodeMap.get(e.target)
+      const needsFix =
+        (e.sourceHandle && !validHandles.has(e.sourceHandle)) ||
+        (e.targetHandle && !validHandles.has(e.targetHandle))
+      if (!needsFix || !srcNode || !tgtNode) return e
+      const dx = tgtNode.position.x - srcNode.position.x
+      const dy = tgtNode.position.y - srcNode.position.y
+      let sourceHandle: string
+      let targetHandle: string
+      if (Math.abs(dx) > Math.abs(dy)) {
+        sourceHandle = dx > 0 ? 'right-s2' : 'left-s2'
+        targetHandle = dx > 0 ? 'left-t1' : 'right-t1'
+      } else {
+        sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
+        targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
+      }
+      return { ...e, sourceHandle, targetHandle }
+    })
+
     set({
       meta: {
         id: row.id,
@@ -310,8 +404,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       },
-      nodes: canvas.nodes ?? [],
-      edges: canvas.edges ?? [],
+      nodes,
+      edges,
       selectedNodeId: null,
       selectedEdgeId: null,
     })

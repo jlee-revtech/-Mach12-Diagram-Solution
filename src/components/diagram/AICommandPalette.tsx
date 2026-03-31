@@ -87,13 +87,16 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
 
       // Add systems as nodes
       const nodeIds: Record<string, string> = {}
+      const nodePositions: Record<string, { x: number; y: number }> = {}
       for (const sys of data.systems || []) {
         const id = `system-${uuid()}`
         nodeIds[sys.id] = id
+        const pos = sys.position || { x: 100, y: 100 }
+        nodePositions[id] = pos
         const newNode: SystemNode = {
           id,
           type: 'system',
-          position: sys.position || { x: 100, y: 100 },
+          position: pos,
           data: {
             label: sys.label,
             systemType: sys.systemType || 'custom',
@@ -103,18 +106,34 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
         store.nodes.push(newNode)
       }
 
-      // Add flows as edges
+      // Add flows as edges — pick best handles based on relative node positions
       for (const flow of data.flows || []) {
         const sourceId = nodeIds[flow.source]
         const targetId = nodeIds[flow.target]
         if (!sourceId || !targetId) continue
 
+        const srcPos = nodePositions[sourceId]
+        const tgtPos = nodePositions[targetId]
+        let sourceHandle = 'right-s2'
+        let targetHandle = 'left-t1'
+        if (srcPos && tgtPos) {
+          const dx = tgtPos.x - srcPos.x
+          const dy = tgtPos.y - srcPos.y
+          if (Math.abs(dx) > Math.abs(dy)) {
+            sourceHandle = dx > 0 ? 'right-s2' : 'left-s2'
+            targetHandle = dx > 0 ? 'left-t1' : 'right-t1'
+          } else {
+            sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
+            targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
+          }
+        }
+
         const newEdge: DataFlowEdge = {
           id: `edge-${uuid()}`,
           source: sourceId,
           target: targetId,
-          sourceHandle: flow.sourceHandle || 'right-src',
-          targetHandle: flow.targetHandle || 'left-tgt',
+          sourceHandle,
+          targetHandle,
           type: 'dataFlow',
           data: {
             direction: flow.direction || 'forward',

@@ -19,6 +19,7 @@ import DataFlowEdgeComponent, { EdgeMarkerDefs } from './DataFlowEdge'
 import Toolbar from './Toolbar'
 import Sidebar from './Sidebar'
 import AICommandPalette from './AICommandPalette'
+import OnboardingGuide from './OnboardingGuide'
 import { PresenceBadge, RemoteCursors } from './CollabPresence'
 
 const nodeTypes = { system: SystemNodeComponent }
@@ -27,6 +28,7 @@ const edgeTypes = { dataFlow: DataFlowEdgeComponent }
 function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const { user, profile } = useAuth()
   const [aiOpen, setAiOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const { connected, users, syncToYjs, updateCursor, seedFromStore } = useCollaboration(
     diagramId,
     profile?.display_name || user?.email || 'Anonymous'
@@ -41,6 +43,9 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const deleteSelected = useDiagramStore((s) => s.deleteSelected)
   const loadDiagram = useDiagramStore((s) => s.loadDiagram)
   const meta = useDiagramStore((s) => s.meta)
+  const connectMode = useDiagramStore((s) => s.connectMode)
+  const toggleConnectMode = useDiagramStore((s) => s.toggleConnectMode)
+  const pendingConnectionSource = useDiagramStore((s) => s.pendingConnectionSource)
 
   // Load diagram from Supabase, then seed Yjs
   useEffect(() => {
@@ -69,6 +74,11 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         setAiOpen((prev) => !prev)
         return
       }
+      if (e.key === 'Escape' && connectMode) {
+        e.preventDefault()
+        toggleConnectMode()
+        return
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (
           e.target instanceof HTMLInputElement ||
@@ -82,12 +92,16 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [deleteSelected])
+  }, [deleteSelected, connectMode, toggleConnectMode])
 
   const handlePaneClick = useCallback(() => {
     setSelectedNode(null)
     setSelectedEdge(null)
-  }, [setSelectedNode, setSelectedEdge])
+    // Cancel pending connection source on blank canvas click
+    if (pendingConnectionSource) {
+      useDiagramStore.setState({ pendingConnectionSource: null })
+    }
+  }, [setSelectedNode, setSelectedEdge, pendingConnectionSource])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     updateCursor(e.clientX, e.clientY)
@@ -124,9 +138,28 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           )}
         </div>
 
-        <Toolbar onAiOpen={() => setAiOpen(true)} />
+        <Toolbar onAiOpen={() => setAiOpen(true)} onHelpOpen={() => setHelpOpen(true)} />
         <EdgeMarkerDefs />
         <AICommandPalette open={aiOpen} onClose={() => setAiOpen(false)} />
+        <OnboardingGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+        {/* Connect mode status banner */}
+        {connectMode && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-[#2563EB]/15 backdrop-blur-sm border border-[#2563EB]/40 rounded-lg px-4 py-2 shadow-lg animate-in fade-in">
+            <div className="w-2 h-2 rounded-full bg-[#2563EB] animate-pulse" />
+            <span className="text-xs text-[#93C5FD] font-medium">
+              {pendingConnectionSource
+                ? 'Now click a target system to connect'
+                : 'Click a source system to start connecting'}
+            </span>
+            <button
+              onClick={toggleConnectMode}
+              className="text-[10px] text-[#64748B] hover:text-[#CBD5E1] ml-2 transition-colors"
+            >
+              Esc to cancel
+            </button>
+          </div>
+        )}
 
         <ReactFlow
           nodes={nodes}
@@ -145,7 +178,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           snapToGrid
           snapGrid={[16, 16]}
           connectionMode={ConnectionMode.Loose}
-          connectionLineStyle={{ stroke: '#2563EB', strokeWidth: 2 }}
+          connectionLineStyle={{ stroke: '#2563EB', strokeWidth: 2.5, strokeDasharray: '6 3' }}
           proOptions={{ hideAttribution: true }}
           className="!bg-[#151E2E]"
         >

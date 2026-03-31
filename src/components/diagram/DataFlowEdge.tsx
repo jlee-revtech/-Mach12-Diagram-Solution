@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -18,6 +18,14 @@ const ELEMENT_TYPE_COLORS: Record<string, string> = {
   event: '#10B981',
   data_object: '#EAB308',
   custom: '#A855F7',
+}
+
+// Fix for Next.js: url(#id) breaks with client-side routing.
+// Use full page URL as base so the browser resolves the fragment correctly.
+function markerUrl(markerId: string) {
+  if (typeof window === 'undefined') return `url(#${markerId})`
+  const base = window.location.href.replace(/#.*$/, '')
+  return `url(${base}#${markerId})`
 }
 
 function DataFlowEdgeComponent({
@@ -52,23 +60,31 @@ function DataFlowEdgeComponent({
   const dataElements = data?.dataElements ?? []
   const isBidirectional = data?.direction === 'bidirectional'
 
+  const endMarker = useMemo(
+    () => markerUrl(`marker-${selected ? 'selected' : 'default'}`),
+    [selected]
+  )
+  const startMarker = useMemo(
+    () =>
+      isBidirectional
+        ? markerUrl(`marker-start-${selected ? 'selected' : 'default'}`)
+        : undefined,
+    [isBidirectional, selected]
+  )
+
   return (
     <>
       <BaseEdge
         id={id}
         path={edgePath}
         style={{
-          stroke: selected ? '#06B6D4' : '#374A5E',
-          strokeWidth: selected ? 2.5 : 1.5,
+          stroke: selected ? '#06B6D4' : '#64748B',
+          strokeWidth: selected ? 2.5 : 2,
           cursor: 'pointer',
           transition: 'stroke 0.15s, stroke-width 0.15s',
         }}
-        markerEnd={`url(#marker-${selected ? 'selected' : 'default'})`}
-        markerStart={
-          isBidirectional
-            ? `url(#marker-start-${selected ? 'selected' : 'default'})`
-            : undefined
-        }
+        markerEnd={endMarker}
+        markerStart={startMarker}
         interactionWidth={20}
       />
 
@@ -171,7 +187,7 @@ export default memo(DataFlowEdgeComponent)
 // ─── Custom SVG Markers ────────────────────────────────
 export function EdgeMarkerDefs() {
   return (
-    <svg style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0 }}>
+    <svg style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, overflow: 'hidden' }}>
       <defs>
         <marker
           id="marker-default"
@@ -182,7 +198,7 @@ export function EdgeMarkerDefs() {
           markerHeight="8"
           orient="auto-start-reverse"
         >
-          <path d="M 2 2 L 10 6 L 2 10 z" fill="#374A5E" />
+          <path d="M 2 2 L 10 6 L 2 10 z" fill="#64748B" />
         </marker>
         <marker
           id="marker-selected"
@@ -204,7 +220,7 @@ export function EdgeMarkerDefs() {
           markerHeight="8"
           orient="auto-start-reverse"
         >
-          <path d="M 10 2 L 2 6 L 10 10 z" fill="#374A5E" />
+          <path d="M 10 2 L 2 6 L 10 10 z" fill="#64748B" />
         </marker>
         <marker
           id="marker-start-selected"

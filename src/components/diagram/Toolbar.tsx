@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/supabase/auth-context'
 import ExportMenu from './ExportMenu'
 import ShareDialog from './ShareDialog'
 
-export default function Toolbar({ onAiOpen }: { onAiOpen?: () => void }) {
+export default function Toolbar({ onAiOpen, onHelpOpen }: { onAiOpen?: () => void; onHelpOpen?: () => void }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
   const { user } = useAuth()
   const router = useRouter()
@@ -16,6 +16,8 @@ export default function Toolbar({ onAiOpen }: { onAiOpen?: () => void }) {
   const saveDiagram = useDiagramStore((s) => s.saveDiagram)
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+  const connectMode = useDiagramStore((s) => s.connectMode)
+  const toggleConnectMode = useDiagramStore((s) => s.toggleConnectMode)
   const [shareOpen, setShareOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -47,6 +49,25 @@ export default function Toolbar({ onAiOpen }: { onAiOpen?: () => void }) {
       <ToolbarButton onClick={() => fitView({ padding: 0.2, duration: 300 })} title="Fit View">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/><rect x="5" y="5" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1"/></svg>
       </ToolbarButton>
+
+      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+
+      <button
+        onClick={toggleConnectMode}
+        title={connectMode ? 'Exit Connect Mode (Esc)' : 'Connect Systems — click two nodes to link them'}
+        className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg transition-colors text-xs font-medium ${
+          connectMode
+            ? 'bg-[#2563EB]/20 text-[#2563EB] ring-1 ring-[#2563EB]/50'
+            : 'text-[#CBD5E1] hover:bg-[#374A5E]/60 hover:text-[#F8FAFC]'
+        }`}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="4" cy="4" r="2" stroke="currentColor" strokeWidth="1.5"/>
+          <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.5"/>
+          <path d="M5.5 5.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2"/>
+        </svg>
+        {connectMode ? 'Connecting...' : 'Connect'}
+      </button>
 
       <div className="w-px h-5 bg-[#374A5E] mx-1" />
 
@@ -90,6 +111,19 @@ export default function Toolbar({ onAiOpen }: { onAiOpen?: () => void }) {
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 8V13a1 1 0 001 1h6a1 1 0 001-1V8M11 4L8 1M8 1L5 4M8 1v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
         Share
       </button>
+
+      {onHelpOpen && (
+        <>
+          <div className="w-px h-5 bg-[#374A5E] mx-1" />
+          <ToolbarButton onClick={onHelpOpen} title="How to use this app">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M6.5 6.5a1.5 1.5 0 112.12 1.37c-.33.19-.62.5-.62.88V9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="8" cy="11.5" r="0.75" fill="currentColor" />
+            </svg>
+          </ToolbarButton>
+        </>
+      )}
 
       <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} />
     </div>
