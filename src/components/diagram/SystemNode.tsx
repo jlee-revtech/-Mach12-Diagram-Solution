@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useCallback } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react'
 import type { SystemData, SystemType } from '@/lib/diagram/types'
 import { useDiagramStore } from '@/lib/diagram/store'
 
@@ -131,8 +131,17 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
         opacity: isDimmed ? 0.2 : 1,
         transition: 'opacity 0.3s, border-color 0.2s, box-shadow 0.2s',
       }}
-      className={`group relative bg-[#1F2C3F] border-2 rounded-xl px-5 py-4 min-w-[180px] max-w-[240px] cursor-pointer transition-all duration-200 hover:scale-[1.02] ${connectMode ? 'hover:!border-[#2563EB] hover:shadow-[0_0_20px_rgba(37,99,235,0.3)]' : ''} ${isDimmed ? 'hover:!opacity-40' : ''}`}
+      className={`group relative bg-[#1F2C3F] border-2 rounded-xl px-5 py-4 min-w-[180px] min-h-[60px] cursor-pointer transition-all duration-200 ${!selected ? 'hover:scale-[1.02]' : ''} ${connectMode ? 'hover:!border-[#2563EB] hover:shadow-[0_0_20px_rgba(37,99,235,0.3)]' : ''} ${isDimmed ? 'hover:!opacity-40' : ''}`}
     >
+      {/* Resize handles — only visible when selected */}
+      <NodeResizer
+        isVisible={selected}
+        minWidth={180}
+        minHeight={60}
+        lineClassName="!border-[#06B6D4]/30"
+        handleClassName="!w-2.5 !h-2.5 !bg-[#06B6D4] !border-[#1F2C3F] !border-2 !rounded-sm"
+      />
+
       {/* ── Primary handles: 1 per side at midpoint, visible on hover ── */}
       <Handle type="source" position={Position.Top} id="top-s2"
         className={`${primaryHandle} ${selected ? primarySelected : primaryVisible} ${!selected ? 'opacity-0 group-hover:opacity-100' : ''}`}
@@ -190,12 +199,12 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
               className="w-full bg-transparent border-b border-[#06B6D4] text-[#F8FAFC] text-sm font-semibold outline-none"
             />
           ) : (
-            <div className="text-sm font-semibold text-[#F8FAFC] truncate">
+            <div className="text-sm font-semibold text-[#F8FAFC]">
               {data.label}
             </div>
           )}
           {data.physicalSystem && (
-            <div className="text-[11px] text-[#06B6D4] truncate">
+            <div className="text-[11px] text-[#06B6D4]">
               {data.physicalSystem}
             </div>
           )}
