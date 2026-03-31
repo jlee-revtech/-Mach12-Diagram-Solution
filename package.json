@@ -1,0 +1,38 @@
+{
+  "name": "mach12-diagram",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3003",
+    "dev:ws": "node ws-server/server.js",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@supabase/supabase-js": "^2.39.8",
+    "@xyflow/react": "^12.8.3",
+    "framer-motion": "^12.36.0",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^4.2.1",
+    "lib0": "^0.2.117",
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "uuid": "^11.1.0",
+    "ws": "^8.20.0",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.30",
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.1",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/uuid": "^10.0.0",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,123 @@
+'use client'
+
+import { useState } from 'react'
+import { useReactFlow } from '@xyflow/react'
+import { useRouter } from 'next/navigation'
+import { useDiagramStore } from '@/lib/diagram/store'
+import { useAuth } from '@/lib/supabase/auth-context'
+import ExportMenu from './ExportMenu'
+import ShareDialog from './ShareDialog'
+
+export default function Toolbar({ onAiOpen }: { onAiOpen?: () => void }) {
+  const { zoomIn, zoomOut, fitView } = useReactFlow()
+  const { user } = useAuth()
+  const router = useRouter()
+  const deleteSelected = useDiagramStore((s) => s.deleteSelected)
+  const saveDiagram = useDiagramStore((s) => s.saveDiagram)
+  const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
+  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const hasSelection = selectedNodeId || selectedEdgeId
+
+  const handleSave = async () => {
+    if (!user) return
+    setSaving(true)
+    await saveDiagram(user.id)
+    setSaving(false)
+  }
+
+  return (
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-[#1F2C3F]/90 backdrop-blur-sm border border-[#374A5E]/60 rounded-xl px-2 py-1.5 shadow-lg">
+      <ToolbarButton onClick={() => router.push('/')} title="Back to Dashboard">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </ToolbarButton>
+
+      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+
+      <ToolbarButton onClick={() => zoomIn()} title="Zoom In">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+      </ToolbarButton>
+
+      <ToolbarButton onClick={() => zoomOut()} title="Zoom Out">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+      </ToolbarButton>
+
+      <ToolbarButton onClick={() => fitView({ padding: 0.2, duration: 300 })} title="Fit View">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/><rect x="5" y="5" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1"/></svg>
+      </ToolbarButton>
+
+      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+
+      {hasSelection && (
+        <ToolbarButton onClick={deleteSelected} title="Delete Selected" variant="danger">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V3a1 1 0 011-1h2a1 1 0 011 1v1m1.5 0l-.5 8.5a1.5 1.5 0 01-1.5 1.5H6.5A1.5 1.5 0 015 12.5L4.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </ToolbarButton>
+      )}
+
+      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+
+      {onAiOpen && (
+        <button
+          onClick={onAiOpen}
+          title="AI Assistant (Ctrl+K)"
+          className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[#06B6D4] hover:bg-[#06B6D4]/10 transition-colors"
+        >
+          <span className="text-[10px] font-bold font-[family-name:var(--font-space-mono)]">AI</span>
+        </button>
+      )}
+
+      <ExportMenu />
+
+      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+
+      <ToolbarButton onClick={handleSave} title={saving ? 'Saving...' : 'Save Diagram'}>
+        {saving ? (
+          <span className="text-[10px] text-[#06B6D4]">...</span>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12.5 14H3.5a1 1 0 01-1-1V3a1 1 0 011-1h7l3 3v8a1 1 0 01-1 1z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 14v-4h6v4M5 2v3h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        )}
+      </ToolbarButton>
+
+      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+
+      <button
+        onClick={() => setShareOpen(true)}
+        title="Share Diagram"
+        className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[#10B981] hover:bg-[#10B981]/10 transition-colors text-xs font-medium"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 8V13a1 1 0 001 1h6a1 1 0 001-1V8M11 4L8 1M8 1L5 4M8 1v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        Share
+      </button>
+
+      <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} />
+    </div>
+  )
+}
+
+function ToolbarButton({
+  children,
+  onClick,
+  title,
+  variant = 'default',
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  title: string
+  variant?: 'default' | 'danger'
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
+        variant === 'danger'
+          ? 'text-red-400 hover:bg-red-500/15 hover:text-red-300'
+          : 'text-[#CBD5E1] hover:bg-[#374A5E]/60 hover:text-[#F8FAFC]'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}

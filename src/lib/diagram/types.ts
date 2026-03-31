@@ -1,0 +1,106 @@
+import type { Node, Edge } from '@xyflow/react'
+
+// ─── System Types ───────────────────────────────────────
+export type SystemType =
+  | 'erp'
+  | 'crm'
+  | 'plm'
+  | 'scm'
+  | 'middleware'
+  | 'database'
+  | 'data_warehouse'
+  | 'analytics'
+  | 'mes'
+  | 'clm'
+  | 'cloud'
+  | 'legacy'
+  | 'custom'
+
+export interface SystemData extends Record<string, unknown> {
+  label: string
+  systemType: SystemType
+  physicalSystem?: string
+  description?: string
+  icon?: string
+}
+
+export type SystemNode = Node<SystemData, 'system'>
+
+// ─── Data Element Types ─────────────────────────────────
+export type DataElementType = 'transaction' | 'master_data' | 'document' | 'event' | 'data_object' | 'custom'
+
+export interface DataObjectAttribute {
+  id: string
+  name: string
+  description?: string
+}
+
+export interface DataElement {
+  id: string
+  name: string
+  elementType: DataElementType
+  description?: string
+  sapObject?: string
+  processContext?: string
+  attributes?: DataObjectAttribute[]
+}
+
+// ─── Data Flow Edge Types ───────────────────────────────
+export type FlowDirection = 'forward' | 'bidirectional'
+
+export interface DataFlowData extends Record<string, unknown> {
+  label?: string
+  dataElements: DataElement[]
+  direction: FlowDirection
+  processContext?: string
+}
+
+export type DataFlowEdge = Edge<DataFlowData, 'dataFlow'>
+
+// ─── Diagram Types ──────────────────────────────────────
+export interface DiagramMeta {
+  id: string
+  title: string
+  description?: string
+  processContext?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── System Palette ─────────────────────────────────────
+export interface SystemTemplate {
+  type: SystemType
+  label: string
+  description: string
+  color: string
+}
+
+export const SYSTEM_TEMPLATES: SystemTemplate[] = [
+  { type: 'erp', label: 'ERP', description: 'Enterprise Resource Planning', color: '#2563EB' },
+  { type: 'crm', label: 'CRM', description: 'Customer Relationship Mgmt', color: '#06B6D4' },
+  { type: 'plm', label: 'PLM', description: 'Product Lifecycle Mgmt', color: '#8B5CF6' },
+  { type: 'scm', label: 'SCM', description: 'Supply Chain Management', color: '#10B981' },
+  { type: 'middleware', label: 'Middleware', description: 'Integration Layer', color: '#F97316' },
+  { type: 'database', label: 'Database', description: 'Data Store', color: '#EF4444' },
+  { type: 'data_warehouse', label: 'Data Warehouse', description: 'DW / Lakehouse', color: '#EAB308' },
+  { type: 'analytics', label: 'Analytics', description: 'BI / Reporting', color: '#EC4899' },
+  { type: 'mes', label: 'MES', description: 'Manufacturing Execution System', color: '#D946EF' },
+  { type: 'clm', label: 'CLM', description: 'Contract Lifecycle Mgmt', color: '#F43F5E' },
+  { type: 'cloud', label: 'Cloud', description: 'Cloud Platform', color: '#14B8A6' },
+  { type: 'legacy', label: 'Legacy', description: 'Legacy System', color: '#64748B' },
+  { type: 'custom', label: 'Custom', description: 'Custom System', color: '#A855F7' },
+]
+
+// ─── Process Context Options ────────────────────────────
+export const PROCESS_CONTEXTS = [
+  'Procure to Pay',
+  'Order to Cash',
+  'Plan to Produce',
+  'Record to Report',
+  'Hire to Retire',
+  'Design to Operate',
+  'Source to Settle',
+  'Acquire to Dispose',
+  'Custom',
+] as const
