@@ -14,6 +14,10 @@ export type SystemType =
   | 'clm'
   | 'cloud'
   | 'legacy'
+  | 'ppm'
+  | 'ims'
+  | 'siop'
+  | 'mps'
   | 'custom'
 
 export interface SystemData extends Record<string, unknown> {
@@ -124,6 +128,10 @@ export const SYSTEM_TEMPLATES: SystemTemplate[] = [
   { type: 'clm', label: 'CLM', description: 'Contract Lifecycle Mgmt', color: '#F43F5E' },
   { type: 'cloud', label: 'Cloud', description: 'Cloud Platform', color: '#14B8A6' },
   { type: 'legacy', label: 'Legacy', description: 'Legacy System', color: '#64748B' },
+  { type: 'ppm', label: 'PPM', description: 'Portfolio & Project Mgmt', color: '#0EA5E9' },
+  { type: 'ims', label: 'IMS', description: 'Integrated Master Schedule', color: '#6366F1' },
+  { type: 'siop', label: 'SIOP', description: 'Sales, Inventory, Ops Planning', color: '#84CC16' },
+  { type: 'mps', label: 'MPS', description: 'Master Production Schedule', color: '#22D3EE' },
   { type: 'custom', label: 'Custom', description: 'Custom System', color: '#A855F7' },
 ]
 

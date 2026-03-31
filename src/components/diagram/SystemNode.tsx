@@ -18,6 +18,10 @@ const SYSTEM_ICONS: Record<SystemType, string> = {
   clm: 'CL',
   cloud: 'CD',
   legacy: 'L',
+  ppm: 'PP',
+  ims: 'IM',
+  siop: 'SI',
+  mps: 'MS',
   custom: '?',
 }
 
@@ -34,6 +38,10 @@ const SYSTEM_COLORS: Record<SystemType, string> = {
   clm: '#F43F5E',
   cloud: '#14B8A6',
   legacy: '#64748B',
+  ppm: '#0EA5E9',
+  ims: '#6366F1',
+  siop: '#84CC16',
+  mps: '#22D3EE',
   custom: '#A855F7',
 }
 

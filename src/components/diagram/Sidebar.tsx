@@ -109,6 +109,9 @@ function PaletteTab() {
               <div className="text-xs font-medium text-[#CBD5E1] truncate">
                 {t.label}
               </div>
+              <div className="text-[9px] text-[#64748B] truncate">
+                {t.description}
+              </div>
             </div>
           </button>
         ))}
@@ -203,8 +206,13 @@ function PropertiesTab() {
           <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
             Logical Type
           </label>
-          <div className="bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#64748B]">
-            {selectedNode.data.systemType.toUpperCase()}
+          <div className="bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2">
+            <div className="text-sm text-[#64748B]">
+              {selectedNode.data.systemType.toUpperCase()}
+            </div>
+            <div className="text-[10px] text-[#94A3B8] mt-0.5">
+              {SYSTEM_TEMPLATES.find((t) => t.type === selectedNode.data.systemType)?.description ?? ''}
+            </div>
           </div>
         </div>
         <div>
