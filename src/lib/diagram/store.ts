@@ -46,6 +46,8 @@ interface DiagramState {
   deleteSelected: () => void
   // Edge endpoint editing (sidebar dropdowns)
   updateEdgeEndpoint: (edgeId: string, endpoint: 'source' | 'target', newNodeId: string) => void
+  // Edge label position (0–1 along path)
+  updateEdgeLabelPosition: (edgeId: string, position: number) => void
   // Edge data copy/paste
   copiedEdgeData: DataFlowData | null
   copyEdgeData: (edgeId: string) => void
@@ -162,6 +164,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
               sourceHandle: newConnection.sourceHandle ?? e.sourceHandle,
               targetHandle: newConnection.targetHandle ?? e.targetHandle,
             }
+          : e
+      ),
+    })
+  },
+
+  // ─── Edge Label Position ───────────────────────────────
+  updateEdgeLabelPosition: (edgeId, position) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId && e.data
+          ? { ...e, data: { ...e.data, labelPosition: Math.max(0, Math.min(1, position)) } }
           : e
       ),
     })

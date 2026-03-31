@@ -1,12 +1,13 @@
 'use client'
 
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
   type EdgeProps,
   MarkerType,
+  useReactFlow,
 } from '@xyflow/react'
 import type { DataFlowData } from '@/lib/diagram/types'
 import { useDiagramStore } from '@/lib/diagram/store'
@@ -28,6 +29,59 @@ function markerUrl(markerId: string) {
   return `url(${base}#${markerId})`
 }
 
+// ─── Path position helpers ──────────────────────────────
+// Given an SVG path `d` string, compute the {x,y} at a 0–1 ratio.
+function getPointAtRatio(d: string, ratio: number): { x: number; y: number } {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', d)
+  svg.appendChild(path)
+  document.body.appendChild(svg)
+  const totalLen = path.getTotalLength()
+  const pt = path.getPointAtLength(ratio * totalLen)
+  document.body.removeChild(svg)
+  return { x: pt.x, y: pt.y }
+}
+
+// Project a flow-space point onto the path, returning the closest 0–1 ratio.
+function closestRatioOnPath(d: string, px: number, py: number): number {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', d)
+  svg.appendChild(path)
+  document.body.appendChild(svg)
+  const totalLen = path.getTotalLength()
+  // Binary-search style sampling: coarse pass then refine
+  let bestDist = Infinity
+  let bestRatio = 0.5
+  const COARSE = 40
+  for (let i = 0; i <= COARSE; i++) {
+    const r = i / COARSE
+    const pt = path.getPointAtLength(r * totalLen)
+    const dist = (pt.x - px) ** 2 + (pt.y - py) ** 2
+    if (dist < bestDist) {
+      bestDist = dist
+      bestRatio = r
+    }
+  }
+  // Refine around best
+  const step = 1 / COARSE
+  const lo = Math.max(0, bestRatio - step)
+  const hi = Math.min(1, bestRatio + step)
+  const FINE = 30
+  for (let i = 0; i <= FINE; i++) {
+    const r = lo + (hi - lo) * (i / FINE)
+    const pt = path.getPointAtLength(r * totalLen)
+    const dist = (pt.x - px) ** 2 + (pt.y - py) ** 2
+    if (dist < bestDist) {
+      bestDist = dist
+      bestRatio = r
+    }
+  }
+  document.body.removeChild(svg)
+  return bestRatio
+}
+
 function DataFlowEdgeComponent({
   id,
   sourceX,
@@ -41,13 +95,15 @@ function DataFlowEdgeComponent({
 }: EdgeProps & { data?: DataFlowData }) {
   const setSelectedEdge = useDiagramStore((s) => s.setSelectedEdge)
   const setSidebarTab = useDiagramStore((s) => s.setSidebarTab)
+  const updateEdgeLabelPosition = useDiagramStore((s) => s.updateEdgeLabelPosition)
   const spotlightNodeId = useDiagramStore((s) => s.spotlightNodeId)
   const spotlightEdgeIds = useDiagramStore((s) => s.spotlightEdgeIds)
+  const { screenToFlowPosition } = useReactFlow()
 
   const isSpotlit = spotlightNodeId !== null && spotlightEdgeIds.has(id)
   const isDimmed = spotlightNodeId !== null && !spotlightEdgeIds.has(id)
 
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  const [edgePath, defaultLabelX, defaultLabelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
@@ -56,6 +112,56 @@ function DataFlowEdgeComponent({
     targetPosition,
     borderRadius: 16,
   })
+
+  // Label position along path (0–1, default 0.5)
+  const labelRatio = data?.labelPosition ?? 0.5
+  const labelPos = useMemo(() => {
+    if (typeof document === 'undefined') return { x: defaultLabelX, y: defaultLabelY }
+    // For default midpoint, use React Flow's computed value (faster)
+    if (labelRatio === 0.5) return { x: defaultLabelX, y: defaultLabelY }
+    return getPointAtRatio(edgePath, labelRatio)
+  }, [edgePath, labelRatio, defaultLabelX, defaultLabelY])
+
+  // ─── Drag state for label repositioning ───────────────
+  const [dragging, setDragging] = useState(false)
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
+  const dragRef = useRef(false)
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if (!selected) return
+    e.stopPropagation()
+    e.preventDefault()
+    dragRef.current = true
+    setDragging(true)
+
+    const onMove = (me: MouseEvent) => {
+      if (!dragRef.current) return
+      const flowPos = screenToFlowPosition({ x: me.clientX, y: me.clientY })
+      setDragPos(flowPos)
+    }
+    const onUp = (me: MouseEvent) => {
+      dragRef.current = false
+      setDragging(false)
+      setDragPos(null)
+      const flowPos = screenToFlowPosition({ x: me.clientX, y: me.clientY })
+      const ratio = closestRatioOnPath(edgePath, flowPos.x, flowPos.y)
+      updateEdgeLabelPosition(id, ratio)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [selected, id, edgePath, screenToFlowPosition, updateEdgeLabelPosition])
+
+  // While dragging, project current mouse onto path for live preview
+  const liveLabelPos = useMemo(() => {
+    if (!dragging || !dragPos || typeof document === 'undefined') return null
+    const ratio = closestRatioOnPath(edgePath, dragPos.x, dragPos.y)
+    return getPointAtRatio(edgePath, ratio)
+  }, [dragging, dragPos, edgePath])
+
+  const displayX = liveLabelPos?.x ?? labelPos.x
+  const displayY = liveLabelPos?.y ?? labelPos.y
 
   const handleClick = useCallback(() => {
     setSelectedEdge(id)
@@ -115,22 +221,36 @@ function DataFlowEdgeComponent({
         <EdgeLabelRenderer>
           <div
             onClick={handleClick}
+            onMouseDown={handleDragStart}
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              transform: `translate(-50%, -50%) translate(${displayX}px,${displayY}px)`,
               pointerEvents: 'all',
-              opacity: isDimmed ? 0.1 : 1,
-              transition: 'opacity 0.3s',
+              opacity: isDimmed ? 0.1 : dragging ? 0.85 : 1,
+              transition: dragging ? 'none' : 'opacity 0.3s',
+              cursor: selected ? (dragging ? 'grabbing' : 'grab') : 'pointer',
             }}
-            className="cursor-pointer"
+            className={selected ? 'nopan' : ''}
           >
             <div
               className={`bg-[#1F2C3F] border rounded-lg px-3 py-2 shadow-lg transition-all ${
-                highlight
-                  ? 'border-[#06B6D4] shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                  : 'border-[#374A5E]/60 hover:border-[#374A5E]'
+                dragging
+                  ? 'border-[#06B6D4] shadow-[0_0_16px_rgba(6,182,212,0.3)] scale-[1.02]'
+                  : highlight
+                    ? 'border-[#06B6D4] shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                    : 'border-[#374A5E]/60 hover:border-[#374A5E]'
               }`}
             >
+              {/* Drag indicator when selected */}
+              {selected && !dragging && (
+                <div className="flex justify-center mb-1 -mt-0.5">
+                  <div className="flex gap-0.5">
+                    <div className="w-1 h-1 rounded-full bg-[#06B6D4]/40" />
+                    <div className="w-1 h-1 rounded-full bg-[#06B6D4]/40" />
+                    <div className="w-1 h-1 rounded-full bg-[#06B6D4]/40" />
+                  </div>
+                </div>
+              )}
               <div className="flex flex-col gap-1">
                 {visibleElements.map((el) => (
                   <div key={el.id}>
@@ -187,18 +307,22 @@ function DataFlowEdgeComponent({
         <EdgeLabelRenderer>
           <div
             onClick={handleClick}
+            onMouseDown={handleDragStart}
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              transform: `translate(-50%, -50%) translate(${displayX}px,${displayY}px)`,
               pointerEvents: 'all',
               opacity: isDimmed ? 0.1 : 1,
-              transition: 'opacity 0.3s',
+              transition: dragging ? 'none' : 'opacity 0.3s',
+              cursor: selected ? (dragging ? 'grabbing' : 'grab') : 'pointer',
             }}
-            className="cursor-pointer"
+            className={selected ? 'nopan' : ''}
           >
             <div
               className={`bg-[#1F2C3F]/80 border border-dashed rounded-md px-2 py-1 transition-all ${
-                selected ? 'border-[#06B6D4]' : 'border-[#374A5E] hover:border-[#64748B]'
+                dragging
+                  ? 'border-[#06B6D4]'
+                  : selected ? 'border-[#06B6D4]' : 'border-[#374A5E] hover:border-[#64748B]'
               }`}
             >
               <span className="text-[10px] text-[#64748B] font-[family-name:var(--font-space-mono)]">

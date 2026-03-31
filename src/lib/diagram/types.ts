@@ -93,6 +93,7 @@ export interface DataFlowData extends Record<string, unknown> {
   processContext?: string
   outputArtifacts?: OutputArtifact[] // legacy per-edge artifacts
   outputArtifactIds?: string[] // references to diagram-level artifacts
+  labelPosition?: number // 0–1 position along the edge path (default 0.5 = midpoint)
 }
 
 export type DataFlowEdge = Edge<DataFlowData, 'dataFlow'>
