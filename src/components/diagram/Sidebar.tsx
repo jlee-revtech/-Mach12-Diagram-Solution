@@ -732,6 +732,7 @@ function ElementsTab() {
   const addTechnicalProperty = useDiagramStore((s) => s.addTechnicalProperty)
   const removeTechnicalProperty = useDiagramStore((s) => s.removeTechnicalProperty)
   const updateTechnicalProperty = useDiagramStore((s) => s.updateTechnicalProperty)
+  const reorderDataElements = useDiagramStore((s) => s.reorderDataElements)
   const addOutputArtifact = useDiagramStore((s) => s.addOutputArtifact)
   const removeOutputArtifact = useDiagramStore((s) => s.removeOutputArtifact)
   const updateOutputArtifact = useDiagramStore((s) => s.updateOutputArtifact)
@@ -740,6 +741,8 @@ function ElementsTab() {
   const [newType, setNewType] = useState<DataElementType>('transaction')
   const [newAttrName, setNewAttrName] = useState<Record<string, string>>({})
   const [expandedProps, setExpandedProps] = useState<Set<string>>(new Set())
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const toggleProps = useCallback((elementId: string) => {
     setExpandedProps((prev) => {
@@ -786,11 +789,52 @@ function ElementsTab() {
         Data elements flowing through this connection.
       </p>
 
-      {/* Existing elements */}
+      {/* Existing elements (drag to reorder) */}
       <div className="space-y-2 mb-4">
-        {dataElements.map((el) => (
-          <div key={el.id} className="bg-[#151E2E] border border-[#374A5E]/40 rounded-lg px-3 py-2">
+        {dataElements.map((el, idx) => (
+          <div
+            key={el.id}
+            draggable
+            onDragStart={(e) => {
+              setDragIndex(idx)
+              e.dataTransfer.effectAllowed = 'move'
+              // Make drag image semi-transparent
+              if (e.currentTarget instanceof HTMLElement) {
+                e.dataTransfer.setDragImage(e.currentTarget, 0, 0)
+              }
+            }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              setDragOverIndex(idx)
+            }}
+            onDragLeave={() => setDragOverIndex(null)}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragIndex !== null && dragIndex !== idx) {
+                reorderDataElements(selectedEdge.id, dragIndex, idx)
+              }
+              setDragIndex(null)
+              setDragOverIndex(null)
+            }}
+            onDragEnd={() => { setDragIndex(null); setDragOverIndex(null) }}
+            className={`bg-[#151E2E] border rounded-lg px-3 py-2 transition-all ${
+              dragIndex === idx
+                ? 'opacity-40 border-[#06B6D4]/40'
+                : dragOverIndex === idx
+                  ? 'border-[#06B6D4] shadow-[0_0_8px_rgba(6,182,212,0.15)]'
+                  : 'border-[#374A5E]/40'
+            }`}
+          >
             <div className="flex items-center gap-2">
+              {/* Drag handle */}
+              <div className="cursor-grab active:cursor-grabbing text-[#374A5E] hover:text-[#64748B] transition-colors shrink-0" title="Drag to reorder">
+                <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                  <circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/>
+                  <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
+                  <circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/>
+                </svg>
+              </div>
               <div className="flex-1 min-w-0">
                 <input
                   value={el.name}

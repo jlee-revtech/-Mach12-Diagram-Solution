@@ -54,6 +54,7 @@ interface DiagramState {
   addDataElement: (edgeId: string, element: Omit<DataElement, 'id'>) => void
   updateDataElement: (edgeId: string, elementId: string, updates: Partial<DataElement>) => void
   removeDataElement: (edgeId: string, elementId: string) => void
+  reorderDataElements: (edgeId: string, fromIndex: number, toIndex: number) => void
   // Data object attribute actions
   addAttribute: (edgeId: string, elementId: string, attr: Omit<DataObjectAttribute, 'id'>) => void
   removeAttribute: (edgeId: string, elementId: string, attrId: string) => void
@@ -338,6 +339,18 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
             }
           : e
       ),
+    })
+  },
+
+  reorderDataElements: (edgeId, fromIndex, toIndex) => {
+    set({
+      edges: get().edges.map((e) => {
+        if (e.id !== edgeId || !e.data) return e
+        const items = [...e.data.dataElements]
+        const [moved] = items.splice(fromIndex, 1)
+        items.splice(toIndex, 0, moved)
+        return { ...e, data: { ...e.data, dataElements: items } }
+      }),
     })
   },
 
