@@ -6,19 +6,19 @@ import { useRouter } from 'next/navigation'
 import { useDiagramStore } from '@/lib/diagram/store'
 import { useAuth } from '@/lib/supabase/auth-context'
 import ExportMenu from './ExportMenu'
-import ShareDialog from './ShareDialog'
 
-export default function Toolbar({ onAiOpen, onHelpOpen }: { onAiOpen?: () => void; onHelpOpen?: () => void }) {
+export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpen?: () => void; onHelpOpen?: () => void; onShareOpen?: () => void }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
   const { user } = useAuth()
   const router = useRouter()
   const deleteSelected = useDiagramStore((s) => s.deleteSelected)
   const saveDiagram = useDiagramStore((s) => s.saveDiagram)
+  const autoLayout = useDiagramStore((s) => s.autoLayout)
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
   const connectMode = useDiagramStore((s) => s.connectMode)
   const toggleConnectMode = useDiagramStore((s) => s.toggleConnectMode)
-  const [shareOpen, setShareOpen] = useState(false)
+  // shareOpen state removed — dialog now managed by parent (DiagramCanvas)
   const [saving, setSaving] = useState(false)
 
   const hasSelection = selectedNodeId || selectedEdgeId
@@ -48,6 +48,16 @@ export default function Toolbar({ onAiOpen, onHelpOpen }: { onAiOpen?: () => voi
 
       <ToolbarButton onClick={() => fitView({ padding: 0.2, duration: 300 })} title="Fit View">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/><rect x="5" y="5" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1"/></svg>
+      </ToolbarButton>
+
+      <ToolbarButton onClick={() => { autoLayout(); setTimeout(() => fitView({ padding: 0.2, duration: 500 }), 50) }} title="Auto Layout — reorganize systems to show connections clearly">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="3" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+          <rect x="10" y="1" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+          <rect x="10" y="7" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+          <rect x="10" y="12" width="5" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+          <path d="M6 5h4M6 5l3-2M6 5l3 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
       </ToolbarButton>
 
       <div className="w-px h-5 bg-[#374A5E] mx-1" />
@@ -104,7 +114,7 @@ export default function Toolbar({ onAiOpen, onHelpOpen }: { onAiOpen?: () => voi
       <div className="w-px h-5 bg-[#374A5E] mx-1" />
 
       <button
-        onClick={() => setShareOpen(true)}
+        onClick={onShareOpen}
         title="Share Diagram"
         className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[#10B981] hover:bg-[#10B981]/10 transition-colors text-xs font-medium"
       >
@@ -125,7 +135,6 @@ export default function Toolbar({ onAiOpen, onHelpOpen }: { onAiOpen?: () => voi
         </>
       )}
 
-      <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} />
     </div>
   )
 }

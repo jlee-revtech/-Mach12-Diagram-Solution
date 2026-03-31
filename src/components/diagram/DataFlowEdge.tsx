@@ -41,6 +41,11 @@ function DataFlowEdgeComponent({
 }: EdgeProps & { data?: DataFlowData }) {
   const setSelectedEdge = useDiagramStore((s) => s.setSelectedEdge)
   const setSidebarTab = useDiagramStore((s) => s.setSidebarTab)
+  const spotlightNodeId = useDiagramStore((s) => s.spotlightNodeId)
+  const spotlightEdgeIds = useDiagramStore((s) => s.spotlightEdgeIds)
+
+  const isSpotlit = spotlightNodeId !== null && spotlightEdgeIds.has(id)
+  const isDimmed = spotlightNodeId !== null && !spotlightEdgeIds.has(id)
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -60,16 +65,17 @@ function DataFlowEdgeComponent({
   const dataElements = data?.dataElements ?? []
   const isBidirectional = data?.direction === 'bidirectional'
 
+  const highlight = selected || isSpotlit
   const endMarker = useMemo(
-    () => markerUrl(`marker-${selected ? 'selected' : 'default'}`),
-    [selected]
+    () => markerUrl(`marker-${highlight ? 'selected' : 'default'}`),
+    [highlight]
   )
   const startMarker = useMemo(
     () =>
       isBidirectional
-        ? markerUrl(`marker-start-${selected ? 'selected' : 'default'}`)
+        ? markerUrl(`marker-start-${highlight ? 'selected' : 'default'}`)
         : undefined,
-    [isBidirectional, selected]
+    [isBidirectional, highlight]
   )
 
   return (
@@ -78,10 +84,11 @@ function DataFlowEdgeComponent({
         id={id}
         path={edgePath}
         style={{
-          stroke: selected ? '#06B6D4' : '#64748B',
-          strokeWidth: selected ? 2.5 : 2,
+          stroke: highlight ? '#06B6D4' : '#64748B',
+          strokeWidth: highlight ? 2.5 : 2,
+          opacity: isDimmed ? 0.1 : 1,
           cursor: 'pointer',
-          transition: 'stroke 0.15s, stroke-width 0.15s',
+          transition: 'stroke 0.2s, stroke-width 0.2s, opacity 0.3s',
         }}
         markerEnd={endMarker}
         markerStart={startMarker}
@@ -107,12 +114,14 @@ function DataFlowEdgeComponent({
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               pointerEvents: 'all',
+              opacity: isDimmed ? 0.1 : 1,
+              transition: 'opacity 0.3s',
             }}
             className="cursor-pointer"
           >
             <div
               className={`bg-[#1F2C3F] border rounded-lg px-3 py-2 shadow-lg transition-all ${
-                selected
+                highlight
                   ? 'border-[#06B6D4] shadow-[0_0_12px_rgba(6,182,212,0.25)]'
                   : 'border-[#374A5E]/60 hover:border-[#374A5E]'
               }`}
@@ -163,6 +172,8 @@ function DataFlowEdgeComponent({
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               pointerEvents: 'all',
+              opacity: isDimmed ? 0.1 : 1,
+              transition: 'opacity 0.3s',
             }}
             className="cursor-pointer"
           >

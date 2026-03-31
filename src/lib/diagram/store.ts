@@ -16,6 +16,8 @@ import type {
   SystemType,
   DataElement,
   DataObjectAttribute,
+  TechnicalProperty,
+  OutputArtifact,
   DiagramMeta,
 } from './types'
 
@@ -47,6 +49,18 @@ interface DiagramState {
   addAttribute: (edgeId: string, elementId: string, attr: Omit<DataObjectAttribute, 'id'>) => void
   removeAttribute: (edgeId: string, elementId: string, attrId: string) => void
   updateAttribute: (edgeId: string, elementId: string, attrId: string, updates: Partial<DataObjectAttribute>) => void
+  // Technical property actions
+  addTechnicalProperty: (edgeId: string, elementId: string, prop: Omit<TechnicalProperty, 'id'>) => void
+  removeTechnicalProperty: (edgeId: string, elementId: string, propId: string) => void
+  updateTechnicalProperty: (edgeId: string, elementId: string, propId: string, updates: Partial<TechnicalProperty>) => void
+  // Output artifact actions
+  addOutputArtifact: (edgeId: string, artifact: Omit<OutputArtifact, 'id'>) => void
+  removeOutputArtifact: (edgeId: string, artifactId: string) => void
+  updateOutputArtifact: (edgeId: string, artifactId: string, updates: Partial<OutputArtifact>) => void
+  // Spotlight — auto-highlights connections for selected node
+  spotlightNodeId: string | null
+  spotlightEdgeIds: Set<string>
+  spotlightNodeIds: Set<string>
   // Connect mode (click source, click target)
   connectMode: boolean
   pendingConnectionSource: string | null
@@ -56,6 +70,8 @@ interface DiagramState {
   setSelectedNode: (id: string | null) => void
   setSelectedEdge: (id: string | null) => void
   setSidebarTab: (tab: 'palette' | 'properties' | 'elements' | 'notes') => void
+  // Auto layout
+  autoLayout: () => void
   // Diagram meta
   setTitle: (title: string) => void
   setProcessContext: (context: string) => void
@@ -82,6 +98,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
   sidebarTab: 'palette',
+  spotlightNodeId: null,
+  spotlightEdgeIds: new Set<string>(),
+  spotlightNodeIds: new Set<string>(),
   connectMode: false,
   pendingConnectionSource: null,
 
@@ -276,6 +295,123 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     })
   },
 
+  // ─── Output Artifacts ─────────────────────────────────
+  addOutputArtifact: (edgeId, artifact) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId && e.data
+          ? {
+              ...e,
+              data: {
+                ...e.data,
+                outputArtifacts: [...(e.data.outputArtifacts || []), { ...artifact, id: uuid() }],
+              },
+            }
+          : e
+      ),
+    })
+  },
+
+  removeOutputArtifact: (edgeId, artifactId) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId && e.data
+          ? {
+              ...e,
+              data: {
+                ...e.data,
+                outputArtifacts: (e.data.outputArtifacts || []).filter((a) => a.id !== artifactId),
+              },
+            }
+          : e
+      ),
+    })
+  },
+
+  updateOutputArtifact: (edgeId, artifactId, updates) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId && e.data
+          ? {
+              ...e,
+              data: {
+                ...e.data,
+                outputArtifacts: (e.data.outputArtifacts || []).map((a) =>
+                  a.id === artifactId ? { ...a, ...updates } : a
+                ),
+              },
+            }
+          : e
+      ),
+    })
+  },
+
+  // ─── Technical Properties ──────────────────────────────
+  addTechnicalProperty: (edgeId, elementId, prop) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId && e.data
+          ? {
+              ...e,
+              data: {
+                ...e.data,
+                dataElements: e.data.dataElements.map((el) =>
+                  el.id === elementId
+                    ? { ...el, technicalProperties: [...(el.technicalProperties || []), { ...prop, id: uuid() }] }
+                    : el
+                ),
+              },
+            }
+          : e
+      ),
+    })
+  },
+
+  removeTechnicalProperty: (edgeId, elementId, propId) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId && e.data
+          ? {
+              ...e,
+              data: {
+                ...e.data,
+                dataElements: e.data.dataElements.map((el) =>
+                  el.id === elementId
+                    ? { ...el, technicalProperties: (el.technicalProperties || []).filter((p) => p.id !== propId) }
+                    : el
+                ),
+              },
+            }
+          : e
+      ),
+    })
+  },
+
+  updateTechnicalProperty: (edgeId, elementId, propId, updates) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId && e.data
+          ? {
+              ...e,
+              data: {
+                ...e.data,
+                dataElements: e.data.dataElements.map((el) =>
+                  el.id === elementId
+                    ? {
+                        ...el,
+                        technicalProperties: (el.technicalProperties || []).map((p) =>
+                          p.id === propId ? { ...p, ...updates } : p
+                        ),
+                      }
+                    : el
+                ),
+              },
+            }
+          : e
+      ),
+    })
+  },
+
   // ─── Connect Mode ─────────────────────────────────────
   toggleConnectMode: () => {
     const current = get().connectMode
@@ -332,9 +468,178 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   // ─── Selection ────────────────────────────────────────
-  setSelectedNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
-  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
+  setSelectedNode: (id) => {
+    if (id) {
+      // Compute spotlight: find all edges and nodes connected to this node
+      const { edges } = get()
+      const spotlightEdgeIds = new Set<string>()
+      const spotlightNodeIds = new Set<string>([id])
+      for (const e of edges) {
+        if (e.source === id || e.target === id) {
+          spotlightEdgeIds.add(e.id)
+          spotlightNodeIds.add(e.source)
+          spotlightNodeIds.add(e.target)
+        }
+      }
+      set({ selectedNodeId: id, selectedEdgeId: null, spotlightNodeId: id, spotlightEdgeIds, spotlightNodeIds })
+    } else {
+      set({ selectedNodeId: null, selectedEdgeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set() })
+    }
+  },
+  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set() }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
+
+  // ─── Auto Layout ──────────────────────────────────────
+  autoLayout: () => {
+    const { nodes, edges } = get()
+    if (nodes.length === 0) return
+
+    const NODE_W = 240
+    const NODE_H = 100
+    const COL_GAP = 200 // horizontal gap between columns (no labels here — labels are on horizontal edges)
+
+    // ── 1. Group nodes by systemType into vertical columns ──
+    // Order columns by: ERP first, then by connection density
+    const typeGroups = new Map<string, string[]>()
+    for (const n of nodes) {
+      const t = n.data.systemType
+      if (!typeGroups.has(t)) typeGroups.set(t, [])
+      typeGroups.get(t)!.push(n.id)
+    }
+
+    // Build adjacency for sorting
+    const adj = new Map<string, Set<string>>()
+    nodes.forEach((n) => adj.set(n.id, new Set()))
+    edges.forEach((e) => {
+      adj.get(e.source)?.add(e.target)
+      adj.get(e.target)?.add(e.source)
+    })
+
+    // Sort columns: most connected types first, ERP always first
+    const typeOrder = [...typeGroups.entries()].sort((a, b) => {
+      if (a[0] === 'erp') return -1
+      if (b[0] === 'erp') return 1
+      // Sum connections for all nodes of this type
+      const aConns = a[1].reduce((s, id) => s + (adj.get(id)?.size ?? 0), 0)
+      const bConns = b[1].reduce((s, id) => s + (adj.get(id)?.size ?? 0), 0)
+      return bConns - aConns
+    })
+
+    // ── 2. Measure edge label heights for vertical spacing ──
+    const edgeLabelH = (e: DataFlowEdge): number => {
+      const els = e.data?.dataElements ?? []
+      if (els.length === 0) return 40
+      let h = 24 // padding
+      for (const el of els) {
+        h += 20 // element name row
+        h += (el.attributes?.length ?? 0) * 14
+      }
+      return h
+    }
+
+    // For each node, find the max label height on edges to nodes
+    // in OTHER columns (horizontal edges that need label room)
+    const nodeTypeMap = new Map(nodes.map((n) => [n.id, n.data.systemType]))
+    const maxHorizLabel = new Map<string, number>()
+    for (const e of edges) {
+      const srcType = nodeTypeMap.get(e.source)
+      const tgtType = nodeTypeMap.get(e.target)
+      if (srcType !== tgtType) {
+        // Cross-column edge — its label will appear horizontally
+        // Doesn't affect vertical spacing directly
+      } else {
+        // Same-column edge — label appears between vertically stacked nodes
+        const lh = edgeLabelH(e)
+        maxHorizLabel.set(e.source, Math.max(maxHorizLabel.get(e.source) ?? 0, lh))
+        maxHorizLabel.set(e.target, Math.max(maxHorizLabel.get(e.target) ?? 0, lh))
+      }
+    }
+
+    // ── 3. Position: each systemType is a vertical column ──
+    const positioned = new Map<string, { x: number; y: number }>()
+    let curX = 0
+
+    // Track column x positions for gap calculation
+    const colInfo: { type: string; nodeIds: string[]; x: number }[] = []
+
+    for (const [sysType, nodeIds] of typeOrder) {
+      // Sort nodes within column by connection count (most connected on top)
+      nodeIds.sort((a, b) => (adj.get(b)?.size ?? 0) - (adj.get(a)?.size ?? 0))
+
+      let curY = 0
+      for (let i = 0; i < nodeIds.length; i++) {
+        const nid = nodeIds[i]
+        positioned.set(nid, { x: curX, y: curY })
+
+        // Gap below this node: base gap + extra for same-column edge labels
+        const labelSpace = maxHorizLabel.get(nid) ?? 0
+        const gap = Math.max(180, labelSpace + 80)
+        curY += NODE_H + gap
+      }
+
+      colInfo.push({ type: sysType, nodeIds, x: curX })
+
+      // Compute gap to next column: measure widest label on cross-column edges
+      let maxCrossLabel = 0
+      const colNodeSet = new Set(nodeIds)
+      for (const e of edges) {
+        const srcIn = colNodeSet.has(e.source)
+        const tgtIn = colNodeSet.has(e.target)
+        if ((srcIn && !tgtIn) || (!srcIn && tgtIn)) {
+          const longest = (e.data?.dataElements ?? []).reduce(
+            (max, el) => Math.max(max, el.name.length), 0
+          )
+          maxCrossLabel = Math.max(maxCrossLabel, longest)
+        }
+      }
+      const dynamicGap = Math.max(COL_GAP, maxCrossLabel * 8 + 160)
+      curX += NODE_W + dynamicGap
+    }
+
+    // ── 4. Vertical centering: align all columns to the tallest ──
+    const colHeights = colInfo.map((c) => {
+      if (c.nodeIds.length === 0) return 0
+      const last = c.nodeIds[c.nodeIds.length - 1]
+      return (positioned.get(last)?.y ?? 0) + NODE_H
+    })
+    const maxH = Math.max(...colHeights)
+    for (let i = 0; i < colInfo.length; i++) {
+      const offset = (maxH - colHeights[i]) / 2
+      if (offset > 0) {
+        for (const nid of colInfo[i].nodeIds) {
+          const p = positioned.get(nid)!
+          positioned.set(nid, { x: p.x, y: p.y + offset })
+        }
+      }
+    }
+
+    // ── 5. Apply positions and fix edge handles ──
+    const updatedNodes = nodes.map((n) => {
+      const pos = positioned.get(n.id)
+      return pos ? { ...n, position: pos } : n
+    })
+
+    const nodeMap = new Map(updatedNodes.map((n) => [n.id, n]))
+    const updatedEdges = edges.map((e) => {
+      const src = nodeMap.get(e.source)
+      const tgt = nodeMap.get(e.target)
+      if (!src || !tgt) return e
+      const dx = tgt.position.x - src.position.x
+      const dy = tgt.position.y - src.position.y
+      let sourceHandle: string
+      let targetHandle: string
+      if (Math.abs(dx) > Math.abs(dy)) {
+        sourceHandle = dx > 0 ? 'right-s2' : 'left-s2'
+        targetHandle = dx > 0 ? 'left-t1' : 'right-t1'
+      } else {
+        sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
+        targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
+      }
+      return { ...e, sourceHandle, targetHandle }
+    })
+
+    set({ nodes: updatedNodes, edges: updatedEdges })
+  },
 
   // ─── Diagram Meta ─────────────────────────────────────
   setTitle: (title) =>

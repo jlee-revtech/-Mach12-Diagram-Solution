@@ -46,10 +46,14 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
   const connectMode = useDiagramStore((s) => s.connectMode)
   const handleConnectModeClick = useDiagramStore((s) => s.handleConnectModeClick)
   const pendingConnectionSource = useDiagramStore((s) => s.pendingConnectionSource)
+  const spotlightNodeId = useDiagramStore((s) => s.spotlightNodeId)
+  const spotlightNodeIds = useDiagramStore((s) => s.spotlightNodeIds)
 
   const color = SYSTEM_COLORS[data.systemType]
   const icon = SYSTEM_ICONS[data.systemType]
   const isPendingSource = pendingConnectionSource === id
+  const isDimmed = spotlightNodeId !== null && !spotlightNodeIds.has(id)
+  const isSpotlit = spotlightNodeId !== null && spotlightNodeIds.has(id) && spotlightNodeId !== id
 
   const handleDoubleClick = useCallback(() => {
     setEditValue(data.label)
@@ -100,18 +104,26 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
       style={{
         borderColor: isPendingSource
           ? '#2563EB'
-          : selected
+          : isSpotlit
             ? '#06B6D4'
-            : connectMode
-              ? color + '80'
-              : color + '60',
+            : selected
+              ? '#06B6D4'
+              : connectMode
+                ? color + '80'
+                : isDimmed
+                  ? '#374A5E30'
+                  : color + '60',
         boxShadow: isPendingSource
           ? `0 0 24px #2563EB50, 0 0 48px #2563EB20`
-          : selected
-            ? `0 0 20px ${color}40, 0 0 40px ${color}15`
-            : `0 2px 12px rgba(0,0,0,0.3)`,
+          : isSpotlit
+            ? `0 0 16px ${color}50, 0 0 32px ${color}20`
+            : selected
+              ? `0 0 20px ${color}40, 0 0 40px ${color}15`
+              : `0 2px 12px rgba(0,0,0,0.3)`,
+        opacity: isDimmed ? 0.2 : 1,
+        transition: 'opacity 0.3s, border-color 0.2s, box-shadow 0.2s',
       }}
-      className={`group relative bg-[#1F2C3F] border-2 rounded-xl px-5 py-4 min-w-[180px] max-w-[240px] cursor-pointer transition-all duration-200 hover:scale-[1.02] ${connectMode ? 'hover:!border-[#2563EB] hover:shadow-[0_0_20px_rgba(37,99,235,0.3)]' : ''}`}
+      className={`group relative bg-[#1F2C3F] border-2 rounded-xl px-5 py-4 min-w-[180px] max-w-[240px] cursor-pointer transition-all duration-200 hover:scale-[1.02] ${connectMode ? 'hover:!border-[#2563EB] hover:shadow-[0_0_20px_rgba(37,99,235,0.3)]' : ''} ${isDimmed ? 'hover:!opacity-40' : ''}`}
     >
       {/* ── Primary handles: 1 per side at midpoint, visible on hover ── */}
       <Handle type="source" position={Position.Top} id="top-s2"

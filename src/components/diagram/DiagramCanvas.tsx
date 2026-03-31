@@ -20,6 +20,7 @@ import Toolbar from './Toolbar'
 import Sidebar from './Sidebar'
 import AICommandPalette from './AICommandPalette'
 import OnboardingGuide from './OnboardingGuide'
+import ShareDialog from './ShareDialog'
 import { PresenceBadge, RemoteCursors } from './CollabPresence'
 
 const nodeTypes = { system: SystemNodeComponent }
@@ -29,6 +30,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const { user, profile } = useAuth()
   const [aiOpen, setAiOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const { connected, users, syncToYjs, updateCursor, seedFromStore } = useCollaboration(
     diagramId,
     profile?.display_name || user?.email || 'Anonymous'
@@ -138,10 +140,11 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           )}
         </div>
 
-        <Toolbar onAiOpen={() => setAiOpen(true)} onHelpOpen={() => setHelpOpen(true)} />
+        <Toolbar onAiOpen={() => setAiOpen(true)} onHelpOpen={() => setHelpOpen(true)} onShareOpen={() => setShareOpen(true)} />
         <EdgeMarkerDefs />
         <AICommandPalette open={aiOpen} onClose={() => setAiOpen(false)} />
         <OnboardingGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
+        <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} />
 
         {/* Connect mode status banner */}
         {connectMode && (

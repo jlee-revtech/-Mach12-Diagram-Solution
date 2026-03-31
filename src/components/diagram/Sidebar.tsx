@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { useDiagramStore } from '@/lib/diagram/store'
 import {
   SYSTEM_TEMPLATES,
   PROCESS_CONTEXTS,
+  OUTPUT_ARTIFACT_PRESETS,
   type SystemTemplate,
   type DataElementType,
 } from '@/lib/diagram/types'
@@ -219,6 +220,197 @@ function PropertiesTab() {
   )
 }
 
+// ─── Connections Catalog (shown when no edge is selected) ─
+function ConnectionsCatalog() {
+  const edges = useDiagramStore((s) => s.edges)
+  const nodes = useDiagramStore((s) => s.nodes)
+  const setSelectedEdge = useDiagramStore((s) => s.setSelectedEdge)
+  const setSidebarTab = useDiagramStore((s) => s.setSidebarTab)
+  const [filter, setFilter] = useState('')
+  const [search, setSearch] = useState('')
+
+  const nodeMap = useMemo(
+    () => new Map(nodes.map((n) => [n.id, n])),
+    [nodes]
+  )
+
+  // Build unique system list for filter dropdown
+  const systemOptions = useMemo(() => {
+    const seen = new Map<string, { label: string; physical?: string }>()
+    nodes.forEach((n) => {
+      if (!seen.has(n.id)) seen.set(n.id, { label: n.data.label, physical: n.data.physicalSystem })
+    })
+    return Array.from(seen.entries())
+      .sort((a, b) => a[1].label.localeCompare(b[1].label))
+  }, [nodes])
+
+  // Filter + search
+  const filteredEdges = useMemo(() => {
+    return edges.filter((e) => {
+      const srcNode = nodeMap.get(e.source)
+      const tgtNode = nodeMap.get(e.target)
+      if (!srcNode || !tgtNode) return false
+      // System filter
+      if (filter && e.source !== filter && e.target !== filter) return false
+      // Text search across labels and data element names
+      if (search) {
+        const q = search.toLowerCase()
+        const srcMatch = srcNode.data.label.toLowerCase().includes(q)
+          || (srcNode.data.physicalSystem?.toLowerCase().includes(q) ?? false)
+        const tgtMatch = tgtNode.data.label.toLowerCase().includes(q)
+          || (tgtNode.data.physicalSystem?.toLowerCase().includes(q) ?? false)
+        const elMatch = (e.data?.dataElements ?? []).some((el) =>
+          el.name.toLowerCase().includes(q)
+        )
+        if (!srcMatch && !tgtMatch && !elMatch) return false
+      }
+      return true
+    })
+  }, [edges, nodeMap, filter, search])
+
+  const handleSelect = useCallback(
+    (edgeId: string) => {
+      setSelectedEdge(edgeId)
+      setSidebarTab('elements')
+    },
+    [setSelectedEdge, setSidebarTab]
+  )
+
+  return (
+    <div>
+      <SidebarLabel>All Connections</SidebarLabel>
+      <p className="text-[11px] text-[#64748B] mb-3">
+        {edges.length} connection{edges.length !== 1 ? 's' : ''} in this diagram. Click to edit.
+      </p>
+
+      {/* Filters */}
+      <div className="space-y-2 mb-3">
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors"
+        >
+          <option value="">All systems</option>
+          {systemOptions.map(([id, info]) => (
+            <option key={id} value={id}>
+              {info.label}{info.physical ? ` (${info.physical})` : ''}
+            </option>
+          ))}
+        </select>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search connections..."
+          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E]"
+        />
+      </div>
+
+      {/* Results count */}
+      {(filter || search) && (
+        <div className="text-[10px] text-[#64748B] mb-2 font-[family-name:var(--font-space-mono)]">
+          {filteredEdges.length} of {edges.length} shown
+        </div>
+      )}
+
+      {/* Connection list */}
+      <div className="space-y-1.5">
+        {filteredEdges.map((e) => {
+          const srcNode = nodeMap.get(e.source)
+          const tgtNode = nodeMap.get(e.target)
+          if (!srcNode || !tgtNode) return null
+          const elements = e.data?.dataElements ?? []
+          const isBidi = e.data?.direction === 'bidirectional'
+          return (
+            <button
+              key={e.id}
+              onClick={() => handleSelect(e.id)}
+              className="w-full text-left bg-[#151E2E] hover:bg-[#1F2C3F] border border-[#374A5E]/30 hover:border-[#374A5E]/60 rounded-lg px-3 py-2 transition-colors group"
+            >
+              {/* Source → Target */}
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="truncate max-w-[110px]">
+                  <span className="text-[11px] font-medium text-[#CBD5E1]">
+                    {srcNode.data.label}
+                  </span>
+                  {srcNode.data.physicalSystem && (
+                    <span className="block text-[9px] text-[#06B6D4] truncate">
+                      {srcNode.data.physicalSystem}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-[#64748B] shrink-0">
+                  {isBidi ? '↔' : '→'}
+                </span>
+                <div className="truncate max-w-[110px]">
+                  <span className="text-[11px] font-medium text-[#CBD5E1]">
+                    {tgtNode.data.label}
+                  </span>
+                  {tgtNode.data.physicalSystem && (
+                    <span className="block text-[9px] text-[#06B6D4] truncate">
+                      {tgtNode.data.physicalSystem}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {/* Data elements summary */}
+              {elements.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {elements.slice(0, 3).map((el) => (
+                    <span
+                      key={el.id}
+                      className="text-[9px] bg-[#1A2435] text-[#94A3B8] px-1.5 py-0.5 rounded border border-[#374A5E]/30"
+                    >
+                      {el.name}
+                    </span>
+                  ))}
+                  {elements.length > 3 && (
+                    <span className="text-[9px] text-[#64748B] px-1 py-0.5">
+                      +{elements.length - 3} more
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-[9px] text-[#374A5E] italic">No data elements</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {edges.length === 0 && (
+        <div className="text-center py-8">
+          <div className="text-[#374A5E] text-2xl mb-2">&#8646;</div>
+          <p className="text-xs text-[#64748B] mb-1">No connections yet</p>
+          <p className="text-[10px] text-[#374A5E]">
+            Use the Connect button in the toolbar or drag between system handles to create connections.
+          </p>
+        </div>
+      )}
+
+      {edges.length > 0 && filteredEdges.length === 0 && (
+        <div className="text-center py-6">
+          <p className="text-xs text-[#64748B]">No connections match your filter</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const TECHNICAL_PROPERTY_PRESETS = [
+  'Source System ID',
+  'Target System ID',
+  'Table',
+  'Field',
+  'Transaction Code',
+  'BAPI / API',
+  'IDoc Type',
+  'Message Type',
+  'Middleware Route',
+  'Frequency',
+  'Volume',
+  'Format',
+]
+
 // ─── Elements Tab ───────────────────────────────────────
 function ElementsTab() {
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
@@ -229,10 +421,26 @@ function ElementsTab() {
   const addAttribute = useDiagramStore((s) => s.addAttribute)
   const removeAttribute = useDiagramStore((s) => s.removeAttribute)
   const updateAttribute = useDiagramStore((s) => s.updateAttribute)
+  const addTechnicalProperty = useDiagramStore((s) => s.addTechnicalProperty)
+  const removeTechnicalProperty = useDiagramStore((s) => s.removeTechnicalProperty)
+  const updateTechnicalProperty = useDiagramStore((s) => s.updateTechnicalProperty)
+  const addOutputArtifact = useDiagramStore((s) => s.addOutputArtifact)
+  const removeOutputArtifact = useDiagramStore((s) => s.removeOutputArtifact)
+  const updateOutputArtifact = useDiagramStore((s) => s.updateOutputArtifact)
 
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<DataElementType>('transaction')
   const [newAttrName, setNewAttrName] = useState<Record<string, string>>({})
+  const [expandedProps, setExpandedProps] = useState<Set<string>>(new Set())
+
+  const toggleProps = useCallback((elementId: string) => {
+    setExpandedProps((prev) => {
+      const next = new Set(prev)
+      if (next.has(elementId)) next.delete(elementId)
+      else next.add(elementId)
+      return next
+    })
+  }, [])
 
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId)
 
@@ -257,12 +465,7 @@ function ElementsTab() {
   )
 
   if (!selectedEdge) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-[#374A5E] text-3xl mb-3">&#8646;</div>
-        <p className="text-sm text-[#64748B]">Select a data flow (arrow) to manage data elements</p>
-      </div>
-    )
+    return <ConnectionsCatalog />
   }
 
   const dataElements = selectedEdge.data?.dataElements ?? []
@@ -319,6 +522,78 @@ function ElementsTab() {
               </select>
             </div>
 
+            {/* Technical Properties — collapsible */}
+            <div className="mt-2">
+              <button
+                onClick={() => toggleProps(el.id)}
+                className="flex items-center gap-1.5 w-full text-left group/tp"
+              >
+                <svg
+                  width="10" height="10" viewBox="0 0 10 10" fill="none"
+                  className={`transition-transform ${expandedProps.has(el.id) ? 'rotate-90' : ''}`}
+                >
+                  <path d="M3 1l4 4-4 4" stroke="#64748B" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] font-bold group-hover/tp:text-[#94A3B8] transition-colors">
+                  Technical Details
+                </span>
+                {(el.technicalProperties?.length ?? 0) > 0 && (
+                  <span className="text-[8px] bg-[#2563EB]/20 text-[#2563EB] px-1.5 py-0.5 rounded-full font-medium">
+                    {el.technicalProperties!.length}
+                  </span>
+                )}
+              </button>
+
+              {expandedProps.has(el.id) && (
+                <div className="mt-1.5 ml-2 pl-2 border-l border-[#2563EB]/30 space-y-1.5">
+                  {/* Existing properties */}
+                  {(el.technicalProperties || []).map((prop) => (
+                    <div key={prop.id} className="flex items-start gap-1.5">
+                      <div className="flex-1 min-w-0">
+                        <input
+                          value={prop.key}
+                          onChange={(e) =>
+                            updateTechnicalProperty(selectedEdge.id, el.id, prop.id, { key: e.target.value })
+                          }
+                          className="w-full bg-transparent text-[9px] text-[#64748B] outline-none font-[family-name:var(--font-space-mono)] uppercase tracking-wider"
+                        />
+                        <input
+                          value={prop.value}
+                          onChange={(e) =>
+                            updateTechnicalProperty(selectedEdge.id, el.id, prop.id, { value: e.target.value })
+                          }
+                          placeholder="Enter value..."
+                          className="w-full bg-transparent text-[11px] text-[#CBD5E1] outline-none placeholder:text-[#374A5E]"
+                        />
+                      </div>
+                      <button
+                        onClick={() => removeTechnicalProperty(selectedEdge.id, el.id, prop.id)}
+                        className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0 mt-1"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Quick-add preset buttons */}
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {TECHNICAL_PROPERTY_PRESETS
+                      .filter((preset) => !(el.technicalProperties || []).some((p) => p.key === preset))
+                      .slice(0, 6)
+                      .map((preset) => (
+                        <button
+                          key={preset}
+                          onClick={() => addTechnicalProperty(selectedEdge.id, el.id, { key: preset, value: '' })}
+                          className="text-[8px] bg-[#0F172A] text-[#64748B] hover:text-[#CBD5E1] hover:border-[#374A5E] border border-[#374A5E]/30 px-1.5 py-0.5 rounded transition-colors"
+                        >
+                          + {preset}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Attributes for data objects */}
             {el.elementType === 'data_object' && (
               <div className="mt-2 ml-2 pl-2 border-l border-[#374A5E]/40">
@@ -367,6 +642,60 @@ function ElementsTab() {
             No data elements yet
           </div>
         )}
+      </div>
+
+      {/* ── Output Artifacts ─────────────────────────────── */}
+      <div className="mb-4">
+        <SidebarLabel>Output Artifacts</SidebarLabel>
+        <p className="text-[11px] text-[#64748B] mb-3">
+          Deliverables produced by this data flow.
+        </p>
+
+        {/* Existing artifacts */}
+        <div className="space-y-1.5 mb-3">
+          {(selectedEdge.data?.outputArtifacts ?? []).map((art) => (
+            <div key={art.id} className="bg-[#151E2E] border border-[#F97316]/20 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <input
+                    value={art.name}
+                    onChange={(e) => updateOutputArtifact(selectedEdge.id, art.id, { name: e.target.value })}
+                    className="w-full bg-transparent text-xs text-[#CBD5E1] outline-none font-medium"
+                  />
+                </div>
+                <button
+                  onClick={() => removeOutputArtifact(selectedEdge.id, art.id)}
+                  className="text-[#64748B] hover:text-red-400 transition-colors shrink-0"
+                >
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                </button>
+              </div>
+              <input
+                value={art.description || ''}
+                onChange={(e) => updateOutputArtifact(selectedEdge.id, art.id, { description: e.target.value })}
+                placeholder="Description..."
+                className="w-full bg-transparent text-[10px] text-[#64748B] outline-none mt-1 placeholder:text-[#374A5E]"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Quick-add preset artifacts */}
+        <div className="flex flex-wrap gap-1">
+          {OUTPUT_ARTIFACT_PRESETS
+            .filter((preset) => !(selectedEdge.data?.outputArtifacts ?? []).some((a) => a.name === preset))
+            .slice(0, 8)
+            .map((preset) => (
+              <button
+                key={preset}
+                onClick={() => addOutputArtifact(selectedEdge.id, { name: preset })}
+                className="text-[8px] bg-[#F97316]/5 text-[#F97316]/70 hover:text-[#F97316] hover:border-[#F97316]/40 border border-[#F97316]/20 px-1.5 py-0.5 rounded transition-colors"
+              >
+                + {preset}
+              </button>
+            ))}
+        </div>
       </div>
 
       {/* Add new element */}

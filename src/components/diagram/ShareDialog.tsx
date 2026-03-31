@@ -99,24 +99,27 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md bg-[#1A2435] border border-[#374A5E]/60 rounded-2xl shadow-2xl overflow-hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#374A5E]/40">
-          <h3 className="text-sm font-semibold text-[#F8FAFC]">Share Diagram</h3>
-          <button
-            onClick={onClose}
-            className="text-[#64748B] hover:text-[#F8FAFC] transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          </button>
-        </div>
+    <div className="fixed inset-0" style={{ zIndex: 9999 }} onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60" />
+      {/* Scrollable centering wrapper */}
+      <div className="absolute inset-0 overflow-y-auto flex items-start justify-center py-8 px-4">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full max-w-md bg-[#1A2435] border border-[#374A5E]/60 rounded-2xl shadow-2xl my-auto"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[#374A5E]/40">
+            <h3 className="text-sm font-semibold text-[#F8FAFC]">Share Diagram</h3>
+            <button
+              onClick={onClose}
+              className="text-[#64748B] hover:text-[#F8FAFC] transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </button>
+          </div>
 
-        <div className="p-6">
+          <div className="p-6">
           <p className="text-xs text-[#64748B] mb-4">
             Generate a share link for <strong className="text-[#CBD5E1]">{meta.title}</strong>. Recipients will be added to your organization and granted access to this diagram.
           </p>
@@ -214,6 +217,7 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

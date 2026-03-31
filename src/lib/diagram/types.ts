@@ -35,6 +35,12 @@ export interface DataObjectAttribute {
   description?: string
 }
 
+export interface TechnicalProperty {
+  id: string
+  key: string
+  value: string
+}
+
 export interface DataElement {
   id: string
   name: string
@@ -43,7 +49,34 @@ export interface DataElement {
   sapObject?: string
   processContext?: string
   attributes?: DataObjectAttribute[]
+  technicalProperties?: TechnicalProperty[]
 }
+
+// ─── Output Artifacts ──────────────────────────────────
+export interface OutputArtifact {
+  id: string
+  name: string
+  description?: string
+}
+
+export const OUTPUT_ARTIFACT_PRESETS = [
+  'Approved Budget',
+  'Organizational Forecast',
+  'Cost and Schedule Estimate',
+  'Bill of Materials',
+  'Purchase Order',
+  'Work Breakdown Structure',
+  'Material Requirements Plan',
+  'Production Schedule',
+  'Quality Report',
+  'Shipment Notice',
+  'Invoice',
+  'Financial Statement',
+  'Compliance Report',
+  'Change Order',
+  'Engineering Drawing',
+  'Test Results',
+] as const
 
 // ─── Data Flow Edge Types ───────────────────────────────
 export type FlowDirection = 'forward' | 'bidirectional'
@@ -53,6 +86,7 @@ export interface DataFlowData extends Record<string, unknown> {
   dataElements: DataElement[]
   direction: FlowDirection
   processContext?: string
+  outputArtifacts?: OutputArtifact[]
 }
 
 export type DataFlowEdge = Edge<DataFlowData, 'dataFlow'>
@@ -97,6 +131,7 @@ export const PROCESS_CONTEXTS = [
   'Procure to Pay',
   'Order to Cash',
   'Plan to Produce',
+  'Plan to Perform',
   'Record to Report',
   'Hire to Retire',
   'Design to Operate',
