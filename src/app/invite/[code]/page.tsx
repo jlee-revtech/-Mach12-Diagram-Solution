@@ -57,21 +57,31 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
 
       setDiagramId(share.diagram_id)
 
-      // Add user to org if not already a member
-      if (!profile?.organization_id || profile.organization_id !== share.organization_id) {
-        const profRes = await fetch(
-          `${url}/rest/v1/profiles?id=eq.${user.id}`,
-          {
-            method: 'PATCH',
-            headers: { ...headers, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({
-              organization_id: share.organization_id,
-              role: 'member',
-            }),
-          }
-        )
-        if (!profRes.ok) throw new Error('Failed to join organization')
+      // Add user to org via org_members (upsert)
+      const memberRes = await fetch(`${url}/rest/v1/org_members`, {
+        method: 'POST',
+        headers: { ...headers, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({
+          user_id: user.id,
+          organization_id: share.organization_id,
+          role: 'member',
+        }),
+      })
+      if (!memberRes.ok) {
+        const err = await memberRes.json().catch(() => ({}))
+        // Ignore duplicate key errors (already a member)
+        if (!err.message?.includes('duplicate')) throw new Error('Failed to join organization')
       }
+
+      // Set as active org on profile
+      await fetch(
+        `${url}/rest/v1/profiles?id=eq.${user.id}`,
+        {
+          method: 'PATCH',
+          headers: { ...headers, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ organization_id: share.organization_id }),
+        }
+      )
 
       // Grant diagram permission
       const permRes = await fetch(`${url}/rest/v1/diagram_permissions`, {

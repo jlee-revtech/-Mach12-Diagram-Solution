@@ -44,3 +44,15 @@ export interface OrgInvite {
   expires_at: string | null
   created_at: string
 }
+
+export interface OrgMember {
+  id: string
+  user_id: string
+  organization_id: string
+  role: 'admin' | 'member'
+  created_at: string
+}
+
+export interface OrgWithRole extends Organization {
+  role: 'admin' | 'member'
+}

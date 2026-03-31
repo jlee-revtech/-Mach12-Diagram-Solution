@@ -3,12 +3,13 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { createClient } from './client'
-import type { Profile, Organization } from './types'
+import type { Profile, Organization, OrgWithRole } from './types'
 
 interface AuthState {
   user: User | null
   profile: Profile | null
-  organization: Organization | null
+  organization: Organization | null  // active org
+  organizations: OrgWithRole[]       // all orgs the user belongs to
   session: Session | null
   loading: boolean
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>
@@ -16,6 +17,7 @@ interface AuthState {
   signOut: () => Promise<void>
   createOrg: (name: string, slug: string) => Promise<{ error: string | null }>
   joinOrg: (inviteCode: string) => Promise<{ error: string | null }>
+  switchOrg: (orgId: string) => Promise<void>
   refreshProfile: () => Promise<void>
 }
 
@@ -25,41 +27,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [organization, setOrganization] = useState<Organization | null>(null)
+  const [organizations, setOrganizations] = useState<OrgWithRole[]>([])
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const apiHeaders = useCallback((accessToken: string) => ({
+    'Content-Type': 'application/json',
+    'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    'Authorization': `Bearer ${accessToken}`,
+    'Accept': 'application/json',
+  }), [])
+
   const fetchProfile = useCallback(async (userId: string, accessToken: string) => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const headers = {
-      'apikey': anonKey,
-      'Authorization': `Bearer ${accessToken}`,
-      'Accept': 'application/vnd.pgrst.object+json',
-    }
+    const headers = apiHeaders(accessToken)
 
+    // Fetch profile
     const profRes = await fetch(
       `${url}/rest/v1/profiles?id=eq.${userId}&select=*`,
-      { headers: { ...headers, 'Accept': 'application/json' } }
+      { headers }
     )
     if (!profRes.ok) return
     const profArr = await profRes.json()
     if (!profArr.length) return
-
     const data = profArr[0]
     setProfile(data)
 
-    if (data.organization_id) {
+    // Fetch all org memberships
+    const membersRes = await fetch(
+      `${url}/rest/v1/org_members?user_id=eq.${userId}&select=organization_id,role`,
+      { headers }
+    )
+    let userOrgs: OrgWithRole[] = []
+    if (membersRes.ok) {
+      const memberships = await membersRes.json()
+      if (memberships.length > 0) {
+        const orgIds = memberships.map((m: { organization_id: string }) => m.organization_id)
+        const orgRes = await fetch(
+          `${url}/rest/v1/organizations?id=in.(${orgIds.join(',')})&select=*`,
+          { headers }
+        )
+        if (orgRes.ok) {
+          const orgs = await orgRes.json()
+          userOrgs = orgs.map((org: Organization) => {
+            const membership = memberships.find((m: { organization_id: string }) => m.organization_id === org.id)
+            return { ...org, role: membership?.role ?? 'member' }
+          })
+        }
+      }
+    }
+    setOrganizations(userOrgs)
+
+    // Set active org: use profile.organization_id if it's in the list, otherwise first org
+    if (userOrgs.length > 0) {
+      const activeOrg = data.organization_id
+        ? userOrgs.find((o) => o.id === data.organization_id) ?? userOrgs[0]
+        : userOrgs[0]
+      setOrganization(activeOrg)
+    } else if (data.organization_id) {
+      // Fallback: old-style single org (before migration runs)
       const orgRes = await fetch(
         `${url}/rest/v1/organizations?id=eq.${data.organization_id}&select=*`,
-        { headers: { ...headers, 'Accept': 'application/json' } }
+        { headers }
       )
       if (orgRes.ok) {
         const orgArr = await orgRes.json()
-        if (orgArr.length) setOrganization(orgArr[0])
+        if (orgArr.length) {
+          setOrganization(orgArr[0])
+          setOrganizations([{ ...orgArr[0], role: data.role }])
+        }
       }
     } else {
       setOrganization(null)
     }
-  }, [])
+  }, [apiHeaders])
 
   const refreshProfile = useCallback(async () => {
     if (user && session) await fetchProfile(user.id, session.access_token)
@@ -69,10 +110,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient()
     let initialDone = false
 
-    // onAuthStateChange fires immediately with INITIAL_SESSION event
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // console.log('[auth] event:', event, session?.user?.email ?? 'none')
         setSession(session)
         setUser(session?.user ?? null)
         if (session?.user && session.access_token) {
@@ -80,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setProfile(null)
           setOrganization(null)
+          setOrganizations([])
         }
         if (!initialDone) {
           initialDone = true
@@ -88,10 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     )
 
-    // Fallback: if onAuthStateChange doesn't fire within 2s, stop loading
     const timeout = setTimeout(() => {
       if (!initialDone) {
-        // timeout fallback
         initialDone = true
         setLoading(false)
       }
@@ -125,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
     setProfile(null)
     setOrganization(null)
+    setOrganizations([])
     setSession(null)
   }, [])
 
@@ -134,16 +173,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser || !currentSession) return { error: 'Not authenticated' }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const headers = {
-      'Content-Type': 'application/json',
-      'apikey': anonKey,
-      'Authorization': `Bearer ${currentSession.access_token}`,
+      ...apiHeaders(currentSession.access_token),
       'Prefer': 'return=representation',
     }
 
-    // Insert org
-    // insert org
+    // Create org
     const orgRes = await fetch(`${url}/rest/v1/organizations`, {
       method: 'POST',
       headers,
@@ -151,27 +186,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
     const orgData = await orgRes.json()
     if (!orgRes.ok) return { error: orgData.message || 'Failed to create org' }
-
     const org = Array.isArray(orgData) ? orgData[0] : orgData
 
-    // Update profile
-    // update profile
-    const profRes = await fetch(
+    // Create org_members entry
+    const memberRes = await fetch(`${url}/rest/v1/org_members`, {
+      method: 'POST',
+      headers: { ...apiHeaders(currentSession.access_token), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ user_id: currentUser.id, organization_id: org.id, role: 'admin' }),
+    })
+    if (!memberRes.ok) {
+      const err = await memberRes.json()
+      return { error: err.message || 'Failed to add membership' }
+    }
+
+    // Set as active org on profile
+    await fetch(
       `${url}/rest/v1/profiles?id=eq.${currentUser.id}`,
       {
         method: 'PATCH',
-        headers: { ...headers, 'Prefer': 'return=minimal' },
+        headers: { ...apiHeaders(currentSession.access_token), 'Prefer': 'return=minimal' },
         body: JSON.stringify({ organization_id: org.id, role: 'admin' }),
       }
     )
-    if (!profRes.ok) {
-      const profErr = await profRes.json()
-      return { error: profErr.message || 'Failed to update profile' }
-    }
 
     window.location.href = '/'
     return { error: null }
-  }, [user, session])
+  }, [user, session, apiHeaders])
 
   const joinOrg = useCallback(async (inviteCode: string) => {
     const currentUser = user
@@ -179,12 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser || !currentSession) return { error: 'Not authenticated' }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const headers = {
-      'Content-Type': 'application/json',
-      'apikey': anonKey,
-      'Authorization': `Bearer ${currentSession.access_token}`,
-    }
+    const headers = apiHeaders(currentSession.access_token)
 
     // Look up invite
     const inviteRes = await fetch(
@@ -198,26 +233,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: 'Invite code has expired' }
     }
 
-    // Update profile
-    const profRes = await fetch(
+    // Create org_members entry (upsert)
+    const memberRes = await fetch(`${url}/rest/v1/org_members`, {
+      method: 'POST',
+      headers: { ...headers, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: currentUser.id, organization_id: invite.organization_id, role: 'member' }),
+    })
+    if (!memberRes.ok) {
+      const err = await memberRes.json().catch(() => ({}))
+      return { error: err.message || 'Failed to join organization' }
+    }
+
+    // Set as active org on profile
+    await fetch(
       `${url}/rest/v1/profiles?id=eq.${currentUser.id}`,
       {
         method: 'PATCH',
         headers: { ...headers, 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ organization_id: invite.organization_id, role: 'member' }),
+        body: JSON.stringify({ organization_id: invite.organization_id }),
       }
     )
-    if (!profRes.ok) return { error: 'Failed to join organization' }
 
     window.location.href = '/'
     return { error: null }
-  }, [user])
+  }, [user, session, apiHeaders])
+
+  const switchOrg = useCallback(async (orgId: string) => {
+    const currentUser = user
+    const currentSession = session
+    if (!currentUser || !currentSession) return
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const headers = { ...apiHeaders(currentSession.access_token), 'Prefer': 'return=minimal' }
+
+    // Update profile's active org
+    await fetch(
+      `${url}/rest/v1/profiles?id=eq.${currentUser.id}`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ organization_id: orgId }),
+      }
+    )
+
+    // Update local state immediately
+    const newOrg = organizations.find((o) => o.id === orgId)
+    if (newOrg) {
+      setOrganization(newOrg)
+      setProfile((prev) => prev ? { ...prev, organization_id: orgId } : prev)
+    }
+  }, [user, session, organizations, apiHeaders])
 
   return (
     <AuthContext.Provider
       value={{
-        user, profile, organization, session, loading,
-        signUp, signIn, signOut, createOrg, joinOrg, refreshProfile,
+        user, profile, organization, organizations, session, loading,
+        signUp, signIn, signOut, createOrg, joinOrg, switchOrg, refreshProfile,
       }}
     >
       {children}

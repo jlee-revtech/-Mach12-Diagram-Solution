@@ -17,8 +17,7 @@ export default function SetupPage() {
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth')
-    if (!loading && organization) router.push('/')
-  }, [user, organization, loading, router])
+  }, [user, loading, router])
 
   const handleCreate = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()

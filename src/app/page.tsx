@@ -10,7 +10,8 @@ export default function Dashboard() {
   const [diagrams, setDiagrams] = useState<DiagramRow[]>([])
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
   const router = useRouter()
-  const { user, profile, organization, loading, signOut } = useAuth()
+  const { user, profile, organization, organizations, loading, signOut, switchOrg } = useAuth()
+  const [orgMenuOpen, setOrgMenuOpen] = useState(false)
 
   // Auth gating
   useEffect(() => {
@@ -59,7 +60,65 @@ export default function Dashboard() {
               <span className="text-[#CBD5E1] text-lg font-medium">Diagrams</span>
             </div>
             <div className="flex items-center gap-3 mt-1">
-              <span className="text-xs text-[#64748B]">{organization.name}</span>
+              {/* Org switcher */}
+              <div className="relative">
+                <button
+                  onClick={() => setOrgMenuOpen(!orgMenuOpen)}
+                  className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#CBD5E1] transition-colors"
+                >
+                  {organization.name}
+                  {organizations.length > 1 && (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${orgMenuOpen ? 'rotate-180' : ''}`}>
+                      <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
+                {orgMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setOrgMenuOpen(false)} />
+                    <div className="absolute left-0 top-full mt-1 z-50 w-56 bg-[#1F2C3F] border border-[#374A5E]/60 rounded-lg shadow-xl overflow-hidden">
+                      <div className="px-3 py-2 border-b border-[#374A5E]/40">
+                        <span className="text-[9px] uppercase tracking-widest text-[#64748B] font-[family-name:var(--font-space-mono)] font-bold">
+                          Organizations
+                        </span>
+                      </div>
+                      {organizations.map((org) => (
+                        <button
+                          key={org.id}
+                          onClick={async () => {
+                            await switchOrg(org.id)
+                            setOrgMenuOpen(false)
+                            setLoadingDiagrams(true)
+                            listDiagrams(org.id).then(setDiagrams).finally(() => setLoadingDiagrams(false))
+                          }}
+                          className={`flex items-center gap-2 w-full text-left px-3 py-2 text-xs transition-colors ${
+                            org.id === organization.id
+                              ? 'bg-[#2563EB]/10 text-[#93C5FD]'
+                              : 'text-[#CBD5E1] hover:bg-[#151E2E]'
+                          }`}
+                        >
+                          <div className={`w-2 h-2 rounded-full ${org.id === organization.id ? 'bg-[#2563EB]' : 'bg-[#374A5E]'}`} />
+                          <span className="flex-1 truncate">{org.name}</span>
+                          <span className="text-[8px] uppercase text-[#64748B] font-[family-name:var(--font-space-mono)]">
+                            {org.role}
+                          </span>
+                        </button>
+                      ))}
+                      <div className="border-t border-[#374A5E]/40">
+                        <button
+                          onClick={() => { setOrgMenuOpen(false); router.push('/setup') }}
+                          className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs text-[#64748B] hover:text-[#CBD5E1] hover:bg-[#151E2E] transition-colors"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M5 2v6M2 5h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          </svg>
+                          Create or join org
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               <span className="text-[#374A5E]">|</span>
               <span className="text-xs text-[#64748B]">{profile?.display_name || profile?.email}</span>
               <button
