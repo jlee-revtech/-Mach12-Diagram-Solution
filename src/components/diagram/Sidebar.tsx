@@ -220,6 +220,196 @@ function PropertiesTab() {
   )
 }
 
+// ─── Artifact Tagger (shown on edge edit) ──────────────
+function ArtifactTagger({ edgeId, taggedIds }: { edgeId: string; taggedIds: string[] }) {
+  const artifacts = useDiagramStore((s) => s.artifacts)
+  const toggleEdgeArtifact = useDiagramStore((s) => s.toggleEdgeArtifact)
+
+  if (artifacts.length === 0) {
+    return (
+      <div className="mb-4">
+        <SidebarLabel>Output Artifacts</SidebarLabel>
+        <p className="text-[10px] text-[#374A5E] italic">
+          No artifacts defined. Add them in the Data tab (click canvas first).
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-4">
+      <SidebarLabel>Output Artifacts</SidebarLabel>
+      <p className="text-[11px] text-[#64748B] mb-2">
+        Tag which artifacts this data flow contributes to.
+      </p>
+      <div className="space-y-1">
+        {artifacts.map((art) => {
+          const isTagged = taggedIds.includes(art.id)
+          return (
+            <button
+              key={art.id}
+              onClick={() => toggleEdgeArtifact(edgeId, art.id)}
+              className={`flex items-center gap-2 w-full text-left px-3 py-1.5 rounded-lg transition-all ${
+                isTagged
+                  ? 'bg-[#F97316]/10 border border-[#F97316]/40'
+                  : 'bg-[#151E2E] border border-[#374A5E]/30 hover:border-[#374A5E]/60'
+              }`}
+            >
+              <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-colors ${
+                isTagged ? 'border-[#F97316] bg-[#F97316]' : 'border-[#374A5E]'
+              }`}>
+                {isTagged && (
+                  <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+              <span className={`text-xs transition-colors ${isTagged ? 'text-[#CBD5E1] font-medium' : 'text-[#64748B]'}`}>
+                {art.name}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Artifacts Manager ─────────────────────────────────
+function ArtifactsManager() {
+  const artifacts = useDiagramStore((s) => s.artifacts)
+  const addArtifact = useDiagramStore((s) => s.addArtifact)
+  const removeArtifact = useDiagramStore((s) => s.removeArtifact)
+  const updateArtifact = useDiagramStore((s) => s.updateArtifact)
+  const spotlightArtifactId = useDiagramStore((s) => s.spotlightArtifactId)
+  const setSpotlightArtifact = useDiagramStore((s) => s.setSpotlightArtifact)
+  const edges = useDiagramStore((s) => s.edges)
+  const [newName, setNewName] = useState('')
+
+  const handleAdd = useCallback(() => {
+    if (!newName.trim()) return
+    addArtifact({ name: newName.trim() })
+    setNewName('')
+  }, [newName, addArtifact])
+
+  // Count tagged edges per artifact
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const e of edges) {
+      for (const aid of e.data?.outputArtifactIds ?? []) {
+        counts.set(aid, (counts.get(aid) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [edges])
+
+  return (
+    <div className="mb-5">
+      <SidebarLabel>Output Artifacts</SidebarLabel>
+      <p className="text-[11px] text-[#64748B] mb-3">
+        Deliverables produced by data flows. Click to spotlight.
+      </p>
+
+      <div className="space-y-1.5 mb-3">
+        {artifacts.map((art) => {
+          const isActive = spotlightArtifactId === art.id
+          const count = tagCounts.get(art.id) ?? 0
+          return (
+            <div
+              key={art.id}
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-[#F97316]/10 border border-[#F97316]/40 shadow-[0_0_12px_rgba(249,115,22,0.15)]'
+                  : 'bg-[#151E2E] border border-[#374A5E]/30 hover:border-[#F97316]/30'
+              }`}
+            >
+              <button
+                onClick={() => setSpotlightArtifact(isActive ? null : art.id)}
+                className="flex items-center gap-2 flex-1 min-w-0 text-left"
+              >
+                <div className={`w-2 h-2 rounded-full shrink-0 transition-colors ${isActive ? 'bg-[#F97316]' : 'bg-[#F97316]/40'}`} />
+                <div className="flex-1 min-w-0">
+                  <input
+                    value={art.name}
+                    onChange={(e) => { e.stopPropagation(); updateArtifact(art.id, { name: e.target.value }) }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full bg-transparent text-xs text-[#CBD5E1] outline-none font-medium"
+                  />
+                  <div className="flex items-center gap-2">
+                    {count > 0 && (
+                      <span className="text-[8px] text-[#F97316]/70 font-[family-name:var(--font-space-mono)]">
+                        {count} flow{count !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {count === 0 && (
+                      <span className="text-[8px] text-[#374A5E] italic">untagged</span>
+                    )}
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => { if (isActive) setSpotlightArtifact(null); removeArtifact(art.id) }}
+                className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0"
+              >
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Add new artifact */}
+      <div className="flex items-center gap-2">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+          placeholder="New artifact name..."
+          className="flex-1 bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#F97316] transition-colors placeholder:text-[#374A5E]"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!newName.trim()}
+          className="bg-[#F97316] hover:bg-[#FB923C] disabled:opacity-30 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+        >
+          Add
+        </button>
+      </div>
+
+      {/* Presets */}
+      {artifacts.length === 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {OUTPUT_ARTIFACT_PRESETS.slice(0, 6).map((preset) => (
+            <button
+              key={preset}
+              onClick={() => addArtifact({ name: preset })}
+              className="text-[8px] bg-[#F97316]/5 text-[#F97316]/60 hover:text-[#F97316] border border-[#F97316]/15 hover:border-[#F97316]/30 px-1.5 py-0.5 rounded transition-colors"
+            >
+              + {preset}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Active spotlight banner */}
+      {spotlightArtifactId && (
+        <div className="mt-3 flex items-center gap-2 bg-[#F97316]/10 border border-[#F97316]/30 rounded-lg px-3 py-2">
+          <div className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
+          <span className="text-[10px] text-[#FB923C] font-medium flex-1">
+            Spotlighting: {artifacts.find((a) => a.id === spotlightArtifactId)?.name}
+          </span>
+          <button
+            onClick={() => setSpotlightArtifact(null)}
+            className="text-[9px] text-[#64748B] hover:text-[#CBD5E1] transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Connections Catalog (shown when no edge is selected) ─
 function ConnectionsCatalog() {
   const edges = useDiagramStore((s) => s.edges)
@@ -278,6 +468,9 @@ function ConnectionsCatalog() {
 
   return (
     <div>
+      {/* Artifacts section */}
+      <ArtifactsManager />
+
       <SidebarLabel>All Connections</SidebarLabel>
       <p className="text-[11px] text-[#64748B] mb-3">
         {edges.length} connection{edges.length !== 1 ? 's' : ''} in this diagram. Click to edit.
@@ -644,59 +837,8 @@ function ElementsTab() {
         )}
       </div>
 
-      {/* ── Output Artifacts ─────────────────────────────── */}
-      <div className="mb-4">
-        <SidebarLabel>Output Artifacts</SidebarLabel>
-        <p className="text-[11px] text-[#64748B] mb-3">
-          Deliverables produced by this data flow.
-        </p>
-
-        {/* Existing artifacts */}
-        <div className="space-y-1.5 mb-3">
-          {(selectedEdge.data?.outputArtifacts ?? []).map((art) => (
-            <div key={art.id} className="bg-[#151E2E] border border-[#F97316]/20 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <input
-                    value={art.name}
-                    onChange={(e) => updateOutputArtifact(selectedEdge.id, art.id, { name: e.target.value })}
-                    className="w-full bg-transparent text-xs text-[#CBD5E1] outline-none font-medium"
-                  />
-                </div>
-                <button
-                  onClick={() => removeOutputArtifact(selectedEdge.id, art.id)}
-                  className="text-[#64748B] hover:text-red-400 transition-colors shrink-0"
-                >
-                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                </button>
-              </div>
-              <input
-                value={art.description || ''}
-                onChange={(e) => updateOutputArtifact(selectedEdge.id, art.id, { description: e.target.value })}
-                placeholder="Description..."
-                className="w-full bg-transparent text-[10px] text-[#64748B] outline-none mt-1 placeholder:text-[#374A5E]"
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Quick-add preset artifacts */}
-        <div className="flex flex-wrap gap-1">
-          {OUTPUT_ARTIFACT_PRESETS
-            .filter((preset) => !(selectedEdge.data?.outputArtifacts ?? []).some((a) => a.name === preset))
-            .slice(0, 8)
-            .map((preset) => (
-              <button
-                key={preset}
-                onClick={() => addOutputArtifact(selectedEdge.id, { name: preset })}
-                className="text-[8px] bg-[#F97316]/5 text-[#F97316]/70 hover:text-[#F97316] hover:border-[#F97316]/40 border border-[#F97316]/20 px-1.5 py-0.5 rounded transition-colors"
-              >
-                + {preset}
-              </button>
-            ))}
-        </div>
-      </div>
+      {/* ── Output Artifacts (tag this connection) ─────── */}
+      <ArtifactTagger edgeId={selectedEdge.id} taggedIds={selectedEdge.data?.outputArtifactIds ?? []} />
 
       {/* Add new element */}
       <SidebarLabel>Add Element</SidebarLabel>

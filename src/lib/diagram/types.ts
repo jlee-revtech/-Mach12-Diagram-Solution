@@ -86,7 +86,8 @@ export interface DataFlowData extends Record<string, unknown> {
   dataElements: DataElement[]
   direction: FlowDirection
   processContext?: string
-  outputArtifacts?: OutputArtifact[]
+  outputArtifacts?: OutputArtifact[] // legacy per-edge artifacts
+  outputArtifactIds?: string[] // references to diagram-level artifacts
 }
 
 export type DataFlowEdge = Edge<DataFlowData, 'dataFlow'>

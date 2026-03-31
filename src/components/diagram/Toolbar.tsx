@@ -18,6 +18,7 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
   const connectMode = useDiagramStore((s) => s.connectMode)
   const toggleConnectMode = useDiagramStore((s) => s.toggleConnectMode)
+  const spotlightNodeId = useDiagramStore((s) => s.spotlightNodeId)
   // shareOpen state removed — dialog now managed by parent (DiagramCanvas)
   const [saving, setSaving] = useState(false)
 
@@ -64,11 +65,14 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
 
       <button
         onClick={toggleConnectMode}
-        title={connectMode ? 'Exit Connect Mode (Esc)' : 'Connect Systems — click two nodes to link them'}
+        disabled={!!spotlightNodeId && !connectMode}
+        title={spotlightNodeId ? 'Click canvas to exit spotlight first' : connectMode ? 'Exit Connect Mode (Esc)' : 'Connect Systems — click two nodes to link them'}
         className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg transition-colors text-xs font-medium ${
           connectMode
             ? 'bg-[#2563EB]/20 text-[#2563EB] ring-1 ring-[#2563EB]/50'
-            : 'text-[#CBD5E1] hover:bg-[#374A5E]/60 hover:text-[#F8FAFC]'
+            : spotlightNodeId
+              ? 'text-[#374A5E] cursor-not-allowed'
+              : 'text-[#CBD5E1] hover:bg-[#374A5E]/60 hover:text-[#F8FAFC]'
         }`}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

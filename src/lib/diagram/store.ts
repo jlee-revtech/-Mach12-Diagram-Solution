@@ -57,10 +57,19 @@ interface DiagramState {
   addOutputArtifact: (edgeId: string, artifact: Omit<OutputArtifact, 'id'>) => void
   removeOutputArtifact: (edgeId: string, artifactId: string) => void
   updateOutputArtifact: (edgeId: string, artifactId: string, updates: Partial<OutputArtifact>) => void
+  // Diagram-level output artifacts
+  artifacts: OutputArtifact[]
+  addArtifact: (artifact: Omit<OutputArtifact, 'id'>) => void
+  removeArtifact: (artifactId: string) => void
+  updateArtifact: (artifactId: string, updates: Partial<OutputArtifact>) => void
+  toggleEdgeArtifact: (edgeId: string, artifactId: string) => void
   // Spotlight — auto-highlights connections for selected node
   spotlightNodeId: string | null
   spotlightEdgeIds: Set<string>
   spotlightNodeIds: Set<string>
+  // Spotlight by artifact
+  spotlightArtifactId: string | null
+  setSpotlightArtifact: (artifactId: string | null) => void
   // Connect mode (click source, click target)
   connectMode: boolean
   pendingConnectionSource: string | null
@@ -98,9 +107,11 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
   sidebarTab: 'palette',
+  artifacts: [],
   spotlightNodeId: null,
   spotlightEdgeIds: new Set<string>(),
   spotlightNodeIds: new Set<string>(),
+  spotlightArtifactId: null,
   connectMode: false,
   pendingConnectionSource: null,
 
@@ -295,7 +306,75 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     })
   },
 
-  // ─── Output Artifacts ─────────────────────────────────
+  // ─── Diagram-Level Artifacts ───────────────────────────
+  addArtifact: (artifact) => {
+    set({ artifacts: [...get().artifacts, { ...artifact, id: uuid() }] })
+  },
+
+  removeArtifact: (artifactId) => {
+    // Remove from diagram list and untag from all edges
+    set({
+      artifacts: get().artifacts.filter((a) => a.id !== artifactId),
+      edges: get().edges.map((e) =>
+        e.data?.outputArtifactIds?.includes(artifactId)
+          ? { ...e, data: { ...e.data!, outputArtifactIds: e.data!.outputArtifactIds!.filter((id) => id !== artifactId) } }
+          : e
+      ),
+    })
+  },
+
+  updateArtifact: (artifactId, updates) => {
+    set({
+      artifacts: get().artifacts.map((a) =>
+        a.id === artifactId ? { ...a, ...updates } : a
+      ),
+    })
+  },
+
+  toggleEdgeArtifact: (edgeId, artifactId) => {
+    set({
+      edges: get().edges.map((e) => {
+        if (e.id !== edgeId || !e.data) return e
+        const ids = e.data.outputArtifactIds ?? []
+        const has = ids.includes(artifactId)
+        return {
+          ...e,
+          data: {
+            ...e.data,
+            outputArtifactIds: has ? ids.filter((id) => id !== artifactId) : [...ids, artifactId],
+          },
+        }
+      }),
+    })
+  },
+
+  // Spotlight by artifact
+  setSpotlightArtifact: (artifactId) => {
+    if (!artifactId) {
+      set({ spotlightArtifactId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set(), selectedNodeId: null })
+      return
+    }
+    const { edges } = get()
+    const edgeIds = new Set<string>()
+    const nodeIds = new Set<string>()
+    for (const e of edges) {
+      if (e.data?.outputArtifactIds?.includes(artifactId)) {
+        edgeIds.add(e.id)
+        nodeIds.add(e.source)
+        nodeIds.add(e.target)
+      }
+    }
+    set({
+      spotlightArtifactId: artifactId,
+      spotlightNodeId: '__artifact__', // sentinel so spotlight rendering activates
+      spotlightEdgeIds: edgeIds,
+      spotlightNodeIds: nodeIds,
+      selectedNodeId: null,
+      selectedEdgeId: null,
+    })
+  },
+
+  // ─── Per-Edge Output Artifacts (legacy) ──────────────
   addOutputArtifact: (edgeId, artifact) => {
     set({
       edges: get().edges.map((e) =>
@@ -414,8 +493,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── Connect Mode ─────────────────────────────────────
   toggleConnectMode: () => {
-    const current = get().connectMode
-    set({ connectMode: !current, pendingConnectionSource: null })
+    const { connectMode, spotlightNodeId } = get()
+    // Can't enter connect mode while spotlight is active
+    if (!connectMode && spotlightNodeId) return
+    set({ connectMode: !connectMode, pendingConnectionSource: null })
   },
 
   handleConnectModeClick: (nodeId: string) => {
@@ -470,7 +551,6 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   // ─── Selection ────────────────────────────────────────
   setSelectedNode: (id) => {
     if (id) {
-      // Compute spotlight: find all edges and nodes connected to this node
       const { edges } = get()
       const spotlightEdgeIds = new Set<string>()
       const spotlightNodeIds = new Set<string>([id])
@@ -481,12 +561,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
           spotlightNodeIds.add(e.target)
         }
       }
-      set({ selectedNodeId: id, selectedEdgeId: null, spotlightNodeId: id, spotlightEdgeIds, spotlightNodeIds })
+      set({ selectedNodeId: id, selectedEdgeId: null, spotlightNodeId: id, spotlightEdgeIds, spotlightNodeIds, spotlightArtifactId: null })
     } else {
-      set({ selectedNodeId: null, selectedEdgeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set() })
+      set({ selectedNodeId: null, selectedEdgeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set(), spotlightArtifactId: null })
     }
   },
-  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set() }),
+  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set(), spotlightArtifactId: null }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
 
   // ─── Auto Layout ──────────────────────────────────────
@@ -653,12 +733,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── Persistence (Supabase) ────────────────────────────
   saveDiagram: async (userId: string) => {
-    const { meta, nodes, edges } = get()
+    const { meta, nodes, edges, artifacts } = get()
     await saveDiagramApi(meta.id, userId, {
       title: meta.title,
       description: meta.description,
       process_context: meta.processContext,
-      canvas_data: { nodes, edges, notes: meta.notes },
+      canvas_data: { nodes, edges, notes: meta.notes, artifacts },
     })
     set({ meta: { ...meta, updatedAt: new Date().toISOString() } })
   },
@@ -666,7 +746,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   loadDiagram: async (id: string) => {
     const row = await getDiagram(id)
     if (!row) return false
-    const canvas = row.canvas_data as { nodes: SystemNode[]; edges: DataFlowEdge[]; notes?: string }
+    const canvas = row.canvas_data as { nodes: SystemNode[]; edges: DataFlowEdge[]; notes?: string; artifacts?: OutputArtifact[] }
     const nodes = canvas.nodes ?? []
     let edges = canvas.edges ?? []
 
@@ -711,6 +791,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       },
       nodes,
       edges,
+      artifacts: canvas.artifacts ?? [],
       selectedNodeId: null,
       selectedEdgeId: null,
     })
