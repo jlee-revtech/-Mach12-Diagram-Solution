@@ -612,6 +612,113 @@ const TECHNICAL_PROPERTY_PRESETS = [
   'Format',
 ]
 
+// ─── Connection Header (source/target + copy/paste) ────
+function ConnectionHeader({ edgeId }: { edgeId: string }) {
+  const edges = useDiagramStore((s) => s.edges)
+  const nodes = useDiagramStore((s) => s.nodes)
+  const updateEdgeEndpoint = useDiagramStore((s) => s.updateEdgeEndpoint)
+  const copyEdgeData = useDiagramStore((s) => s.copyEdgeData)
+  const pasteEdgeData = useDiagramStore((s) => s.pasteEdgeData)
+  const copiedEdgeData = useDiagramStore((s) => s.copiedEdgeData)
+  const setSelectedEdge = useDiagramStore((s) => s.setSelectedEdge)
+
+  const edge = edges.find((e) => e.id === edgeId)
+  if (!edge) return null
+
+  const srcNode = nodes.find((n) => n.id === edge.source)
+  const tgtNode = nodes.find((n) => n.id === edge.target)
+
+  return (
+    <div className="mb-4 space-y-3">
+      <SidebarLabel>Connection</SidebarLabel>
+
+      {/* Source dropdown */}
+      <div>
+        <label className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          Source
+        </label>
+        <select
+          value={edge.source}
+          onChange={(e) => updateEdgeEndpoint(edgeId, 'source', e.target.value)}
+          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#06B6D4] transition-colors"
+        >
+          {nodes.map((n) => (
+            <option key={n.id} value={n.id} disabled={n.id === edge.target}>
+              {n.data.label}{n.data.physicalSystem ? ` (${n.data.physicalSystem})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Direction indicator */}
+      <div className="flex items-center justify-center">
+        <div className="flex items-center gap-2 text-[#64748B]">
+          <div className="h-px w-8 bg-[#374A5E]" />
+          <span className="text-xs">{edge.data?.direction === 'bidirectional' ? '↕' : '↓'}</span>
+          <div className="h-px w-8 bg-[#374A5E]" />
+        </div>
+      </div>
+
+      {/* Target dropdown */}
+      <div>
+        <label className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          Target
+        </label>
+        <select
+          value={edge.target}
+          onChange={(e) => updateEdgeEndpoint(edgeId, 'target', e.target.value)}
+          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#06B6D4] transition-colors"
+        >
+          {nodes.map((n) => (
+            <option key={n.id} value={n.id} disabled={n.id === edge.source}>
+              {n.data.label}{n.data.physicalSystem ? ` (${n.data.physicalSystem})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Copy / Paste buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => copyEdgeData(edgeId)}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-[#151E2E] hover:bg-[#1F2C3F] border border-[#374A5E]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-1.5 text-xs text-[#94A3B8] hover:text-[#06B6D4] transition-all"
+          title="Copy data elements (Ctrl+C)"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.5"/>
+          </svg>
+          Copy Data
+        </button>
+        <button
+          onClick={() => { pasteEdgeData(edgeId) }}
+          disabled={!copiedEdgeData}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-[#151E2E] hover:bg-[#1F2C3F] border border-[#374A5E]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-1.5 text-xs text-[#94A3B8] hover:text-[#06B6D4] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[#374A5E]/40 disabled:hover:text-[#94A3B8]"
+          title="Paste data elements (Ctrl+V)"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <path d="M10 2h1.5A1.5 1.5 0 0113 3.5v9a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 12.5v-9A1.5 1.5 0 014.5 2H6" stroke="currentColor" strokeWidth="1.5"/>
+            <rect x="6" y="1" width="4" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+          </svg>
+          Paste Data
+        </button>
+      </div>
+
+      {/* Copied indicator */}
+      {copiedEdgeData && (
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-[#06B6D4]/5 border border-[#06B6D4]/20 rounded-md">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
+          <span className="text-[9px] text-[#06B6D4]/80 font-[family-name:var(--font-space-mono)]">
+            {copiedEdgeData.dataElements.length} element{copiedEdgeData.dataElements.length !== 1 ? 's' : ''} on clipboard
+          </span>
+        </div>
+      )}
+
+      <div className="border-b border-[#374A5E]/30" />
+    </div>
+  )
+}
+
 // ─── Elements Tab ───────────────────────────────────────
 function ElementsTab() {
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
@@ -673,6 +780,7 @@ function ElementsTab() {
 
   return (
     <div>
+      <ConnectionHeader edgeId={selectedEdge.id} />
       <SidebarLabel>Data Elements</SidebarLabel>
       <p className="text-[11px] text-[#64748B] mb-4">
         Data elements flowing through this connection.

@@ -13,6 +13,7 @@ import { getDiagram, saveDiagram as saveDiagramApi } from '@/lib/supabase/diagra
 import type {
   SystemNode,
   DataFlowEdge,
+  DataFlowData,
   SystemType,
   DataElement,
   DataObjectAttribute,
@@ -36,11 +37,19 @@ interface DiagramState {
   onNodesChange: (changes: NodeChange<SystemNode>[]) => void
   onEdgesChange: (changes: EdgeChange<DataFlowEdge>[]) => void
   onConnect: (connection: Connection) => void
+  // Edge reconnection (drag endpoint to new node)
+  onReconnect: (oldEdge: DataFlowEdge, newConnection: Connection) => void
   // System node actions
   addSystem: (type: SystemType, label: string, position: XYPosition) => string
   updateSystemLabel: (nodeId: string, label: string) => void
   updateSystemPhysical: (nodeId: string, physicalSystem: string) => void
   deleteSelected: () => void
+  // Edge endpoint editing (sidebar dropdowns)
+  updateEdgeEndpoint: (edgeId: string, endpoint: 'source' | 'target', newNodeId: string) => void
+  // Edge data copy/paste
+  copiedEdgeData: DataFlowData | null
+  copyEdgeData: (edgeId: string) => void
+  pasteEdgeData: (edgeId: string) => void
   // Data element actions
   addDataElement: (edgeId: string, element: Omit<DataElement, 'id'>) => void
   updateDataElement: (edgeId: string, elementId: string, updates: Partial<DataElement>) => void
@@ -112,6 +121,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   spotlightEdgeIds: new Set<string>(),
   spotlightNodeIds: new Set<string>(),
   spotlightArtifactId: null,
+  copiedEdgeData: null,
   connectMode: false,
   pendingConnectionSource: null,
 
@@ -136,6 +146,96 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       },
     }
     set({ edges: addEdge(newEdge, get().edges) as DataFlowEdge[] })
+  },
+
+  onReconnect: (oldEdge, newConnection) => {
+    // Replace the old edge with the reconnected one, preserving all data
+    set({
+      edges: get().edges.map((e) =>
+        e.id === oldEdge.id
+          ? {
+              ...e,
+              source: newConnection.source,
+              target: newConnection.target,
+              sourceHandle: newConnection.sourceHandle ?? e.sourceHandle,
+              targetHandle: newConnection.targetHandle ?? e.targetHandle,
+            }
+          : e
+      ),
+    })
+  },
+
+  // ─── Edge Endpoint Editing (sidebar) ──────────────────
+  updateEdgeEndpoint: (edgeId, endpoint, newNodeId) => {
+    const { edges, nodes } = get()
+    const edge = edges.find((e) => e.id === edgeId)
+    if (!edge) return
+    // Don't allow self-loops
+    const otherEnd = endpoint === 'source' ? edge.target : edge.source
+    if (newNodeId === otherEnd) return
+    // Recalculate best handles for new layout
+    const srcId = endpoint === 'source' ? newNodeId : edge.source
+    const tgtId = endpoint === 'target' ? newNodeId : edge.target
+    const srcNode = nodes.find((n) => n.id === srcId)
+    const tgtNode = nodes.find((n) => n.id === tgtId)
+    if (!srcNode || !tgtNode) return
+    const dx = tgtNode.position.x - srcNode.position.x
+    const dy = tgtNode.position.y - srcNode.position.y
+    let sourceHandle: string
+    let targetHandle: string
+    if (Math.abs(dx) > Math.abs(dy)) {
+      sourceHandle = dx > 0 ? 'right-s2' : 'left-s2'
+      targetHandle = dx > 0 ? 'left-t1' : 'right-t1'
+    } else {
+      sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
+      targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
+    }
+    set({
+      edges: edges.map((e) =>
+        e.id === edgeId
+          ? { ...e, source: srcId, target: tgtId, sourceHandle, targetHandle }
+          : e
+      ),
+    })
+  },
+
+  // ─── Edge Data Copy/Paste ─────────────────────────────
+  copyEdgeData: (edgeId) => {
+    const edge = get().edges.find((e) => e.id === edgeId)
+    if (!edge?.data) return
+    // Deep clone the data, assigning new IDs so paste creates independent copies
+    const cloned: DataFlowData = {
+      ...edge.data,
+      dataElements: edge.data.dataElements.map((el) => ({
+        ...el,
+        id: uuid(),
+        attributes: el.attributes?.map((a) => ({ ...a, id: uuid() })),
+        technicalProperties: el.technicalProperties?.map((p) => ({ ...p, id: uuid() })),
+      })),
+    }
+    set({ copiedEdgeData: cloned })
+  },
+
+  pasteEdgeData: (edgeId) => {
+    const { copiedEdgeData, edges } = get()
+    if (!copiedEdgeData) return
+    // Re-generate IDs for each paste so multiple pastes produce unique elements
+    const freshData: DataFlowData = {
+      ...copiedEdgeData,
+      dataElements: copiedEdgeData.dataElements.map((el) => ({
+        ...el,
+        id: uuid(),
+        attributes: el.attributes?.map((a) => ({ ...a, id: uuid() })),
+        technicalProperties: el.technicalProperties?.map((p) => ({ ...p, id: uuid() })),
+      })),
+    }
+    set({
+      edges: edges.map((e) =>
+        e.id === edgeId && e.data
+          ? { ...e, data: { ...freshData, label: e.data.label } }
+          : e
+      ),
+    })
   },
 
   // ─── System Node Actions ──────────────────────────────

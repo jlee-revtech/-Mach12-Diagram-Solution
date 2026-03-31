@@ -8,7 +8,7 @@ const awarenessProtocol = require('y-protocols/awareness')
 const encoding = require('lib0/encoding')
 const decoding = require('lib0/decoding')
 
-const PORT = process.env.WS_PORT || 1234
+const PORT = process.env.PORT || process.env.WS_PORT || 1234
 
 // Store docs in memory
 const docs = new Map()

@@ -45,9 +45,23 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const deleteSelected = useDiagramStore((s) => s.deleteSelected)
   const loadDiagram = useDiagramStore((s) => s.loadDiagram)
   const meta = useDiagramStore((s) => s.meta)
+  const onReconnect = useDiagramStore((s) => s.onReconnect)
+  const copyEdgeData = useDiagramStore((s) => s.copyEdgeData)
+  const pasteEdgeData = useDiagramStore((s) => s.pasteEdgeData)
   const connectMode = useDiagramStore((s) => s.connectMode)
   const toggleConnectMode = useDiagramStore((s) => s.toggleConnectMode)
   const pendingConnectionSource = useDiagramStore((s) => s.pendingConnectionSource)
+
+  // Track reconnect in progress for visual feedback
+  const [reconnecting, setReconnecting] = useState(false)
+  // Toast for copy/paste feedback
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => setToast(null), 2000)
+  }, [])
 
   // Load diagram from Supabase, then seed Yjs
   useEffect(() => {
@@ -111,6 +125,26 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         setAiOpen((prev) => !prev)
         return
       }
+      // Ctrl+C — copy selected edge data
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        const edgeId = useDiagramStore.getState().selectedEdgeId
+        if (edgeId) {
+          e.preventDefault()
+          copyEdgeData(edgeId)
+          showToast('Connection data copied')
+        }
+        return
+      }
+      // Ctrl+V — paste edge data onto selected edge
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        const { selectedEdgeId, copiedEdgeData } = useDiagramStore.getState()
+        if (selectedEdgeId && copiedEdgeData) {
+          e.preventDefault()
+          pasteEdgeData(selectedEdgeId)
+          showToast('Connection data pasted')
+        }
+        return
+      }
       if (e.key === 'Escape' && connectMode) {
         e.preventDefault()
         toggleConnectMode()
@@ -129,7 +163,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [deleteSelected, connectMode, toggleConnectMode])
+  }, [deleteSelected, connectMode, toggleConnectMode, copyEdgeData, pasteEdgeData, showToast])
 
   const handlePaneClick = useCallback(() => {
     setSelectedNode(null)
@@ -194,6 +228,26 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         <OnboardingGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
         <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} />
 
+        {/* Toast notification */}
+        {toast && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#06B6D4]/15 backdrop-blur-sm border border-[#06B6D4]/40 rounded-lg px-4 py-2 shadow-lg animate-in fade-in slide-in-from-bottom-2">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M3 7l3 3 5-6" stroke="#06B6D4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-xs text-[#67E8F9] font-medium">{toast}</span>
+          </div>
+        )}
+
+        {/* Reconnect mode indicator */}
+        {reconnecting && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-[#06B6D4]/15 backdrop-blur-sm border border-[#06B6D4]/40 rounded-lg px-4 py-2 shadow-lg animate-in fade-in">
+            <div className="w-2 h-2 rounded-full bg-[#06B6D4] animate-pulse" />
+            <span className="text-xs text-[#67E8F9] font-medium">
+              Drop on a system to reconnect
+            </span>
+          </div>
+        )}
+
         {/* Connect mode status banner */}
         {connectMode && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-[#2563EB]/15 backdrop-blur-sm border border-[#2563EB]/40 rounded-lg px-4 py-2 shadow-lg animate-in fade-in">
@@ -218,6 +272,9 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onReconnect={onReconnect}
+          onReconnectStart={() => setReconnecting(true)}
+          onReconnectEnd={() => setReconnecting(false)}
           onPaneClick={handlePaneClick}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -229,7 +286,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           snapToGrid
           snapGrid={[16, 16]}
           connectionMode={ConnectionMode.Loose}
-          connectionLineStyle={{ stroke: '#2563EB', strokeWidth: 2.5, strokeDasharray: '6 3' }}
+          connectionLineStyle={{ stroke: reconnecting ? '#06B6D4' : '#2563EB', strokeWidth: 2.5, strokeDasharray: '6 3' }}
           proOptions={{ hideAttribution: true }}
           className="!bg-[#151E2E]"
         >
