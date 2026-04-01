@@ -372,7 +372,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       id,
       type: 'systemGroup',
       position,
-      style: { width: 500, height: 400 },
+      zIndex: -1,
+      style: { width: 500, height: 400, pointerEvents: 'none' as const },
+      focusable: false,
       data: { label, color: color || '#374A5E' },
     }
     set({ groups: [...get().groups, newGroup] })
