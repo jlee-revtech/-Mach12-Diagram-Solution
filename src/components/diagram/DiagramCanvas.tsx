@@ -30,7 +30,7 @@ const nodeTypes = { system: SystemNodeComponent, systemGroup: GroupNodeComponent
 const edgeTypes = { dataFlow: DataFlowEdgeComponent }
 
 // Static CSS for group node pointer-events — outside render to avoid style recalc per frame
-const GROUP_NODE_STYLE = `.react-flow__node-systemGroup { pointer-events: none !important; }`
+const GROUP_NODE_STYLE = `.react-flow__node-systemGroup { pointer-events: none !important; } .react-flow__node-systemGroup .react-flow__handle { pointer-events: auto !important; }`
 
 function ArtifactSpotlightBar() {
   const artifacts = useDiagramStore((s) => s.artifacts)

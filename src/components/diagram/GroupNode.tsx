@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useCallback } from 'react'
-import { NodeResizer, type NodeProps } from '@xyflow/react'
+import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react'
 import type { SystemGroupData } from '@/lib/diagram/types'
 import { useDiagramStore } from '@/lib/diagram/store'
 
@@ -103,6 +103,34 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
           style={{ pointerEvents: 'auto' }}
           className="absolute top-0 -right-2 bottom-0 w-5 cursor-pointer"
         />
+
+        {/* Connection handles — visible on hover/selection, positioned on borders */}
+        <div style={{ pointerEvents: 'auto' }} className={`${isSelected ? 'opacity-100' : 'opacity-0 hover:opacity-100'} transition-opacity`}>
+          <Handle type="source" position={Position.Top} id="grp-top-s"
+            className="!border-2 !rounded-full !w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
+            style={{ left: '50%', top: -6, pointerEvents: 'auto' }} />
+          <Handle type="target" position={Position.Top} id="grp-top-t"
+            className="!border-2 !rounded-full !w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
+            style={{ left: '40%', top: -6, pointerEvents: 'auto' }} />
+          <Handle type="source" position={Position.Bottom} id="grp-bot-s"
+            className="!border-2 !rounded-full !w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
+            style={{ left: '50%', bottom: -6, top: 'auto', pointerEvents: 'auto' }} />
+          <Handle type="target" position={Position.Bottom} id="grp-bot-t"
+            className="!border-2 !rounded-full !w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
+            style={{ left: '40%', bottom: -6, top: 'auto', pointerEvents: 'auto' }} />
+          <Handle type="source" position={Position.Left} id="grp-left-s"
+            className="!border-2 !rounded-full !w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
+            style={{ top: '50%', left: -6, pointerEvents: 'auto' }} />
+          <Handle type="target" position={Position.Left} id="grp-left-t"
+            className="!border-2 !rounded-full !w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
+            style={{ top: '40%', left: -6, pointerEvents: 'auto' }} />
+          <Handle type="source" position={Position.Right} id="grp-right-s"
+            className="!border-2 !rounded-full !w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
+            style={{ top: '50%', right: -6, left: 'auto', pointerEvents: 'auto' }} />
+          <Handle type="target" position={Position.Right} id="grp-right-t"
+            className="!border-2 !rounded-full !w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
+            style={{ top: '40%', right: -6, left: 'auto', pointerEvents: 'auto' }} />
+        </div>
 
         {/* Group label — top-left badge (always clickable) */}
         <div

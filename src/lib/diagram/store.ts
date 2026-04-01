@@ -849,36 +849,43 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   handleConnectModeClick: (nodeId: string) => {
-    const { pendingConnectionSource, nodes, pushUndo } = get()
+    const { pendingConnectionSource, nodes, groups, pushUndo } = get()
     if (!pendingConnectionSource) {
-      // First click — set as source
       set({ pendingConnectionSource: nodeId })
       return
     }
     if (pendingConnectionSource === nodeId) {
-      // Clicked same node — cancel
       set({ pendingConnectionSource: null })
       return
     }
-    // Second click — pick best handles based on relative position
-    const sourceNode = nodes.find((n) => n.id === pendingConnectionSource)
-    const targetNode = nodes.find((n) => n.id === nodeId)
+    // Search both system nodes and groups for source/target
+    const allNodes = [...nodes, ...groups]
+    const sourceNode = allNodes.find((n) => n.id === pendingConnectionSource)
+    const targetNode = allNodes.find((n) => n.id === nodeId)
     if (!sourceNode || !targetNode) {
       set({ pendingConnectionSource: null })
       return
     }
     const dx = targetNode.position.x - sourceNode.position.x
     const dy = targetNode.position.y - sourceNode.position.y
+    const srcIsGroup = sourceNode.type === 'systemGroup'
+    const tgtIsGroup = targetNode.type === 'systemGroup'
     let sourceHandle: string
     let targetHandle: string
     if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal: source's right → target's left, or vice versa
-      sourceHandle = dx > 0 ? 'right-s2' : 'left-s2'
-      targetHandle = dx > 0 ? 'left-t1' : 'right-t1'
+      sourceHandle = dx > 0
+        ? (srcIsGroup ? 'grp-right-s' : 'right-s2')
+        : (srcIsGroup ? 'grp-left-s' : 'left-s2')
+      targetHandle = dx > 0
+        ? (tgtIsGroup ? 'grp-left-t' : 'left-t1')
+        : (tgtIsGroup ? 'grp-right-t' : 'right-t1')
     } else {
-      // Vertical: source's bottom → target's top, or vice versa
-      sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
-      targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
+      sourceHandle = dy > 0
+        ? (srcIsGroup ? 'grp-bot-s' : 'bot-s2')
+        : (srcIsGroup ? 'grp-top-s' : 'top-s2')
+      targetHandle = dy > 0
+        ? (tgtIsGroup ? 'grp-top-t' : 'top-t1')
+        : (tgtIsGroup ? 'grp-bot-t' : 'bot-t1')
     }
     pushUndo()
     const newEdge: DataFlowEdge = {
