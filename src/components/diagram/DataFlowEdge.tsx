@@ -263,12 +263,12 @@ function DataFlowEdgeComponent({
             className={selected ? 'nopan' : ''}
           >
             <div
-              className={`bg-[#1F2C3F] border rounded-lg px-3 py-2 shadow-lg transition-all ${
+              className={`bg-[#0F172A]/90 backdrop-blur-sm border-l-2 border rounded-lg px-3 py-2 shadow-lg transition-all ${
                 dragging
-                  ? 'border-[#06B6D4] shadow-[0_0_16px_rgba(6,182,212,0.3)] scale-[1.02]'
+                  ? 'border-[#06B6D4] border-l-[#06B6D4] shadow-[0_0_16px_rgba(6,182,212,0.3)] scale-[1.02]'
                   : highlight
-                    ? 'border-[#06B6D4] shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                    : 'border-[#374A5E]/60 hover:border-[#374A5E]'
+                    ? 'border-[#06B6D4]/60 border-l-[#06B6D4] shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                    : 'border-[#374A5E]/40 border-l-[#64748B] hover:border-[#374A5E]/60'
               }`}
             >
               {/* Drag indicator when selected */}
@@ -349,7 +349,7 @@ function DataFlowEdgeComponent({
             className={selected ? 'nopan' : ''}
           >
             <div
-              className={`bg-[#1F2C3F]/80 border border-dashed rounded-md px-2 py-1 transition-all ${
+              className={`bg-[#0F172A]/80 border border-dashed rounded-md px-2 py-1 transition-all ${
                 dragging
                   ? 'border-[#06B6D4]'
                   : selected ? 'border-[#06B6D4]' : 'border-[#374A5E] hover:border-[#64748B]'
