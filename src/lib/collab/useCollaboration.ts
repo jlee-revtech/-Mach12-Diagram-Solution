@@ -21,6 +21,7 @@ export function useCollaboration(diagramId: string | undefined, userName: string
   const docRef = useRef<Y.Doc | null>(null)
   const providerRef = useRef<WebsocketProvider | null>(null)
   const suppressSync = useRef(false)
+  const lastYjsFingerprintRef = useRef('')
 
   const wsUrl = process.env.NEXT_PUBLIC_WS_URL
 
@@ -78,7 +79,12 @@ export function useCollaboration(diagramId: string | undefined, userName: string
       const nodes = yNodes.toArray().map((yNode) => yNode.toJSON()) as unknown as SystemNode[]
       const edges = yEdges.toArray().map((yEdge) => yEdge.toJSON()) as unknown as DataFlowEdge[]
 
-      useDiagramStore.setState({ nodes, edges })
+      // Only update store if data actually changed — prevents echo loops
+      const fp = JSON.stringify({ n: nodes, e: edges })
+      if (fp !== lastYjsFingerprintRef.current) {
+        lastYjsFingerprintRef.current = fp
+        useDiagramStore.setState({ nodes, edges })
+      }
 
       // Keep suppressed briefly to prevent echo loop
       setTimeout(() => { suppressSync.current = false }, 200)
@@ -105,6 +111,9 @@ export function useCollaboration(diagramId: string | undefined, userName: string
 
     suppressSync.current = true
     const { nodes, edges } = useDiagramStore.getState()
+
+    // Update fingerprint so syncFromYjs won't echo this data back
+    lastYjsFingerprintRef.current = JSON.stringify({ n: nodes, e: edges })
 
     const yNodes = doc.getArray<Y.Map<unknown>>('nodes')
     const yEdges = doc.getArray<Y.Map<unknown>>('edges')

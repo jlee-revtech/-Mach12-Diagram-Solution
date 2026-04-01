@@ -29,6 +29,9 @@ import { PresenceBadge, RemoteCursors } from './CollabPresence'
 const nodeTypes = { system: SystemNodeComponent, systemGroup: GroupNodeComponent }
 const edgeTypes = { dataFlow: DataFlowEdgeComponent }
 
+// Static CSS for group node pointer-events — outside render to avoid style recalc per frame
+const GROUP_NODE_STYLE = `.react-flow__node-systemGroup { pointer-events: none !important; }`
+
 function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const { user, profile } = useAuth()
   const [aiOpen, setAiOpen] = useState(false)
@@ -45,17 +48,31 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const nodes = useMemo(() => [...groups as any[], ...systemNodes], [groups, systemNodes])
 
   // Split node changes by type: group changes update groups array, system changes update nodes
-  const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups])
+  const groupIdsRef = useRef(new Set<string>())
+  groupIdsRef.current = new Set(groups.map((g) => g.id))
   const handleNodesChange = useCallback((changes: NodeChange<any>[]) => {
-    const systemChanges = changes.filter((c) => !('id' in c && groupIds.has((c as any).id)))
-    const groupChanges = changes.filter((c) => 'id' in c && groupIds.has((c as any).id))
+    const gids = groupIdsRef.current
+    const systemChanges: NodeChange<any>[] = []
+    const groupChanges: NodeChange<any>[] = []
+    for (const c of changes) {
+      if ('id' in c && gids.has((c as any).id)) {
+        groupChanges.push(c)
+      } else {
+        systemChanges.push(c)
+      }
+    }
+    // Batch into a single setState to avoid double re-render
+    const updates: Record<string, any> = {}
     if (systemChanges.length > 0) {
-      useDiagramStore.setState({ nodes: applyNodeChanges(systemChanges, useDiagramStore.getState().nodes) as any })
+      updates.nodes = applyNodeChanges(systemChanges, useDiagramStore.getState().nodes)
     }
     if (groupChanges.length > 0) {
-      useDiagramStore.setState({ groups: applyNodeChanges(groupChanges, useDiagramStore.getState().groups) as any })
+      updates.groups = applyNodeChanges(groupChanges, useDiagramStore.getState().groups)
     }
-  }, [groupIds])
+    if (Object.keys(updates).length > 0) {
+      useDiagramStore.setState(updates)
+    }
+  }, [])
   const onEdgesChange = useDiagramStore((s) => s.onEdgesChange)
   const onConnect = useDiagramStore((s) => s.onConnect)
   const setSelectedNode = useDiagramStore((s) => s.setSelectedNode)
@@ -298,7 +315,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         )}
 
         {/* Override pointer-events for group nodes so clicks pass through to edges/labels */}
-        <style>{`.react-flow__node-systemGroup { pointer-events: none !important; }`}</style>
+        <style dangerouslySetInnerHTML={{ __html: GROUP_NODE_STYLE }} />
         <ReactFlow
           nodes={nodes}
           edges={edges}
