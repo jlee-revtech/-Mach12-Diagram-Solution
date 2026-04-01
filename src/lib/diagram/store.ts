@@ -25,6 +25,15 @@ import type {
 } from './types'
 
 
+// ─── Undo History ───────────────────────────────────────
+interface DiagramSnapshot {
+  nodes: SystemNode[]
+  edges: DataFlowEdge[]
+  groups: SystemGroupNode[]
+  artifacts: OutputArtifact[]
+}
+const MAX_UNDO = 20
+
 // ─── Store Interface ────────────────────────────────────
 interface DiagramState {
   // Diagram metadata
@@ -113,6 +122,11 @@ interface DiagramState {
   setTitle: (title: string) => void
   setProcessContext: (context: string) => void
   setNotes: (notes: string) => void
+  // Undo
+  undoStack: DiagramSnapshot[]
+  pushUndo: () => void
+  undo: () => void
+  canUndo: boolean
   // Persistence (Supabase)
   saveDiagram: (userId: string) => Promise<void>
   loadDiagram: (id: string) => Promise<boolean>
@@ -143,6 +157,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   spotlightNodeIds: new Set<string>(),
   spotlightArtifactId: null,
   copiedEdgeData: null,
+  undoStack: [],
+  canUndo: false,
   connectMode: false,
   pendingConnectionSource: null,
 
@@ -156,6 +172,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   onConnect: (connection) => {
+    get().pushUndo()
     const newEdge: DataFlowEdge = {
       ...connection,
       id: `edge-${uuid()}`,
@@ -170,6 +187,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   onReconnect: (oldEdge, newConnection) => {
+    get().pushUndo()
     // Replace the old edge with the reconnected one, preserving all data
     set({
       edges: get().edges.map((e) =>
@@ -199,6 +217,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── Edge Endpoint Editing (sidebar) ──────────────────
   updateEdgeEndpoint: (edgeId, endpoint, newNodeId) => {
+    get().pushUndo()
     const { edges, nodes } = get()
     const edge = edges.find((e) => e.id === edgeId)
     if (!edge) return
@@ -249,6 +268,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   pasteEdgeData: (edgeId) => {
+    get().pushUndo()
     const { copiedEdgeData, edges } = get()
     if (!copiedEdgeData) return
     // Re-generate IDs for each paste so multiple pastes produce unique elements
@@ -272,6 +292,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── System Node Actions ──────────────────────────────
   addSystem: (type, label, position) => {
+    get().pushUndo()
     const id = `system-${uuid()}`
     const newNode: SystemNode = {
       id,
@@ -300,6 +321,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   deleteSelected: () => {
+    get().pushUndo()
     const { selectedNodeId, selectedEdgeId, selectedGroupId, nodes, edges, groups } = get()
     if (selectedGroupId) {
       set({
@@ -324,6 +346,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── Module Actions ───────────────────────────────────
   addModule: (nodeId, module) => {
+    get().pushUndo()
     set({
       nodes: get().nodes.map((n) =>
         n.id === nodeId && n.type === 'system'
@@ -334,6 +357,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   removeModule: (nodeId, moduleId) => {
+    get().pushUndo()
     set({
       nodes: get().nodes.map((n) =>
         n.id === nodeId && n.type === 'system'
@@ -367,6 +391,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── System Group Actions ────────────────────────────
   addGroup: (label, position, color) => {
+    get().pushUndo()
     const id = `group-${uuid()}`
     const newGroup: SystemGroupNode = {
       id,
@@ -399,6 +424,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── Data Element Actions ─────────────────────────────
   addDataElement: (edgeId, element) => {
+    get().pushUndo()
     set({
       edges: get().edges.map((e) =>
         e.id === edgeId && e.data
@@ -436,6 +462,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   removeDataElement: (edgeId, elementId) => {
+    get().pushUndo()
     set({
       edges: get().edges.map((e) =>
         e.id === edgeId && e.data
@@ -454,6 +481,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   reorderDataElements: (edgeId, fromIndex, toIndex) => {
+    get().pushUndo()
     set({
       edges: get().edges.map((e) => {
         if (e.id !== edgeId || !e.data) return e
@@ -555,10 +583,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── Diagram-Level Artifacts ───────────────────────────
   addArtifact: (artifact) => {
+    get().pushUndo()
     set({ artifacts: [...get().artifacts, { ...artifact, id: uuid() }] })
   },
 
   removeArtifact: (artifactId) => {
+    get().pushUndo()
     // Remove from diagram list and untag from all edges + elements
     set({
       artifacts: get().artifacts.filter((a) => a.id !== artifactId),
@@ -756,7 +786,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   handleConnectModeClick: (nodeId: string) => {
-    const { pendingConnectionSource, nodes } = get()
+    const { pendingConnectionSource, nodes, pushUndo } = get()
     if (!pendingConnectionSource) {
       // First click — set as source
       set({ pendingConnectionSource: nodeId })
@@ -787,6 +817,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
       targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
     }
+    pushUndo()
     const newEdge: DataFlowEdge = {
       id: `edge-${uuid()}`,
       type: 'dataFlow',
@@ -830,6 +861,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   autoLayout: () => {
     const { nodes, edges } = get()
     if (nodes.length === 0) return
+    get().pushUndo()
 
     const NODE_W = 240
     const NODE_H = 100
@@ -966,6 +998,37 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     })
 
     set({ nodes: updatedNodes, edges: updatedEdges })
+  },
+
+  // ─── Undo ─────────────────────────────────────────────
+  pushUndo: () => {
+    const { nodes, edges, groups, artifacts, undoStack } = get()
+    const snapshot: DiagramSnapshot = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+      groups: JSON.parse(JSON.stringify(groups)),
+      artifacts: JSON.parse(JSON.stringify(artifacts)),
+    }
+    const newStack = [...undoStack, snapshot].slice(-MAX_UNDO)
+    set({ undoStack: newStack, canUndo: true })
+  },
+
+  undo: () => {
+    const { undoStack } = get()
+    if (undoStack.length === 0) return
+    const prev = undoStack[undoStack.length - 1]
+    const newStack = undoStack.slice(0, -1)
+    set({
+      nodes: prev.nodes,
+      edges: prev.edges,
+      groups: prev.groups,
+      artifacts: prev.artifacts,
+      undoStack: newStack,
+      canUndo: newStack.length > 0,
+      selectedNodeId: null,
+      selectedEdgeId: null,
+      selectedGroupId: null,
+    })
   },
 
   // ─── Diagram Meta ─────────────────────────────────────

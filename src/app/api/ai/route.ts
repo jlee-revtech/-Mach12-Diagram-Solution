@@ -79,6 +79,8 @@ export async function POST(req: NextRequest) {
       return handleSuggest(context)
     } else if (action === 'analyze') {
       return handleAnalyze(context)
+    } else if (action === 'implement') {
+      return handleImplement(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -224,6 +226,90 @@ No markdown, just JSON.`,
     json = JSON.parse(cleaned)
   } catch {
     return NextResponse.json({ error: 'Failed to parse analysis', raw: text }, { status: 500 })
+  }
+
+  return NextResponse.json(json)
+}
+
+async function handleImplement(context: {
+  systems: { id: string; label: string; systemType: string; physicalSystem?: string }[]
+  flows: { id: string; source: string; target: string; dataElements: { name: string; elementType?: string }[] }[]
+  processContext?: string
+  analysis: {
+    missingSystems?: string[]
+    missingFlows?: string[]
+    dataGovernance?: string[]
+    recommendations?: string[]
+  }
+}) {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `You are updating an existing data architecture diagram based on analysis recommendations. The current diagram has these systems and flows. Implement the recommendations by adding new systems and data flows.
+
+IMPORTANT RULES:
+- Only ADD new systems and flows. Do NOT include existing systems or flows in your response.
+- For new flows, the "source" and "target" must reference system IDs. Use existing system IDs (listed below) for connections to existing systems, and your new system IDs for new systems.
+- Position new systems logically relative to the existing layout.
+
+EXISTING SYSTEMS:
+${JSON.stringify(context.systems, null, 2)}
+
+EXISTING FLOWS:
+${JSON.stringify(context.flows, null, 2)}
+
+${context.processContext ? `Process Context: ${context.processContext}` : ''}
+
+ANALYSIS RECOMMENDATIONS TO IMPLEMENT:
+- Missing Systems: ${JSON.stringify(context.analysis.missingSystems ?? [])}
+- Missing Data Flows: ${JSON.stringify(context.analysis.missingFlows ?? [])}
+- Data Governance: ${JSON.stringify(context.analysis.dataGovernance ?? [])}
+- Recommendations: ${JSON.stringify(context.analysis.recommendations ?? [])}
+
+Return ONLY valid JSON with new systems and flows to ADD to the diagram. Use this schema:
+{
+  "systems": [
+    {
+      "id": "new-system-1",
+      "label": "System Name",
+      "systemType": "erp|crm|plm|scm|middleware|database|data_warehouse|analytics|cloud|legacy|custom",
+      "physicalSystem": "e.g., SAP S/4HANA",
+      "position": { "x": number, "y": number }
+    }
+  ],
+  "flows": [
+    {
+      "id": "new-flow-1",
+      "source": "existing-system-id OR new-system-id",
+      "target": "existing-system-id OR new-system-id",
+      "direction": "forward|bidirectional",
+      "dataElements": [
+        {
+          "name": "Data Element Name",
+          "elementType": "transaction|master_data|document|event|data_object|custom",
+          "attributes": [{"name": "attr name"}]
+        }
+      ]
+    }
+  ]
+}
+
+No markdown, just JSON.`,
+      },
+    ],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  let json
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    json = JSON.parse(cleaned)
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse implementation', raw: text }, { status: 500 })
   }
 
   return NextResponse.json(json)

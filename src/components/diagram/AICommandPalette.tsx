@@ -18,6 +18,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
   const [analysis, setAnalysis] = useState<any>(null)
   const [imageData, setImageData] = useState<string | null>(null)
   const [imageName, setImageName] = useState<string | null>(null)
+  const [implementing, setImplementing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -202,6 +203,140 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
     }
   }, [nodes, edges, meta])
 
+  const handleImplement = useCallback(async () => {
+    if (!analysis) return
+    setImplementing(true)
+    setError(null)
+
+    try {
+      // Build context with existing system IDs so AI can reference them for new flows
+      const context = {
+        systems: nodes.map((n) => ({
+          id: n.id,
+          label: n.data.label,
+          systemType: n.data.systemType,
+          physicalSystem: n.data.physicalSystem,
+        })),
+        flows: edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          dataElements: (e.data?.dataElements || []).map((el) => ({
+            name: el.name,
+            elementType: el.elementType,
+          })),
+        })),
+        processContext: meta.processContext,
+        analysis: {
+          missingSystems: analysis.missingSystems,
+          missingFlows: analysis.missingFlows,
+          dataGovernance: analysis.dataGovernance,
+          recommendations: analysis.recommendations,
+        },
+      }
+
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'implement', context }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Implementation failed')
+
+      // Push undo before applying changes
+      const store = useDiagramStore.getState()
+      store.pushUndo()
+
+      // Map AI's new system IDs → real React Flow node IDs
+      // Also build a lookup that includes existing system IDs
+      const nodeIdMap: Record<string, string> = {}
+      // Existing nodes: their IDs pass through directly
+      for (const n of store.nodes) {
+        nodeIdMap[n.id] = n.id
+      }
+      const nodePositions: Record<string, { x: number; y: number }> = {}
+      for (const n of store.nodes) {
+        nodePositions[n.id] = n.position
+      }
+
+      // Add new systems
+      for (const sys of data.systems || []) {
+        const id = `system-${uuid()}`
+        nodeIdMap[sys.id] = id
+        const pos = sys.position || { x: 100, y: 100 }
+        nodePositions[id] = pos
+        const newNode: SystemNode = {
+          id,
+          type: 'system',
+          position: pos,
+          data: {
+            label: sys.label,
+            systemType: sys.systemType || 'custom',
+            physicalSystem: sys.physicalSystem,
+          },
+        }
+        store.nodes.push(newNode)
+      }
+
+      // Add new flows
+      for (const flow of data.flows || []) {
+        const sourceId = nodeIdMap[flow.source]
+        const targetId = nodeIdMap[flow.target]
+        if (!sourceId || !targetId) continue
+
+        const srcPos = nodePositions[sourceId]
+        const tgtPos = nodePositions[targetId]
+        let sourceHandle = 'right-s2'
+        let targetHandle = 'left-t1'
+        if (srcPos && tgtPos) {
+          const dx = tgtPos.x - srcPos.x
+          const dy = tgtPos.y - srcPos.y
+          if (Math.abs(dx) > Math.abs(dy)) {
+            sourceHandle = dx > 0 ? 'right-s2' : 'left-s2'
+            targetHandle = dx > 0 ? 'left-t1' : 'right-t1'
+          } else {
+            sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
+            targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
+          }
+        }
+
+        const newEdge: DataFlowEdge = {
+          id: `edge-${uuid()}`,
+          source: sourceId,
+          target: targetId,
+          sourceHandle,
+          targetHandle,
+          type: 'dataFlow',
+          data: {
+            direction: flow.direction || 'forward',
+            dataElements: (flow.dataElements || []).map((el: any) => ({
+              id: uuid(),
+              name: el.name,
+              elementType: el.elementType || 'custom',
+              description: el.description,
+              attributes: el.elementType === 'data_object'
+                ? (el.attributes || []).map((a: any) => ({ id: uuid(), name: a.name }))
+                : undefined,
+            })),
+          },
+        }
+        store.edges.push(newEdge)
+      }
+
+      // Trigger re-render
+      useDiagramStore.setState({
+        nodes: [...store.nodes],
+        edges: [...store.edges],
+      })
+
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to implement recommendations')
+    } finally {
+      setImplementing(false)
+    }
+  }, [analysis, nodes, edges, meta, onClose])
+
   if (!open) return null
 
   return (
@@ -379,6 +514,43 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                 {analysis.recommendations?.length > 0 && (
                   <AnalysisSection title="Recommendations" items={analysis.recommendations} color="#10B981" />
                 )}
+
+                {/* Implement Recommendations */}
+                <div className="pt-3 border-t border-[#374A5E]/40 flex items-center gap-3">
+                  <button
+                    onClick={handleImplement}
+                    disabled={implementing}
+                    className="flex-1 flex items-center justify-center gap-2 bg-[#10B981] hover:bg-[#059669] disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+                  >
+                    {implementing ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Implementing...
+                      </>
+                    ) : (
+                      <>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M2 8.5l4 4 8-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Implement Recommendations
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={implementing || loading}
+                    title="Re-analyze"
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-[#374A5E]/40 text-[#64748B] hover:text-[#CBD5E1] hover:border-[#374A5E] transition-colors disabled:opacity-30"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M7 3L4 6l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-[10px] text-[#374A5E] text-center">
+                  AI will add missing systems and data flows to your diagram. You can undo with Ctrl+Z.
+                </p>
               </div>
             )}
 

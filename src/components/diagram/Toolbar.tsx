@@ -22,7 +22,10 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
   // shareOpen state removed — dialog now managed by parent (DiagramCanvas)
   const [saving, setSaving] = useState(false)
 
-  const hasSelection = selectedNodeId || selectedEdgeId
+  const undo = useDiagramStore((s) => s.undo)
+  const canUndo = useDiagramStore((s) => s.canUndo)
+  const selectedGroupId = useDiagramStore((s) => s.selectedGroupId)
+  const hasSelection = selectedNodeId || selectedEdgeId || selectedGroupId
 
   const handleSave = async () => {
     if (!user) return
@@ -60,6 +63,22 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
           <path d="M6 5h4M6 5l3-2M6 5l3 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
         </svg>
       </ToolbarButton>
+
+      <button
+        onClick={undo}
+        disabled={!canUndo}
+        title="Undo (Ctrl+Z)"
+        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
+          canUndo
+            ? 'text-[#CBD5E1] hover:bg-[#374A5E]/60 hover:text-[#F8FAFC]'
+            : 'text-[#374A5E] cursor-not-allowed'
+        }`}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M7 3L4 6l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
 
       <div className="w-px h-5 bg-[#374A5E] mx-1" />
 

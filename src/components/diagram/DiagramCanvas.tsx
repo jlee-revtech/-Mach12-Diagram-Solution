@@ -143,6 +143,13 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         setAiOpen((prev) => !prev)
         return
       }
+      // Ctrl+Z — undo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+        e.preventDefault()
+        useDiagramStore.getState().undo()
+        return
+      }
       // Ctrl+C — copy selected edge data
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
         const edgeId = useDiagramStore.getState().selectedEdgeId
