@@ -20,15 +20,31 @@ export type SystemType =
   | 'mps'
   | 'custom'
 
+// ─── Modules (sub-components within a system) ──────────
+export interface SystemModule {
+  id: string
+  name: string
+  description?: string
+}
+
 export interface SystemData extends Record<string, unknown> {
   label: string
   systemType: SystemType
   physicalSystem?: string
   description?: string
   icon?: string
+  modules?: SystemModule[]
 }
 
 export type SystemNode = Node<SystemData, 'system'>
+
+// ─── System Groups (umbrella around multiple systems) ───
+export interface SystemGroupData extends Record<string, unknown> {
+  label: string
+  color?: string
+}
+
+export type SystemGroupNode = Node<SystemGroupData, 'systemGroup'>
 
 // ─── Data Element Types ─────────────────────────────────
 export type DataElementType = 'transaction' | 'master_data' | 'document' | 'event' | 'data_object' | 'custom'

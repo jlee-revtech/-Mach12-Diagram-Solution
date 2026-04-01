@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -8,6 +8,8 @@ import {
   MiniMap,
   ReactFlowProvider,
   ConnectionMode,
+  applyNodeChanges,
+  type NodeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -15,6 +17,7 @@ import { useDiagramStore } from '@/lib/diagram/store'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useCollaboration } from '@/lib/collab/useCollaboration'
 import SystemNodeComponent from './SystemNode'
+import GroupNodeComponent from './GroupNode'
 import DataFlowEdgeComponent, { EdgeMarkerDefs } from './DataFlowEdge'
 import Toolbar from './Toolbar'
 import Sidebar from './Sidebar'
@@ -23,7 +26,7 @@ import OnboardingGuide from './OnboardingGuide'
 import ShareDialog from './ShareDialog'
 import { PresenceBadge, RemoteCursors } from './CollabPresence'
 
-const nodeTypes = { system: SystemNodeComponent }
+const nodeTypes = { system: SystemNodeComponent, systemGroup: GroupNodeComponent }
 const edgeTypes = { dataFlow: DataFlowEdgeComponent }
 
 function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
@@ -35,9 +38,24 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
     diagramId,
     profile?.display_name || user?.email || 'Anonymous'
   )
-  const nodes = useDiagramStore((s) => s.nodes)
+  const systemNodes = useDiagramStore((s) => s.nodes)
+  const groups = useDiagramStore((s) => s.groups)
   const edges = useDiagramStore((s) => s.edges)
-  const onNodesChange = useDiagramStore((s) => s.onNodesChange)
+  // Merge groups (rendered first/behind) and system nodes for ReactFlow
+  const nodes = useMemo(() => [...groups as any[], ...systemNodes], [groups, systemNodes])
+
+  // Split node changes by type: group changes update groups array, system changes update nodes
+  const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups])
+  const handleNodesChange = useCallback((changes: NodeChange<any>[]) => {
+    const systemChanges = changes.filter((c) => !('id' in c && groupIds.has((c as any).id)))
+    const groupChanges = changes.filter((c) => 'id' in c && groupIds.has((c as any).id))
+    if (systemChanges.length > 0) {
+      useDiagramStore.setState({ nodes: applyNodeChanges(systemChanges, useDiagramStore.getState().nodes) as any })
+    }
+    if (groupChanges.length > 0) {
+      useDiagramStore.setState({ groups: applyNodeChanges(groupChanges, useDiagramStore.getState().groups) as any })
+    }
+  }, [groupIds])
   const onEdgesChange = useDiagramStore((s) => s.onEdgesChange)
   const onConnect = useDiagramStore((s) => s.onConnect)
   const setSelectedNode = useDiagramStore((s) => s.setSelectedNode)
@@ -82,7 +100,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   // Debounced sync to Yjs + autosave to Supabase on ANY change
   useEffect(() => {
     // Build a fingerprint of current state to detect real changes
-    const fingerprint = JSON.stringify({ n: nodes, e: edges })
+    const fingerprint = JSON.stringify({ n: nodes, e: edges, g: groups })
     if (fingerprint === lastSaveRef.current) return
 
     setSaveStatus('unsaved')
@@ -115,7 +133,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, user])
+  }, [nodes, edges, groups, user])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -168,6 +186,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const handlePaneClick = useCallback(() => {
     setSelectedNode(null)
     setSelectedEdge(null)
+    useDiagramStore.setState({ selectedGroupId: null })
     // Cancel pending connection source on blank canvas click
     if (pendingConnectionSource) {
       useDiagramStore.setState({ pendingConnectionSource: null })
@@ -269,7 +288,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onReconnect={onReconnect}

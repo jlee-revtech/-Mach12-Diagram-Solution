@@ -213,6 +213,25 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
           </div>
         </div>
       </div>
+
+      {/* Modules list */}
+      {data.modules && data.modules.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-[#374A5E]/30">
+          <div className="flex flex-wrap gap-1">
+            {data.modules.map((mod) => (
+              <div
+                key={mod.id}
+                style={{ borderColor: color + '40', backgroundColor: color + '08' }}
+                className="border rounded px-1.5 py-0.5"
+              >
+                <span style={{ color: color + 'CC' }} className="text-[9px] font-medium font-[family-name:var(--font-space-mono)]">
+                  {mod.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

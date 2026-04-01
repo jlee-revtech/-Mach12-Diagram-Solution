@@ -12,15 +12,18 @@ import { v4 as uuid } from 'uuid'
 import { getDiagram, saveDiagram as saveDiagramApi } from '@/lib/supabase/diagrams'
 import type {
   SystemNode,
+  SystemGroupNode,
   DataFlowEdge,
   DataFlowData,
   SystemType,
+  SystemModule,
   DataElement,
   DataObjectAttribute,
   TechnicalProperty,
   OutputArtifact,
   DiagramMeta,
 } from './types'
+
 
 // ─── Store Interface ────────────────────────────────────
 interface DiagramState {
@@ -29,9 +32,11 @@ interface DiagramState {
   // React Flow state
   nodes: SystemNode[]
   edges: DataFlowEdge[]
+  groups: SystemGroupNode[]
   // UI state
   selectedNodeId: string | null
   selectedEdgeId: string | null
+  selectedGroupId: string | null
   sidebarTab: 'palette' | 'properties' | 'elements' | 'notes'
   // React Flow handlers
   onNodesChange: (changes: NodeChange<SystemNode>[]) => void
@@ -44,6 +49,15 @@ interface DiagramState {
   updateSystemLabel: (nodeId: string, label: string) => void
   updateSystemPhysical: (nodeId: string, physicalSystem: string) => void
   deleteSelected: () => void
+  // Module actions (sub-components within a system)
+  addModule: (nodeId: string, module: Omit<SystemModule, 'id'>) => void
+  removeModule: (nodeId: string, moduleId: string) => void
+  updateModule: (nodeId: string, moduleId: string, updates: Partial<SystemModule>) => void
+  reorderModules: (nodeId: string, fromIndex: number, toIndex: number) => void
+  // System group actions
+  addGroup: (label: string, position: XYPosition, color?: string) => string
+  updateGroupLabel: (nodeId: string, label: string) => void
+  updateGroupColor: (nodeId: string, color: string) => void
   // Edge endpoint editing (sidebar dropdowns)
   updateEdgeEndpoint: (edgeId: string, endpoint: 'source' | 'target', newNodeId: string) => void
   // Edge label position (0–1 along path)
@@ -91,6 +105,7 @@ interface DiagramState {
   // Selection
   setSelectedNode: (id: string | null) => void
   setSelectedEdge: (id: string | null) => void
+  setSelectedGroup: (id: string | null) => void
   setSidebarTab: (tab: 'palette' | 'properties' | 'elements' | 'notes') => void
   // Auto layout
   autoLayout: () => void
@@ -117,8 +132,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   meta: createEmptyMeta(),
   nodes: [],
   edges: [],
+  groups: [],
   selectedNodeId: null,
   selectedEdgeId: null,
+  selectedGroupId: null,
   sidebarTab: 'palette',
   artifacts: [],
   spotlightNodeId: null,
@@ -283,8 +300,13 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   deleteSelected: () => {
-    const { selectedNodeId, selectedEdgeId, nodes, edges } = get()
-    if (selectedNodeId) {
+    const { selectedNodeId, selectedEdgeId, selectedGroupId, nodes, edges, groups } = get()
+    if (selectedGroupId) {
+      set({
+        groups: groups.filter((g) => g.id !== selectedGroupId),
+        selectedGroupId: null,
+      })
+    } else if (selectedNodeId) {
       set({
         nodes: nodes.filter((n) => n.id !== selectedNodeId),
         edges: edges.filter(
@@ -298,6 +320,79 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         selectedEdgeId: null,
       })
     }
+  },
+
+  // ─── Module Actions ───────────────────────────────────
+  addModule: (nodeId, module) => {
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId && n.type === 'system'
+          ? { ...n, data: { ...n.data, modules: [...((n.data as any).modules || []), { ...module, id: uuid() }] } }
+          : n
+      ),
+    })
+  },
+
+  removeModule: (nodeId, moduleId) => {
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId && n.type === 'system'
+          ? { ...n, data: { ...n.data, modules: ((n.data as any).modules || []).filter((m: any) => m.id !== moduleId) } }
+          : n
+      ),
+    })
+  },
+
+  updateModule: (nodeId, moduleId, updates) => {
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId && n.type === 'system'
+          ? { ...n, data: { ...n.data, modules: ((n.data as any).modules || []).map((m: any) => m.id === moduleId ? { ...m, ...updates } : m) } }
+          : n
+      ),
+    })
+  },
+
+  reorderModules: (nodeId, fromIndex, toIndex) => {
+    set({
+      nodes: get().nodes.map((n) => {
+        if (n.id !== nodeId || n.type !== 'system') return n
+        const modules = [...((n.data as any).modules || [])]
+        const [moved] = modules.splice(fromIndex, 1)
+        modules.splice(toIndex, 0, moved)
+        return { ...n, data: { ...n.data, modules } }
+      }),
+    })
+  },
+
+  // ─── System Group Actions ────────────────────────────
+  addGroup: (label, position, color) => {
+    const id = `group-${uuid()}`
+    const newGroup: SystemGroupNode = {
+      id,
+      type: 'systemGroup',
+      position,
+      style: { width: 500, height: 400 },
+      data: { label, color: color || '#374A5E' },
+    }
+    set({ groups: [...get().groups, newGroup] })
+    return id
+  },
+
+  updateGroupLabel: (nodeId, label) => {
+    set({
+      groups: get().groups.map((g) =>
+        g.id === nodeId ? { ...g, data: { ...g.data, label } } : g
+      ),
+    })
+  },
+
+  updateGroupColor: (nodeId, color) => {
+    set({
+      groups: get().groups.map((g) =>
+        g.id === nodeId ? { ...g, data: { ...g.data, color } } : g
+      ),
+    })
   },
 
   // ─── Data Element Actions ─────────────────────────────
@@ -720,12 +815,13 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
           spotlightNodeIds.add(e.target)
         }
       }
-      set({ selectedNodeId: id, selectedEdgeId: null, spotlightNodeId: id, spotlightEdgeIds, spotlightNodeIds, spotlightArtifactId: null })
+      set({ selectedNodeId: id, selectedEdgeId: null, selectedGroupId: null, spotlightNodeId: id, spotlightEdgeIds, spotlightNodeIds, spotlightArtifactId: null })
     } else {
-      set({ selectedNodeId: null, selectedEdgeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set(), spotlightArtifactId: null })
+      set({ selectedNodeId: null, selectedEdgeId: null, selectedGroupId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set(), spotlightArtifactId: null })
     }
   },
-  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set(), spotlightArtifactId: null }),
+  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null, selectedGroupId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set(), spotlightArtifactId: null }),
+  setSelectedGroup: (id) => set({ selectedGroupId: id, selectedNodeId: null, selectedEdgeId: null, spotlightNodeId: null, spotlightEdgeIds: new Set(), spotlightNodeIds: new Set(), spotlightArtifactId: null }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
 
   // ─── Auto Layout ──────────────────────────────────────
@@ -735,120 +831,110 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
     const NODE_W = 240
     const NODE_H = 100
-    const COL_GAP = 200 // horizontal gap between columns (no labels here — labels are on horizontal edges)
+    const H_GAP = 280  // horizontal gap between layers
+    const V_GAP = 160  // vertical gap between nodes in same layer
 
-    // ── 1. Group nodes by systemType into vertical columns ──
-    // Order columns by: ERP first, then by connection density
-    const typeGroups = new Map<string, string[]>()
+    // ── 1. Build directed adjacency (source → targets) ──
+    const outEdges = new Map<string, string[]>()
+    const inEdges = new Map<string, string[]>()
+    const nodeIds = new Set(nodes.map((n) => n.id))
     for (const n of nodes) {
-      const t = n.data.systemType
-      if (!typeGroups.has(t)) typeGroups.set(t, [])
-      typeGroups.get(t)!.push(n.id)
+      outEdges.set(n.id, [])
+      inEdges.set(n.id, [])
     }
-
-    // Build adjacency for sorting
-    const adj = new Map<string, Set<string>>()
-    nodes.forEach((n) => adj.set(n.id, new Set()))
-    edges.forEach((e) => {
-      adj.get(e.source)?.add(e.target)
-      adj.get(e.target)?.add(e.source)
-    })
-
-    // Sort columns: most connected types first, ERP always first
-    const typeOrder = [...typeGroups.entries()].sort((a, b) => {
-      if (a[0] === 'erp') return -1
-      if (b[0] === 'erp') return 1
-      // Sum connections for all nodes of this type
-      const aConns = a[1].reduce((s, id) => s + (adj.get(id)?.size ?? 0), 0)
-      const bConns = b[1].reduce((s, id) => s + (adj.get(id)?.size ?? 0), 0)
-      return bConns - aConns
-    })
-
-    // ── 2. Measure edge label heights for vertical spacing ──
-    const edgeLabelH = (e: DataFlowEdge): number => {
-      const els = e.data?.dataElements ?? []
-      if (els.length === 0) return 40
-      let h = 24 // padding
-      for (const el of els) {
-        h += 20 // element name row
-        h += (el.attributes?.length ?? 0) * 14
-      }
-      return h
-    }
-
-    // For each node, find the max label height on edges to nodes
-    // in OTHER columns (horizontal edges that need label room)
-    const nodeTypeMap = new Map(nodes.map((n) => [n.id, n.data.systemType]))
-    const maxHorizLabel = new Map<string, number>()
     for (const e of edges) {
-      const srcType = nodeTypeMap.get(e.source)
-      const tgtType = nodeTypeMap.get(e.target)
-      if (srcType !== tgtType) {
-        // Cross-column edge — its label will appear horizontally
-        // Doesn't affect vertical spacing directly
-      } else {
-        // Same-column edge — label appears between vertically stacked nodes
-        const lh = edgeLabelH(e)
-        maxHorizLabel.set(e.source, Math.max(maxHorizLabel.get(e.source) ?? 0, lh))
-        maxHorizLabel.set(e.target, Math.max(maxHorizLabel.get(e.target) ?? 0, lh))
+      if (nodeIds.has(e.source) && nodeIds.has(e.target)) {
+        outEdges.get(e.source)!.push(e.target)
+        inEdges.get(e.target)!.push(e.source)
       }
     }
 
-    // ── 3. Position: each systemType is a vertical column ──
+    // ── 2. Topological layering (longest-path from sources) ──
+    // Sources = nodes with no incoming edges from other nodes
+    const layer = new Map<string, number>()
+    const queue: string[] = []
+
+    for (const n of nodes) {
+      if (inEdges.get(n.id)!.length === 0) {
+        layer.set(n.id, 0)
+        queue.push(n.id)
+      }
+    }
+
+    // If no sources found (all in cycles), pick most-connected as layer 0
+    if (queue.length === 0) {
+      const sorted = [...nodes].sort((a, b) => {
+        const aConns = (outEdges.get(a.id)?.length ?? 0) + (inEdges.get(a.id)?.length ?? 0)
+        const bConns = (outEdges.get(b.id)?.length ?? 0) + (inEdges.get(b.id)?.length ?? 0)
+        return bConns - aConns
+      })
+      layer.set(sorted[0].id, 0)
+      queue.push(sorted[0].id)
+    }
+
+    // BFS to assign layers (longest path from any source)
+    let head = 0
+    while (head < queue.length) {
+      const nid = queue[head++]
+      const myLayer = layer.get(nid)!
+      for (const tgt of outEdges.get(nid) ?? []) {
+        const prevLayer = layer.get(tgt)
+        if (prevLayer === undefined || prevLayer < myLayer + 1) {
+          layer.set(tgt, myLayer + 1)
+          queue.push(tgt)
+        }
+      }
+    }
+
+    // Assign unvisited nodes (disconnected) to layer 0
+    for (const n of nodes) {
+      if (!layer.has(n.id)) layer.set(n.id, 0)
+    }
+
+    // ── 3. Group by layer, sort within layer by systemType then connections ──
+    const TYPE_PRIORITY: Record<string, number> = {
+      erp: 0, middleware: 1, database: 2, data_warehouse: 3,
+      crm: 4, plm: 5, scm: 6, analytics: 7, mes: 8,
+      cloud: 9, legacy: 10, custom: 11,
+    }
+    const layers = new Map<number, string[]>()
+    for (const [nid, l] of layer) {
+      if (!layers.has(l)) layers.set(l, [])
+      layers.get(l)!.push(nid)
+    }
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+    for (const [, nids] of layers) {
+      nids.sort((a, b) => {
+        const na = nodeMap.get(a)!
+        const nb = nodeMap.get(b)!
+        const pa = TYPE_PRIORITY[na.data.systemType] ?? 50
+        const pb = TYPE_PRIORITY[nb.data.systemType] ?? 50
+        if (pa !== pb) return pa - pb
+        // Secondary: more connections first
+        const ca = (outEdges.get(a)?.length ?? 0) + (inEdges.get(a)?.length ?? 0)
+        const cb = (outEdges.get(b)?.length ?? 0) + (inEdges.get(b)?.length ?? 0)
+        return cb - ca
+      })
+    }
+
+    // ── 4. Position: layers left-to-right, nodes top-to-bottom ──
     const positioned = new Map<string, { x: number; y: number }>()
-    let curX = 0
+    const sortedLayers = [...layers.entries()].sort((a, b) => a[0] - b[0])
 
-    // Track column x positions for gap calculation
-    const colInfo: { type: string; nodeIds: string[]; x: number }[] = []
+    // Measure the tallest layer for vertical centering
+    const maxLayerSize = Math.max(...sortedLayers.map(([, nids]) => nids.length))
 
-    for (const [sysType, nodeIds] of typeOrder) {
-      // Sort nodes within column by connection count (most connected on top)
-      nodeIds.sort((a, b) => (adj.get(b)?.size ?? 0) - (adj.get(a)?.size ?? 0))
+    for (const [l, nids] of sortedLayers) {
+      const x = l * (NODE_W + H_GAP)
+      const totalH = nids.length * NODE_H + (nids.length - 1) * V_GAP
+      const maxTotalH = maxLayerSize * NODE_H + (maxLayerSize - 1) * V_GAP
+      const yOffset = (maxTotalH - totalH) / 2
 
-      let curY = 0
-      for (let i = 0; i < nodeIds.length; i++) {
-        const nid = nodeIds[i]
-        positioned.set(nid, { x: curX, y: curY })
-
-        // Gap below this node: base gap + extra for same-column edge labels
-        const labelSpace = maxHorizLabel.get(nid) ?? 0
-        const gap = Math.max(180, labelSpace + 80)
-        curY += NODE_H + gap
-      }
-
-      colInfo.push({ type: sysType, nodeIds, x: curX })
-
-      // Compute gap to next column: measure widest label on cross-column edges
-      let maxCrossLabel = 0
-      const colNodeSet = new Set(nodeIds)
-      for (const e of edges) {
-        const srcIn = colNodeSet.has(e.source)
-        const tgtIn = colNodeSet.has(e.target)
-        if ((srcIn && !tgtIn) || (!srcIn && tgtIn)) {
-          const longest = (e.data?.dataElements ?? []).reduce(
-            (max, el) => Math.max(max, el.name.length), 0
-          )
-          maxCrossLabel = Math.max(maxCrossLabel, longest)
-        }
-      }
-      const dynamicGap = Math.max(COL_GAP, maxCrossLabel * 8 + 160)
-      curX += NODE_W + dynamicGap
-    }
-
-    // ── 4. Vertical centering: align all columns to the tallest ──
-    const colHeights = colInfo.map((c) => {
-      if (c.nodeIds.length === 0) return 0
-      const last = c.nodeIds[c.nodeIds.length - 1]
-      return (positioned.get(last)?.y ?? 0) + NODE_H
-    })
-    const maxH = Math.max(...colHeights)
-    for (let i = 0; i < colInfo.length; i++) {
-      const offset = (maxH - colHeights[i]) / 2
-      if (offset > 0) {
-        for (const nid of colInfo[i].nodeIds) {
-          const p = positioned.get(nid)!
-          positioned.set(nid, { x: p.x, y: p.y + offset })
-        }
+      for (let i = 0; i < nids.length; i++) {
+        positioned.set(nids[i], {
+          x,
+          y: yOffset + i * (NODE_H + V_GAP),
+        })
       }
     }
 
@@ -858,10 +944,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       return pos ? { ...n, position: pos } : n
     })
 
-    const nodeMap = new Map(updatedNodes.map((n) => [n.id, n]))
+    const updNodeMap = new Map(updatedNodes.map((n) => [n.id, n]))
     const updatedEdges = edges.map((e) => {
-      const src = nodeMap.get(e.source)
-      const tgt = nodeMap.get(e.target)
+      const src = updNodeMap.get(e.source)
+      const tgt = updNodeMap.get(e.target)
       if (!src || !tgt) return e
       const dx = tgt.position.x - src.position.x
       const dy = tgt.position.y - src.position.y
@@ -892,12 +978,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   // ─── Persistence (Supabase) ────────────────────────────
   saveDiagram: async (userId: string) => {
-    const { meta, nodes, edges, artifacts } = get()
+    const { meta, nodes, edges, artifacts, groups } = get()
     await saveDiagramApi(meta.id, userId, {
       title: meta.title,
       description: meta.description,
       process_context: meta.processContext,
-      canvas_data: { nodes, edges, notes: meta.notes, artifacts },
+      canvas_data: { nodes, edges, notes: meta.notes, artifacts, groups },
     })
     set({ meta: { ...meta, updatedAt: new Date().toISOString() } })
   },
@@ -905,7 +991,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   loadDiagram: async (id: string) => {
     const row = await getDiagram(id)
     if (!row) return false
-    const canvas = row.canvas_data as { nodes: SystemNode[]; edges: DataFlowEdge[]; notes?: string; artifacts?: OutputArtifact[] }
+    const canvas = row.canvas_data as { nodes: SystemNode[]; edges: DataFlowEdge[]; notes?: string; artifacts?: OutputArtifact[]; groups?: SystemGroupNode[] }
     const nodes = canvas.nodes ?? []
     let edges = canvas.edges ?? []
 
@@ -950,9 +1036,11 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       },
       nodes,
       edges,
+      groups: canvas.groups ?? [],
       artifacts: canvas.artifacts ?? [],
       selectedNodeId: null,
       selectedEdgeId: null,
+      selectedGroupId: null,
     })
     return true
   },

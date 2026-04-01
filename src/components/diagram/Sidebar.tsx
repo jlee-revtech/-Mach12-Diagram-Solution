@@ -69,6 +69,9 @@ export default function Sidebar() {
 // ─── Palette Tab ────────────────────────────────────────
 function PaletteTab() {
   const addSystem = useDiagramStore((s) => s.addSystem)
+  const addGroup = useDiagramStore((s) => s.addGroup)
+  const setSidebarTab = useDiagramStore((s) => s.setSidebarTab)
+  const setSelectedGroup = useDiagramStore((s) => s.setSelectedGroup)
   const { screenToFlowPosition } = useReactFlow()
 
   const handleAdd = useCallback(
@@ -83,11 +86,46 @@ function PaletteTab() {
     [addSystem, screenToFlowPosition]
   )
 
+  const handleAddGroup = useCallback(() => {
+    const pos = screenToFlowPosition({
+      x: window.innerWidth / 2 - 250,
+      y: window.innerHeight / 2 - 200,
+    })
+    const id = addGroup('System Group', pos)
+    setSelectedGroup(id)
+    setSidebarTab('properties')
+  }, [addGroup, setSelectedGroup, setSidebarTab, screenToFlowPosition])
+
   return (
     <div>
       <SidebarLabel>Diagram Settings</SidebarLabel>
       <DiagramSettings />
-      <div className="mt-5" />
+
+      {/* Add System Group */}
+      <div className="mt-5 mb-5">
+        <SidebarLabel>System Groups</SidebarLabel>
+        <p className="text-[11px] text-[#64748B] mb-2">
+          Create a visual grouping around related systems.
+        </p>
+        <button
+          onClick={handleAddGroup}
+          className="w-full flex items-center gap-2 bg-[#1F2C3F] hover:bg-[#263448] border border-dashed border-[#374A5E]/60 hover:border-[#374A5E] rounded-lg px-3 py-2.5 transition-colors text-left"
+        >
+          <div className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold font-[family-name:var(--font-space-mono)] shrink-0 bg-[#374A5E]/20 text-[#64748B] border border-dashed border-[#374A5E]/40">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="1" y="1" width="14" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2"/>
+              <rect x="3" y="3" width="4" height="4" rx="1" fill="currentColor" opacity="0.4"/>
+              <rect x="9" y="5" width="4" height="4" rx="1" fill="currentColor" opacity="0.4"/>
+              <rect x="5" y="9" width="4" height="4" rx="1" fill="currentColor" opacity="0.4"/>
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-[#CBD5E1]">Add Group</div>
+            <div className="text-[9px] text-[#64748B]">Visual umbrella for systems</div>
+          </div>
+        </button>
+      </div>
+
       <SidebarLabel>Add System</SidebarLabel>
       <p className="text-[11px] text-[#64748B] mb-3">
         Click to add a system to the canvas.
@@ -159,12 +197,156 @@ function DiagramSettings() {
   )
 }
 
+// ─── Group Properties ───────────────────────────────────
+const GROUP_COLORS = [
+  '#374A5E', '#2563EB', '#06B6D4', '#10B981', '#8B5CF6',
+  '#F97316', '#EF4444', '#EC4899', '#EAB308', '#14B8A6',
+]
+
+function GroupPropertiesTab() {
+  const selectedGroupId = useDiagramStore((s) => s.selectedGroupId)
+  const groups = useDiagramStore((s) => s.groups)
+  const updateGroupLabel = useDiagramStore((s) => s.updateGroupLabel)
+  const updateGroupColor = useDiagramStore((s) => s.updateGroupColor)
+
+  const selectedGroup = groups.find((g) => g.id === selectedGroupId)
+  if (!selectedGroup) return null
+
+  return (
+    <div>
+      <SidebarLabel>Group Properties</SidebarLabel>
+      <div className="space-y-3">
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+            Group Name
+          </label>
+          <input
+            value={selectedGroup.data.label}
+            onChange={(e) => updateGroupLabel(selectedGroup.id, e.target.value)}
+            className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+            Color
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {GROUP_COLORS.map((c) => (
+              <button
+                key={c}
+                onClick={() => updateGroupColor(selectedGroup.id, c)}
+                style={{ backgroundColor: c }}
+                className={`w-6 h-6 rounded-md border-2 transition-all ${
+                  selectedGroup.data.color === c ? 'border-white scale-110' : 'border-transparent hover:scale-110'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+        <p className="text-[10px] text-[#64748B] italic">
+          Drag system nodes inside this group to visually associate them. Resize the group by dragging its edges.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Module Editor ──────────────────────────────────────
+function ModuleEditor({ nodeId }: { nodeId: string }) {
+  const nodes = useDiagramStore((s) => s.nodes)
+  const addModule = useDiagramStore((s) => s.addModule)
+  const removeModule = useDiagramStore((s) => s.removeModule)
+  const updateModule = useDiagramStore((s) => s.updateModule)
+  const reorderModules = useDiagramStore((s) => s.reorderModules)
+  const [newModuleName, setNewModuleName] = useState('')
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
+  const node = nodes.find((n) => n.id === nodeId)
+  if (!node) return null
+  const modules = node.data.modules || []
+
+  const handleAdd = () => {
+    if (!newModuleName.trim()) return
+    addModule(nodeId, { name: newModuleName.trim() })
+    setNewModuleName('')
+  }
+
+  return (
+    <div className="mt-4">
+      <SidebarLabel>Modules</SidebarLabel>
+      <p className="text-[11px] text-[#64748B] mb-2">
+        Sub-components within this system (e.g., MM, FI, SD).
+      </p>
+
+      {/* Module list */}
+      <div className="space-y-1 mb-2">
+        {modules.map((mod, idx) => (
+          <div
+            key={mod.id}
+            draggable
+            onDragStart={(e) => { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move' }}
+            onDragOver={(e) => { e.preventDefault(); setDragOverIdx(idx) }}
+            onDragLeave={() => setDragOverIdx(null)}
+            onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && dragIdx !== idx) reorderModules(nodeId, dragIdx, idx); setDragIdx(null); setDragOverIdx(null) }}
+            onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+            className={`flex items-center gap-1.5 bg-[#151E2E] border rounded-lg px-2 py-1.5 transition-all ${
+              dragIdx === idx ? 'opacity-40 border-[#06B6D4]/40' : dragOverIdx === idx ? 'border-[#06B6D4]' : 'border-[#374A5E]/40'
+            }`}
+          >
+            <div className="cursor-grab active:cursor-grabbing text-[#374A5E] hover:text-[#64748B] shrink-0">
+              <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor">
+                <circle cx="2" cy="1.5" r="1"/><circle cx="6" cy="1.5" r="1"/>
+                <circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/>
+                <circle cx="2" cy="10.5" r="1"/><circle cx="6" cy="10.5" r="1"/>
+              </svg>
+            </div>
+            <input
+              value={mod.name}
+              onChange={(e) => updateModule(nodeId, mod.id, { name: e.target.value })}
+              className="flex-1 bg-transparent text-xs text-[#CBD5E1] outline-none min-w-0"
+            />
+            <button
+              onClick={() => removeModule(nodeId, mod.id)}
+              className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0"
+            >
+              <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Add module */}
+      <div className="flex items-center gap-2">
+        <input
+          value={newModuleName}
+          onChange={(e) => setNewModuleName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+          placeholder="e.g., MM, FI, SD..."
+          className="flex-1 bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E]"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!newModuleName.trim()}
+          className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-30 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Properties Tab ─────────────────────────────────────
 function PropertiesTab() {
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
+  const selectedGroupId = useDiagramStore((s) => s.selectedGroupId)
   const nodes = useDiagramStore((s) => s.nodes)
   const updateSystemLabel = useDiagramStore((s) => s.updateSystemLabel)
   const updateSystemPhysical = useDiagramStore((s) => s.updateSystemPhysical)
+
+  // Show group properties if a group is selected
+  if (selectedGroupId) return <GroupPropertiesTab />
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
 
@@ -224,6 +406,9 @@ function PropertiesTab() {
           </div>
         </div>
       </div>
+
+      {/* Module Editor */}
+      <ModuleEditor nodeId={selectedNode.id} />
     </div>
   )
 }
