@@ -211,6 +211,41 @@ function DataFlowEdgeComponent({
         style={{ cursor: 'pointer' }}
       />
 
+      {/* Sequence badge — shown near the source end of the edge */}
+      {data?.sequence != null && (
+        <EdgeLabelRenderer>
+          <div
+            onClick={handleClick}
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${
+                typeof document !== 'undefined'
+                  ? getPointAtRatio(edgePath, 0.12).x
+                  : sourceX
+              }px,${
+                typeof document !== 'undefined'
+                  ? getPointAtRatio(edgePath, 0.12).y
+                  : sourceY
+              }px)`,
+              pointerEvents: 'all',
+              opacity: isDimmed ? 0.1 : 1,
+              transition: 'opacity 0.3s',
+            }}
+            className="cursor-pointer"
+          >
+            <div
+              className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold font-[family-name:var(--font-space-mono)] shadow-md transition-all ${
+                highlight
+                  ? 'bg-[#06B6D4] text-[#0F172A] shadow-[0_0_8px_rgba(6,182,212,0.4)]'
+                  : 'bg-[#374A5E] text-[#F8FAFC]'
+              }`}
+            >
+              {data.sequence}
+            </div>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+
       {/* Data element labels */}
       {dataElements.length > 0 && (
         <EdgeLabelRenderer>

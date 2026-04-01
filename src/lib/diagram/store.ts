@@ -71,6 +71,8 @@ interface DiagramState {
   updateEdgeEndpoint: (edgeId: string, endpoint: 'source' | 'target', newNodeId: string) => void
   // Edge label position (0–1 along path)
   updateEdgeLabelPosition: (edgeId: string, position: number) => void
+  // Edge sequence (step ordering)
+  updateEdgeSequence: (edgeId: string, sequence: number | undefined) => void
   // System node copy/paste
   copiedNodeData: { data: SystemNode['data']; connectedEdges: DataFlowEdge[] } | null
   copyNode: (nodeId: string) => void
@@ -215,6 +217,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       edges: get().edges.map((e) =>
         e.id === edgeId && e.data
           ? { ...e, data: { ...e.data, labelPosition: Math.max(0, Math.min(1, position)) } }
+          : e
+      ),
+    })
+  },
+
+  // ─── Edge Sequence ────────────────────────────────────
+  updateEdgeSequence: (edgeId, sequence) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId && e.data
+          ? { ...e, data: { ...e.data, sequence } }
           : e
       ),
     })

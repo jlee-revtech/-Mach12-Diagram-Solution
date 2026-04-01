@@ -32,6 +32,36 @@ const edgeTypes = { dataFlow: DataFlowEdgeComponent }
 // Static CSS for group node pointer-events — outside render to avoid style recalc per frame
 const GROUP_NODE_STYLE = `.react-flow__node-systemGroup { pointer-events: none !important; }`
 
+function ArtifactSpotlightBar() {
+  const artifacts = useDiagramStore((s) => s.artifacts)
+  const spotlightArtifactId = useDiagramStore((s) => s.spotlightArtifactId)
+  const setSpotlightArtifact = useDiagramStore((s) => s.setSpotlightArtifact)
+
+  if (artifacts.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap gap-1 px-1 py-1">
+      {artifacts.map((art) => {
+        const isActive = spotlightArtifactId === art.id
+        return (
+          <button
+            key={art.id}
+            onClick={() => setSpotlightArtifact(isActive ? null : art.id)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[9px] font-medium transition-all ${
+              isActive
+                ? 'bg-[#F97316]/20 text-[#FB923C] border border-[#F97316]/40 shadow-[0_0_8px_rgba(249,115,22,0.2)]'
+                : 'bg-[#1F2C3F]/80 text-[#64748B] border border-[#374A5E]/30 hover:text-[#CBD5E1] hover:border-[#374A5E]/60'
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#F97316]' : 'bg-[#F97316]/30'}`} />
+            {art.name}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const { user, profile } = useAuth()
   const [aiOpen, setAiOpen] = useState(false)
@@ -291,6 +321,8 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
                'Unsaved changes'}
             </span>
           </div>
+          {/* Output Artifacts quick-spotlight */}
+          <ArtifactSpotlightBar />
         </div>
 
         <Toolbar onAiOpen={() => setAiOpen(true)} onHelpOpen={() => setHelpOpen(true)} onShareOpen={() => setShareOpen(true)} />
