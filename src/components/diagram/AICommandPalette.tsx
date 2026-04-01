@@ -19,7 +19,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
   const [imageData, setImageData] = useState<string | null>(null)
   const [imageName, setImageName] = useState<string | null>(null)
   const [implementing, setImplementing] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const nodes = useDiagramStore((s) => s.nodes)
@@ -35,6 +35,23 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
       setImageName(null)
     }
   }, [open])
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        const file = item.getAsFile()
+        if (!file) continue
+        setImageName('Pasted screenshot')
+        const reader = new FileReader()
+        reader.onload = () => setImageData(reader.result as string)
+        reader.readAsDataURL(file)
+        return
+      }
+    }
+  }, [])
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -372,35 +389,48 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
 
         {mode === 'generate' ? (
           <div className="p-4">
-            <div className="flex items-center gap-3 bg-[#151E2E] rounded-xl px-4 py-3 border border-[#374A5E]/40 focus-within:border-[#2563EB]">
-              <span className="text-[#06B6D4] text-sm font-bold font-[family-name:var(--font-space-mono)]">AI</span>
-              <input
-                ref={inputRef}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !loading && handleGenerate()}
-                placeholder={imageData ? "Describe what to do with this image..." : "Describe your data architecture..."}
-                className="flex-1 bg-transparent text-sm text-[#F8FAFC] outline-none placeholder:text-[#374A5E]"
-                disabled={loading}
-              />
-              {/* Image upload button */}
-              <button
-                onClick={() => fileRef.current?.click()}
-                title="Upload screenshot"
-                className="text-[#64748B] hover:text-[#06B6D4] transition-colors shrink-0"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/><path d="M2 11l3-3 2 2 3-4 4 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-              {loading && (
-                <div className="w-4 h-4 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin" />
-              )}
+            <div className="bg-[#151E2E] rounded-xl px-4 py-3 border border-[#374A5E]/40 focus-within:border-[#2563EB]">
+              <div className="flex items-start gap-3">
+                <span className="text-[#06B6D4] text-sm font-bold font-[family-name:var(--font-space-mono)] mt-1 shrink-0">AI</span>
+                <textarea
+                  ref={inputRef}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onPaste={handlePaste}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !loading) handleGenerate()
+                  }}
+                  placeholder={imageData ? "Describe what to do with this image..." : "Describe your data architecture...\n\nPaste long prompts, requirements, or system descriptions here.\nCtrl+Enter to generate."}
+                  className="flex-1 bg-transparent text-sm text-[#F8FAFC] outline-none placeholder:text-[#374A5E] resize-none min-h-[80px] max-h-[200px] leading-relaxed w-full"
+                  rows={4}
+                  disabled={loading}
+                />
+              </div>
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#374A5E]/20">
+                <div className="flex items-center gap-2">
+                  {/* Image upload button */}
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    title="Upload screenshot"
+                    className="text-[#64748B] hover:text-[#06B6D4] transition-colors shrink-0"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/><path d="M2 11l3-3 2 2 3-4 4 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  {loading && (
+                    <div className="w-4 h-4 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin" />
+                  )}
+                </div>
+                <span className="text-[9px] text-[#374A5E] font-[family-name:var(--font-space-mono)]">
+                  Ctrl+Enter to generate
+                </span>
+              </div>
             </div>
 
             {/* Image preview */}
