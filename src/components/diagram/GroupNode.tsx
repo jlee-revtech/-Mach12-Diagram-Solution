@@ -44,8 +44,6 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
 
   return (
     <div
-      onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
       style={{
         borderColor: selected ? '#06B6D4' : color + '60',
         backgroundColor: color + '08',
@@ -53,6 +51,7 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
         height: '100%',
         minWidth: 300,
         minHeight: 200,
+        pointerEvents: 'none',
       }}
       className="border-2 border-dashed rounded-2xl relative"
     >
@@ -64,10 +63,22 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
         handleClassName="!w-2.5 !h-2.5 !bg-[#06B6D4] !border-[#1F2C3F] !border-2 !rounded-sm"
       />
 
-      {/* Group label — top-left badge */}
+      {/* Invisible border hit area — only the border edge is clickable */}
+      {/* Top */}
+      <div onClick={handleClick} style={{ pointerEvents: 'auto' }} className="absolute -top-1 left-0 right-0 h-3 cursor-pointer" />
+      {/* Bottom */}
+      <div onClick={handleClick} style={{ pointerEvents: 'auto' }} className="absolute -bottom-1 left-0 right-0 h-3 cursor-pointer" />
+      {/* Left */}
+      <div onClick={handleClick} style={{ pointerEvents: 'auto' }} className="absolute top-0 -left-1 bottom-0 w-3 cursor-pointer" />
+      {/* Right */}
+      <div onClick={handleClick} style={{ pointerEvents: 'auto' }} className="absolute top-0 -right-1 bottom-0 w-3 cursor-pointer" />
+
+      {/* Group label — top-left badge (clickable) */}
       <div
-        style={{ backgroundColor: color + '20', borderColor: color + '40' }}
-        className="absolute -top-3 left-4 border rounded-md px-3 py-0.5 backdrop-blur-sm"
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        style={{ backgroundColor: color + '20', borderColor: color + '40', pointerEvents: 'auto' }}
+        className="absolute -top-3 left-4 border rounded-md px-3 py-0.5 backdrop-blur-sm cursor-pointer"
       >
         {isEditing ? (
           <input
@@ -76,7 +87,9 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
             className="bg-transparent border-b border-[#06B6D4] text-[#F8FAFC] text-xs font-semibold outline-none min-w-[80px]"
+            style={{ pointerEvents: 'auto' }}
           />
         ) : (
           <span style={{ color }} className="text-xs font-bold uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
