@@ -22,6 +22,7 @@ const SYSTEM_ICONS: Record<SystemType, string> = {
   ims: 'IM',
   siop: 'SI',
   mps: 'MS',
+  hcm: 'HC',
   custom: '?',
 }
 
@@ -42,6 +43,7 @@ const SYSTEM_COLORS: Record<SystemType, string> = {
   ims: '#6366F1',
   siop: '#84CC16',
   mps: '#22D3EE',
+  hcm: '#F472B6',
   custom: '#A855F7',
 }
 

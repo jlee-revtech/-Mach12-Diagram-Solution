@@ -71,6 +71,10 @@ interface DiagramState {
   updateEdgeEndpoint: (edgeId: string, endpoint: 'source' | 'target', newNodeId: string) => void
   // Edge label position (0–1 along path)
   updateEdgeLabelPosition: (edgeId: string, position: number) => void
+  // System node copy/paste
+  copiedNodeData: { data: SystemNode['data']; connectedEdges: DataFlowEdge[] } | null
+  copyNode: (nodeId: string) => void
+  pasteNode: () => void
   // Edge data copy/paste
   copiedEdgeData: DataFlowData | null
   copyEdgeData: (edgeId: string) => void
@@ -156,6 +160,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   spotlightEdgeIds: new Set<string>(),
   spotlightNodeIds: new Set<string>(),
   spotlightArtifactId: null,
+  copiedNodeData: null,
   copiedEdgeData: null,
   undoStack: [],
   canUndo: false,
@@ -251,6 +256,51 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   // ─── Edge Data Copy/Paste ─────────────────────────────
+  // ─── System Node Copy/Paste ────────────────────────────
+  copyNode: (nodeId) => {
+    const { nodes, edges } = get()
+    const node = nodes.find((n) => n.id === nodeId)
+    if (!node) return
+    // Deep clone node data and connected edges
+    const clone = typeof structuredClone === 'function' ? structuredClone : (v: any) => JSON.parse(JSON.stringify(v))
+    const connectedEdges = edges.filter((e) => e.source === nodeId || e.target === nodeId)
+    set({ copiedNodeData: { data: clone(node.data), connectedEdges: clone(connectedEdges) } })
+  },
+
+  pasteNode: () => {
+    const { copiedNodeData, nodes, edges } = get()
+    if (!copiedNodeData) return
+    get().pushUndo()
+
+    // Create new node with offset position from the original or center of canvas
+    const newId = `system-${uuid()}`
+    // Find a position — offset from the last selected node or use a default
+    const selectedId = get().selectedNodeId
+    const refNode = selectedId ? nodes.find((n) => n.id === selectedId) : nodes[nodes.length - 1]
+    const pos = refNode
+      ? { x: refNode.position.x + 60, y: refNode.position.y + 60 }
+      : { x: 200, y: 200 }
+
+    const newNode: SystemNode = {
+      id: newId,
+      type: 'system',
+      position: pos,
+      data: {
+        ...copiedNodeData.data,
+        label: copiedNodeData.data.label + ' (copy)',
+        // Give modules fresh IDs
+        modules: copiedNodeData.data.modules?.map((m) => ({ ...m, id: uuid() })),
+      },
+    }
+
+    set({
+      nodes: [...nodes, newNode],
+      selectedNodeId: newId,
+      selectedEdgeId: null,
+      selectedGroupId: null,
+    })
+  },
+
   copyEdgeData: (edgeId) => {
     const edge = get().edges.find((e) => e.id === edgeId)
     if (!edge?.data) return

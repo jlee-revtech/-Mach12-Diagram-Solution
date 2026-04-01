@@ -182,23 +182,36 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         useDiagramStore.getState().undo()
         return
       }
-      // Ctrl+C — copy selected edge data
+      // Ctrl+C — copy selected node or edge data
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
-        const edgeId = useDiagramStore.getState().selectedEdgeId
-        if (edgeId) {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+        const { selectedNodeId, selectedEdgeId } = useDiagramStore.getState()
+        if (selectedNodeId) {
           e.preventDefault()
-          copyEdgeData(edgeId)
+          useDiagramStore.getState().copyNode(selectedNodeId)
+          showToast('System copied')
+        } else if (selectedEdgeId) {
+          e.preventDefault()
+          copyEdgeData(selectedEdgeId)
           showToast('Connection data copied')
         }
         return
       }
-      // Ctrl+V — paste edge data onto selected edge
+      // Ctrl+V — paste node or edge data
       if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
-        const { selectedEdgeId, copiedEdgeData } = useDiagramStore.getState()
-        if (selectedEdgeId && copiedEdgeData) {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+        const state = useDiagramStore.getState()
+        // If an edge is selected and we have copied edge data, paste onto edge
+        if (state.selectedEdgeId && state.copiedEdgeData) {
           e.preventDefault()
-          pasteEdgeData(selectedEdgeId)
+          pasteEdgeData(state.selectedEdgeId)
           showToast('Connection data pasted')
+        }
+        // Otherwise if we have a copied node, paste it
+        else if (state.copiedNodeData) {
+          e.preventDefault()
+          state.pasteNode()
+          showToast('System pasted')
         }
         return
       }

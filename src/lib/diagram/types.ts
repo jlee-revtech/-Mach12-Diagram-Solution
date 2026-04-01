@@ -18,6 +18,7 @@ export type SystemType =
   | 'ims'
   | 'siop'
   | 'mps'
+  | 'hcm'
   | 'custom'
 
 // ─── Modules (sub-components within a system) ──────────
@@ -150,6 +151,7 @@ export const SYSTEM_TEMPLATES: SystemTemplate[] = [
   { type: 'ims', label: 'IMS', description: 'Integrated Master Schedule', color: '#6366F1' },
   { type: 'siop', label: 'SIOP', description: 'Sales, Inventory, Ops Planning', color: '#84CC16' },
   { type: 'mps', label: 'MPS', description: 'Master Production Schedule', color: '#22D3EE' },
+  { type: 'hcm', label: 'HCM', description: 'Human Capital Management', color: '#F472B6' },
   { type: 'custom', label: 'Custom', description: 'Custom System', color: '#A855F7' },
 ]
 
