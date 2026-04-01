@@ -93,6 +93,7 @@ function DataFlowEdgeComponent({
   const updateEdgeLabelPosition = useDiagramStore((s) => s.updateEdgeLabelPosition)
   const spotlightNodeId = useDiagramStore((s) => s.spotlightNodeId)
   const spotlightEdgeIds = useDiagramStore((s) => s.spotlightEdgeIds)
+  const spotlightArtifactId = useDiagramStore((s) => s.spotlightArtifactId)
   const { screenToFlowPosition } = useReactFlow()
 
   const isSpotlit = spotlightNodeId !== null && spotlightEdgeIds.has(id)
@@ -165,6 +166,10 @@ function DataFlowEdgeComponent({
 
   const dataElements = data?.dataElements ?? []
   const isBidirectional = data?.direction === 'bidirectional'
+  // Show artifact-specific sequence when spotlighting, otherwise legacy sequence
+  const displaySequence = spotlightArtifactId && data?.artifactSequences?.[spotlightArtifactId]
+    ? data.artifactSequences[spotlightArtifactId]
+    : data?.sequence ?? null
   const [expanded, setExpanded] = useState(false)
   const VISIBLE_LIMIT = 10
   const hasOverflow = dataElements.length > VISIBLE_LIMIT
@@ -211,8 +216,8 @@ function DataFlowEdgeComponent({
         style={{ cursor: 'pointer' }}
       />
 
-      {/* Sequence badge — shown near the source end of the edge */}
-      {data?.sequence != null && (
+      {/* Sequence badge — show artifact-specific or legacy sequence */}
+      {displaySequence != null && (
         <EdgeLabelRenderer>
           <div
             onClick={handleClick}
@@ -240,7 +245,7 @@ function DataFlowEdgeComponent({
                   : 'bg-[#374A5E] text-[#F8FAFC]'
               }`}
             >
-              {data.sequence}
+              {displaySequence}
             </div>
           </div>
         </EdgeLabelRenderer>

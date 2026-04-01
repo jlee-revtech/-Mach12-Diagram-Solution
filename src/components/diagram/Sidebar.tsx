@@ -414,9 +414,10 @@ function PropertiesTab() {
 }
 
 // ─── Artifact Tagger (shown on edge edit) ──────────────
-function ArtifactTagger({ edgeId, taggedIds }: { edgeId: string; taggedIds: string[] }) {
+function ArtifactTagger({ edgeId, taggedIds, artifactSequences }: { edgeId: string; taggedIds: string[]; artifactSequences?: Record<string, number> }) {
   const artifacts = useDiagramStore((s) => s.artifacts)
   const toggleEdgeArtifact = useDiagramStore((s) => s.toggleEdgeArtifact)
+  const updateEdgeArtifactSequence = useDiagramStore((s) => s.updateEdgeArtifactSequence)
 
   if (artifacts.length === 0) {
     return (
@@ -433,34 +434,54 @@ function ArtifactTagger({ edgeId, taggedIds }: { edgeId: string; taggedIds: stri
     <div className="mb-4">
       <SidebarLabel>Output Artifacts</SidebarLabel>
       <p className="text-[11px] text-[#64748B] mb-2">
-        Tag which artifacts this data flow contributes to.
+        Tag artifacts and set step order for each.
       </p>
       <div className="space-y-1">
         {artifacts.map((art) => {
           const isTagged = taggedIds.includes(art.id)
+          const seq = artifactSequences?.[art.id]
           return (
-            <button
+            <div
               key={art.id}
-              onClick={() => toggleEdgeArtifact(edgeId, art.id)}
-              className={`flex items-center gap-2 w-full text-left px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
                 isTagged
                   ? 'bg-[#F97316]/10 border border-[#F97316]/40'
                   : 'bg-[#151E2E] border border-[#374A5E]/30 hover:border-[#374A5E]/60'
               }`}
             >
-              <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-colors ${
-                isTagged ? 'border-[#F97316] bg-[#F97316]' : 'border-[#374A5E]'
-              }`}>
-                {isTagged && (
-                  <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </div>
-              <span className={`text-xs transition-colors ${isTagged ? 'text-[#CBD5E1] font-medium' : 'text-[#64748B]'}`}>
-                {art.name}
-              </span>
-            </button>
+              <button
+                onClick={() => toggleEdgeArtifact(edgeId, art.id)}
+                className="flex items-center gap-2 flex-1 min-w-0 text-left"
+              >
+                <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
+                  isTagged ? 'border-[#F97316] bg-[#F97316]' : 'border-[#374A5E]'
+                }`}>
+                  {isTagged && (
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                      <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-xs transition-colors truncate ${isTagged ? 'text-[#CBD5E1] font-medium' : 'text-[#64748B]'}`}>
+                  {art.name}
+                </span>
+              </button>
+              {isTagged && (
+                <input
+                  type="number"
+                  min={1}
+                  value={seq ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? undefined : parseInt(e.target.value, 10)
+                    updateEdgeArtifactSequence(edgeId, art.id, val && val > 0 ? val : undefined)
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Step"
+                  title="Step sequence for this artifact"
+                  className="w-12 bg-[#0F172A] border border-[#374A5E]/50 rounded px-1.5 py-1 text-center text-[10px] text-[#F8FAFC] font-bold font-[family-name:var(--font-space-mono)] outline-none focus:border-[#F97316] transition-colors placeholder:text-[#374A5E] placeholder:font-normal shrink-0"
+                />
+              )}
+            </div>
           )
         })}
       </div>
@@ -982,28 +1003,7 @@ function ElementsTab() {
     <div>
       <ConnectionHeader edgeId={selectedEdge.id} />
 
-      {/* Sequence number */}
-      <div className="flex items-center gap-3 mb-4 bg-[#151E2E] border border-[#374A5E]/40 rounded-lg px-3 py-2">
-        <div className="flex-1 min-w-0">
-          <label className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-0.5">
-            Step Sequence
-          </label>
-          <p className="text-[9px] text-[#374A5E]">
-            Number this flow to show execution order
-          </p>
-        </div>
-        <input
-          type="number"
-          min={1}
-          value={selectedEdge.data?.sequence ?? ''}
-          onChange={(e) => {
-            const val = e.target.value === '' ? undefined : parseInt(e.target.value, 10)
-            useDiagramStore.getState().updateEdgeSequence(selectedEdge.id, val && val > 0 ? val : undefined)
-          }}
-          placeholder="—"
-          className="w-14 bg-[#0F172A] border border-[#374A5E]/50 rounded-md px-2 py-1.5 text-center text-sm text-[#F8FAFC] font-bold font-[family-name:var(--font-space-mono)] outline-none focus:border-[#06B6D4] transition-colors placeholder:text-[#374A5E] placeholder:font-normal"
-        />
-      </div>
+      {/* Sequence is now per-artifact — shown in the artifact tagger below */}
 
       <SidebarLabel>Data Elements</SidebarLabel>
       <p className="text-[11px] text-[#64748B] mb-4">
@@ -1267,7 +1267,7 @@ function ElementsTab() {
       </div>
 
       {/* ── Output Artifacts (tag this connection) ─────── */}
-      <ArtifactTagger edgeId={selectedEdge.id} taggedIds={selectedEdge.data?.outputArtifactIds ?? []} />
+      <ArtifactTagger edgeId={selectedEdge.id} taggedIds={selectedEdge.data?.outputArtifactIds ?? []} artifactSequences={selectedEdge.data?.artifactSequences} />
 
       {/* Add new element */}
       <SidebarLabel>Add Element</SidebarLabel>

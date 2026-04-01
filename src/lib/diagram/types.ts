@@ -111,7 +111,8 @@ export interface DataFlowData extends Record<string, unknown> {
   outputArtifacts?: OutputArtifact[] // legacy per-edge artifacts
   outputArtifactIds?: string[] // references to diagram-level artifacts
   labelPosition?: number // 0–1 position along the edge path (default 0.5 = midpoint)
-  sequence?: number // step order (1, 2, 3...) for sequencing data flows
+  sequence?: number // legacy single sequence
+  artifactSequences?: Record<string, number> // artifact ID → step number
 }
 
 export type DataFlowEdge = Edge<DataFlowData, 'dataFlow'>

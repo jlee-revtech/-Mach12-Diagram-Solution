@@ -71,8 +71,8 @@ interface DiagramState {
   updateEdgeEndpoint: (edgeId: string, endpoint: 'source' | 'target', newNodeId: string) => void
   // Edge label position (0–1 along path)
   updateEdgeLabelPosition: (edgeId: string, position: number) => void
-  // Edge sequence (step ordering)
-  updateEdgeSequence: (edgeId: string, sequence: number | undefined) => void
+  // Edge sequence per artifact
+  updateEdgeArtifactSequence: (edgeId: string, artifactId: string, sequence: number | undefined) => void
   // System node copy/paste
   copiedNodeData: { data: SystemNode['data']; connectedEdges: DataFlowEdge[] } | null
   copyNode: (nodeId: string) => void
@@ -222,14 +222,19 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     })
   },
 
-  // ─── Edge Sequence ────────────────────────────────────
-  updateEdgeSequence: (edgeId, sequence) => {
+  // ─── Edge Sequence per Artifact ────────────────────────
+  updateEdgeArtifactSequence: (edgeId, artifactId, sequence) => {
     set({
-      edges: get().edges.map((e) =>
-        e.id === edgeId && e.data
-          ? { ...e, data: { ...e.data, sequence } }
-          : e
-      ),
+      edges: get().edges.map((e) => {
+        if (e.id !== edgeId || !e.data) return e
+        const seqs = { ...(e.data.artifactSequences ?? {}) }
+        if (sequence != null && sequence > 0) {
+          seqs[artifactId] = sequence
+        } else {
+          delete seqs[artifactId]
+        }
+        return { ...e, data: { ...e.data, artifactSequences: Object.keys(seqs).length > 0 ? seqs : undefined } }
+      }),
     })
   },
 
