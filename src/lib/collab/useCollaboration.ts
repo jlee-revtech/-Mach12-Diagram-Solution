@@ -81,7 +81,7 @@ export function useCollaboration(diagramId: string | undefined, userName: string
       useDiagramStore.setState({ nodes, edges })
 
       // Keep suppressed briefly to prevent echo loop
-      setTimeout(() => { suppressSync.current = false }, 100)
+      setTimeout(() => { suppressSync.current = false }, 200)
     }
 
     yNodes.observe(syncFromYjs)
@@ -127,7 +127,8 @@ export function useCollaboration(diagramId: string | undefined, userName: string
       })
     })
 
-    suppressSync.current = false
+    // Keep suppressed briefly so observe callbacks from our own transaction don't echo back
+    setTimeout(() => { suppressSync.current = false }, 200)
   }, [])
 
   // Update cursor position in awareness

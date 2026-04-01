@@ -96,6 +96,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSaveRef = useRef<string>('')
+  const savingRef = useRef(false)
 
   // Debounced sync to Yjs + autosave to Supabase on ANY change
   useEffect(() => {
@@ -114,17 +115,21 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
     // Autosave to Supabase after changes settle (2s debounce)
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
-      if (!user) return
+      if (!user || savingRef.current) return
+      savingRef.current = true
       setSaveStatus('saving')
       try {
         await useDiagramStore.getState().saveDiagram(user.id)
         lastSaveRef.current = JSON.stringify({
           n: useDiagramStore.getState().nodes,
           e: useDiagramStore.getState().edges,
+          g: useDiagramStore.getState().groups,
         })
         setSaveStatus('saved')
       } catch {
         setSaveStatus('unsaved')
+      } finally {
+        savingRef.current = false
       }
     }, 2000)
 
