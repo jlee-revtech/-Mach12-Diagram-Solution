@@ -30,28 +30,31 @@ function markerUrl(markerId: string) {
 }
 
 // ─── Path position helpers ──────────────────────────────
+// Reusable SVG path element — avoids DOM create/destroy on every render
+let _reusablePath: SVGPathElement | null = null
+function getReusablePath(d: string): SVGPathElement {
+  if (!_reusablePath) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none'
+    _reusablePath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    svg.appendChild(_reusablePath)
+    document.body.appendChild(svg)
+  }
+  _reusablePath.setAttribute('d', d)
+  return _reusablePath
+}
+
 // Given an SVG path `d` string, compute the {x,y} at a 0–1 ratio.
 function getPointAtRatio(d: string, ratio: number): { x: number; y: number } {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-  path.setAttribute('d', d)
-  svg.appendChild(path)
-  document.body.appendChild(svg)
-  const totalLen = path.getTotalLength()
-  const pt = path.getPointAtLength(ratio * totalLen)
-  document.body.removeChild(svg)
+  const path = getReusablePath(d)
+  const pt = path.getPointAtLength(ratio * path.getTotalLength())
   return { x: pt.x, y: pt.y }
 }
 
 // Project a flow-space point onto the path, returning the closest 0–1 ratio.
 function closestRatioOnPath(d: string, px: number, py: number): number {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-  path.setAttribute('d', d)
-  svg.appendChild(path)
-  document.body.appendChild(svg)
+  const path = getReusablePath(d)
   const totalLen = path.getTotalLength()
-  // Binary-search style sampling: coarse pass then refine
   let bestDist = Infinity
   let bestRatio = 0.5
   const COARSE = 40
@@ -59,12 +62,8 @@ function closestRatioOnPath(d: string, px: number, py: number): number {
     const r = i / COARSE
     const pt = path.getPointAtLength(r * totalLen)
     const dist = (pt.x - px) ** 2 + (pt.y - py) ** 2
-    if (dist < bestDist) {
-      bestDist = dist
-      bestRatio = r
-    }
+    if (dist < bestDist) { bestDist = dist; bestRatio = r }
   }
-  // Refine around best
   const step = 1 / COARSE
   const lo = Math.max(0, bestRatio - step)
   const hi = Math.min(1, bestRatio + step)
@@ -73,12 +72,8 @@ function closestRatioOnPath(d: string, px: number, py: number): number {
     const r = lo + (hi - lo) * (i / FINE)
     const pt = path.getPointAtLength(r * totalLen)
     const dist = (pt.x - px) ** 2 + (pt.y - py) ** 2
-    if (dist < bestDist) {
-      bestDist = dist
-      bestRatio = r
-    }
+    if (dist < bestDist) { bestDist = dist; bestRatio = r }
   }
-  document.body.removeChild(svg)
   return bestRatio
 }
 

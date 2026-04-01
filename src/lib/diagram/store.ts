@@ -1003,11 +1003,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   // ─── Undo ─────────────────────────────────────────────
   pushUndo: () => {
     const { nodes, edges, groups, artifacts, undoStack } = get()
+    const clone = typeof structuredClone === 'function' ? structuredClone : (v: any) => JSON.parse(JSON.stringify(v))
     const snapshot: DiagramSnapshot = {
-      nodes: JSON.parse(JSON.stringify(nodes)),
-      edges: JSON.parse(JSON.stringify(edges)),
-      groups: JSON.parse(JSON.stringify(groups)),
-      artifacts: JSON.parse(JSON.stringify(artifacts)),
+      nodes: clone(nodes),
+      edges: clone(edges),
+      groups: clone(groups),
+      artifacts: clone(artifacts),
     }
     const newStack = [...undoStack, snapshot].slice(-MAX_UNDO)
     set({ undoStack: newStack, canUndo: true })

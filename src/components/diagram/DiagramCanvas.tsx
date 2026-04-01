@@ -116,10 +116,12 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const savingRef = useRef(false)
 
   // Debounced sync to Yjs + autosave to Supabase on ANY change
+  // Use a cheap change counter instead of JSON.stringify on every frame
+  const changeTickRef = useRef(0)
   useEffect(() => {
-    // Build a fingerprint of current state to detect real changes
-    const fingerprint = JSON.stringify({ n: nodes, e: edges, g: groups })
-    if (fingerprint === lastSaveRef.current) return
+    // Increment tick — the actual fingerprint comparison is deferred to the debounced callbacks
+    changeTickRef.current++
+    const tick = changeTickRef.current
 
     setSaveStatus('unsaved')
 
@@ -133,15 +135,23 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
       if (!user || savingRef.current) return
+      // Only save if no more changes came in during the debounce period
+      if (changeTickRef.current !== tick) return
+      // Fingerprint check — only run once when we're actually about to save
+      const fp = JSON.stringify({
+        n: useDiagramStore.getState().nodes,
+        e: useDiagramStore.getState().edges,
+        g: useDiagramStore.getState().groups,
+      })
+      if (fp === lastSaveRef.current) {
+        setSaveStatus('saved')
+        return
+      }
       savingRef.current = true
       setSaveStatus('saving')
       try {
         await useDiagramStore.getState().saveDiagram(user.id)
-        lastSaveRef.current = JSON.stringify({
-          n: useDiagramStore.getState().nodes,
-          e: useDiagramStore.getState().edges,
-          g: useDiagramStore.getState().groups,
-        })
+        lastSaveRef.current = fp
         setSaveStatus('saved')
       } catch {
         setSaveStatus('unsaved')
@@ -155,7 +165,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, groups, user])
+  }, [systemNodes, edges, groups, user])
 
   // Keyboard shortcuts
   useEffect(() => {
