@@ -285,9 +285,12 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           </div>
         )}
 
+        {/* Override pointer-events for group nodes so clicks pass through to edges/labels */}
+        <style>{`.react-flow__node-systemGroup { pointer-events: none !important; }`}</style>
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          elevateEdgesOnSelect
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
