@@ -413,6 +413,104 @@ function PropertiesTab() {
   )
 }
 
+// ─── Copy Data From Sibling Connection ─────────────────
+function CopyFromSibling({ edgeId, sourceId, targetId }: { edgeId: string; sourceId: string; targetId: string }) {
+  const edges = useDiagramStore((s) => s.edges)
+  const nodes = useDiagramStore((s) => s.nodes)
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  // Find sibling connections: same source OR same target, excluding self
+  const siblings = useMemo(() => {
+    return edges.filter((e) => {
+      if (e.id === edgeId) return false
+      if ((e.data?.dataElements?.length ?? 0) === 0) return false
+      return e.source === sourceId || e.target === sourceId || e.source === targetId || e.target === targetId
+    })
+  }, [edges, edgeId, sourceId, targetId])
+
+  const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
+
+  const handleCopy = useCallback((fromEdgeId: string) => {
+    const fromEdge = edges.find((e) => e.id === fromEdgeId)
+    if (!fromEdge?.data?.dataElements) return
+    const store = useDiagramStore.getState()
+    // Clone data elements with new IDs
+    const clonedElements = fromEdge.data.dataElements.map((el) => ({
+      ...el,
+      id: Math.random().toString(36).substring(2, 10),
+      attributes: el.attributes?.map((a) => ({ ...a, id: Math.random().toString(36).substring(2, 10) })),
+      technicalProperties: el.technicalProperties?.map((p) => ({ ...p, id: Math.random().toString(36).substring(2, 10) })),
+    }))
+    store.pushUndo()
+    useDiagramStore.setState({
+      edges: store.edges.map((e) =>
+        e.id === edgeId && e.data
+          ? { ...e, data: { ...e.data, dataElements: [...e.data.dataElements, ...clonedElements] } }
+          : e
+      ),
+    })
+    setCopied(true)
+    setTimeout(() => { setCopied(false); setOpen(false) }, 1200)
+  }, [edges, edgeId])
+
+  if (siblings.length === 0) return null
+
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-[10px] text-[#64748B] hover:text-[#CBD5E1] transition-colors"
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="4" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+          <path d="M6 4V2.5A1.5 1.5 0 017.5 1h5A1.5 1.5 0 0114 2.5v5a1.5 1.5 0 01-1.5 1.5H11" stroke="currentColor" strokeWidth="1.3"/>
+        </svg>
+        {copied ? 'Copied!' : 'Copy data elements from another connection'}
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`transition-transform ${open ? 'rotate-180' : ''}`}>
+          <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1">
+          {siblings.map((e) => {
+            const src = nodeMap.get(e.source)
+            const tgt = nodeMap.get(e.target)
+            const elCount = e.data?.dataElements?.length ?? 0
+            return (
+              <button
+                key={e.id}
+                onClick={() => handleCopy(e.id)}
+                className="flex items-center gap-2 w-full text-left bg-[#151E2E] hover:bg-[#1F2C3F] border border-[#374A5E]/30 hover:border-[#374A5E]/60 rounded-lg px-3 py-2 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 text-[10px]">
+                    <span className="text-[#CBD5E1] truncate max-w-[80px]">{src?.data.label ?? '?'}</span>
+                    <span className="text-[#64748B]">→</span>
+                    <span className="text-[#CBD5E1] truncate max-w-[80px]">{tgt?.data.label ?? '?'}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {(e.data?.dataElements ?? []).slice(0, 3).map((el) => (
+                      <span key={el.id} className="text-[8px] bg-[#0F172A] text-[#94A3B8] px-1 py-0.5 rounded border border-[#374A5E]/20">
+                        {el.name}
+                      </span>
+                    ))}
+                    {elCount > 3 && (
+                      <span className="text-[8px] text-[#64748B]">+{elCount - 3}</span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[9px] text-[#2563EB] font-medium shrink-0">Copy</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Artifact Tagger (shown on edge edit) ──────────────
 function ArtifactTagger({ edgeId, taggedIds, artifactSequences }: { edgeId: string; taggedIds: string[]; artifactSequences?: Record<string, number> }) {
   const artifacts = useDiagramStore((s) => s.artifacts)
@@ -1268,6 +1366,9 @@ function ElementsTab() {
 
       {/* ── Output Artifacts (tag this connection) ─────── */}
       <ArtifactTagger edgeId={selectedEdge.id} taggedIds={selectedEdge.data?.outputArtifactIds ?? []} artifactSequences={selectedEdge.data?.artifactSequences} />
+
+      {/* Copy data elements from sibling connection */}
+      <CopyFromSibling edgeId={selectedEdge.id} sourceId={selectedEdge.source} targetId={selectedEdge.target} />
 
       {/* Add new element */}
       <SidebarLabel>Add Element</SidebarLabel>
