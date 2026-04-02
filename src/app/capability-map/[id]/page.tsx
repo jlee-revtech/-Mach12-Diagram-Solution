@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useEffect, useState, useCallback } from 'react'
+import { use, useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useSIPOCStore } from '@/lib/sipoc/store'
@@ -13,45 +13,47 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const { user, organization, loading: authLoading } = useAuth()
 
   const map = useSIPOCStore(s => s.map)
+  const mapTitle = map?.title ?? ''
   const loading = useSIPOCStore(s => s.loading)
-  const loadMap = useSIPOCStore(s => s.loadMap)
-  const loadOrgEntities = useSIPOCStore(s => s.loadOrgEntities)
-  const updateTitle = useSIPOCStore(s => s.updateTitle)
   const addCapability = useSIPOCStore(s => s.addCapability)
 
   const [titleInput, setTitleInput] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
+  const loadedRef = useRef(false)
+  const orgLoadedRef = useRef<string | null>(null)
 
   // Auth gating
   useEffect(() => {
     if (!authLoading && !user) router.push('/auth')
   }, [user, authLoading, router])
 
-  // Load map data
+  // Load map data (once)
   useEffect(() => {
-    if (id) {
-      loadMap(id)
+    if (id && !loadedRef.current) {
+      loadedRef.current = true
+      useSIPOCStore.getState().loadMap(id)
     }
-  }, [id, loadMap])
+  }, [id])
 
-  // Load org entities when org is available
+  // Load org entities when org is available (once per org)
   useEffect(() => {
-    if (organization) {
-      loadOrgEntities(organization.id)
+    if (organization && orgLoadedRef.current !== organization.id) {
+      orgLoadedRef.current = organization.id
+      useSIPOCStore.getState().loadOrgEntities(organization.id)
     }
-  }, [organization, loadOrgEntities])
+  }, [organization])
 
   // Sync title input
   useEffect(() => {
-    if (map) setTitleInput(map.title)
-  }, [map?.title])
+    if (mapTitle) setTitleInput(mapTitle)
+  }, [mapTitle])
 
   const handleTitleBlur = useCallback(() => {
     setEditingTitle(false)
-    if (user && titleInput.trim() && titleInput !== map?.title) {
-      updateTitle(titleInput.trim(), user.id)
+    if (user && titleInput.trim() && titleInput !== mapTitle) {
+      useSIPOCStore.getState().updateTitle(titleInput.trim(), user.id)
     }
-  }, [user, titleInput, map?.title, updateTitle])
+  }, [user, titleInput, mapTitle])
 
   if (authLoading || !user || loading || !map) {
     return (
