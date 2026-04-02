@@ -59,18 +59,11 @@ export interface Capability {
   updated_at: string
 }
 
-// ─── Data Objects (nested on inputs/outputs) ──────────
-export interface DataAttribute {
+// ─── Dimensions (detail attributes on inputs/outputs) ──
+export interface Dimension {
   id: string
   name: string
   description?: string
-}
-
-export interface SIPOCDataObject {
-  id: string
-  name: string
-  description?: string
-  attributes: DataAttribute[]
 }
 
 // ─── Capability Inputs (with supplier & system tags) ───
@@ -80,7 +73,7 @@ export interface CapabilityInput {
   information_product_id: string
   supplier_persona_ids: string[]
   source_system_ids: string[]
-  data_objects: SIPOCDataObject[]
+  dimensions: Dimension[]
   sort_order: number
   created_at: string
 }
@@ -91,7 +84,7 @@ export interface CapabilityOutput {
   capability_id: string
   information_product_id: string
   consumer_persona_ids: string[]
-  data_objects: SIPOCDataObject[]
+  dimensions: Dimension[]
   sort_order: number
   created_at: string
 }

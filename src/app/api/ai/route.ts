@@ -81,6 +81,8 @@ export async function POST(req: NextRequest) {
       return handleAnalyze(context)
     } else if (action === 'implement') {
       return handleImplement(context)
+    } else if (action === 'sipoc-generate') {
+      return handleSIPOCGenerate(prompt, context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

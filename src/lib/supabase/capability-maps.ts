@@ -193,7 +193,7 @@ export async function createCapabilityInput(
 
 export async function updateCapabilityInput(
   id: string,
-  updates: Partial<Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'data_objects' | 'sort_order'>>
+  updates: Partial<Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'dimensions' | 'sort_order'>>
 ): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/capability_inputs?id=eq.${id}`, {
     method: 'PATCH',
@@ -251,7 +251,7 @@ export async function createCapabilityOutput(
 
 export async function updateCapabilityOutput(
   id: string,
-  updates: Partial<Pick<CapabilityOutput, 'consumer_persona_ids' | 'data_objects' | 'sort_order'>>
+  updates: Partial<Pick<CapabilityOutput, 'consumer_persona_ids' | 'dimensions' | 'sort_order'>>
 ): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/capability_outputs?id=eq.${id}`, {
     method: 'PATCH',

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { Persona, InformationProduct, LogicalSystem, SIPOCDataObject } from '@/lib/sipoc/types'
+import type { Persona, InformationProduct, LogicalSystem, Dimension } from '@/lib/sipoc/types'
 import { PERSONA_COLORS, IP_CATEGORIES } from '@/lib/sipoc/types'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 
@@ -100,131 +100,51 @@ function SectionLabel({ label, count }: { label: string; count?: number }) {
   )
 }
 
-// ─── Data Objects Editor ────────────────────────────────
-function DataObjectsEditor({
-  dataObjects,
+// ─── Dimensions Editor (detail attributes on an input/output) ──
+function DimensionsEditor({
+  dimensions,
   side,
   itemId,
   capabilityId,
 }: {
-  dataObjects: SIPOCDataObject[]
+  dimensions: Dimension[]
   side: 'input' | 'output'
   itemId: string
   capabilityId: string
 }) {
-  const addDataObject = useSIPOCStore(s => s.addDataObject)
-  const updateDataObject = useSIPOCStore(s => s.updateDataObject)
-  const removeDataObject = useSIPOCStore(s => s.removeDataObject)
-  const addDataAttribute = useSIPOCStore(s => s.addDataAttribute)
-  const updateDataAttribute = useSIPOCStore(s => s.updateDataAttribute)
-  const removeDataAttribute = useSIPOCStore(s => s.removeDataAttribute)
-
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [newAttrName, setNewAttrName] = useState<Record<string, string>>({})
-
-  const toggleExpanded = (id: string) => {
-    setExpandedIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  const handleAddAttr = (doId: string) => {
-    const name = (newAttrName[doId] || '').trim()
-    if (!name) return
-    addDataAttribute(side, itemId, capabilityId, doId, name)
-    setNewAttrName(prev => ({ ...prev, [doId]: '' }))
-  }
+  const addDimension = useSIPOCStore(s => s.addDimension)
+  const updateDimension = useSIPOCStore(s => s.updateDimension)
+  const removeDimension = useSIPOCStore(s => s.removeDimension)
 
   return (
     <div>
       <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
-        Data Objects
+        Dimensions
       </div>
-      {dataObjects.length > 0 && (
-        <div className="space-y-1.5 mb-1.5">
-          {dataObjects.map(dObj => (
-            <div key={dObj.id} className="border border-[var(--m12-border)]/20 rounded-md bg-[var(--m12-bg-card)]/50">
-              {/* Data Object header */}
-              <div className="flex items-center gap-1.5 px-2 py-1.5">
-                <button
-                  onClick={() => toggleExpanded(dObj.id)}
-                  className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
-                >
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`transition-transform ${expandedIds.has(dObj.id) ? 'rotate-90' : ''}`}>
-                    <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <input
-                  value={dObj.name}
-                  onChange={e => updateDataObject(side, itemId, capabilityId, dObj.id, { name: e.target.value })}
-                  className="flex-1 bg-transparent text-[10px] font-medium text-[var(--m12-text)] focus:outline-none border-b border-transparent focus:border-[#2563EB]/40 py-0.5"
-                />
-                <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
-                  {dObj.attributes.length}
-                </span>
-                <button
-                  onClick={() => removeDataObject(side, itemId, capabilityId, dObj.id)}
-                  className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors"
-                >
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                    <path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Expanded: attributes list */}
-              {expandedIds.has(dObj.id) && (
-                <div className="px-2 pb-2 pt-0.5 border-t border-[var(--m12-border)]/10">
-                  {dObj.attributes.length > 0 && (
-                    <div className="space-y-0.5 mb-1.5">
-                      {dObj.attributes.map(attr => (
-                        <div key={attr.id} className="flex items-center gap-1.5 group/attr pl-3">
-                          <div className="w-1 h-1 rounded-full bg-[var(--m12-text-faint)] shrink-0" />
-                          <input
-                            value={attr.name}
-                            onChange={e => updateDataAttribute(side, itemId, capabilityId, dObj.id, attr.id, { name: e.target.value })}
-                            className="flex-1 bg-transparent text-[9px] text-[var(--m12-text-secondary)] focus:outline-none border-b border-transparent focus:border-[#2563EB]/30 py-0.5"
-                          />
-                          <button
-                            onClick={() => removeDataAttribute(side, itemId, capabilityId, dObj.id, attr.id)}
-                            className="opacity-0 group-hover/attr:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
-                          >
-                            <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
-                              <path d="M1.5 1.5l4 4M5.5 1.5l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* Quick-add attribute */}
-                  <div className="flex gap-1 pl-3">
-                    <input
-                      value={newAttrName[dObj.id] || ''}
-                      onChange={e => setNewAttrName(prev => ({ ...prev, [dObj.id]: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && handleAddAttr(dObj.id)}
-                      placeholder="Add attribute..."
-                      className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/30 rounded px-1.5 py-0.5 text-[9px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/40"
-                    />
-                    <button
-                      onClick={() => handleAddAttr(dObj.id)}
-                      className="text-[8px] text-[#2563EB] hover:text-[#3B82F6] font-medium transition-colors px-1"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              )}
+      {dimensions.length > 0 && (
+        <div className="space-y-0.5 mb-1.5 border-l-2 border-[var(--m12-border)]/20 ml-1 pl-2">
+          {dimensions.map(dim => (
+            <div key={dim.id} className="flex items-center gap-1.5 group/dim">
+              <input
+                value={dim.name}
+                onChange={e => updateDimension(side, itemId, capabilityId, dim.id, { name: e.target.value })}
+                className="flex-1 bg-transparent text-[10px] text-[var(--m12-text-secondary)] focus:outline-none border-b border-transparent focus:border-[#2563EB]/30 py-0.5"
+              />
+              <button
+                onClick={() => removeDimension(side, itemId, capabilityId, dim.id)}
+                className="opacity-0 group-hover/dim:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
           ))}
         </div>
       )}
-      {/* Quick-add data object */}
       <QuickAdd
-        placeholder="Add data object..."
-        onAdd={name => addDataObject(side, itemId, capabilityId, name)}
+        placeholder="Add dimension..."
+        onAdd={name => addDimension(side, itemId, capabilityId, name)}
       />
     </div>
   )
@@ -337,8 +257,8 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   />
                 </div>
                 {/* Data Objects */}
-                <DataObjectsEditor
-                  dataObjects={input.data_objects || []}
+                <DimensionsEditor
+                  dimensions={input.dimensions || []}
                   side="input"
                   itemId={input.id}
                   capabilityId={capabilityId}
@@ -401,8 +321,8 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   />
                 </div>
                 {/* Data Objects */}
-                <DataObjectsEditor
-                  dataObjects={output.data_objects || []}
+                <DimensionsEditor
+                  dimensions={output.dimensions || []}
                   side="output"
                   itemId={output.id}
                   capabilityId={capabilityId}

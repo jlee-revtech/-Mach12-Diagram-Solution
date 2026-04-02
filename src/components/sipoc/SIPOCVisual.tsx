@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { HydratedCapability, SIPOCDataObject } from '@/lib/sipoc/types'
+import type { HydratedCapability, Dimension } from '@/lib/sipoc/types'
 
 // ─── Column Header ──────────────────────────────────────
 function ColumnHeader({ label, color, letter }: { label: string; color: string; letter: string }) {
@@ -40,21 +40,21 @@ function SystemChip({ name, color }: { name: string; color?: string }) {
   )
 }
 
-// ─── Info Product Card ──────────────────────────────────
+// ─── Info Product Card (the data object, with dimensions) ─
 function IPCard({
   name,
   category,
-  dataObjects,
-  showDataObjects,
+  dimensions,
+  showDimensions,
   accentColor,
 }: {
   name: string
   category?: string
-  dataObjects?: SIPOCDataObject[]
-  showDataObjects: boolean
+  dimensions?: Dimension[]
+  showDimensions: boolean
   accentColor: string
 }) {
-  const hasData = dataObjects && dataObjects.length > 0
+  const hasDims = dimensions && dimensions.length > 0
   return (
     <div
       className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2.5 shadow-sm transition-all hover:shadow-md"
@@ -62,9 +62,9 @@ function IPCard({
     >
       <div className="flex items-center gap-1.5">
         <div className="text-[11px] font-semibold text-[var(--m12-text)] flex-1 leading-tight">{name}</div>
-        {hasData && (
+        {hasDims && (
           <span className="text-[7px] bg-[var(--m12-bg)] text-[var(--m12-text-muted)] rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] font-bold border border-[var(--m12-border)]/20">
-            {dataObjects.length}
+            {dimensions.length}
           </span>
         )}
       </div>
@@ -73,19 +73,10 @@ function IPCard({
           {category}
         </div>
       )}
-      {showDataObjects && hasData && (
-        <div className="mt-2 pt-2 border-t border-[var(--m12-border)]/15 space-y-1.5">
-          {dataObjects.map(dObj => (
-            <div key={dObj.id}>
-              <div className="text-[9px] font-semibold text-[var(--m12-text-secondary)]">{dObj.name}</div>
-              {dObj.attributes.length > 0 && (
-                <div className="pl-2.5 mt-0.5 space-y-0 border-l border-[var(--m12-border)]/15 ml-0.5">
-                  {dObj.attributes.map(attr => (
-                    <div key={attr.id} className="text-[8px] text-[var(--m12-text-muted)] py-px">{attr.name}</div>
-                  ))}
-                </div>
-              )}
-            </div>
+      {showDimensions && hasDims && (
+        <div className="mt-2 pt-1.5 border-t border-[var(--m12-border)]/15 space-y-0 border-l-2 border-[var(--m12-border)]/15 ml-0.5 pl-2">
+          {dimensions.map(dim => (
+            <div key={dim.id} className="text-[8px] text-[var(--m12-text-muted)] py-px">{dim.name}</div>
           ))}
         </div>
       )}
@@ -103,9 +94,9 @@ function HArrow({ muted }: { muted?: boolean }) {
 }
 
 // ─── Single input lane (Suppliers → Input) ──────────────
-function InputLane({ input, showDataObjects }: {
+function InputLane({ input, showDimensions }: {
   input: HydratedCapability['inputs'][0]
-  showDataObjects: boolean
+  showDimensions: boolean
 }) {
   const hasSuppliers = input.supplierPersonas.length > 0 || input.sourceSystems.length > 0
 
@@ -131,8 +122,8 @@ function InputLane({ input, showDataObjects }: {
         <IPCard
           name={input.informationProduct.name}
           category={input.informationProduct.category}
-          dataObjects={input.data_objects}
-          showDataObjects={showDataObjects}
+          dimensions={input.dimensions}
+          showDimensions={showDimensions}
           accentColor="#EAB308"
         />
       </div>
@@ -141,9 +132,9 @@ function InputLane({ input, showDataObjects }: {
 }
 
 // ─── Single output lane (Output → Consumers) ────────────
-function OutputLane({ output, showDataObjects }: {
+function OutputLane({ output, showDimensions }: {
   output: HydratedCapability['outputs'][0]
-  showDataObjects: boolean
+  showDimensions: boolean
 }) {
   const hasConsumers = output.consumerPersonas.length > 0
 
@@ -154,8 +145,8 @@ function OutputLane({ output, showDataObjects }: {
         <IPCard
           name={output.informationProduct.name}
           category={output.informationProduct.category}
-          dataObjects={output.data_objects}
-          showDataObjects={showDataObjects}
+          dimensions={output.dimensions}
+          showDimensions={showDimensions}
           accentColor="#10B981"
         />
       </div>
@@ -176,11 +167,11 @@ function OutputLane({ output, showDataObjects }: {
 }
 
 // ─── Single Capability SIPOC Block ──────────────────────
-function CapabilityBlock({ capability, isSelected, onSelect, showDataObjects }: {
+function CapabilityBlock({ capability, isSelected, onSelect, showDimensions }: {
   capability: HydratedCapability
   isSelected: boolean
   onSelect: () => void
-  showDataObjects: boolean
+  showDimensions: boolean
 }) {
   const maxLanes = Math.max(capability.inputs.length, capability.outputs.length, 1)
 
@@ -199,7 +190,7 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDataObjects }: 
         <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center bg-[var(--m12-bg-card)]/30">
           {capability.inputs.length > 0 ? (
             capability.inputs.map(input => (
-              <InputLane key={input.id} input={input} showDataObjects={showDataObjects} />
+              <InputLane key={input.id} input={input} showDimensions={showDimensions} />
             ))
           ) : (
             <div className="flex items-center justify-center py-4 text-[10px] text-[var(--m12-text-faint)] italic">
@@ -243,7 +234,7 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDataObjects }: 
         <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center bg-[var(--m12-bg-card)]/30">
           {capability.outputs.length > 0 ? (
             capability.outputs.map(output => (
-              <OutputLane key={output.id} output={output} showDataObjects={showDataObjects} />
+              <OutputLane key={output.id} output={output} showDimensions={showDimensions} />
             ))
           ) : (
             <div className="flex items-center justify-center py-4 text-[10px] text-[var(--m12-text-faint)] italic">
@@ -267,7 +258,7 @@ export default function SIPOCVisual() {
   const selectedCapabilityId = useSIPOCStore(s => s.selectedCapabilityId)
   const setSelectedCapability = useSIPOCStore(s => s.setSelectedCapability)
 
-  const [showDataObjects, setShowDataObjects] = useState(false)
+  const [showDimensions, setShowDataObjects] = useState(false)
 
   const capabilities = useMemo(() => {
     return useSIPOCStore.getState().getHydratedCapabilities()
@@ -307,9 +298,9 @@ export default function SIPOCVisual() {
       {/* Controls */}
       <div className="flex items-center justify-end">
         <button
-          onClick={() => setShowDataObjects(!showDataObjects)}
+          onClick={() => setShowDataObjects(!showDimensions)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider border transition-colors ${
-            showDataObjects
+            showDimensions
               ? 'bg-[#2563EB]/10 border-[#2563EB]/40 text-[#93C5FD]'
               : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[var(--m12-border)] hover:text-[var(--m12-text-secondary)]'
           }`}
@@ -318,7 +309,7 @@ export default function SIPOCVisual() {
             <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1" />
             <path d="M3 4h4M3 6h2.5" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
           </svg>
-          {showDataObjects ? 'Hide' : 'Show'} Data Objects
+          {showDimensions ? 'Hide' : 'Show'} Dimensions
         </button>
       </div>
 
@@ -329,7 +320,7 @@ export default function SIPOCVisual() {
           capability={cap}
           isSelected={selectedCapabilityId === cap.id}
           onSelect={() => setSelectedCapability(selectedCapabilityId === cap.id ? null : cap.id)}
-          showDataObjects={showDataObjects}
+          showDimensions={showDimensions}
         />
       ))}
     </div>
