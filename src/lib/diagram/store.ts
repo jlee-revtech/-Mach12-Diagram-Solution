@@ -1184,6 +1184,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       return { ...e, sourceHandle, targetHandle }
     })
 
+    // Remove orphaned edges (source or target node no longer exists)
+    const nodeIds = new Set(nodes.map((n) => n.id))
+    edges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+
     set({
       meta: {
         id: row.id,

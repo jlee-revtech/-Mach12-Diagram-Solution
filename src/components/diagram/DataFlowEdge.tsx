@@ -151,7 +151,8 @@ function DataFlowEdgeComponent({
   const displayX = liveLabelPos?.x ?? labelPos.x
   const displayY = liveLabelPos?.y ?? labelPos.y
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation()
     setSelectedEdge(id)
     setSidebarTab('elements')
   }, [id, setSelectedEdge, setSidebarTab])

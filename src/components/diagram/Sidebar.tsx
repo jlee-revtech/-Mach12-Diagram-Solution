@@ -104,6 +104,16 @@ function GroupTemplatesSection() {
         { x: pos.x + sys.relativeX, y: pos.y + sys.relativeY }
       )
       newNodeIds.push(id)
+      // Apply saved dimensions
+      if (sys.width || sys.height) {
+        useDiagramStore.setState({
+          nodes: useDiagramStore.getState().nodes.map((n) =>
+            n.id === id
+              ? { ...n, width: sys.width, height: sys.height, style: { ...n.style, width: sys.width, height: sys.height } }
+              : n
+          ),
+        })
+      }
       // Apply physical system and modules
       if (sys.physicalSystem) {
         useDiagramStore.getState().updateSystemPhysical(id, sys.physicalSystem)
