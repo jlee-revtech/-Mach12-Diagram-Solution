@@ -391,7 +391,24 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   deleteSelected: () => {
     get().pushUndo()
     const { selectedNodeId, selectedEdgeId, selectedGroupId, nodes, edges, groups } = get()
-    if (selectedGroupId) {
+
+    // Check for multi-selection (box select / shift-click)
+    const selectedNodeIds = new Set(nodes.filter((n) => n.selected).map((n) => n.id))
+    const selectedGroupIds = new Set(groups.filter((g) => g.selected).map((g) => g.id))
+    const selectedEdgeIds = new Set(edges.filter((e) => e.selected).map((e) => e.id))
+
+    if (selectedNodeIds.size > 0 || selectedGroupIds.size > 0 || selectedEdgeIds.size > 0) {
+      set({
+        nodes: nodes.filter((n) => !selectedNodeIds.has(n.id)),
+        edges: edges.filter(
+          (e) => !selectedEdgeIds.has(e.id) && !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target)
+        ),
+        groups: groups.filter((g) => !selectedGroupIds.has(g.id)),
+        selectedNodeId: null,
+        selectedEdgeId: null,
+        selectedGroupId: null,
+      })
+    } else if (selectedGroupId) {
       set({
         groups: groups.filter((g) => g.id !== selectedGroupId),
         selectedGroupId: null,

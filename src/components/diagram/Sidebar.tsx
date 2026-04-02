@@ -124,8 +124,8 @@ function GroupTemplatesSection() {
       store.onConnect({
         source: sourceId,
         target: targetId,
-        sourceHandle: 'right-s2',
-        targetHandle: 'left-t1',
+        sourceHandle: edge.sourceHandle || 'right-s2',
+        targetHandle: edge.targetHandle || 'left-t1',
       })
       // Apply saved edge data (dataElements, direction, processContext, etc.)
       if (edge.data) {
@@ -418,6 +418,8 @@ function GroupPropertiesTab() {
         edges: containedEdges.map((e) => ({
           sourceIdx: systemIdxMap.get(e.source) ?? 0,
           targetIdx: systemIdxMap.get(e.target) ?? 0,
+          sourceHandle: e.sourceHandle,
+          targetHandle: e.targetHandle,
           data: e.data,
         })),
       })
