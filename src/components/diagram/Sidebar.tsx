@@ -92,8 +92,8 @@ function GroupTemplatesSection() {
       y: window.innerHeight / 2 - 200,
     })
     const td = template.template_data
-    // Create group
-    addGroup(td.group.label, pos, td.group.color)
+    // Create group with saved dimensions
+    addGroup(td.group.label, pos, td.group.color, td.group.width, td.group.height)
 
     // Create systems with relative positions
     const newNodeIds: string[] = []
@@ -115,7 +115,7 @@ function GroupTemplatesSection() {
       }
     }
 
-    // Create edges between contained systems
+    // Create edges between contained systems and restore data elements
     const store = useDiagramStore.getState()
     for (const edge of td.edges) {
       const sourceId = newNodeIds[edge.sourceIdx]
@@ -127,6 +127,20 @@ function GroupTemplatesSection() {
         sourceHandle: 'right-s2',
         targetHandle: 'left-t1',
       })
+      // Apply saved edge data (dataElements, direction, processContext, etc.)
+      if (edge.data) {
+        const updated = useDiagramStore.getState()
+        const newEdge = updated.edges.find(
+          (e) => e.source === sourceId && e.target === targetId
+        )
+        if (newEdge) {
+          useDiagramStore.setState({
+            edges: updated.edges.map((e) =>
+              e.id === newEdge.id ? { ...e, data: { ...e.data, ...edge.data } } : e
+            ),
+          })
+        }
+      }
     }
   }, [addGroup, addSystem, screenToFlowPosition])
 

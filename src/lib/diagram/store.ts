@@ -64,7 +64,7 @@ interface DiagramState {
   updateModule: (nodeId: string, moduleId: string, updates: Partial<SystemModule>) => void
   reorderModules: (nodeId: string, fromIndex: number, toIndex: number) => void
   // System group actions
-  addGroup: (label: string, position: XYPosition, color?: string) => string
+  addGroup: (label: string, position: XYPosition, color?: string, width?: number, height?: number) => string
   updateGroupLabel: (nodeId: string, label: string) => void
   updateGroupColor: (nodeId: string, color: string) => void
   // Edge endpoint editing (sidebar dropdowns)
@@ -458,7 +458,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   // ─── System Group Actions ────────────────────────────
-  addGroup: (label, position, color) => {
+  addGroup: (label, position, color, width, height) => {
     get().pushUndo()
     const id = `group-${uuid()}`
     const newGroup: SystemGroupNode = {
@@ -466,7 +466,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       type: 'systemGroup',
       position,
       zIndex: -1,
-      style: { width: 500, height: 400, pointerEvents: 'none' as const },
+      style: { width: width ?? 500, height: height ?? 400, pointerEvents: 'none' as const },
       focusable: false,
       data: { label, color: color || '#374A5E' },
     }
