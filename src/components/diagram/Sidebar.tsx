@@ -1229,7 +1229,9 @@ const TECHNICAL_PROPERTY_PRESETS = [
 function ConnectionHeader({ edgeId }: { edgeId: string }) {
   const edges = useDiagramStore((s) => s.edges)
   const nodes = useDiagramStore((s) => s.nodes)
+  const groups = useDiagramStore((s) => s.groups)
   const updateEdgeEndpoint = useDiagramStore((s) => s.updateEdgeEndpoint)
+  const reverseEdge = useDiagramStore((s) => s.reverseEdge)
   const copyEdgeData = useDiagramStore((s) => s.copyEdgeData)
   const pasteEdgeData = useDiagramStore((s) => s.pasteEdgeData)
   const copiedEdgeData = useDiagramStore((s) => s.copiedEdgeData)
@@ -1238,8 +1240,9 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
   const edge = edges.find((e) => e.id === edgeId)
   if (!edge) return null
 
-  const srcNode = nodes.find((n) => n.id === edge.source)
-  const tgtNode = nodes.find((n) => n.id === edge.target)
+  const allEndpoints = [...nodes as any[], ...groups]
+  const srcNode = allEndpoints.find((n: any) => n.id === edge.source)
+  const tgtNode = allEndpoints.find((n: any) => n.id === edge.target)
 
   return (
     <div className="mb-4 space-y-3">
@@ -1260,15 +1263,29 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
               {n.data.label}{n.data.physicalSystem ? ` (${n.data.physicalSystem})` : ''}
             </option>
           ))}
+          {groups.map((g) => (
+            <option key={g.id} value={g.id} disabled={g.id === edge.target}>
+              {g.data.label} (Group)
+            </option>
+          ))}
         </select>
       </div>
 
-      {/* Direction indicator */}
+      {/* Direction indicator + reverse button */}
       <div className="flex items-center justify-center">
         <div className="flex items-center gap-2 text-[var(--m12-text-muted)]">
-          <div className="h-px w-8 bg-[#374A5E]" />
-          <span className="text-xs">{edge.data?.direction === 'bidirectional' ? '↕' : '↓'}</span>
-          <div className="h-px w-8 bg-[#374A5E]" />
+          <div className="h-px w-6 bg-[var(--m12-border)]" />
+          <button
+            onClick={() => reverseEdge(edgeId)}
+            title="Reverse direction"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md border border-[var(--m12-border)]/40 hover:border-[#06B6D4]/40 text-[var(--m12-text-muted)] hover:text-[#06B6D4] transition-all text-[10px] font-[family-name:var(--font-space-mono)]"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path d="M4 10l-2-2 2-2M12 6l2 2-2 2M2 8h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Reverse
+          </button>
+          <div className="h-px w-6 bg-[var(--m12-border)]" />
         </div>
       </div>
 
@@ -1285,6 +1302,11 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
           {nodes.map((n) => (
             <option key={n.id} value={n.id} disabled={n.id === edge.source}>
               {n.data.label}{n.data.physicalSystem ? ` (${n.data.physicalSystem})` : ''}
+            </option>
+          ))}
+          {groups.map((g) => (
+            <option key={g.id} value={g.id} disabled={g.id === edge.source}>
+              {g.data.label} (Group)
             </option>
           ))}
         </select>
@@ -1404,6 +1426,35 @@ function ElementsTab() {
   return (
     <div>
       <ConnectionHeader edgeId={selectedEdge.id} />
+
+      {/* Condition (If/Then) */}
+      <div className="mb-4">
+        <label className="text-[9px] uppercase tracking-wider text-[#EAB308] font-[family-name:var(--font-space-mono)] font-bold block mb-1">
+          Condition (If / Then)
+        </label>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-[#EAB308]/70 font-[family-name:var(--font-space-mono)] shrink-0">IF</span>
+          <input
+            value={selectedEdge.data?.condition || ''}
+            onChange={(e) => {
+              useDiagramStore.setState({
+                edges: useDiagramStore.getState().edges.map((ed) =>
+                  ed.id === selectedEdge.id
+                    ? { ...ed, data: { ...ed.data!, condition: e.target.value || undefined } }
+                    : ed
+                ),
+              })
+            }}
+            placeholder="e.g. Material Type = FERT"
+            className="w-full bg-[var(--m12-bg)] border border-[#EAB308]/30 focus:border-[#EAB308]/60 rounded-lg px-2.5 py-1.5 text-xs text-[var(--m12-text)] outline-none transition-colors placeholder:text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]"
+          />
+        </div>
+        {selectedEdge.data?.condition && (
+          <p className="text-[9px] text-[var(--m12-text-muted)] mt-1 italic">
+            This data flow applies only when the condition is met.
+          </p>
+        )}
+      </div>
 
       {/* Sequence is now per-artifact — shown in the artifact tagger below */}
 

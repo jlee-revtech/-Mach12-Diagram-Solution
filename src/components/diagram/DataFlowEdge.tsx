@@ -279,6 +279,13 @@ function DataFlowEdgeComponent({
                   </div>
                 </div>
               )}
+              {/* Condition badge */}
+              {data?.condition && (
+                <div className="flex items-center gap-1 mb-1.5 -mx-0.5">
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#EAB308] bg-[#EAB308]/10 border border-[#EAB308]/30 px-1.5 py-0.5 rounded font-[family-name:var(--font-space-mono)]">IF</span>
+                  <span className="text-[9px] text-[#EAB308]/90 font-medium italic">{data.condition}</span>
+                </div>
+              )}
               <div className="flex flex-col gap-1">
                 {visibleElements.map((el) => (
                   <div key={el.id}>

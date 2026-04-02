@@ -69,6 +69,8 @@ interface DiagramState {
   updateGroupColor: (nodeId: string, color: string) => void
   // Edge endpoint editing (sidebar dropdowns)
   updateEdgeEndpoint: (edgeId: string, endpoint: 'source' | 'target', newNodeId: string) => void
+  // Reverse edge direction (swap source and target)
+  reverseEdge: (edgeId: string) => void
   // Edge label position (0–1 along path)
   updateEdgeLabelPosition: (edgeId: string, position: number) => void
   // Edge sequence per artifact
@@ -273,6 +275,23 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     })
   },
 
+  reverseEdge: (edgeId) => {
+    get().pushUndo()
+    set({
+      edges: get().edges.map((e) =>
+        e.id === edgeId
+          ? {
+              ...e,
+              source: e.target,
+              target: e.source,
+              sourceHandle: e.targetHandle?.replace('-t', '-s') ?? null,
+              targetHandle: e.sourceHandle?.replace('-s', '-t') ?? null,
+            }
+          : e
+      ),
+    })
+  },
+
   // ─── Edge Data Copy/Paste ─────────────────────────────
   // ─── System Node Copy/Paste ────────────────────────────
   copyNode: (nodeId) => {
@@ -399,13 +418,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
     if (selectedNodeIds.size > 0 || selectedGroupIds.size > 0 || selectedEdgeIds.size > 0) {
       const remainingNodes = nodes.filter((n) => !selectedNodeIds.has(n.id))
-      const remainingNodeIds = new Set(remainingNodes.map((n) => n.id))
+      const remainingGroups = groups.filter((g) => !selectedGroupIds.has(g.id))
+      const remainingEndpoints = new Set([
+        ...remainingNodes.map((n) => n.id),
+        ...remainingGroups.map((g) => g.id),
+      ])
       set({
         nodes: remainingNodes,
         edges: edges.filter(
-          (e) => !selectedEdgeIds.has(e.id) && remainingNodeIds.has(e.source) && remainingNodeIds.has(e.target)
+          (e) => !selectedEdgeIds.has(e.id) && remainingEndpoints.has(e.source) && remainingEndpoints.has(e.target)
         ),
-        groups: groups.filter((g) => !selectedGroupIds.has(g.id)),
+        groups: remainingGroups,
         selectedNodeId: null,
         selectedEdgeId: null,
         selectedGroupId: null,
@@ -413,6 +436,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     } else if (selectedGroupId) {
       set({
         groups: groups.filter((g) => g.id !== selectedGroupId),
+        edges: edges.filter(
+          (e) => e.source !== selectedGroupId && e.target !== selectedGroupId
+        ),
         selectedGroupId: null,
       })
     } else if (selectedNodeId) {
@@ -1155,14 +1181,19 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const nodes = canvas.nodes ?? []
     let edges = canvas.edges ?? []
 
+    const groups = canvas.groups ?? []
+
     // Repair edges with invalid handle IDs (e.g. 'right-src', 'left-tgt')
     const validHandles = new Set([
       'top-s1','top-t1','top-s2','top-t2','top-s3','top-t3',
       'bot-s1','bot-t1','bot-s2','bot-t2','bot-s3','bot-t3',
       'left-s1','left-t1','left-s2','left-t2','left-s3',
       'right-s1','right-t1','right-s2','right-t2','right-s3',
+      'grp-top-s','grp-top-t','grp-bot-s','grp-bot-t',
+      'grp-left-s','grp-left-t','grp-right-s','grp-right-t',
     ])
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+    const allNodesForMap = [...nodes as any[], ...groups]
+    const nodeMap = new Map(allNodesForMap.map((n: any) => [n.id, n]))
     edges = edges.map((e) => {
       const srcNode = nodeMap.get(e.source)
       const tgtNode = nodeMap.get(e.target)
@@ -1172,21 +1203,23 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       if (!needsFix || !srcNode || !tgtNode) return e
       const dx = tgtNode.position.x - srcNode.position.x
       const dy = tgtNode.position.y - srcNode.position.y
+      const srcIsGroup = srcNode.type === 'systemGroup'
+      const tgtIsGroup = tgtNode.type === 'systemGroup'
       let sourceHandle: string
       let targetHandle: string
       if (Math.abs(dx) > Math.abs(dy)) {
-        sourceHandle = dx > 0 ? 'right-s2' : 'left-s2'
-        targetHandle = dx > 0 ? 'left-t1' : 'right-t1'
+        sourceHandle = dx > 0 ? (srcIsGroup ? 'grp-right-s' : 'right-s2') : (srcIsGroup ? 'grp-left-s' : 'left-s2')
+        targetHandle = dx > 0 ? (tgtIsGroup ? 'grp-left-t' : 'left-t1') : (tgtIsGroup ? 'grp-right-t' : 'right-t1')
       } else {
-        sourceHandle = dy > 0 ? 'bot-s2' : 'top-s2'
-        targetHandle = dy > 0 ? 'top-t1' : 'bot-t1'
+        sourceHandle = dy > 0 ? (srcIsGroup ? 'grp-bot-s' : 'bot-s2') : (srcIsGroup ? 'grp-top-s' : 'top-s2')
+        targetHandle = dy > 0 ? (tgtIsGroup ? 'grp-top-t' : 'top-t1') : (tgtIsGroup ? 'grp-bot-t' : 'bot-t1')
       }
       return { ...e, sourceHandle, targetHandle }
     })
 
     // Remove orphaned edges (source or target node no longer exists)
-    const nodeIds = new Set(nodes.map((n) => n.id))
-    edges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+    const allNodeIds = new Set(allNodesForMap.map((n: any) => n.id))
+    edges = edges.filter((e) => allNodeIds.has(e.source) && allNodeIds.has(e.target))
 
     set({
       meta: {
@@ -1200,7 +1233,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       },
       nodes,
       edges,
-      groups: canvas.groups ?? [],
+      groups,
       artifacts: canvas.artifacts ?? [],
       selectedNodeId: null,
       selectedEdgeId: null,
