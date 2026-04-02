@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { HydratedCapability } from '@/lib/sipoc/types'
 
@@ -172,9 +173,18 @@ function CapabilityRow({ capability, isSelected, onSelect }: {
 
 // ─── Main SIPOC Visual ──────────────────────────────────
 export default function SIPOCVisual() {
-  const capabilities = useSIPOCStore(s => s.getHydratedCapabilities())
+  const rawCapabilities = useSIPOCStore(s => s.capabilities)
+  const inputs = useSIPOCStore(s => s.inputs)
+  const outputs = useSIPOCStore(s => s.outputs)
+  const personas = useSIPOCStore(s => s.personas)
+  const informationProducts = useSIPOCStore(s => s.informationProducts)
+  const logicalSystems = useSIPOCStore(s => s.logicalSystems)
   const selectedCapabilityId = useSIPOCStore(s => s.selectedCapabilityId)
   const setSelectedCapability = useSIPOCStore(s => s.setSelectedCapability)
+
+  const capabilities = useMemo(() => {
+    return useSIPOCStore.getState().getHydratedCapabilities()
+  }, [rawCapabilities, inputs, outputs, personas, informationProducts, logicalSystems])
 
   if (capabilities.length === 0) {
     return (
