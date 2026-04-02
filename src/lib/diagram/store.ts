@@ -398,10 +398,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const selectedEdgeIds = new Set(edges.filter((e) => e.selected).map((e) => e.id))
 
     if (selectedNodeIds.size > 0 || selectedGroupIds.size > 0 || selectedEdgeIds.size > 0) {
+      const remainingNodes = nodes.filter((n) => !selectedNodeIds.has(n.id))
+      const remainingNodeIds = new Set(remainingNodes.map((n) => n.id))
       set({
-        nodes: nodes.filter((n) => !selectedNodeIds.has(n.id)),
+        nodes: remainingNodes,
         edges: edges.filter(
-          (e) => !selectedEdgeIds.has(e.id) && !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target)
+          (e) => !selectedEdgeIds.has(e.id) && remainingNodeIds.has(e.source) && remainingNodeIds.has(e.target)
         ),
         groups: groups.filter((g) => !selectedGroupIds.has(g.id)),
         selectedNodeId: null,
