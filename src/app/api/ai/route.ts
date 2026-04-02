@@ -316,3 +316,104 @@ No markdown, just JSON.`,
 
   return NextResponse.json(json)
 }
+
+// ─── SIPOC AI Generation ────────────────────────────────
+
+const SIPOC_SYSTEM_PROMPT = `You are an expert Business Transformation Architect specializing in Aerospace & Defense and Government Contracting. You help users model SIPOC (Suppliers, Inputs, Process, Outputs, Customers) capability maps for BPML Level 3 processes.
+
+You understand:
+- A&D business processes: Procure to Pay, Order to Cash, Plan to Produce, Plan to Perform, Record to Report, Hire to Retire, Design to Operate, Acquire to Dispose
+- Enterprise systems: SAP S/4HANA, Oracle, Salesforce, Teamcenter, Windchill, Costpoint, Deltek, etc.
+- Data governance, master data management, and information product flows
+- Organizational roles in A&D: Program Managers, Control Account Managers, Contracts Managers, Financial Planning, Rates Management, Cost Management, Proposal Managers, Engineering, Quality, Supply Chain, etc.
+
+When generating SIPOC data, think about:
+- Who supplies each piece of information (personas/roles AND source systems)
+- What the actual information products are (the data objects)
+- What dimensions/attributes make up each information product
+- Who consumes the outputs and why
+- The end-to-end data flow through the L3 capability`
+
+async function handleSIPOCGenerate(prompt: string, context?: {
+  capabilityName?: string
+  capabilityDescription?: string
+  existingPersonas?: string[]
+  existingInformationProducts?: string[]
+  existingLogicalSystems?: string[]
+}) {
+  const contextBlock = context ? `
+EXISTING ENTITIES (reuse these names when applicable):
+- Personas already defined: ${(context.existingPersonas || []).join(', ') || 'None'}
+- Information Products already defined: ${(context.existingInformationProducts || []).join(', ') || 'None'}
+- Logical Systems already defined: ${(context.existingLogicalSystems || []).join(', ') || 'None'}
+${context.capabilityName ? `\nCapability being modeled: ${context.capabilityName}` : ''}
+${context.capabilityDescription ? `Description: ${context.capabilityDescription}` : ''}` : ''
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: SIPOC_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Generate a comprehensive SIPOC breakdown for the following L3 BPML capability/process. Return ONLY valid JSON.
+${contextBlock}
+
+User request: ${prompt}
+
+Return this exact JSON structure:
+{
+  "inputs": [
+    {
+      "informationProduct": "Name of the information product / data object",
+      "category": "Financial|Operational|Engineering|Supply Chain|Human Resources|Compliance|Customer|Program Management|Quality|Other",
+      "supplierPersonas": [
+        { "name": "Role Name", "role": "Brief role description" }
+      ],
+      "sourceSystems": [
+        { "name": "System Name", "systemType": "erp|crm|plm|scm|middleware|database|data_warehouse|analytics|mes|clm|cloud|legacy|ppm|ims|hcm|custom" }
+      ],
+      "dimensions": [
+        { "name": "Dimension/attribute name" }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "informationProduct": "Name of the output information product",
+      "category": "Financial|Operational|Engineering|Supply Chain|Human Resources|Compliance|Customer|Program Management|Quality|Other",
+      "consumerPersonas": [
+        { "name": "Role Name", "role": "Brief role description" }
+      ],
+      "dimensions": [
+        { "name": "Dimension/attribute name" }
+      ]
+    }
+  ]
+}
+
+Guidelines:
+- Generate 4-8 inputs and 3-6 outputs for a typical L3 capability
+- Each input should have 1-3 supplier personas and 1-2 source systems
+- Each input/output should have 2-5 dimensions (the key attributes/fields of that data object)
+- Each output should have 1-3 consumer personas
+- Use realistic A&D terminology and role names
+- Reuse existing entity names from the context when they match
+- Dimensions should represent the key data fields or measures within the information product
+
+No markdown, no explanation, just the JSON object.`,
+      },
+    ],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  let json
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    json = JSON.parse(cleaned)
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse SIPOC generation', raw: text }, { status: 500 })
+  }
+
+  return NextResponse.json(json)
+}

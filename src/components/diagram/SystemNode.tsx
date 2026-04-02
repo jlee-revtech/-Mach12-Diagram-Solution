@@ -23,6 +23,7 @@ const SYSTEM_ICONS: Record<SystemType, string> = {
   siop: 'SI',
   mps: 'MS',
   hcm: 'HC',
+  fpa: 'FA',
   custom: '?',
 }
 
@@ -44,6 +45,7 @@ const SYSTEM_COLORS: Record<SystemType, string> = {
   siop: '#84CC16',
   mps: '#22D3EE',
   hcm: '#F472B6',
+  fpa: '#34D399',
   custom: '#A855F7',
 }
 

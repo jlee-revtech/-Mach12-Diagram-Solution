@@ -167,25 +167,63 @@ function OutputLane({ output, showDimensions }: {
 }
 
 // ─── Single Capability SIPOC Block ──────────────────────
-function CapabilityBlock({ capability, isSelected, onSelect, showDimensions }: {
+function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, collapsed, onToggleCollapse }: {
   capability: HydratedCapability
   isSelected: boolean
   onSelect: () => void
   showDimensions: boolean
+  collapsed: boolean
+  onToggleCollapse: () => void
 }) {
-  const maxLanes = Math.max(capability.inputs.length, capability.outputs.length, 1)
+  if (collapsed) {
+    return (
+      <div
+        className={`rounded-xl border transition-all cursor-pointer flex items-center gap-3 px-4 py-2.5 ${
+          isSelected
+            ? 'border-[#2563EB]/50 bg-[#2563EB]/5'
+            : 'border-[var(--m12-border)]/25 hover:border-[var(--m12-border)]/50'
+        }`}
+      >
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleCollapse() }}
+          className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <div className="w-2 h-2 rounded-full bg-[#2563EB]/40" />
+        <span className="text-xs font-semibold text-[var(--m12-text)] flex-1" onClick={onSelect}>{capability.name}</span>
+        <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+          {capability.inputs.length}in / {capability.outputs.length}out
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div
-      onClick={onSelect}
       className={`rounded-2xl border transition-all cursor-pointer overflow-hidden ${
         isSelected
           ? 'border-[#2563EB]/50 shadow-xl shadow-[#2563EB]/8 ring-1 ring-[#2563EB]/20'
           : 'border-[var(--m12-border)]/25 hover:border-[var(--m12-border)]/50 shadow-sm'
       }`}
     >
+      {/* Collapse toggle bar */}
+      <div className="flex items-center gap-2 px-4 py-1.5 bg-[var(--m12-bg)]/30 border-b border-[var(--m12-border)]/10">
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleCollapse() }}
+          className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 3l3.5 4 3.5-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider" onClick={onSelect}>{capability.name}</span>
+      </div>
+
       {/* Capability block uses a 3-column layout: left (S→I) | center (P) | right (O→C) */}
-      <div className="flex items-stretch">
+      <div className="flex items-stretch" onClick={onSelect}>
         {/* ── Left: Suppliers → Inputs ─────────────────── */}
         <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center bg-[var(--m12-bg-card)]/30">
           {capability.inputs.length > 0 ? (
@@ -258,7 +296,16 @@ export default function SIPOCVisual() {
   const selectedCapabilityId = useSIPOCStore(s => s.selectedCapabilityId)
   const setSelectedCapability = useSIPOCStore(s => s.setSelectedCapability)
 
-  const [showDimensions, setShowDataObjects] = useState(false)
+  const [showDimensions, setShowDimensions] = useState(false)
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+
+  const toggleCollapse = (id: string) => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   const capabilities = useMemo(() => {
     return useSIPOCStore.getState().getHydratedCapabilities()
@@ -298,7 +345,7 @@ export default function SIPOCVisual() {
       {/* Controls */}
       <div className="flex items-center justify-end">
         <button
-          onClick={() => setShowDataObjects(!showDimensions)}
+          onClick={() => setShowDimensions(!showDimensions)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider border transition-colors ${
             showDimensions
               ? 'bg-[#2563EB]/10 border-[#2563EB]/40 text-[#93C5FD]'
@@ -321,6 +368,8 @@ export default function SIPOCVisual() {
           isSelected={selectedCapabilityId === cap.id}
           onSelect={() => setSelectedCapability(selectedCapabilityId === cap.id ? null : cap.id)}
           showDimensions={showDimensions}
+          collapsed={collapsedIds.has(cap.id)}
+          onToggleCollapse={() => toggleCollapse(cap.id)}
         />
       ))}
     </div>

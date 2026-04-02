@@ -35,19 +35,23 @@ function QuickAdd({ placeholder, onAdd }: { placeholder: string; onAdd: (value: 
 }
 
 // ─── Multi-select tag picker ────────────────────────────
-function TagPicker<T extends { id: string; name: string }>({
+function MultiSelect<T extends { id: string; name: string }>({
   items,
   selectedIds,
   onChange,
   colorFn,
   emptyLabel,
+  placeholder,
 }: {
   items: T[]
   selectedIds: string[]
   onChange: (ids: string[]) => void
   colorFn?: (item: T) => string | undefined
   emptyLabel: string
+  placeholder?: string
 }) {
+  const [open, setOpen] = useState(false)
+
   const toggle = (id: string) => {
     onChange(
       selectedIds.includes(id)
@@ -60,26 +64,66 @@ function TagPicker<T extends { id: string; name: string }>({
     return <div className="text-[10px] text-[var(--m12-text-muted)] italic py-1">{emptyLabel}</div>
   }
 
+  const selectedItems = items.filter(i => selectedIds.includes(i.id))
+
   return (
-    <div className="flex flex-wrap gap-1">
-      {items.map(item => {
-        const isSelected = selectedIds.includes(item.id)
-        const color = colorFn?.(item)
-        return (
-          <button
-            key={item.id}
-            onClick={() => toggle(item.id)}
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-all border ${
-              isSelected
-                ? 'border-[#2563EB]/60 bg-[#2563EB]/15 text-[var(--m12-text)]'
-                : 'border-[var(--m12-border)]/30 text-[var(--m12-text-muted)] hover:border-[var(--m12-border)]/60'
-            }`}
-          >
-            {color && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />}
-            {item.name}
-          </button>
-        )
-      })}
+    <div className="relative">
+      {/* Trigger */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-1 min-h-[28px] bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-2 py-1 text-left hover:border-[var(--m12-border)]/60 transition-colors"
+      >
+        {selectedItems.length > 0 ? (
+          <div className="flex flex-wrap gap-0.5 flex-1">
+            {selectedItems.map(item => {
+              const color = colorFn?.(item)
+              return (
+                <span key={item.id} className="inline-flex items-center gap-1 bg-[#2563EB]/10 border border-[#2563EB]/20 rounded px-1.5 py-0 text-[9px] text-[var(--m12-text)]">
+                  {color && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />}
+                  {item.name}
+                </span>
+              )
+            })}
+          </div>
+        ) : (
+          <span className="text-[10px] text-[var(--m12-text-faint)] flex-1">{placeholder || 'Select...'}</span>
+        )}
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}>
+          <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden max-h-[200px] overflow-y-auto">
+            {items.map(item => {
+              const isSelected = selectedIds.includes(item.id)
+              const color = colorFn?.(item)
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => toggle(item.id)}
+                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${
+                    isSelected ? 'bg-[#2563EB]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'
+                  }`}
+                >
+                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#2563EB] border-[#2563EB]' : 'border-[var(--m12-border)]'}`}>
+                    {isSelected && (
+                      <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                        <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  {color && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />}
+                  <span className="flex-1 truncate">{item.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -237,7 +281,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 {/* Supplier personas */}
                 <div>
                   <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Suppliers</div>
-                  <TagPicker
+                  <MultiSelect
                     items={personas}
                     selectedIds={input.supplier_persona_ids}
                     onChange={ids => updateInputSuppliers(input.id, capabilityId, ids)}
@@ -248,7 +292,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 {/* Source systems */}
                 <div>
                   <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Source Systems</div>
-                  <TagPicker
+                  <MultiSelect
                     items={logicalSystems}
                     selectedIds={input.source_system_ids}
                     onChange={ids => updateInputSystems(input.id, capabilityId, ids)}
@@ -312,7 +356,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 {/* Consumer personas */}
                 <div>
                   <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Consumers</div>
-                  <TagPicker
+                  <MultiSelect
                     items={personas}
                     selectedIds={output.consumer_persona_ids}
                     onChange={ids => updateOutputConsumers(output.id, capabilityId, ids)}

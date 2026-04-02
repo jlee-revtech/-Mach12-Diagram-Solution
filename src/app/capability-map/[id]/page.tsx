@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/supabase/auth-context'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import SIPOCVisual from '@/components/sipoc/SIPOCVisual'
 import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
+import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -16,9 +17,11 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const mapTitle = map?.title ?? ''
   const loading = useSIPOCStore(s => s.loading)
   const addCapability = useSIPOCStore(s => s.addCapability)
+  const selectedCapabilityId = useSIPOCStore(s => s.selectedCapabilityId)
 
   const [titleInput, setTitleInput] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
+  const [showAI, setShowAI] = useState(false)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -112,6 +115,19 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
 
         <div className="flex-1" />
 
+        {/* AI generate button */}
+        {selectedCapabilityId && (
+          <button
+            onClick={() => setShowAI(true)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-[#8B5CF6] to-[#2563EB] hover:from-[#7C3AED] hover:to-[#3B82F6] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="white" />
+            </svg>
+            AI Generate
+          </button>
+        )}
+
         {/* Add capability button */}
         <button
           onClick={() => {
@@ -137,6 +153,15 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         {/* Editor sidebar */}
         {organization && <CapabilityEditor orgId={organization.id} />}
       </div>
+
+      {/* AI Generate Panel */}
+      {showAI && selectedCapabilityId && organization && (
+        <AIGeneratePanel
+          capabilityId={selectedCapabilityId}
+          orgId={organization.id}
+          onClose={() => setShowAI(false)}
+        />
+      )}
     </div>
   )
 }

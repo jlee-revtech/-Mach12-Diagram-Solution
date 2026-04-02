@@ -19,6 +19,7 @@ export type SystemType =
   | 'siop'
   | 'mps'
   | 'hcm'
+  | 'fpa'
   | 'custom'
 
 // ─── Modules (sub-components within a system) ──────────
@@ -157,6 +158,7 @@ export const SYSTEM_TEMPLATES: SystemTemplate[] = [
   { type: 'siop', label: 'SIOP', description: 'Sales, Inventory, Ops Planning', color: '#84CC16' },
   { type: 'mps', label: 'MPS', description: 'Master Production Schedule', color: '#22D3EE' },
   { type: 'hcm', label: 'HCM', description: 'Human Capital Management', color: '#F472B6' },
+  { type: 'fpa', label: 'FP&A', description: 'Financial Planning & Analytics', color: '#34D399' },
   { type: 'custom', label: 'Custom', description: 'Custom System', color: '#A855F7' },
 ]
 
