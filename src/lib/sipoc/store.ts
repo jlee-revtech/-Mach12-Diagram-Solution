@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { v4 as uuid } from 'uuid'
 import type {
   CapabilityMapRow,
   Capability,
@@ -8,6 +9,8 @@ import type {
   InformationProduct,
   LogicalSystem,
   HydratedCapability,
+  SIPOCDataObject,
+  DataAttribute,
 } from './types'
 import * as api from '@/lib/supabase/capability-maps'
 
@@ -57,6 +60,14 @@ interface SIPOCState {
   addOutput: (capabilityId: string, informationProductId: string) => Promise<void>
   removeOutput: (outputId: string, capabilityId: string) => Promise<void>
   updateOutputConsumers: (outputId: string, capabilityId: string, personaIds: string[]) => Promise<void>
+
+  // ─── Data Object CRUD (on inputs/outputs) ──────────────
+  addDataObject: (side: 'input' | 'output', itemId: string, capabilityId: string, name: string) => Promise<void>
+  updateDataObject: (side: 'input' | 'output', itemId: string, capabilityId: string, dataObjectId: string, updates: Partial<Pick<SIPOCDataObject, 'name' | 'description'>>) => Promise<void>
+  removeDataObject: (side: 'input' | 'output', itemId: string, capabilityId: string, dataObjectId: string) => Promise<void>
+  addDataAttribute: (side: 'input' | 'output', itemId: string, capabilityId: string, dataObjectId: string, name: string) => Promise<void>
+  updateDataAttribute: (side: 'input' | 'output', itemId: string, capabilityId: string, dataObjectId: string, attrId: string, updates: Partial<Pick<DataAttribute, 'name' | 'description'>>) => Promise<void>
+  removeDataAttribute: (side: 'input' | 'output', itemId: string, capabilityId: string, dataObjectId: string, attrId: string) => Promise<void>
 
   // ─── Entity pool CRUD (org-scoped) ────────────────────
   addPersona: (orgId: string, data: { name: string; role?: string; color?: string }) => Promise<Persona>
@@ -263,6 +274,129 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         ),
       },
     })
+  },
+
+  // ─── Data Object CRUD helpers ──────────────────────────
+
+  addDataObject: async (side, itemId, capabilityId, name) => {
+    const newObj: SIPOCDataObject = { id: uuid(), name, attributes: [] }
+    const key = side === 'input' ? 'inputs' : 'outputs'
+    const items = get()[key][capabilityId] || []
+    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
+      item.id === itemId ? { ...item, data_objects: [...(item.data_objects || []), newObj] } : item
+    )
+    set({ [key]: { ...get()[key], [capabilityId]: updated } })
+    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (side === 'input') {
+      await api.updateCapabilityInput(itemId, { data_objects: target?.data_objects })
+    } else {
+      await api.updateCapabilityOutput(itemId, { data_objects: target?.data_objects })
+    }
+  },
+
+  updateDataObject: async (side, itemId, capabilityId, dataObjectId, updates) => {
+    const key = side === 'input' ? 'inputs' : 'outputs'
+    const items = get()[key][capabilityId] || []
+    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
+      item.id === itemId
+        ? { ...item, data_objects: (item.data_objects || []).map(d => d.id === dataObjectId ? { ...d, ...updates } : d) }
+        : item
+    )
+    set({ [key]: { ...get()[key], [capabilityId]: updated } })
+    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (side === 'input') {
+      await api.updateCapabilityInput(itemId, { data_objects: target?.data_objects })
+    } else {
+      await api.updateCapabilityOutput(itemId, { data_objects: target?.data_objects })
+    }
+  },
+
+  removeDataObject: async (side, itemId, capabilityId, dataObjectId) => {
+    const key = side === 'input' ? 'inputs' : 'outputs'
+    const items = get()[key][capabilityId] || []
+    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
+      item.id === itemId
+        ? { ...item, data_objects: (item.data_objects || []).filter(d => d.id !== dataObjectId) }
+        : item
+    )
+    set({ [key]: { ...get()[key], [capabilityId]: updated } })
+    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (side === 'input') {
+      await api.updateCapabilityInput(itemId, { data_objects: target?.data_objects })
+    } else {
+      await api.updateCapabilityOutput(itemId, { data_objects: target?.data_objects })
+    }
+  },
+
+  addDataAttribute: async (side, itemId, capabilityId, dataObjectId, name) => {
+    const newAttr: DataAttribute = { id: uuid(), name }
+    const key = side === 'input' ? 'inputs' : 'outputs'
+    const items = get()[key][capabilityId] || []
+    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
+      item.id === itemId
+        ? {
+            ...item,
+            data_objects: (item.data_objects || []).map(d =>
+              d.id === dataObjectId ? { ...d, attributes: [...d.attributes, newAttr] } : d
+            ),
+          }
+        : item
+    )
+    set({ [key]: { ...get()[key], [capabilityId]: updated } })
+    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (side === 'input') {
+      await api.updateCapabilityInput(itemId, { data_objects: target?.data_objects })
+    } else {
+      await api.updateCapabilityOutput(itemId, { data_objects: target?.data_objects })
+    }
+  },
+
+  updateDataAttribute: async (side, itemId, capabilityId, dataObjectId, attrId, updates) => {
+    const key = side === 'input' ? 'inputs' : 'outputs'
+    const items = get()[key][capabilityId] || []
+    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
+      item.id === itemId
+        ? {
+            ...item,
+            data_objects: (item.data_objects || []).map(d =>
+              d.id === dataObjectId
+                ? { ...d, attributes: d.attributes.map(a => a.id === attrId ? { ...a, ...updates } : a) }
+                : d
+            ),
+          }
+        : item
+    )
+    set({ [key]: { ...get()[key], [capabilityId]: updated } })
+    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (side === 'input') {
+      await api.updateCapabilityInput(itemId, { data_objects: target?.data_objects })
+    } else {
+      await api.updateCapabilityOutput(itemId, { data_objects: target?.data_objects })
+    }
+  },
+
+  removeDataAttribute: async (side, itemId, capabilityId, dataObjectId, attrId) => {
+    const key = side === 'input' ? 'inputs' : 'outputs'
+    const items = get()[key][capabilityId] || []
+    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
+      item.id === itemId
+        ? {
+            ...item,
+            data_objects: (item.data_objects || []).map(d =>
+              d.id === dataObjectId
+                ? { ...d, attributes: d.attributes.filter(a => a.id !== attrId) }
+                : d
+            ),
+          }
+        : item
+    )
+    set({ [key]: { ...get()[key], [capabilityId]: updated } })
+    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (side === 'input') {
+      await api.updateCapabilityInput(itemId, { data_objects: target?.data_objects })
+    } else {
+      await api.updateCapabilityOutput(itemId, { data_objects: target?.data_objects })
+    }
   },
 
   // ─── Entity pool CRUD ─────────────────────────────────

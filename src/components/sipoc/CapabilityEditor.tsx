@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { Persona, InformationProduct, LogicalSystem } from '@/lib/sipoc/types'
+import type { Persona, InformationProduct, LogicalSystem, SIPOCDataObject } from '@/lib/sipoc/types'
 import { PERSONA_COLORS, IP_CATEGORIES } from '@/lib/sipoc/types'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 
@@ -96,6 +96,136 @@ function SectionLabel({ label, count }: { label: string; count?: number }) {
           {count}
         </span>
       )}
+    </div>
+  )
+}
+
+// ─── Data Objects Editor ────────────────────────────────
+function DataObjectsEditor({
+  dataObjects,
+  side,
+  itemId,
+  capabilityId,
+}: {
+  dataObjects: SIPOCDataObject[]
+  side: 'input' | 'output'
+  itemId: string
+  capabilityId: string
+}) {
+  const addDataObject = useSIPOCStore(s => s.addDataObject)
+  const updateDataObject = useSIPOCStore(s => s.updateDataObject)
+  const removeDataObject = useSIPOCStore(s => s.removeDataObject)
+  const addDataAttribute = useSIPOCStore(s => s.addDataAttribute)
+  const updateDataAttribute = useSIPOCStore(s => s.updateDataAttribute)
+  const removeDataAttribute = useSIPOCStore(s => s.removeDataAttribute)
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [newAttrName, setNewAttrName] = useState<Record<string, string>>({})
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleAddAttr = (doId: string) => {
+    const name = (newAttrName[doId] || '').trim()
+    if (!name) return
+    addDataAttribute(side, itemId, capabilityId, doId, name)
+    setNewAttrName(prev => ({ ...prev, [doId]: '' }))
+  }
+
+  return (
+    <div>
+      <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+        Data Objects
+      </div>
+      {dataObjects.length > 0 && (
+        <div className="space-y-1.5 mb-1.5">
+          {dataObjects.map(dObj => (
+            <div key={dObj.id} className="border border-[var(--m12-border)]/20 rounded-md bg-[var(--m12-bg-card)]/50">
+              {/* Data Object header */}
+              <div className="flex items-center gap-1.5 px-2 py-1.5">
+                <button
+                  onClick={() => toggleExpanded(dObj.id)}
+                  className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
+                >
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`transition-transform ${expandedIds.has(dObj.id) ? 'rotate-90' : ''}`}>
+                    <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <input
+                  value={dObj.name}
+                  onChange={e => updateDataObject(side, itemId, capabilityId, dObj.id, { name: e.target.value })}
+                  className="flex-1 bg-transparent text-[10px] font-medium text-[var(--m12-text)] focus:outline-none border-b border-transparent focus:border-[#2563EB]/40 py-0.5"
+                />
+                <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                  {dObj.attributes.length}
+                </span>
+                <button
+                  onClick={() => removeDataObject(side, itemId, capabilityId, dObj.id)}
+                  className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors"
+                >
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                    <path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Expanded: attributes list */}
+              {expandedIds.has(dObj.id) && (
+                <div className="px-2 pb-2 pt-0.5 border-t border-[var(--m12-border)]/10">
+                  {dObj.attributes.length > 0 && (
+                    <div className="space-y-0.5 mb-1.5">
+                      {dObj.attributes.map(attr => (
+                        <div key={attr.id} className="flex items-center gap-1.5 group/attr pl-3">
+                          <div className="w-1 h-1 rounded-full bg-[var(--m12-text-faint)] shrink-0" />
+                          <input
+                            value={attr.name}
+                            onChange={e => updateDataAttribute(side, itemId, capabilityId, dObj.id, attr.id, { name: e.target.value })}
+                            className="flex-1 bg-transparent text-[9px] text-[var(--m12-text-secondary)] focus:outline-none border-b border-transparent focus:border-[#2563EB]/30 py-0.5"
+                          />
+                          <button
+                            onClick={() => removeDataAttribute(side, itemId, capabilityId, dObj.id, attr.id)}
+                            className="opacity-0 group-hover/attr:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
+                          >
+                            <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                              <path d="M1.5 1.5l4 4M5.5 1.5l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Quick-add attribute */}
+                  <div className="flex gap-1 pl-3">
+                    <input
+                      value={newAttrName[dObj.id] || ''}
+                      onChange={e => setNewAttrName(prev => ({ ...prev, [dObj.id]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && handleAddAttr(dObj.id)}
+                      placeholder="Add attribute..."
+                      className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/30 rounded px-1.5 py-0.5 text-[9px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/40"
+                    />
+                    <button
+                      onClick={() => handleAddAttr(dObj.id)}
+                      className="text-[8px] text-[#2563EB] hover:text-[#3B82F6] font-medium transition-colors px-1"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Quick-add data object */}
+      <QuickAdd
+        placeholder="Add data object..."
+        onAdd={name => addDataObject(side, itemId, capabilityId, name)}
+      />
     </div>
   )
 }
@@ -206,6 +336,13 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     emptyLabel="Create logical systems first"
                   />
                 </div>
+                {/* Data Objects */}
+                <DataObjectsEditor
+                  dataObjects={input.data_objects || []}
+                  side="input"
+                  itemId={input.id}
+                  capabilityId={capabilityId}
+                />
               </div>
             )
           })}
@@ -263,6 +400,13 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     emptyLabel="Create personas first"
                   />
                 </div>
+                {/* Data Objects */}
+                <DataObjectsEditor
+                  dataObjects={output.data_objects || []}
+                  side="output"
+                  itemId={output.id}
+                  capabilityId={capabilityId}
+                />
               </div>
             )
           })}
@@ -303,6 +447,150 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   )
 }
 
+// ─── Inline Editable Row ────────────────────────────────
+function EditableRow({
+  id,
+  name,
+  onSave,
+  onDelete,
+  editingId,
+  setEditingId,
+  color,
+  colorDot,
+  secondaryLabel,
+  secondaryField,
+  onSaveSecondary,
+  categoryField,
+  categoryValue,
+  onSaveCategory,
+  colorOptions,
+  onSaveColor,
+  children,
+}: {
+  id: string
+  name: string
+  onSave: (name: string) => void
+  onDelete: () => void
+  editingId: string | null
+  setEditingId: (id: string | null) => void
+  color?: string
+  colorDot?: 'round' | 'square'
+  secondaryLabel?: string
+  secondaryField?: string
+  onSaveSecondary?: (value: string) => void
+  categoryField?: string
+  categoryValue?: string
+  onSaveCategory?: (value: string) => void
+  colorOptions?: readonly string[]
+  onSaveColor?: (color: string) => void
+  children?: React.ReactNode
+}) {
+  const isEditing = editingId === id
+  const [editName, setEditName] = useState(name)
+  const [editSecondary, setEditSecondary] = useState(secondaryField || '')
+  const [editCategory, setEditCategory] = useState(categoryValue || '')
+
+  const startEditing = () => {
+    setEditName(name)
+    setEditSecondary(secondaryField || '')
+    setEditCategory(categoryValue || '')
+    setEditingId(id)
+  }
+
+  const save = () => {
+    if (editName.trim()) onSave(editName.trim())
+    if (onSaveSecondary) onSaveSecondary(editSecondary.trim())
+    if (onSaveCategory) onSaveCategory(editCategory)
+    setEditingId(null)
+  }
+
+  if (isEditing) {
+    return (
+      <div className="bg-[var(--m12-bg)] border border-[#2563EB]/40 rounded-lg p-2.5 space-y-2">
+        <div className="flex items-center gap-2">
+          {color && (
+            <div className={`w-2.5 h-2.5 shrink-0 ${colorDot === 'square' ? 'rounded' : 'rounded-full'}`} style={{ backgroundColor: color }} />
+          )}
+          <input
+            value={editName}
+            onChange={e => setEditName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && save()}
+            autoFocus
+            className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60"
+          />
+        </div>
+        {onSaveSecondary && (
+          <input
+            value={editSecondary}
+            onChange={e => setEditSecondary(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && save()}
+            placeholder={secondaryLabel || 'Role...'}
+            className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+          />
+        )}
+        {onSaveCategory && (
+          <select
+            value={editCategory}
+            onChange={e => setEditCategory(e.target.value)}
+            className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60"
+          >
+            <option value="">No category</option>
+            {IP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        {colorOptions && onSaveColor && (
+          <div className="flex flex-wrap gap-1">
+            {colorOptions.map(c => (
+              <button
+                key={c}
+                onClick={() => onSaveColor(c)}
+                className={`w-5 h-5 rounded-full border-2 transition-colors ${color === c ? 'border-white scale-110' : 'border-transparent hover:border-white/40'}`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        )}
+        {children}
+        <div className="flex gap-1.5">
+          <button onClick={save} className="text-[10px] bg-[#2563EB] hover:bg-[#3B82F6] text-white px-2.5 py-1 rounded font-medium transition-colors">Save</button>
+          <button onClick={() => setEditingId(null)} className="text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-2 py-1 transition-colors">Cancel</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 group cursor-pointer hover:bg-[var(--m12-bg)]/50 rounded-lg px-1 py-0.5 -mx-1 transition-colors" onClick={startEditing}>
+      {color && (
+        <div className={`w-2.5 h-2.5 shrink-0 ${colorDot === 'square' ? 'rounded' : 'rounded-full'}`} style={{ backgroundColor: color }} />
+      )}
+      {!color && (
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[var(--m12-text-muted)] shrink-0">
+          <rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1" />
+          <path d="M3 4.5h4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
+        </svg>
+      )}
+      <span className="text-xs text-[var(--m12-text)] flex-1 truncate">{name}</span>
+      {categoryValue && (
+        <span className="text-[8px] text-[var(--m12-text-muted)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] uppercase">
+          {categoryValue}
+        </span>
+      )}
+      {secondaryField && !categoryValue && (
+        <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{secondaryField}</span>
+      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete() }}
+        className="opacity-0 group-hover:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
 // ─── Entity Pool Manager ────────────────────────────────
 function EntityPool({ orgId }: { orgId: string }) {
   const personas = useSIPOCStore(s => s.personas)
@@ -310,13 +598,17 @@ function EntityPool({ orgId }: { orgId: string }) {
   const logicalSystems = useSIPOCStore(s => s.logicalSystems)
   const addPersona = useSIPOCStore(s => s.addPersona)
   const removePersona = useSIPOCStore(s => s.removePersona)
+  const updatePersona = useSIPOCStore(s => s.updatePersona)
   const addInformationProduct = useSIPOCStore(s => s.addInformationProduct)
   const removeInformationProduct = useSIPOCStore(s => s.removeInformationProduct)
+  const updateInformationProduct = useSIPOCStore(s => s.updateInformationProduct)
   const addLogicalSystem = useSIPOCStore(s => s.addLogicalSystem)
   const removeLogicalSystem = useSIPOCStore(s => s.removeLogicalSystem)
+  const updateLogicalSystem = useSIPOCStore(s => s.updateLogicalSystem)
 
   const [activeTab, setActiveTab] = useState<'personas' | 'products' | 'systems'>('personas')
   const [newSystemType, setNewSystemType] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const handleAddPersona = useCallback(async (name: string) => {
     const colorIdx = personas.length % PERSONA_COLORS.length
@@ -349,7 +641,7 @@ function EntityPool({ orgId }: { orgId: string }) {
         {tabs.map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { setActiveTab(tab.key); setEditingId(null) }}
             className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 px-2 rounded-md transition-colors ${
               activeTab === tab.key
                 ? 'bg-[var(--m12-bg-card)] text-[var(--m12-text)] shadow-sm'
@@ -365,19 +657,22 @@ function EntityPool({ orgId }: { orgId: string }) {
       {activeTab === 'personas' && (
         <div className="space-y-1.5">
           {personas.map(p => (
-            <div key={p.id} className="flex items-center gap-2 group">
-              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-              <span className="text-xs text-[var(--m12-text)] flex-1 truncate">{p.name}</span>
-              {p.role && <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{p.role}</span>}
-              <button
-                onClick={() => removePersona(p.id)}
-                className="opacity-0 group-hover:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
+            <EditableRow
+              key={p.id}
+              id={p.id}
+              name={p.name}
+              editingId={editingId}
+              setEditingId={setEditingId}
+              color={p.color}
+              colorDot="round"
+              secondaryLabel="Role..."
+              secondaryField={p.role || ''}
+              onSave={name => updatePersona(p.id, { name })}
+              onSaveSecondary={role => updatePersona(p.id, { role: role || undefined })}
+              onDelete={() => removePersona(p.id)}
+              colorOptions={PERSONA_COLORS}
+              onSaveColor={color => updatePersona(p.id, { color })}
+            />
           ))}
           <QuickAdd placeholder="New persona name..." onAdd={handleAddPersona} />
         </div>
@@ -387,26 +682,17 @@ function EntityPool({ orgId }: { orgId: string }) {
       {activeTab === 'products' && (
         <div className="space-y-1.5">
           {informationProducts.map(ip => (
-            <div key={ip.id} className="flex items-center gap-2 group">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[var(--m12-text-muted)] shrink-0">
-                <rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1" />
-                <path d="M3 4.5h4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
-              </svg>
-              <span className="text-xs text-[var(--m12-text)] flex-1 truncate">{ip.name}</span>
-              {ip.category && (
-                <span className="text-[8px] text-[var(--m12-text-muted)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] uppercase">
-                  {ip.category}
-                </span>
-              )}
-              <button
-                onClick={() => removeInformationProduct(ip.id)}
-                className="opacity-0 group-hover:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
+            <EditableRow
+              key={ip.id}
+              id={ip.id}
+              name={ip.name}
+              editingId={editingId}
+              setEditingId={setEditingId}
+              categoryValue={ip.category || ''}
+              onSave={name => updateInformationProduct(ip.id, { name })}
+              onSaveCategory={category => updateInformationProduct(ip.id, { category: category || undefined })}
+              onDelete={() => removeInformationProduct(ip.id)}
+            />
           ))}
           <QuickAdd placeholder="New info product name..." onAdd={handleAddIP} />
         </div>
@@ -418,21 +704,36 @@ function EntityPool({ orgId }: { orgId: string }) {
           {logicalSystems.map(s => {
             const template = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
             return (
-              <div key={s.id} className="flex items-center gap-2 group">
-                <div className="w-2.5 h-2.5 rounded shrink-0" style={{ backgroundColor: s.color || template?.color || '#64748B' }} />
-                <span className="text-xs text-[var(--m12-text)] flex-1 truncate">{s.name}</span>
-                {template && (
-                  <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{template.label}</span>
-                )}
-                <button
-                  onClick={() => removeLogicalSystem(s.id)}
-                  className="opacity-0 group-hover:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
+              <EditableRow
+                key={s.id}
+                id={s.id}
+                name={s.name}
+                editingId={editingId}
+                setEditingId={setEditingId}
+                color={s.color || template?.color || '#64748B'}
+                colorDot="square"
+                secondaryField={template?.label}
+                onSave={name => updateLogicalSystem(s.id, { name })}
+                onDelete={() => removeLogicalSystem(s.id)}
+              >
+                <select
+                  defaultValue={s.system_type || ''}
+                  onChange={e => {
+                    const val = e.target.value as import('@/lib/diagram/types').SystemType | ''
+                    const tmpl = SYSTEM_TEMPLATES.find(t => t.type === val)
+                    updateLogicalSystem(s.id, {
+                      system_type: val || undefined,
+                      color: tmpl?.color,
+                    })
+                  }}
+                  className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60"
                 >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
+                  <option value="">Type (optional)</option>
+                  {SYSTEM_TEMPLATES.map(t => (
+                    <option key={t.type} value={t.type}>{t.label} — {t.description}</option>
+                  ))}
+                </select>
+              </EditableRow>
             )
           })}
           {/* System type selector + name */}

@@ -1,171 +1,256 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { HydratedCapability } from '@/lib/sipoc/types'
+import type { HydratedCapability, SIPOCDataObject } from '@/lib/sipoc/types'
 
 // ─── Column Header ──────────────────────────────────────
 function ColumnHeader({ label, color, letter }: { label: string; color: string; letter: string }) {
   return (
-    <div className="flex flex-col items-center gap-1 pb-3">
+    <div className="flex flex-col items-center gap-1.5">
       <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm font-[family-name:var(--font-orbitron)]"
-        style={{ backgroundColor: color }}
+        className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm font-[family-name:var(--font-orbitron)] shadow-lg"
+        style={{ backgroundColor: color, boxShadow: `0 4px 14px ${color}30` }}
       >
         {letter}
       </div>
-      <span className="text-[10px] uppercase tracking-widest font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] font-bold">
+      <span className="text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] font-bold">
         {label}
       </span>
     </div>
   )
 }
 
-// ─── Tag Chip ───────────────────────────────────────────
-function TagChip({ label, color, small }: { label: string; color?: string; small?: boolean }) {
+// ─── Persona/System chip ────────────────────────────────
+function PersonaChip({ name, color }: { name: string; color: string }) {
   return (
-    <div
-      className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--m12-border)]/40 bg-[var(--m12-bg)]/60 backdrop-blur-sm ${
-        small ? 'px-2 py-0.5' : 'px-2.5 py-1'
-      }`}
-    >
-      {color && <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />}
-      <span className={`${small ? 'text-[9px]' : 'text-[10px]'} font-medium text-[var(--m12-text-secondary)] truncate max-w-[120px]`}>
-        {label}
-      </span>
+    <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 rounded-full px-2.5 py-1 shadow-sm">
+      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+      <span className="text-[10px] font-medium text-[var(--m12-text-secondary)] whitespace-nowrap">{name}</span>
+    </div>
+  )
+}
+
+function SystemChip({ name, color }: { name: string; color?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 bg-[var(--m12-bg)]/80 border border-[var(--m12-border)]/20 rounded px-2 py-0.5">
+      <div className="w-1.5 h-1.5 rounded-sm shrink-0" style={{ backgroundColor: color || '#64748B' }} />
+      <span className="text-[8px] font-medium text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase whitespace-nowrap">{name}</span>
     </div>
   )
 }
 
 // ─── Info Product Card ──────────────────────────────────
-function IPCard({ name, category }: { name: string; category?: string }) {
+function IPCard({
+  name,
+  category,
+  dataObjects,
+  showDataObjects,
+  accentColor,
+}: {
+  name: string
+  category?: string
+  dataObjects?: SIPOCDataObject[]
+  showDataObjects: boolean
+  accentColor: string
+}) {
+  const hasData = dataObjects && dataObjects.length > 0
   return (
-    <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 shadow-sm hover:border-[var(--m12-border)] transition-colors">
-      <div className="text-xs font-medium text-[var(--m12-text)]">{name}</div>
+    <div
+      className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2.5 shadow-sm transition-all hover:shadow-md"
+      style={{ borderLeftWidth: 3, borderLeftColor: accentColor }}
+    >
+      <div className="flex items-center gap-1.5">
+        <div className="text-[11px] font-semibold text-[var(--m12-text)] flex-1 leading-tight">{name}</div>
+        {hasData && (
+          <span className="text-[7px] bg-[var(--m12-bg)] text-[var(--m12-text-muted)] rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] font-bold border border-[var(--m12-border)]/20">
+            {dataObjects.length}
+          </span>
+        )}
+      </div>
       {category && (
-        <div className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mt-0.5">
+        <div className="text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mt-0.5">
           {category}
+        </div>
+      )}
+      {showDataObjects && hasData && (
+        <div className="mt-2 pt-2 border-t border-[var(--m12-border)]/15 space-y-1.5">
+          {dataObjects.map(dObj => (
+            <div key={dObj.id}>
+              <div className="text-[9px] font-semibold text-[var(--m12-text-secondary)]">{dObj.name}</div>
+              {dObj.attributes.length > 0 && (
+                <div className="pl-2.5 mt-0.5 space-y-0 border-l border-[var(--m12-border)]/15 ml-0.5">
+                  {dObj.attributes.map(attr => (
+                    <div key={attr.id} className="text-[8px] text-[var(--m12-text-muted)] py-px">{attr.name}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
   )
 }
 
-// ─── Flow Arrow SVG ─────────────────────────────────────
-function FlowArrow() {
+// ─── Connecting arrow (horizontal) ──────────────────────
+function HArrow({ muted }: { muted?: boolean }) {
   return (
-    <div className="flex items-center justify-center px-1 shrink-0">
-      <svg width="24" height="16" viewBox="0 0 24 16" fill="none" className="text-[var(--m12-border)]">
-        <path d="M0 8h20M16 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+    <svg width="28" height="12" viewBox="0 0 28 12" fill="none" className={`shrink-0 ${muted ? 'opacity-20' : 'opacity-40'}`}>
+      <path d="M0 6h24M20 2l5 4-5 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--m12-text-muted)]" />
+    </svg>
+  )
+}
+
+// ─── Single input lane (Suppliers → Input) ──────────────
+function InputLane({ input, showDataObjects }: {
+  input: HydratedCapability['inputs'][0]
+  showDataObjects: boolean
+}) {
+  const hasSuppliers = input.supplierPersonas.length > 0 || input.sourceSystems.length > 0
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* Suppliers for this input */}
+      <div className="flex-1 flex flex-wrap gap-1 justify-end min-w-0">
+        {input.supplierPersonas.map(p => (
+          <PersonaChip key={p.id} name={p.name} color={p.color} />
+        ))}
+        {input.sourceSystems.map(s => (
+          <SystemChip key={s.id} name={s.name} color={s.color} />
+        ))}
+        {!hasSuppliers && (
+          <div className="text-[9px] text-[var(--m12-text-faint)] italic">—</div>
+        )}
+      </div>
+
+      <HArrow muted={!hasSuppliers} />
+
+      {/* Input IP card */}
+      <div className="w-[180px] shrink-0">
+        <IPCard
+          name={input.informationProduct.name}
+          category={input.informationProduct.category}
+          dataObjects={input.data_objects}
+          showDataObjects={showDataObjects}
+          accentColor="#EAB308"
+        />
+      </div>
     </div>
   )
 }
 
-// ─── Single Capability SIPOC Row ────────────────────────
-function CapabilityRow({ capability, isSelected, onSelect }: {
+// ─── Single output lane (Output → Consumers) ────────────
+function OutputLane({ output, showDataObjects }: {
+  output: HydratedCapability['outputs'][0]
+  showDataObjects: boolean
+}) {
+  const hasConsumers = output.consumerPersonas.length > 0
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* Output IP card */}
+      <div className="w-[180px] shrink-0">
+        <IPCard
+          name={output.informationProduct.name}
+          category={output.informationProduct.category}
+          dataObjects={output.data_objects}
+          showDataObjects={showDataObjects}
+          accentColor="#10B981"
+        />
+      </div>
+
+      <HArrow muted={!hasConsumers} />
+
+      {/* Consumers for this output */}
+      <div className="flex-1 flex flex-wrap gap-1 min-w-0">
+        {output.consumerPersonas.map(p => (
+          <PersonaChip key={p.id} name={p.name} color={p.color} />
+        ))}
+        {!hasConsumers && (
+          <div className="text-[9px] text-[var(--m12-text-faint)] italic">—</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Single Capability SIPOC Block ──────────────────────
+function CapabilityBlock({ capability, isSelected, onSelect, showDataObjects }: {
   capability: HydratedCapability
   isSelected: boolean
   onSelect: () => void
+  showDataObjects: boolean
 }) {
-  // Collect unique suppliers (personas) and source systems across all inputs
-  const allSupplierPersonas = new Map<string, { name: string; color: string }>()
-  const allSourceSystems = new Map<string, { name: string; color?: string }>()
-  capability.inputs.forEach(input => {
-    input.supplierPersonas.forEach(p => allSupplierPersonas.set(p.id, { name: p.name, color: p.color }))
-    input.sourceSystems.forEach(s => allSourceSystems.set(s.id, { name: s.name, color: s.color }))
-  })
-
-  // Collect unique consumers
-  const allConsumerPersonas = new Map<string, { name: string; color: string }>()
-  capability.outputs.forEach(output => {
-    output.consumerPersonas.forEach(p => allConsumerPersonas.set(p.id, { name: p.name, color: p.color }))
-  })
+  const maxLanes = Math.max(capability.inputs.length, capability.outputs.length, 1)
 
   return (
     <div
       onClick={onSelect}
-      className={`grid grid-cols-[1fr_auto_1fr_auto_minmax(140px,1.2fr)_auto_1fr_auto_1fr] items-stretch gap-0 rounded-xl border transition-all cursor-pointer ${
+      className={`rounded-2xl border transition-all cursor-pointer overflow-hidden ${
         isSelected
-          ? 'border-[#2563EB]/60 bg-[#2563EB]/5 shadow-lg shadow-[#2563EB]/10'
-          : 'border-[var(--m12-border)]/30 hover:border-[var(--m12-border)]/60 bg-[var(--m12-bg-card)]/50'
+          ? 'border-[#2563EB]/50 shadow-xl shadow-[#2563EB]/8 ring-1 ring-[#2563EB]/20'
+          : 'border-[var(--m12-border)]/25 hover:border-[var(--m12-border)]/50 shadow-sm'
       }`}
     >
-      {/* S — Suppliers */}
-      <div className="p-3 flex flex-col gap-1.5 min-h-[80px]">
-        {allSupplierPersonas.size > 0 ? (
-          [...allSupplierPersonas.values()].map((p, i) => (
-            <TagChip key={i} label={p.name} color={p.color} />
-          ))
-        ) : (
-          <div className="text-[10px] text-[var(--m12-text-muted)] italic p-2">No suppliers</div>
-        )}
-        {allSourceSystems.size > 0 && (
-          <div className="mt-1 pt-1 border-t border-[var(--m12-border)]/20 flex flex-col gap-1">
-            {[...allSourceSystems.values()].map((s, i) => (
-              <TagChip key={i} label={s.name} color={s.color || '#64748B'} small />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <FlowArrow />
-
-      {/* I — Inputs */}
-      <div className="p-3 flex flex-col gap-1.5">
-        {capability.inputs.length > 0 ? (
-          capability.inputs.map(input => (
-            <IPCard
-              key={input.id}
-              name={input.informationProduct.name}
-              category={input.informationProduct.category}
-            />
-          ))
-        ) : (
-          <div className="text-[10px] text-[var(--m12-text-muted)] italic p-2">No inputs</div>
-        )}
-      </div>
-
-      <FlowArrow />
-
-      {/* P — Process (Capability) */}
-      <div className="p-3 flex items-center justify-center">
-        <div className="bg-[#2563EB]/10 border-2 border-[#2563EB]/40 rounded-xl px-4 py-3 text-center w-full">
-          <div className="text-sm font-semibold text-[var(--m12-text)]">{capability.name}</div>
-          {capability.description && (
-            <div className="text-[10px] text-[var(--m12-text-muted)] mt-1 line-clamp-2">{capability.description}</div>
+      {/* Capability block uses a 3-column layout: left (S→I) | center (P) | right (O→C) */}
+      <div className="flex items-stretch">
+        {/* ── Left: Suppliers → Inputs ─────────────────── */}
+        <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center bg-[var(--m12-bg-card)]/30">
+          {capability.inputs.length > 0 ? (
+            capability.inputs.map(input => (
+              <InputLane key={input.id} input={input} showDataObjects={showDataObjects} />
+            ))
+          ) : (
+            <div className="flex items-center justify-center py-4 text-[10px] text-[var(--m12-text-faint)] italic">
+              No inputs defined
+            </div>
           )}
         </div>
-      </div>
 
-      <FlowArrow />
+        {/* ── Center divider + arrow into Process ──────── */}
+        <div className="flex items-center">
+          <svg width="16" height="20" viewBox="0 0 16 20" fill="none" className="opacity-25">
+            <path d="M0 10h12M9 6l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--m12-text-muted)]" />
+          </svg>
+        </div>
 
-      {/* O — Outputs */}
-      <div className="p-3 flex flex-col gap-1.5">
-        {capability.outputs.length > 0 ? (
-          capability.outputs.map(output => (
-            <IPCard
-              key={output.id}
-              name={output.informationProduct.name}
-              category={output.informationProduct.category}
-            />
-          ))
-        ) : (
-          <div className="text-[10px] text-[var(--m12-text-muted)] italic p-2">No outputs</div>
-        )}
-      </div>
+        {/* ── Center: Process (Capability) ─────────────── */}
+        <div className="w-[200px] shrink-0 flex items-center justify-center p-3 bg-[#2563EB]/[0.04]">
+          <div className="bg-gradient-to-b from-[#2563EB]/15 to-[#2563EB]/8 border-2 border-[#2563EB]/30 rounded-xl px-5 py-4 text-center w-full shadow-inner">
+            <div className="text-[13px] font-bold text-[var(--m12-text)] leading-tight">{capability.name}</div>
+            {capability.description && (
+              <div className="text-[10px] text-[var(--m12-text-muted)] mt-1.5 line-clamp-3 leading-relaxed">{capability.description}</div>
+            )}
+            <div className="mt-2 inline-flex items-center gap-1 text-[7px] font-[family-name:var(--font-space-mono)] text-[#2563EB]/60 uppercase tracking-widest font-bold">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <circle cx="4" cy="4" r="3" stroke="currentColor" strokeWidth="0.8" />
+                <circle cx="4" cy="4" r="1" fill="currentColor" />
+              </svg>
+              L3 Capability
+            </div>
+          </div>
+        </div>
 
-      <FlowArrow />
+        {/* ── Center divider + arrow out of Process ────── */}
+        <div className="flex items-center">
+          <svg width="16" height="20" viewBox="0 0 16 20" fill="none" className="opacity-25">
+            <path d="M0 10h12M9 6l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--m12-text-muted)]" />
+          </svg>
+        </div>
 
-      {/* C — Customers */}
-      <div className="p-3 flex flex-col gap-1.5">
-        {allConsumerPersonas.size > 0 ? (
-          [...allConsumerPersonas.values()].map((p, i) => (
-            <TagChip key={i} label={p.name} color={p.color} />
-          ))
-        ) : (
-          <div className="text-[10px] text-[var(--m12-text-muted)] italic p-2">No customers</div>
-        )}
+        {/* ── Right: Outputs → Consumers ───────────────── */}
+        <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center bg-[var(--m12-bg-card)]/30">
+          {capability.outputs.length > 0 ? (
+            capability.outputs.map(output => (
+              <OutputLane key={output.id} output={output} showDataObjects={showDataObjects} />
+            ))
+          ) : (
+            <div className="flex items-center justify-center py-4 text-[10px] text-[var(--m12-text-faint)] italic">
+              No outputs defined
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -182,6 +267,8 @@ export default function SIPOCVisual() {
   const selectedCapabilityId = useSIPOCStore(s => s.selectedCapabilityId)
   const setSelectedCapability = useSIPOCStore(s => s.setSelectedCapability)
 
+  const [showDataObjects, setShowDataObjects] = useState(false)
+
   const capabilities = useMemo(() => {
     return useSIPOCStore.getState().getHydratedCapabilities()
   }, [rawCapabilities, inputs, outputs, personas, informationProducts, logicalSystems])
@@ -195,27 +282,54 @@ export default function SIPOCVisual() {
   }
 
   return (
-    <div className="space-y-3">
-      {/* SIPOC Column Headers */}
-      <div className="grid grid-cols-[1fr_auto_1fr_auto_minmax(140px,1.2fr)_auto_1fr_auto_1fr] items-end gap-0 px-3">
-        <ColumnHeader label="Suppliers" color="#F97316" letter="S" />
-        <div className="w-6" />
-        <ColumnHeader label="Inputs" color="#EAB308" letter="I" />
-        <div className="w-6" />
-        <ColumnHeader label="Process" color="#2563EB" letter="P" />
-        <div className="w-6" />
-        <ColumnHeader label="Outputs" color="#10B981" letter="O" />
-        <div className="w-6" />
-        <ColumnHeader label="Customers" color="#8B5CF6" letter="C" />
+    <div className="space-y-5">
+      {/* Header bar: column labels + controls */}
+      <div className="flex items-end justify-between px-2">
+        {/* SIPOC column labels */}
+        <div className="flex items-end gap-0 flex-1">
+          {/* Left half labels */}
+          <div className="flex-1 flex justify-between px-4">
+            <ColumnHeader label="Suppliers" color="#F97316" letter="S" />
+            <ColumnHeader label="Inputs" color="#EAB308" letter="I" />
+          </div>
+          {/* Center spacer for Process column */}
+          <div className="w-[232px] shrink-0 flex justify-center">
+            <ColumnHeader label="Process" color="#2563EB" letter="P" />
+          </div>
+          {/* Right half labels */}
+          <div className="flex-1 flex justify-between px-4">
+            <ColumnHeader label="Outputs" color="#10B981" letter="O" />
+            <ColumnHeader label="Customers" color="#8B5CF6" letter="C" />
+          </div>
+        </div>
       </div>
 
-      {/* Capability Rows */}
+      {/* Controls */}
+      <div className="flex items-center justify-end">
+        <button
+          onClick={() => setShowDataObjects(!showDataObjects)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider border transition-colors ${
+            showDataObjects
+              ? 'bg-[#2563EB]/10 border-[#2563EB]/40 text-[#93C5FD]'
+              : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[var(--m12-border)] hover:text-[var(--m12-text-secondary)]'
+          }`}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1" />
+            <path d="M3 4h4M3 6h2.5" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
+          </svg>
+          {showDataObjects ? 'Hide' : 'Show'} Data Objects
+        </button>
+      </div>
+
+      {/* Capability Blocks */}
       {capabilities.map(cap => (
-        <CapabilityRow
+        <CapabilityBlock
           key={cap.id}
           capability={cap}
           isSelected={selectedCapabilityId === cap.id}
           onSelect={() => setSelectedCapability(selectedCapabilityId === cap.id ? null : cap.id)}
+          showDataObjects={showDataObjects}
         />
       ))}
     </div>
