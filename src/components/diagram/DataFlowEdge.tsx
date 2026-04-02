@@ -90,6 +90,8 @@ function DataFlowEdgeComponent({
   const spotlightNodeId = useDiagramStore((s) => s.spotlightNodeId)
   const spotlightEdgeIds = useDiagramStore((s) => s.spotlightEdgeIds)
   const spotlightArtifactId = useDiagramStore((s) => s.spotlightArtifactId)
+  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
+  const isStoreSelected = selectedEdgeId === id
   const { screenToFlowPosition } = useReactFlow()
 
   const isSpotlit = spotlightNodeId !== null && spotlightEdgeIds.has(id)
@@ -117,7 +119,7 @@ function DataFlowEdgeComponent({
   const dragRef = useRef(false)
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
-    if (!selected) return
+    if (!selected && !isStoreSelected) return
     e.stopPropagation()
     e.preventDefault()
     dragRef.current = true
@@ -140,7 +142,7 @@ function DataFlowEdgeComponent({
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [selected, id, edgePath, screenToFlowPosition, updateEdgeLabelPosition])
+  }, [selected, isStoreSelected, id, edgePath, screenToFlowPosition, updateEdgeLabelPosition])
 
   const liveLabelPos = useMemo(() => {
     if (!dragging || !dragPos || typeof document === 'undefined') return null
@@ -168,7 +170,8 @@ function DataFlowEdgeComponent({
   const visibleElements = expanded ? dataElements : dataElements.slice(0, VISIBLE_LIMIT)
   const hiddenCount = dataElements.length - VISIBLE_LIMIT
 
-  const highlight = selected || isSpotlit
+  const isSelected = selected || isStoreSelected
+  const highlight = isSelected || isSpotlit
   const endMarker = useMemo(
     () => markerUrl(`marker-${highlight ? 'selected' : 'default'}`),
     [highlight]
@@ -255,9 +258,9 @@ function DataFlowEdgeComponent({
               pointerEvents: 'all',
               opacity: isDimmed ? 0.1 : dragging ? 0.85 : 1,
               transition: dragging ? 'none' : 'opacity 0.3s',
-              cursor: selected ? (dragging ? 'grabbing' : 'grab') : 'pointer',
+              cursor: isSelected ? (dragging ? 'grabbing' : 'grab') : 'pointer',
             }}
-            className={selected ? 'nopan' : ''}
+            className={isSelected ? 'nopan' : ''}
           >
             <div
               style={{ backgroundColor: 'var(--m12-edge-label-bg)' }}
@@ -270,7 +273,7 @@ function DataFlowEdgeComponent({
               }`}
             >
               {/* Drag indicator when selected */}
-              {selected && !dragging && (
+              {isSelected && !dragging && (
                 <div className="flex justify-center mb-1 -mt-0.5">
                   <div className="flex gap-0.5">
                     <div className="w-1 h-1 rounded-full bg-[#06B6D4]/40" />
@@ -349,7 +352,7 @@ function DataFlowEdgeComponent({
               pointerEvents: 'all',
               opacity: isDimmed ? 0.1 : 1,
               transition: dragging ? 'none' : 'opacity 0.3s',
-              cursor: selected ? (dragging ? 'grabbing' : 'grab') : 'pointer',
+              cursor: isSelected ? (dragging ? 'grabbing' : 'grab') : 'pointer',
               backgroundColor: 'var(--m12-edge-label-bg)',
             }}
             className={`rounded-md ${selected ? 'nopan' : ''}`}
@@ -358,7 +361,7 @@ function DataFlowEdgeComponent({
               className={`border border-dashed rounded-md px-2 py-1 transition-all ${
                 dragging
                   ? 'border-[#06B6D4]'
-                  : selected ? 'border-[#06B6D4]' : 'border-[var(--m12-border)] hover:border-[var(--m12-text-muted)]'
+                  : isSelected ? 'border-[#06B6D4]' : 'border-[var(--m12-border)] hover:border-[var(--m12-text-muted)]'
               }`}
             >
               <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">

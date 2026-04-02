@@ -12,6 +12,8 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
   const setSelectedGroup = useDiagramStore((s) => s.setSelectedGroup)
   const setSidebarTab = useDiagramStore((s) => s.setSidebarTab)
   const selectedGroupId = useDiagramStore((s) => s.selectedGroupId)
+  const connectMode = useDiagramStore((s) => s.connectMode)
+  const handleConnectModeClick = useDiagramStore((s) => s.handleConnectModeClick)
 
   const color = data.color || 'var(--m12-border)'
   const isSelected = selectedGroupId === id
@@ -42,9 +44,13 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
 
   const handleBorderClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
+    if (connectMode) {
+      handleConnectModeClick(id)
+      return
+    }
     setSelectedGroup(id)
     setSidebarTab('properties')
-  }, [id, setSelectedGroup, setSidebarTab])
+  }, [id, connectMode, handleConnectModeClick, setSelectedGroup, setSidebarTab])
 
   const handleClass = "!border-2 !rounded-full !w-3 !h-3 !bg-[var(--m12-handle-bg)] !border-[var(--m12-handle-border)] hover:!bg-[#F97316] hover:!border-[#F97316] hover:!w-4 hover:!h-4 transition-all duration-200"
 

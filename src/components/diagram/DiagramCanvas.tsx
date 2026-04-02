@@ -75,6 +75,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const systemNodes = useDiagramStore((s) => s.nodes)
   const groups = useDiagramStore((s) => s.groups)
   const edges = useDiagramStore((s) => s.edges)
+  const artifacts = useDiagramStore((s) => s.artifacts)
   // Merge groups (rendered first/behind) and system nodes for ReactFlow
   const nodes = useMemo(() => [...groups as any[], ...systemNodes], [groups, systemNodes])
 
@@ -173,6 +174,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         n: useDiagramStore.getState().nodes,
         e: useDiagramStore.getState().edges,
         g: useDiagramStore.getState().groups,
+        a: useDiagramStore.getState().artifacts,
       })
       if (fp === lastSaveRef.current) {
         setSaveStatus('saved')
@@ -196,7 +198,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemNodes, edges, groups, user])
+  }, [systemNodes, edges, groups, artifacts, user])
 
   // Keyboard shortcuts
   useEffect(() => {

@@ -713,6 +713,23 @@ function PropertiesTab() {
 
       {/* Module Editor */}
       <ModuleEditor nodeId={selectedNode.id} />
+
+      {/* Duplicate System */}
+      <div className="mt-5 pt-4 border-t border-[var(--m12-border)]/30">
+        <button
+          onClick={() => {
+            useDiagramStore.getState().copyNode(selectedNode.id)
+            useDiagramStore.getState().pasteNode()
+          }}
+          className="w-full flex items-center justify-center gap-1.5 bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-2 text-xs text-[var(--m12-text-muted)] hover:text-[#06B6D4] transition-all"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.5"/>
+          </svg>
+          Duplicate System
+        </button>
+      </div>
     </div>
   )
 }
