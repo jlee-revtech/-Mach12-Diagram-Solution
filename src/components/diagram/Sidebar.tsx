@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { useDiagramStore } from '@/lib/diagram/store'
+import { useAuth } from '@/lib/supabase/auth-context'
 import {
   SYSTEM_TEMPLATES,
   PROCESS_CONTEXTS,
@@ -67,6 +68,133 @@ export default function Sidebar() {
 }
 
 // ─── Palette Tab ────────────────────────────────────────
+function GroupTemplatesSection() {
+  const { organization, user } = useAuth()
+  const addSystem = useDiagramStore((s) => s.addSystem)
+  const addGroup = useDiagramStore((s) => s.addGroup)
+  const { screenToFlowPosition } = useReactFlow()
+  const [templates, setTemplates] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  // Load templates when expanded
+  useEffect(() => {
+    if (!expanded || !organization) return
+    setLoading(true)
+    import('@/lib/supabase/diagrams').then(({ listGroupTemplates }) =>
+      listGroupTemplates(organization.id).then(setTemplates).finally(() => setLoading(false))
+    )
+  }, [expanded, organization])
+
+  const handleInsert = useCallback(async (template: any) => {
+    const pos = screenToFlowPosition({
+      x: window.innerWidth / 2 - 250,
+      y: window.innerHeight / 2 - 200,
+    })
+    const td = template.template_data
+    // Create group
+    addGroup(td.group.label, pos, td.group.color)
+
+    // Create systems with relative positions
+    const newNodeIds: string[] = []
+    for (const sys of td.systems) {
+      const id = addSystem(
+        sys.systemType as any,
+        sys.label,
+        { x: pos.x + sys.relativeX + 20, y: pos.y + sys.relativeY + 30 }
+      )
+      newNodeIds.push(id)
+      // Apply physical system and modules
+      if (sys.physicalSystem) {
+        useDiagramStore.getState().updateSystemPhysical(id, sys.physicalSystem)
+      }
+      if (sys.modules?.length) {
+        for (const mod of sys.modules as any[]) {
+          useDiagramStore.getState().addModule(id, mod.name)
+        }
+      }
+    }
+
+    // Create edges between contained systems
+    const store = useDiagramStore.getState()
+    for (const edge of td.edges) {
+      const sourceId = newNodeIds[edge.sourceIdx]
+      const targetId = newNodeIds[edge.targetIdx]
+      if (!sourceId || !targetId) continue
+      store.onConnect({
+        source: sourceId,
+        target: targetId,
+        sourceHandle: 'right-s2',
+        targetHandle: 'left-t1',
+      })
+    }
+  }, [addGroup, addSystem, screenToFlowPosition])
+
+  const handleDelete = useCallback(async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm('Delete this template?')) return
+    const { deleteGroupTemplate } = await import('@/lib/supabase/diagrams')
+    await deleteGroupTemplate(id)
+    setTemplates((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  return (
+    <div className="mb-5">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 w-full text-left mb-2"
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${expanded ? 'rotate-90' : ''}`}>
+          <path d="M3 1l4 4-4 4" stroke="#64748B" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <span className="text-[10px] uppercase tracking-widest text-[#F97316] font-[family-name:var(--font-space-mono)] font-bold">
+          Saved Templates
+        </span>
+      </button>
+
+      {expanded && (
+        <div>
+          {loading && (
+            <p className="text-[10px] text-[#64748B] py-2">Loading templates...</p>
+          )}
+          {!loading && templates.length === 0 && (
+            <p className="text-[10px] text-[#374A5E] italic py-2">
+              No templates yet. Select a group and save it as a template in the Properties tab.
+            </p>
+          )}
+          {!loading && templates.length > 0 && (
+            <div className="space-y-1.5">
+              {templates.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-2 bg-[#1F2C3F] hover:bg-[#263448] border border-[#F97316]/20 hover:border-[#F97316]/40 rounded-lg px-3 py-2 transition-colors cursor-pointer"
+                >
+                  <button
+                    onClick={() => handleInsert(t)}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <div className="text-xs font-medium text-[#CBD5E1]">{t.name}</div>
+                    <div className="text-[9px] text-[#64748B]">
+                      {t.template_data.systems.length} system{t.template_data.systems.length !== 1 ? 's' : ''}
+                      {t.template_data.edges.length > 0 && ` · ${t.template_data.edges.length} flow${t.template_data.edges.length !== 1 ? 's' : ''}`}
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(t.id, e)}
+                    className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PaletteTab() {
   const addSystem = useDiagramStore((s) => s.addSystem)
   const addGroup = useDiagramStore((s) => s.addGroup)
@@ -125,6 +253,9 @@ function PaletteTab() {
           </div>
         </button>
       </div>
+
+      {/* Reusable Group Templates */}
+      <GroupTemplatesSection />
 
       <SidebarLabel>Add System</SidebarLabel>
       <p className="text-[11px] text-[#64748B] mb-3">
@@ -206,11 +337,80 @@ const GROUP_COLORS = [
 function GroupPropertiesTab() {
   const selectedGroupId = useDiagramStore((s) => s.selectedGroupId)
   const groups = useDiagramStore((s) => s.groups)
+  const nodes = useDiagramStore((s) => s.nodes)
+  const edges = useDiagramStore((s) => s.edges)
   const updateGroupLabel = useDiagramStore((s) => s.updateGroupLabel)
   const updateGroupColor = useDiagramStore((s) => s.updateGroupColor)
+  const { user, organization } = useAuth()
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [showSave, setShowSave] = useState(false)
 
   const selectedGroup = groups.find((g) => g.id === selectedGroupId)
   if (!selectedGroup) return null
+
+  // Find systems visually inside this group's bounding box
+  const groupBounds = {
+    x: selectedGroup.position.x,
+    y: selectedGroup.position.y,
+    w: (selectedGroup.style?.width as number) || 500,
+    h: (selectedGroup.style?.height as number) || 400,
+  }
+  const containedSystems = nodes.filter((n) => {
+    const nx = n.position.x
+    const ny = n.position.y
+    return (
+      nx >= groupBounds.x &&
+      ny >= groupBounds.y &&
+      nx <= groupBounds.x + groupBounds.w &&
+      ny <= groupBounds.y + groupBounds.h
+    )
+  })
+  const containedIds = new Set(containedSystems.map((n) => n.id))
+
+  // Find edges between contained systems
+  const containedEdges = edges.filter(
+    (e) => containedIds.has(e.source) && containedIds.has(e.target)
+  )
+
+  const handleSaveTemplate = useCallback(async () => {
+    if (!user || !organization || !templateName.trim()) return
+    setSaving(true)
+    try {
+      const { saveGroupTemplate } = await import('@/lib/supabase/diagrams')
+      const systemIdxMap = new Map(containedSystems.map((n, i) => [n.id, i]))
+      await saveGroupTemplate(organization.id, user.id, templateName.trim(), null, {
+        group: {
+          label: selectedGroup.data.label,
+          color: selectedGroup.data.color,
+          width: groupBounds.w,
+          height: groupBounds.h,
+        },
+        systems: containedSystems.map((n) => ({
+          label: n.data.label,
+          systemType: n.data.systemType,
+          physicalSystem: n.data.physicalSystem,
+          modules: n.data.modules,
+          relativeX: n.position.x - groupBounds.x,
+          relativeY: n.position.y - groupBounds.y,
+          width: n.width,
+          height: n.height,
+        })),
+        edges: containedEdges.map((e) => ({
+          sourceIdx: systemIdxMap.get(e.source) ?? 0,
+          targetIdx: systemIdxMap.get(e.target) ?? 0,
+          data: e.data,
+        })),
+      })
+      setSaved(true)
+      setTimeout(() => { setSaved(false); setShowSave(false) }, 2000)
+    } catch (err) {
+      console.error('Failed to save template:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [user, organization, templateName, selectedGroup, containedSystems, containedEdges, groupBounds])
 
   return (
     <div>
@@ -243,9 +443,75 @@ function GroupPropertiesTab() {
             ))}
           </div>
         </div>
-        <p className="text-[10px] text-[#64748B] italic">
-          Drag system nodes inside this group to visually associate them. Resize the group by dragging its edges.
-        </p>
+
+        {/* Contained systems summary */}
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+            Systems in Group
+          </label>
+          {containedSystems.length > 0 ? (
+            <div className="space-y-1">
+              {containedSystems.map((n) => (
+                <div key={n.id} className="text-[10px] text-[#94A3B8] bg-[#151E2E] rounded px-2 py-1 border border-[#374A5E]/20">
+                  {n.data.label}
+                  {n.data.physicalSystem && <span className="text-[#06B6D4] ml-1">({n.data.physicalSystem})</span>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[10px] text-[#374A5E] italic">
+              No systems inside this group yet. Drag nodes into the group area.
+            </p>
+          )}
+        </div>
+
+        {/* Save as reusable template */}
+        {containedSystems.length > 0 && (
+          <div className="pt-2 border-t border-[#374A5E]/30">
+            {!showSave ? (
+              <button
+                onClick={() => { setShowSave(true); setTemplateName(selectedGroup.data.label) }}
+                className="flex items-center gap-2 w-full text-left text-[11px] text-[#F97316] hover:text-[#FB923C] transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M12.5 14H3.5a1 1 0 01-1-1V3a1 1 0 011-1h7l3 3v8a1 1 0 01-1 1z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M5 14v-4h6v4M5 2v3h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Save as Reusable Template
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-wider text-[#F97316] font-[family-name:var(--font-space-mono)] block">
+                  Template Name
+                </label>
+                <input
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="e.g., SAP ECC Integration Stack"
+                  className="w-full bg-[#151E2E] border border-[#F97316]/40 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#F97316] transition-colors placeholder:text-[#374A5E]"
+                />
+                <p className="text-[9px] text-[#64748B]">
+                  Saves {containedSystems.length} system{containedSystems.length !== 1 ? 's' : ''} and {containedEdges.length} connection{containedEdges.length !== 1 ? 's' : ''} as a reusable template for your organization.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveTemplate}
+                    disabled={saving || !templateName.trim()}
+                    className="flex-1 bg-[#F97316] hover:bg-[#FB923C] disabled:opacity-30 text-white text-xs font-medium py-2 rounded-lg transition-colors"
+                  >
+                    {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Template'}
+                  </button>
+                  <button
+                    onClick={() => setShowSave(false)}
+                    className="text-xs text-[#64748B] hover:text-[#CBD5E1] px-3 py-2 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

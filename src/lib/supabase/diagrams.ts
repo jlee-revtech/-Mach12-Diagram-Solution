@@ -168,3 +168,62 @@ export async function getOrgMembers(orgId: string) {
   if (!res.ok) return []
   return res.json()
 }
+
+// ─── Group Templates ───────────────────────────────────
+export interface GroupTemplateRow {
+  id: string
+  organization_id: string
+  name: string
+  description: string | null
+  created_by: string | null
+  template_data: {
+    group: { label: string; color?: string; width: number; height: number }
+    systems: { label: string; systemType: string; physicalSystem?: string; modules?: unknown[]; relativeX: number; relativeY: number; width?: number; height?: number }[]
+    edges: { sourceIdx: number; targetIdx: number; data: unknown }[]
+  }
+  created_at: string
+  updated_at: string
+}
+
+export async function listGroupTemplates(orgId: string): Promise<GroupTemplateRow[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/group_templates?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function saveGroupTemplate(
+  orgId: string,
+  userId: string,
+  name: string,
+  description: string | null,
+  templateData: GroupTemplateRow['template_data']
+): Promise<GroupTemplateRow> {
+  const res = await fetch(`${URL}/rest/v1/group_templates`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({
+      organization_id: orgId,
+      name,
+      description,
+      created_by: userId,
+      template_data: templateData,
+    }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to save template')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function deleteGroupTemplate(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/group_templates?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to delete template')
+  }
+}

@@ -389,6 +389,8 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
             data: { dataElements: [], direction: 'forward' },
           }}
           fitView
+          minZoom={0.05}
+          maxZoom={4}
           snapToGrid
           snapGrid={[16, 16]}
           connectionMode={ConnectionMode.Loose}
