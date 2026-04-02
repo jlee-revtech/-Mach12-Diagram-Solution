@@ -22,7 +22,6 @@ const ELEMENT_TYPE_COLORS: Record<string, string> = {
 }
 
 // Fix for Next.js: url(#id) breaks with client-side routing.
-// Use full page URL as base so the browser resolves the fragment correctly.
 function markerUrl(markerId: string) {
   if (typeof window === 'undefined') return `url(#${markerId})`
   const base = window.location.href.replace(/#.*$/, '')
@@ -30,7 +29,6 @@ function markerUrl(markerId: string) {
 }
 
 // ─── Path position helpers ──────────────────────────────
-// Reusable SVG path element — avoids DOM create/destroy on every render
 let _reusablePath: SVGPathElement | null = null
 function getReusablePath(d: string): SVGPathElement {
   if (!_reusablePath) {
@@ -44,14 +42,12 @@ function getReusablePath(d: string): SVGPathElement {
   return _reusablePath
 }
 
-// Given an SVG path `d` string, compute the {x,y} at a 0–1 ratio.
 function getPointAtRatio(d: string, ratio: number): { x: number; y: number } {
   const path = getReusablePath(d)
   const pt = path.getPointAtLength(ratio * path.getTotalLength())
   return { x: pt.x, y: pt.y }
 }
 
-// Project a flow-space point onto the path, returning the closest 0–1 ratio.
 function closestRatioOnPath(d: string, px: number, py: number): number {
   const path = getReusablePath(d)
   const totalLen = path.getTotalLength()
@@ -109,16 +105,13 @@ function DataFlowEdgeComponent({
     borderRadius: 16,
   })
 
-  // Label position along path (0–1, default 0.5)
   const labelRatio = data?.labelPosition ?? 0.5
   const labelPos = useMemo(() => {
     if (typeof document === 'undefined') return { x: defaultLabelX, y: defaultLabelY }
-    // For default midpoint, use React Flow's computed value (faster)
     if (labelRatio === 0.5) return { x: defaultLabelX, y: defaultLabelY }
     return getPointAtRatio(edgePath, labelRatio)
   }, [edgePath, labelRatio, defaultLabelX, defaultLabelY])
 
-  // ─── Drag state for label repositioning ───────────────
   const [dragging, setDragging] = useState(false)
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
   const dragRef = useRef(false)
@@ -149,7 +142,6 @@ function DataFlowEdgeComponent({
     window.addEventListener('mouseup', onUp)
   }, [selected, id, edgePath, screenToFlowPosition, updateEdgeLabelPosition])
 
-  // While dragging, project current mouse onto path for live preview
   const liveLabelPos = useMemo(() => {
     if (!dragging || !dragPos || typeof document === 'undefined') return null
     const ratio = closestRatioOnPath(edgePath, dragPos.x, dragPos.y)
@@ -166,7 +158,6 @@ function DataFlowEdgeComponent({
 
   const dataElements = data?.dataElements ?? []
   const isBidirectional = data?.direction === 'bidirectional'
-  // Show artifact-specific sequence when spotlighting, otherwise legacy sequence
   const displaySequence = spotlightArtifactId && data?.artifactSequences?.[spotlightArtifactId]
     ? data.artifactSequences[spotlightArtifactId]
     : data?.sequence ?? null
@@ -195,7 +186,7 @@ function DataFlowEdgeComponent({
         id={id}
         path={edgePath}
         style={{
-          stroke: highlight ? '#06B6D4' : '#64748B',
+          stroke: highlight ? '#06B6D4' : 'var(--m12-edge-default)',
           strokeWidth: highlight ? 2.5 : 2,
           opacity: isDimmed ? 0.1 : 1,
           cursor: 'pointer',
@@ -216,7 +207,7 @@ function DataFlowEdgeComponent({
         style={{ cursor: 'pointer' }}
       />
 
-      {/* Sequence badge — show artifact-specific or legacy sequence */}
+      {/* Sequence badge */}
       {displaySequence != null && (
         <EdgeLabelRenderer>
           <div
@@ -242,7 +233,7 @@ function DataFlowEdgeComponent({
               className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold font-[family-name:var(--font-space-mono)] shadow-md transition-all ${
                 highlight
                   ? 'bg-[#06B6D4] text-[#0F172A] shadow-[0_0_8px_rgba(6,182,212,0.4)]'
-                  : 'bg-[#374A5E] text-[#F8FAFC]'
+                  : 'bg-[var(--m12-border)] text-[var(--m12-text)]'
               }`}
             >
               {displaySequence}
@@ -268,12 +259,13 @@ function DataFlowEdgeComponent({
             className={selected ? 'nopan' : ''}
           >
             <div
-              className={`bg-[#0F172A]/90 backdrop-blur-sm border-l-2 border rounded-lg px-3 py-2 shadow-lg transition-all ${
+              style={{ backgroundColor: 'var(--m12-edge-label-bg)' }}
+              className={`backdrop-blur-sm border-l-2 border rounded-lg px-3 py-2 shadow-lg transition-all ${
                 dragging
                   ? 'border-[#06B6D4] border-l-[#06B6D4] shadow-[0_0_16px_rgba(6,182,212,0.3)] scale-[1.02]'
                   : highlight
                     ? 'border-[#06B6D4]/60 border-l-[#06B6D4] shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                    : 'border-[#374A5E]/40 border-l-[#64748B] hover:border-[#374A5E]/60'
+                    : 'border-[var(--m12-border)]/40 border-l-[var(--m12-text-muted)] hover:border-[var(--m12-border)]/60'
               }`}
             >
               {/* Drag indicator when selected */}
@@ -293,23 +285,23 @@ function DataFlowEdgeComponent({
                       <div
                         style={{
                           backgroundColor:
-                            ELEMENT_TYPE_COLORS[el.elementType] ?? '#64748B',
+                            ELEMENT_TYPE_COLORS[el.elementType] ?? 'var(--m12-text-muted)',
                         }}
                         className="w-1.5 h-1.5 rounded-full shrink-0"
                       />
-                      <span className="text-[11px] font-medium text-[#CBD5E1] whitespace-nowrap">
+                      <span className="text-[11px] font-medium text-[var(--m12-text-secondary)] whitespace-nowrap">
                         {el.name}
                       </span>
                       {el.processContext && (
-                        <span className="text-[8px] text-[#64748B] bg-[#151E2E] px-1 py-0.5 rounded whitespace-nowrap">
+                        <span className="text-[8px] text-[var(--m12-text-muted)] bg-[var(--m12-bg)] px-1 py-0.5 rounded whitespace-nowrap">
                           {el.processContext}
                         </span>
                       )}
                     </div>
                     {el.elementType === 'data_object' && el.attributes && el.attributes.length > 0 && (
-                      <div className="ml-3 pl-2 border-l border-[#374A5E]/50 mt-0.5 flex flex-col gap-0.5">
+                      <div className="ml-3 pl-2 border-l border-[var(--m12-border)]/50 mt-0.5 flex flex-col gap-0.5">
                         {el.attributes.map((attr) => (
-                          <span key={attr.id} className="text-[10px] text-[#64748B] whitespace-nowrap">
+                          <span key={attr.id} className="text-[10px] text-[var(--m12-text-muted)] whitespace-nowrap">
                             {attr.name}
                           </span>
                         ))}
@@ -350,17 +342,18 @@ function DataFlowEdgeComponent({
               opacity: isDimmed ? 0.1 : 1,
               transition: dragging ? 'none' : 'opacity 0.3s',
               cursor: selected ? (dragging ? 'grabbing' : 'grab') : 'pointer',
+              backgroundColor: 'var(--m12-edge-label-bg)',
             }}
-            className={selected ? 'nopan' : ''}
+            className={`rounded-md ${selected ? 'nopan' : ''}`}
           >
             <div
-              className={`bg-[#0F172A]/80 border border-dashed rounded-md px-2 py-1 transition-all ${
+              className={`border border-dashed rounded-md px-2 py-1 transition-all ${
                 dragging
                   ? 'border-[#06B6D4]'
-                  : selected ? 'border-[#06B6D4]' : 'border-[#374A5E] hover:border-[#64748B]'
+                  : selected ? 'border-[#06B6D4]' : 'border-[var(--m12-border)] hover:border-[var(--m12-text-muted)]'
               }`}
             >
-              <span className="text-[10px] text-[#64748B] font-[family-name:var(--font-space-mono)]">
+              <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
                 + data elements
               </span>
             </div>
@@ -378,48 +371,16 @@ export function EdgeMarkerDefs() {
   return (
     <svg style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, overflow: 'hidden' }}>
       <defs>
-        <marker
-          id="marker-default"
-          viewBox="0 0 12 12"
-          refX="10"
-          refY="6"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto-start-reverse"
-        >
-          <path d="M 2 2 L 10 6 L 2 10 z" fill="#64748B" />
+        <marker id="marker-default" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M 2 2 L 10 6 L 2 10 z" fill="var(--m12-marker-default)" />
         </marker>
-        <marker
-          id="marker-selected"
-          viewBox="0 0 12 12"
-          refX="10"
-          refY="6"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto-start-reverse"
-        >
+        <marker id="marker-selected" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
           <path d="M 2 2 L 10 6 L 2 10 z" fill="#06B6D4" />
         </marker>
-        <marker
-          id="marker-start-default"
-          viewBox="0 0 12 12"
-          refX="2"
-          refY="6"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto-start-reverse"
-        >
-          <path d="M 10 2 L 2 6 L 10 10 z" fill="#64748B" />
+        <marker id="marker-start-default" viewBox="0 0 12 12" refX="2" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M 10 2 L 2 6 L 10 10 z" fill="var(--m12-marker-default)" />
         </marker>
-        <marker
-          id="marker-start-selected"
-          viewBox="0 0 12 12"
-          refX="2"
-          refY="6"
-          markerWidth="8"
-          markerHeight="8"
-          orient="auto-start-reverse"
-        >
+        <marker id="marker-start-selected" viewBox="0 0 12 12" refX="2" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
           <path d="M 10 2 L 2 6 L 10 10 z" fill="#06B6D4" />
         </marker>
       </defs>

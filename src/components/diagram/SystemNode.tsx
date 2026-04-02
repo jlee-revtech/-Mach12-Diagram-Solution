@@ -101,10 +101,10 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
   // Primary handles (one per side at midpoint) — visible on hover
   // Secondary handles — invisible but functional for drag connections
   const primaryHandle = `!border-2 transition-all duration-200 !rounded-full`
-  const primaryVisible = `!w-3 !h-3 !bg-[#1F2C3F] !border-[#64748B] hover:!bg-[#2563EB] hover:!border-[#2563EB] hover:!w-4 hover:!h-4`
+  const primaryVisible = `!w-3 !h-3 !bg-[var(--m12-handle-bg)] !border-[var(--m12-handle-border)] hover:!bg-[#2563EB] hover:!border-[#2563EB] hover:!w-4 hover:!h-4`
   const primarySelected = `!w-3.5 !h-3.5 !bg-[#06B6D4]/20 !border-[#06B6D4] hover:!bg-[#06B6D4] hover:!w-4 hover:!h-4`
   const secondaryHandle = `!border transition-all duration-200`
-  const secondaryVisible = `!w-2 !h-2 !bg-[#1F2C3F] !border-[#374A5E] hover:!bg-[#2563EB] hover:!border-[#2563EB] hover:!w-3 hover:!h-3`
+  const secondaryVisible = `!w-2 !h-2 !bg-[var(--m12-handle-bg)] !border-[var(--m12-secondary-handle-border)] hover:!bg-[#2563EB] hover:!border-[#2563EB] hover:!w-3 hover:!h-3`
   const secondaryHidden = `!w-3 !h-3 !bg-transparent !border-transparent`
 
   return (
@@ -121,7 +121,7 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
               : connectMode
                 ? color + '80'
                 : isDimmed
-                  ? '#374A5E30'
+                  ? 'var(--m12-border)'
                   : color + '60',
         boxShadow: isPendingSource
           ? `0 0 24px #2563EB50, 0 0 48px #2563EB20`
@@ -129,11 +129,12 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
             ? `0 0 16px ${color}50, 0 0 32px ${color}20`
             : selected
               ? `0 0 20px ${color}40, 0 0 40px ${color}15`
-              : `0 2px 12px rgba(0,0,0,0.3)`,
+              : 'var(--m12-node-shadow)',
         opacity: isDimmed ? 0.2 : 1,
         transition: 'opacity 0.3s, border-color 0.2s, box-shadow 0.2s',
+        backgroundColor: 'var(--m12-node-bg)',
       }}
-      className={`group relative bg-[#1F2C3F] border-2 rounded-xl px-5 py-4 min-w-[180px] min-h-[60px] cursor-pointer transition-all duration-200 ${!selected ? 'hover:scale-[1.02]' : ''} ${connectMode ? 'hover:!border-[#2563EB] hover:shadow-[0_0_20px_rgba(37,99,235,0.3)]' : ''} ${isDimmed ? 'hover:!opacity-40' : ''}`}
+      className={`group relative border-2 rounded-xl px-5 py-4 min-w-[180px] min-h-[60px] cursor-pointer transition-all duration-200 ${!selected ? 'hover:scale-[1.02]' : ''} ${connectMode ? 'hover:!border-[#2563EB] hover:shadow-[0_0_20px_rgba(37,99,235,0.3)]' : ''} ${isDimmed ? 'hover:!opacity-40' : ''}`}
     >
       {/* Resize handles — only visible when selected */}
       <NodeResizer
@@ -141,7 +142,7 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
         minWidth={180}
         minHeight={60}
         lineClassName="!border-[#06B6D4]/30"
-        handleClassName="!w-2.5 !h-2.5 !bg-[#06B6D4] !border-[#1F2C3F] !border-2 !rounded-sm"
+        handleClassName="!w-2.5 !h-2.5 !bg-[#06B6D4] !border-[var(--m12-bg-card)] !border-2 !rounded-sm"
       />
 
       {/* ── Primary handles: 1 per side at midpoint, visible on hover ── */}
@@ -198,10 +199,10 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className="w-full bg-transparent border-b border-[#06B6D4] text-[#F8FAFC] text-sm font-semibold outline-none"
+              className="w-full bg-transparent border-b border-[#06B6D4] text-[var(--m12-text)] text-sm font-semibold outline-none"
             />
           ) : (
-            <div className="text-sm font-semibold text-[#F8FAFC]">
+            <div className="text-sm font-semibold text-[var(--m12-text)]">
               {data.label}
             </div>
           )}
@@ -210,7 +211,7 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
               {data.physicalSystem}
             </div>
           )}
-          <div className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)]">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
             {data.systemType}
           </div>
         </div>
@@ -218,7 +219,7 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
 
       {/* Modules list */}
       {data.modules && data.modules.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-[#374A5E]/30">
+        <div className="mt-2 pt-2 border-t border-[var(--m12-border)]/30">
           <div className="flex flex-wrap gap-1">
             {data.modules.map((mod) => (
               <div

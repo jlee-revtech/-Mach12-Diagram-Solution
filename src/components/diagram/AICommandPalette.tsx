@@ -361,16 +361,16 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-xl bg-[#1A2435] border border-[#374A5E]/60 rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-xl bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl overflow-hidden"
       >
         {/* Mode tabs */}
-        <div className="flex border-b border-[#374A5E]/40">
+        <div className="flex border-b border-[var(--m12-border)]/40">
           <button
             onClick={() => { setMode('generate'); setAnalysis(null) }}
             className={`flex-1 px-4 py-3 text-xs font-medium transition-colors ${
               mode === 'generate'
                 ? 'text-[#06B6D4] border-b-2 border-[#06B6D4]'
-                : 'text-[#64748B] hover:text-[#CBD5E1]'
+                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
             }`}
           >
             Generate Diagram
@@ -380,7 +380,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
             className={`flex-1 px-4 py-3 text-xs font-medium transition-colors ${
               mode === 'analyze'
                 ? 'text-[#06B6D4] border-b-2 border-[#06B6D4]'
-                : 'text-[#64748B] hover:text-[#CBD5E1]'
+                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
             }`}
           >
             Analyze Diagram
@@ -389,7 +389,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
 
         {mode === 'generate' ? (
           <div className="p-4">
-            <div className="bg-[#151E2E] rounded-xl px-4 py-3 border border-[#374A5E]/40 focus-within:border-[#2563EB]">
+            <div className="bg-[var(--m12-bg)] rounded-xl px-4 py-3 border border-[var(--m12-border)]/40 focus-within:border-[#2563EB]">
               <div className="flex items-start gap-3">
                 <span className="text-[#06B6D4] text-sm font-bold font-[family-name:var(--font-space-mono)] mt-1 shrink-0">AI</span>
                 <textarea
@@ -401,18 +401,18 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !loading) handleGenerate()
                   }}
                   placeholder={imageData ? "Describe what to do with this image..." : "Describe your data architecture...\n\nPaste long prompts, requirements, or system descriptions here.\nCtrl+Enter to generate."}
-                  className="flex-1 bg-transparent text-sm text-[#F8FAFC] outline-none placeholder:text-[#374A5E] resize-none min-h-[80px] max-h-[200px] leading-relaxed w-full"
+                  className="flex-1 bg-transparent text-sm text-[var(--m12-text)] outline-none placeholder:text-[var(--m12-border)] resize-none min-h-[80px] max-h-[200px] leading-relaxed w-full"
                   rows={4}
                   disabled={loading}
                 />
               </div>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#374A5E]/20">
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--m12-border)]/20">
                 <div className="flex items-center gap-2">
                   {/* Image upload button */}
                   <button
                     onClick={() => fileRef.current?.click()}
                     title="Upload screenshot"
-                    className="text-[#64748B] hover:text-[#06B6D4] transition-colors shrink-0"
+                    className="text-[var(--m12-text-muted)] hover:text-[#06B6D4] transition-colors shrink-0"
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/><path d="M2 11l3-3 2 2 3-4 4 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
@@ -427,7 +427,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                     <div className="w-4 h-4 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin" />
                   )}
                 </div>
-                <span className="text-[9px] text-[#374A5E] font-[family-name:var(--font-space-mono)]">
+                <span className="text-[9px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
                   Ctrl+Enter to generate
                 </span>
               </div>
@@ -439,15 +439,15 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                 <img
                   src={imageData}
                   alt="Uploaded screenshot"
-                  className="max-h-32 rounded-lg border border-[#374A5E]/40"
+                  className="max-h-32 rounded-lg border border-[var(--m12-border)]/40"
                 />
                 <button
                   onClick={() => { setImageData(null); setImageName(null) }}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#1A2435] border border-[#374A5E] rounded-full flex items-center justify-center text-[#64748B] hover:text-red-400 transition-colors"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)] rounded-full flex items-center justify-center text-[var(--m12-text-muted)] hover:text-red-400 transition-colors"
                 >
                   <svg width="8" height="8" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                 </button>
-                <div className="text-[9px] text-[#374A5E] mt-1 truncate max-w-[200px]">{imageName}</div>
+                <div className="text-[9px] text-[var(--m12-border)] mt-1 truncate max-w-[200px]">{imageName}</div>
               </div>
             )}
 
@@ -462,7 +462,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                 <button
                   key={q}
                   onClick={() => { setPrompt(q); setTimeout(() => inputRef.current?.focus(), 0) }}
-                  className="text-[10px] bg-[#151E2E] text-[#64748B] hover:text-[#CBD5E1] border border-[#374A5E]/30 hover:border-[#374A5E] px-2.5 py-1 rounded-lg transition-colors"
+                  className="text-[10px] bg-[var(--m12-bg)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] border border-[var(--m12-border)]/30 hover:border-[var(--m12-border)] px-2.5 py-1 rounded-lg transition-colors"
                 >
                   {q}
                 </button>
@@ -476,7 +476,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
             )}
 
             <div className="mt-3 flex justify-between items-center">
-              <span className="text-[10px] text-[#374A5E] font-[family-name:var(--font-space-mono)]">
+              <span className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
                 Ctrl+K to toggle
               </span>
               <button
@@ -492,7 +492,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
           <div className="p-4">
             {!analysis && !loading && (
               <div className="text-center py-6">
-                <p className="text-sm text-[#CBD5E1] mb-4">
+                <p className="text-sm text-[var(--m12-text-secondary)] mb-4">
                   AI will analyze your current diagram for completeness, missing systems, and data governance.
                 </p>
                 <button
@@ -508,7 +508,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
             {loading && (
               <div className="text-center py-8">
                 <div className="w-6 h-6 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-xs text-[#64748B]">Analyzing your diagram...</p>
+                <p className="text-xs text-[var(--m12-text-muted)]">Analyzing your diagram...</p>
               </div>
             )}
 
@@ -522,7 +522,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                   }`}>
                     {analysis.score}
                   </div>
-                  <div className="text-xs text-[#64748B]">Completeness Score</div>
+                  <div className="text-xs text-[var(--m12-text-muted)]">Completeness Score</div>
                 </div>
 
                 {/* Missing Systems */}
@@ -546,7 +546,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                 )}
 
                 {/* Implement Recommendations */}
-                <div className="pt-3 border-t border-[#374A5E]/40 flex items-center gap-3">
+                <div className="pt-3 border-t border-[var(--m12-border)]/40 flex items-center gap-3">
                   <button
                     onClick={handleImplement}
                     disabled={implementing}
@@ -570,7 +570,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                     onClick={handleAnalyze}
                     disabled={implementing || loading}
                     title="Re-analyze"
-                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-[#374A5E]/40 text-[#64748B] hover:text-[#CBD5E1] hover:border-[#374A5E] transition-colors disabled:opacity-30"
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)] transition-colors disabled:opacity-30"
                   >
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                       <path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -578,7 +578,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                     </svg>
                   </button>
                 </div>
-                <p className="text-[10px] text-[#374A5E] text-center">
+                <p className="text-[10px] text-[var(--m12-border)] text-center">
                   AI will add missing systems and data flows to your diagram. You can undo with Ctrl+Z.
                 </p>
               </div>
@@ -604,7 +604,7 @@ function AnalysisSection({ title, items, color }: { title: string; items: string
       </div>
       <div className="space-y-1">
         {items.map((item, i) => (
-          <div key={i} className="flex items-start gap-2 text-xs text-[#CBD5E1]">
+          <div key={i} className="flex items-start gap-2 text-xs text-[var(--m12-text-secondary)]">
             <div className="w-1 h-1 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: color }} />
             {item}
           </div>

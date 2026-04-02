@@ -5,11 +5,13 @@ import { useReactFlow } from '@xyflow/react'
 import { useRouter } from 'next/navigation'
 import { useDiagramStore } from '@/lib/diagram/store'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { useTheme } from '@/lib/theme-context'
 import ExportMenu from './ExportMenu'
 
 export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpen?: () => void; onHelpOpen?: () => void; onShareOpen?: () => void }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
   const { user } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const router = useRouter()
   const deleteSelected = useDiagramStore((s) => s.deleteSelected)
   const saveDiagram = useDiagramStore((s) => s.saveDiagram)
@@ -35,12 +37,12 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
   }
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-[#1F2C3F]/90 backdrop-blur-sm border border-[#374A5E]/60 rounded-xl px-2 py-1.5 shadow-lg">
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-[var(--m12-bg-card)]/90 backdrop-blur-sm border border-[var(--m12-border)]/60 rounded-xl px-2 py-1.5 shadow-lg">
       <ToolbarButton onClick={() => router.push('/')} title="Back to Dashboard">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </ToolbarButton>
 
-      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+      <div className="w-px h-5 bg-[var(--m12-border)] mx-1" />
 
       <ToolbarButton onClick={() => zoomIn()} title="Zoom In">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -70,8 +72,8 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
         title="Undo (Ctrl+Z)"
         className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
           canUndo
-            ? 'text-[#CBD5E1] hover:bg-[#374A5E]/60 hover:text-[#F8FAFC]'
-            : 'text-[#374A5E] cursor-not-allowed'
+            ? 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-border)]/60 hover:text-[var(--m12-text)]'
+            : 'text-[var(--m12-border)] cursor-not-allowed'
         }`}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -80,7 +82,7 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
         </svg>
       </button>
 
-      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+      <div className="w-px h-5 bg-[var(--m12-border)] mx-1" />
 
       <button
         onClick={toggleConnectMode}
@@ -90,8 +92,8 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
           connectMode
             ? 'bg-[#2563EB]/20 text-[#2563EB] ring-1 ring-[#2563EB]/50'
             : spotlightNodeId
-              ? 'text-[#374A5E] cursor-not-allowed'
-              : 'text-[#CBD5E1] hover:bg-[#374A5E]/60 hover:text-[#F8FAFC]'
+              ? 'text-[var(--m12-border)] cursor-not-allowed'
+              : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-border)]/60 hover:text-[var(--m12-text)]'
         }`}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -102,7 +104,7 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
         {connectMode ? 'Connecting...' : 'Connect'}
       </button>
 
-      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+      <div className="w-px h-5 bg-[var(--m12-border)] mx-1" />
 
       {hasSelection && (
         <ToolbarButton onClick={deleteSelected} title="Delete Selected" variant="danger">
@@ -110,7 +112,7 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
         </ToolbarButton>
       )}
 
-      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+      <div className="w-px h-5 bg-[var(--m12-border)] mx-1" />
 
       {onAiOpen && (
         <button
@@ -124,7 +126,7 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
 
       <ExportMenu />
 
-      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+      <div className="w-px h-5 bg-[var(--m12-border)] mx-1" />
 
       <ToolbarButton onClick={handleSave} title={saving ? 'Saving...' : 'Save Diagram'}>
         {saving ? (
@@ -134,7 +136,7 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
         )}
       </ToolbarButton>
 
-      <div className="w-px h-5 bg-[#374A5E] mx-1" />
+      <div className="w-px h-5 bg-[var(--m12-border)] mx-1" />
 
       <button
         onClick={onShareOpen}
@@ -145,9 +147,24 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
         Share
       </button>
 
+      {/* Theme toggle */}
+      <div className="w-px h-5 bg-[var(--m12-border)] mx-1" />
+      <ToolbarButton onClick={toggleTheme} title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+        {theme === 'dark' ? (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.76 3.76l1.06 1.06M11.18 11.18l1.06 1.06M3.76 12.24l1.06-1.06M11.18 4.82l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M13.5 9.5a5.5 5.5 0 01-7-7 5.5 5.5 0 107 7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </ToolbarButton>
+
       {onHelpOpen && (
         <>
-          <div className="w-px h-5 bg-[#374A5E] mx-1" />
+          <div className="w-px h-5 bg-[var(--m12-border)] mx-1" />
           <ToolbarButton onClick={onHelpOpen} title="How to use this app">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
@@ -180,7 +197,7 @@ function ToolbarButton({
       className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
         variant === 'danger'
           ? 'text-red-400 hover:bg-red-500/15 hover:text-red-300'
-          : 'text-[#CBD5E1] hover:bg-[#374A5E]/60 hover:text-[#F8FAFC]'
+          : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-border)]/60 hover:text-[var(--m12-text)]'
       }`}
     >
       {children}

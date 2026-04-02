@@ -46,28 +46,28 @@ export default function SetupPage() {
   if (loading) return null
 
   return (
-    <div className="min-h-screen bg-[#151E2E] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--m12-bg)] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <span className="text-gradient text-2xl font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
             MACH12
           </span>
-          <span className="text-[#64748B] text-xl">.AI</span>
-          <h2 className="text-lg font-semibold text-[#F8FAFC] mt-4">Set Up Your Organization</h2>
-          <p className="text-sm text-[#64748B] mt-1">
+          <span className="text-[var(--m12-text-muted)] text-xl">.AI</span>
+          <h2 className="text-lg font-semibold text-[var(--m12-text)] mt-4">Set Up Your Organization</h2>
+          <p className="text-sm text-[var(--m12-text-muted)] mt-1">
             Create a new organization or join an existing one by name or invite code.
           </p>
         </div>
 
-        <div className="bg-[#1F2C3F] border border-[#374A5E]/40 rounded-2xl p-8">
+        <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-2xl p-8">
           {/* Tab toggle */}
-          <div className="flex mb-6 bg-[#151E2E] rounded-lg p-1">
+          <div className="flex mb-6 bg-[var(--m12-bg)] rounded-lg p-1">
             <button
               onClick={() => { setMode('create'); setError(null) }}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                 mode === 'create'
                   ? 'bg-[#2563EB] text-white'
-                  : 'text-[#64748B] hover:text-[#CBD5E1]'
+                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
               }`}
             >
               Create / Join Org
@@ -77,7 +77,7 @@ export default function SetupPage() {
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                 mode === 'join'
                   ? 'bg-[#2563EB] text-white'
-                  : 'text-[#64748B] hover:text-[#CBD5E1]'
+                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
               }`}
             >
               Join with Code
@@ -87,7 +87,7 @@ export default function SetupPage() {
           {mode === 'create' ? (
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+                <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
                   Organization Name
                 </label>
                 <input
@@ -96,11 +96,11 @@ export default function SetupPage() {
                   onChange={(e) => handleNameChange(e.target.value)}
                   required
                   placeholder="Revelation Technologies"
-                  className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E]"
+                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+                <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
                   Slug
                 </label>
                 <input
@@ -109,9 +109,9 @@ export default function SetupPage() {
                   onChange={(e) => setOrgSlug(e.target.value)}
                   required
                   placeholder="revtech"
-                  className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E] font-[family-name:var(--font-space-mono)]"
+                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]"
                 />
-                <p className="text-[10px] text-[#374A5E] mt-1">Used as a URL-friendly identifier</p>
+                <p className="text-[10px] text-[var(--m12-border)] mt-1">Used as a URL-friendly identifier</p>
               </div>
 
               {error && (
@@ -131,7 +131,7 @@ export default function SetupPage() {
           ) : (
             <form onSubmit={handleJoin} className="space-y-4">
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+                <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
                   Invite Code
                 </label>
                 <input
@@ -140,7 +140,7 @@ export default function SetupPage() {
                   onChange={(e) => setInviteCode(e.target.value)}
                   required
                   placeholder="Enter invite code"
-                  className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E] font-[family-name:var(--font-space-mono)] tracking-wider text-center"
+                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)] font-[family-name:var(--font-space-mono)] tracking-wider text-center"
                 />
               </div>
 

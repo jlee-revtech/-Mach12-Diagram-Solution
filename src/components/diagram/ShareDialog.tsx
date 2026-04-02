@@ -106,27 +106,27 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
       <div className="absolute inset-0 overflow-y-auto flex items-start justify-center py-8 px-4">
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-md bg-[#1A2435] border border-[#374A5E]/60 rounded-2xl shadow-2xl my-auto"
+          className="relative w-full max-w-md bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl my-auto"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#374A5E]/40">
-            <h3 className="text-sm font-semibold text-[#F8FAFC]">Share Diagram</h3>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--m12-border)]/40">
+            <h3 className="text-sm font-semibold text-[var(--m12-text)]">Share Diagram</h3>
             <button
               onClick={onClose}
-              className="text-[#64748B] hover:text-[#F8FAFC] transition-colors"
+              className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
             >
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
             </button>
           </div>
 
           <div className="p-6">
-          <p className="text-xs text-[#64748B] mb-4">
-            Generate a share link for <strong className="text-[#CBD5E1]">{meta.title}</strong>. Recipients will be added to your organization and granted access to this diagram.
+          <p className="text-xs text-[var(--m12-text-muted)] mb-4">
+            Generate a share link for <strong className="text-[var(--m12-text-secondary)]">{meta.title}</strong>. Recipients will be added to your organization and granted access to this diagram.
           </p>
 
           {/* Permission selector */}
           <div className="mb-4">
-            <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1.5">
+            <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1.5">
               Permission Level
             </label>
             <div className="flex gap-2">
@@ -135,7 +135,7 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
                 className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${
                   permission === 'editor'
                     ? 'bg-[#2563EB] text-white'
-                    : 'bg-[#151E2E] text-[#64748B] hover:text-[#CBD5E1] border border-[#374A5E]/40'
+                    : 'bg-[var(--m12-bg)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] border border-[var(--m12-border)]/40'
                 }`}
               >
                 Editor
@@ -145,7 +145,7 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
                 className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${
                   permission === 'viewer'
                     ? 'bg-[#2563EB] text-white'
-                    : 'bg-[#151E2E] text-[#64748B] hover:text-[#CBD5E1] border border-[#374A5E]/40'
+                    : 'bg-[var(--m12-bg)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] border border-[var(--m12-border)]/40'
                 }`}
               >
                 View Only
@@ -164,11 +164,11 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
             </button>
           ) : (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 bg-[#151E2E] border border-[#374A5E]/40 rounded-lg px-3 py-2.5">
+              <div className="flex items-center gap-2 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2.5">
                 <input
                   readOnly
                   value={shareLink}
-                  className="flex-1 bg-transparent text-xs text-[#CBD5E1] outline-none font-[family-name:var(--font-space-mono)]"
+                  className="flex-1 bg-transparent text-xs text-[var(--m12-text-secondary)] outline-none font-[family-name:var(--font-space-mono)]"
                 />
                 <button
                   onClick={handleCopy}
@@ -177,12 +177,12 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-              <p className="text-[10px] text-[#374A5E]">
+              <p className="text-[10px] text-[var(--m12-border)]">
                 Link expires in 7 days. Anyone with this link can join as {permission}.
               </p>
               <button
                 onClick={() => { setShareLink(null); setCopied(false) }}
-                className="text-xs text-[#64748B] hover:text-[#CBD5E1] transition-colors"
+                className="text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors"
               >
                 Generate new link
               </button>
@@ -192,23 +192,23 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
           {/* Existing shares */}
           {existingShares.length > 0 && (
             <div className="mt-5">
-              <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-2">
+              <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-2">
                 Active Share Links
               </label>
               <div className="space-y-1.5">
                 {existingShares.map((s: any) => (
-                  <div key={s.id} className="flex items-center justify-between bg-[#151E2E] border border-[#374A5E]/30 rounded-lg px-3 py-2">
+                  <div key={s.id} className="flex items-center justify-between bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg px-3 py-2">
                     <div>
-                      <span className="text-[10px] text-[#CBD5E1] font-[family-name:var(--font-space-mono)]">
+                      <span className="text-[10px] text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)]">
                         ...{s.code.slice(-6)}
                       </span>
                       <span className={`ml-2 text-[9px] uppercase px-1.5 py-0.5 rounded ${
-                        s.permission === 'editor' ? 'bg-[#2563EB]/20 text-[#2563EB]' : 'bg-[#64748B]/20 text-[#64748B]'
+                        s.permission === 'editor' ? 'bg-[#2563EB]/20 text-[#2563EB]' : 'bg-[#64748B]/20 text-[var(--m12-text-muted)]'
                       }`}>
                         {s.permission}
                       </span>
                     </div>
-                    <span className="text-[9px] text-[#374A5E]">
+                    <span className="text-[9px] text-[var(--m12-border)]">
                       {new Date(s.expires_at).toLocaleDateString()}
                     </span>
                   </div>

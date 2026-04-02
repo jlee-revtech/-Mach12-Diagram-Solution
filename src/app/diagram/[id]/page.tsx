@@ -12,7 +12,7 @@ export default function DiagramPage({ params }: { params: Promise<{ id: string }
   const { id } = use(params)
 
   return (
-    <div className="fixed inset-0 bg-[#151E2E]">
+    <div className="fixed inset-0 bg-[var(--m12-bg)]">
       <DiagramCanvas diagramId={id} />
     </div>
   )

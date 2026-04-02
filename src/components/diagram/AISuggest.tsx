@@ -83,7 +83,7 @@ export default function AISuggest() {
       {!fetched && !loading && (
         <button
           onClick={handleSuggest}
-          className="w-full bg-[#151E2E] hover:bg-[#1A2435] border border-[#374A5E]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-2.5 text-xs text-[#64748B] hover:text-[#06B6D4] transition-colors flex items-center justify-center gap-2"
+          className="w-full bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-2.5 text-xs text-[var(--m12-text-muted)] hover:text-[#06B6D4] transition-colors flex items-center justify-center gap-2"
         >
           <span className="text-[#06B6D4] font-bold font-[family-name:var(--font-space-mono)] text-[10px]">AI</span>
           Suggest data elements for {sourceNode.data.label} → {targetNode.data.label}
@@ -93,7 +93,7 @@ export default function AISuggest() {
       {loading && (
         <div className="flex items-center justify-center gap-2 py-3">
           <div className="w-3 h-3 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[10px] text-[#64748B]">Getting suggestions...</span>
+          <span className="text-[10px] text-[var(--m12-text-muted)]">Getting suggestions...</span>
         </div>
       )}
 
@@ -109,26 +109,26 @@ export default function AISuggest() {
             <button
               key={i}
               onClick={() => handleAccept(s)}
-              className="w-full flex items-center gap-2 bg-[#151E2E] hover:bg-[#1A2435] border border-[#374A5E]/30 hover:border-[#06B6D4]/40 rounded-lg px-3 py-2 text-left transition-colors group"
+              className="w-full flex items-center gap-2 bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/30 hover:border-[#06B6D4]/40 rounded-lg px-3 py-2 text-left transition-colors group"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] shrink-0 opacity-50 group-hover:opacity-100" />
               <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-[#CBD5E1] group-hover:text-[#F8FAFC] truncate">
+                <div className="text-[11px] text-[var(--m12-text-secondary)] group-hover:text-[var(--m12-text)] truncate">
                   {s.name}
                 </div>
-                <div className="text-[9px] text-[#374A5E] group-hover:text-[#64748B]">
+                <div className="text-[9px] text-[var(--m12-border)] group-hover:text-[var(--m12-text-muted)]">
                   {s.elementType?.replace('_', ' ')}
                   {s.description && ` — ${s.description}`}
                 </div>
               </div>
-              <span className="text-[10px] text-[#374A5E] group-hover:text-[#06B6D4] shrink-0">+</span>
+              <span className="text-[10px] text-[var(--m12-border)] group-hover:text-[#06B6D4] shrink-0">+</span>
             </button>
           ))}
         </div>
       )}
 
       {fetched && suggestions.length === 0 && !loading && (
-        <div className="text-[10px] text-[#374A5E] text-center py-2">
+        <div className="text-[10px] text-[var(--m12-border)] text-center py-2">
           All suggestions accepted
         </div>
       )}

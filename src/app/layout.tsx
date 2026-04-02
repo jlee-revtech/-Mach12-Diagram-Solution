@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import '@/styles/globals.css'
 import { AuthProvider } from '@/lib/supabase/auth-context'
+import { ThemeProvider } from '@/lib/theme-context'
 
 export const metadata: Metadata = {
   title: 'Mach12.ai — Data Architecture Diagrams',
@@ -13,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
@@ -21,7 +22,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-[family-name:var(--font-dm-sans)] antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

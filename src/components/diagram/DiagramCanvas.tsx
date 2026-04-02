@@ -51,7 +51,7 @@ function ArtifactSpotlightBar() {
             className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[9px] font-medium transition-all ${
               isActive
                 ? 'bg-[#F97316]/20 text-[#FB923C] border border-[#F97316]/40 shadow-[0_0_8px_rgba(249,115,22,0.2)]'
-                : 'bg-[#1F2C3F]/80 text-[#64748B] border border-[#374A5E]/30 hover:text-[#CBD5E1] hover:border-[#374A5E]/60'
+                : 'bg-[var(--m12-bg-card)]/80 text-[var(--m12-text-muted)] border border-[var(--m12-border)]/30 hover:text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]/60'
             }`}
           >
             <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#F97316]' : 'bg-[#F97316]/30'}`} />
@@ -281,7 +281,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   }, [updateCursor])
 
   return (
-    <div className="flex h-screen w-full bg-[#151E2E]">
+    <div className="flex h-screen w-full bg-[var(--m12-bg)]">
       {/* Canvas area */}
       <div className="flex-1 relative" onMouseMove={handleMouseMove}>
         <RemoteCursors users={users} />
@@ -293,18 +293,18 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
             <span className="text-gradient text-sm font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
               MACH12
             </span>
-            <span className="text-[#64748B] text-xs">.AI</span>
+            <span className="text-[var(--m12-text-muted)] text-xs">.AI</span>
           </div>
           {/* Diagram title */}
-          <div className="bg-[#1F2C3F]/90 backdrop-blur-sm border border-[#374A5E]/60 rounded-lg px-3 py-1.5">
-            <span className="text-[13px] font-semibold text-[#F8FAFC]">
+          <div className="bg-[var(--m12-bg-card)]/90 backdrop-blur-sm border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5">
+            <span className="text-[13px] font-semibold text-[var(--m12-text)]">
               {meta.title}
             </span>
           </div>
           {meta.processContext && (
-            <div className="bg-[#1F2C3F]/90 backdrop-blur-sm border border-[#374A5E]/60 rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="bg-[var(--m12-bg-card)]/90 backdrop-blur-sm border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-[#06B6D4]" />
-              <span className="text-[11px] font-medium text-[#CBD5E1] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">
+              <span className="text-[11px] font-medium text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">
                 {meta.processContext}
               </span>
             </div>
@@ -314,9 +314,9 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
             <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
               saveStatus === 'saved' ? 'bg-[#10B981]' :
               saveStatus === 'saving' ? 'bg-[#EAB308] animate-pulse' :
-              'bg-[#64748B]'
+              'bg-[var(--m12-text-muted)]'
             }`} />
-            <span className="text-[9px] text-[#64748B] font-[family-name:var(--font-space-mono)]">
+            <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
               {saveStatus === 'saved' ? 'Saved' :
                saveStatus === 'saving' ? 'Saving...' :
                'Unsaved changes'}
@@ -363,7 +363,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
             </span>
             <button
               onClick={toggleConnectMode}
-              className="text-[10px] text-[#64748B] hover:text-[#CBD5E1] ml-2 transition-colors"
+              className="text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] ml-2 transition-colors"
             >
               Esc to cancel
             </button>
@@ -400,22 +400,24 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           connectionMode={ConnectionMode.Loose}
           connectionLineStyle={{ stroke: reconnecting ? '#06B6D4' : '#2563EB', strokeWidth: 2.5, strokeDasharray: '6 3' }}
           proOptions={{ hideAttribution: true }}
-          className="!bg-[#151E2E]"
+          style={{ backgroundColor: 'var(--m12-bg)' }}
         >
           <Background
             variant={BackgroundVariant.Dots}
             gap={24}
             size={1}
-            color="#374A5E40"
+            style={{ color: 'var(--m12-canvas-dot)' } as any}
           />
           <MiniMap
-            nodeStrokeColor="#374A5E"
-            nodeColor="#1F2C3F"
+            nodeStrokeColor="var(--m12-minimap-stroke)"
+            nodeColor="var(--m12-minimap-node)"
             nodeBorderRadius={8}
-            maskColor="rgba(21, 30, 46, 0.85)"
-            className="!bg-[#1A2435] !border-[#374A5E]/40 !rounded-lg"
-            style={{ width: 160, height: 100 }}
+            maskColor="var(--m12-minimap-mask)"
+            style={{ width: 160, height: 100, backgroundColor: 'var(--m12-minimap-bg)', borderColor: 'var(--m12-border)', borderRadius: 8 }}
           />
+          <div className="absolute bottom-2 left-2 text-[10px] text-[var(--m12-border)]/60 select-none pointer-events-none">
+            v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </div>
         </ReactFlow>
       </div>
 

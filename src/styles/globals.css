@@ -22,13 +22,76 @@
   --font-space-mono: 'Space Mono', monospace;
 }
 
+/* ─── Theme Variables ────────────────────────────────── */
+:root {
+  --m12-bg: #F8FAFC;
+  --m12-bg-secondary: #F1F5F9;
+  --m12-bg-card: #FFFFFF;
+  --m12-bg-card-hover: #F1F5F9;
+  --m12-bg-input: #F1F5F9;
+  --m12-bg-deep: #E2E8F0;
+  --m12-border: #CBD5E1;
+  --m12-text: #0F172A;
+  --m12-text-secondary: #334155;
+  --m12-text-muted: #64748B;
+  --m12-text-faint: #94A3B8;
+  --m12-node-bg: #FFFFFF;
+  --m12-edge-label-bg: rgba(255, 255, 255, 0.95);
+  --m12-edge-default: #94A3B8;
+  --m12-marker-default: #94A3B8;
+  --m12-canvas-dot: rgba(203, 213, 225, 0.25);
+  --m12-minimap-bg: #F1F5F9;
+  --m12-minimap-node: #FFFFFF;
+  --m12-minimap-mask: rgba(248, 250, 252, 0.85);
+  --m12-minimap-stroke: #CBD5E1;
+  --m12-scrollbar-track: #F8FAFC;
+  --m12-scrollbar-thumb: #CBD5E1;
+  --m12-cursor-stroke: #0F172A;
+  --m12-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --m12-node-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  --m12-handle-bg: #FFFFFF;
+  --m12-handle-border: #94A3B8;
+  --m12-secondary-handle-border: #CBD5E1;
+}
+
+.dark {
+  --m12-bg: #151E2E;
+  --m12-bg-secondary: #1A2435;
+  --m12-bg-card: #1F2C3F;
+  --m12-bg-card-hover: #263448;
+  --m12-bg-input: #151E2E;
+  --m12-bg-deep: #0F172A;
+  --m12-border: #374A5E;
+  --m12-text: #F8FAFC;
+  --m12-text-secondary: #CBD5E1;
+  --m12-text-muted: #64748B;
+  --m12-text-faint: #94A3B8;
+  --m12-node-bg: #1F2C3F;
+  --m12-edge-label-bg: rgba(15, 23, 42, 0.9);
+  --m12-edge-default: #64748B;
+  --m12-marker-default: #64748B;
+  --m12-canvas-dot: rgba(55, 74, 94, 0.25);
+  --m12-minimap-bg: #1A2435;
+  --m12-minimap-node: #1F2C3F;
+  --m12-minimap-mask: rgba(21, 30, 46, 0.85);
+  --m12-minimap-stroke: #374A5E;
+  --m12-scrollbar-track: #151E2E;
+  --m12-scrollbar-thumb: #374A5E;
+  --m12-cursor-stroke: #151E2E;
+  --m12-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --m12-node-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --m12-handle-bg: #1F2C3F;
+  --m12-handle-border: #64748B;
+  --m12-secondary-handle-border: #374A5E;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
   }
   body {
-    background-color: #151E2E;
-    color: #F8FAFC;
+    background-color: var(--m12-bg);
+    color: var(--m12-text);
     font-family: 'DM Sans', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -49,10 +112,10 @@
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #151E2E;
+  background: var(--m12-scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #374A5E;
+  background: var(--m12-scrollbar-thumb);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {

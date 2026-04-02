@@ -195,10 +195,10 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg mx-4 bg-[#1A2435] border border-[#374A5E]/60 rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg mx-4 bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl overflow-hidden"
       >
         {/* Progress bar */}
-        <div className="h-1 bg-[#151E2E]">
+        <div className="h-1 bg-[var(--m12-bg)]">
           <div
             className="h-full transition-all duration-500 ease-out rounded-r-full"
             style={{
@@ -220,7 +220,7 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
           </div>
           <button
             onClick={onClose}
-            className="text-[#374A5E] hover:text-[#CBD5E1] transition-colors"
+            className="text-[var(--m12-border)] hover:text-[var(--m12-text-secondary)] transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M4 4l8 8M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -239,13 +239,13 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
               {current.icon}
             </div>
             <div className="flex-1 min-w-0 pt-1">
-              <h3 className="text-lg font-semibold text-[#F8FAFC]">{current.title}</h3>
-              <p className="text-sm text-[#64748B] mt-0.5">{current.subtitle}</p>
+              <h3 className="text-lg font-semibold text-[var(--m12-text)]">{current.title}</h3>
+              <p className="text-sm text-[var(--m12-text-muted)] mt-0.5">{current.subtitle}</p>
             </div>
           </div>
 
           {/* Description */}
-          <p className="text-sm leading-relaxed text-[#CBD5E1]">{current.description}</p>
+          <p className="text-sm leading-relaxed text-[var(--m12-text-secondary)]">{current.description}</p>
 
           {/* Keyboard hints */}
           {current.keys.length > 0 && (
@@ -253,7 +253,7 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
               {current.keys.map((key) => (
                 <span
                   key={key}
-                  className="text-[11px] font-[family-name:var(--font-space-mono)] px-2.5 py-1 rounded-md bg-[#151E2E] border border-[#374A5E]/50 text-[#94A3B8]"
+                  className="text-[11px] font-[family-name:var(--font-space-mono)] px-2.5 py-1 rounded-md bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 text-[var(--m12-text-faint)]"
                 >
                   {key}
                 </span>
@@ -286,7 +286,7 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
             {step > 0 && (
               <button
                 onClick={handlePrev}
-                className="text-sm text-[#64748B] hover:text-[#CBD5E1] px-3 py-2 rounded-lg transition-colors"
+                className="text-sm text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg transition-colors"
               >
                 Back
               </button>

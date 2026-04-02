@@ -27,9 +27,9 @@ export default function Sidebar() {
   const setSidebarTab = useDiagramStore((s) => s.setSidebarTab)
 
   return (
-    <div className="w-[300px] bg-[#1A2435] border-l border-[#374A5E]/40 flex flex-col shrink-0 overflow-hidden">
+    <div className="w-[300px] bg-[var(--m12-bg-secondary)] border-l border-[var(--m12-border)]/40 flex flex-col shrink-0 overflow-hidden">
       {/* Tab bar */}
-      <div className="flex border-b border-[#374A5E]/40">
+      <div className="flex border-b border-[var(--m12-border)]/40">
         <TabButton
           active={sidebarTab === 'palette'}
           onClick={() => setSidebarTab('palette')}
@@ -169,10 +169,10 @@ function GroupTemplatesSection() {
       {expanded && (
         <div>
           {loading && (
-            <p className="text-[10px] text-[#64748B] py-2">Loading templates...</p>
+            <p className="text-[10px] text-[var(--m12-text-muted)] py-2">Loading templates...</p>
           )}
           {!loading && templates.length === 0 && (
-            <p className="text-[10px] text-[#374A5E] italic py-2">
+            <p className="text-[10px] text-[var(--m12-border)] italic py-2">
               No templates yet. Select a group and save it as a template in the Properties tab.
             </p>
           )}
@@ -181,21 +181,21 @@ function GroupTemplatesSection() {
               {templates.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center gap-2 bg-[#1F2C3F] hover:bg-[#263448] border border-[#F97316]/20 hover:border-[#F97316]/40 rounded-lg px-3 py-2 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 bg-[var(--m12-bg-card)] hover:bg-[var(--m12-bg-card-hover)] border border-[#F97316]/20 hover:border-[#F97316]/40 rounded-lg px-3 py-2 transition-colors cursor-pointer"
                 >
                   <button
                     onClick={() => handleInsert(t)}
                     className="flex-1 min-w-0 text-left"
                   >
-                    <div className="text-xs font-medium text-[#CBD5E1]">{t.name}</div>
-                    <div className="text-[9px] text-[#64748B]">
+                    <div className="text-xs font-medium text-[var(--m12-text-secondary)]">{t.name}</div>
+                    <div className="text-[9px] text-[var(--m12-text-muted)]">
                       {t.template_data.systems.length} system{t.template_data.systems.length !== 1 ? 's' : ''}
                       {t.template_data.edges.length > 0 && ` · ${t.template_data.edges.length} flow${t.template_data.edges.length !== 1 ? 's' : ''}`}
                     </div>
                   </button>
                   <button
                     onClick={(e) => handleDelete(t.id, e)}
-                    className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0"
+                    className="text-[var(--m12-border)] hover:text-red-400 transition-colors shrink-0"
                   >
                     <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                   </button>
@@ -246,14 +246,14 @@ function PaletteTab() {
       {/* Add System Group */}
       <div className="mt-5 mb-5">
         <SidebarLabel>System Groups</SidebarLabel>
-        <p className="text-[11px] text-[#64748B] mb-2">
+        <p className="text-[11px] text-[var(--m12-text-muted)] mb-2">
           Create a visual grouping around related systems.
         </p>
         <button
           onClick={handleAddGroup}
-          className="w-full flex items-center gap-2 bg-[#1F2C3F] hover:bg-[#263448] border border-dashed border-[#374A5E]/60 hover:border-[#374A5E] rounded-lg px-3 py-2.5 transition-colors text-left"
+          className="w-full flex items-center gap-2 bg-[var(--m12-bg-card)] hover:bg-[var(--m12-bg-card-hover)] border border-dashed border-[var(--m12-border)]/60 hover:border-[var(--m12-border)] rounded-lg px-3 py-2.5 transition-colors text-left"
         >
-          <div className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold font-[family-name:var(--font-space-mono)] shrink-0 bg-[#374A5E]/20 text-[#64748B] border border-dashed border-[#374A5E]/40">
+          <div className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold font-[family-name:var(--font-space-mono)] shrink-0 bg-[#374A5E]/20 text-[var(--m12-text-muted)] border border-dashed border-[var(--m12-border)]/40">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <rect x="1" y="1" width="14" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2"/>
               <rect x="3" y="3" width="4" height="4" rx="1" fill="currentColor" opacity="0.4"/>
@@ -262,8 +262,8 @@ function PaletteTab() {
             </svg>
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-medium text-[#CBD5E1]">Add Group</div>
-            <div className="text-[9px] text-[#64748B]">Visual umbrella for systems</div>
+            <div className="text-xs font-medium text-[var(--m12-text-secondary)]">Add Group</div>
+            <div className="text-[9px] text-[var(--m12-text-muted)]">Visual umbrella for systems</div>
           </div>
         </button>
       </div>
@@ -272,7 +272,7 @@ function PaletteTab() {
       <GroupTemplatesSection />
 
       <SidebarLabel>Add System</SidebarLabel>
-      <p className="text-[11px] text-[#64748B] mb-3">
+      <p className="text-[11px] text-[var(--m12-text-muted)] mb-3">
         Click to add a system to the canvas.
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -280,7 +280,7 @@ function PaletteTab() {
           <button
             key={t.type}
             onClick={() => handleAdd(t)}
-            className="flex items-center gap-2 bg-[#1F2C3F] hover:bg-[#263448] border border-[#374A5E]/40 hover:border-[#374A5E] rounded-lg px-3 py-2.5 transition-colors text-left"
+            className="flex items-center gap-2 bg-[var(--m12-bg-card)] hover:bg-[var(--m12-bg-card-hover)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-lg px-3 py-2.5 transition-colors text-left"
           >
             <div
               style={{ backgroundColor: t.color + '20', color: t.color }}
@@ -289,10 +289,10 @@ function PaletteTab() {
               {t.label.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-medium text-[#CBD5E1] truncate">
+              <div className="text-xs font-medium text-[var(--m12-text-secondary)] truncate">
                 {t.label}
               </div>
-              <div className="text-[9px] text-[#64748B] truncate">
+              <div className="text-[9px] text-[var(--m12-text-muted)] truncate">
                 {t.description}
               </div>
             </div>
@@ -312,23 +312,23 @@ function DiagramSettings() {
   return (
     <div className="space-y-3">
       <div>
-        <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+        <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
           Title
         </label>
         <input
           value={meta.title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors"
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors"
         />
       </div>
       <div>
-        <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+        <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
           Process Context
         </label>
         <select
           value={meta.processContext || ''}
           onChange={(e) => setProcessContext(e.target.value)}
-          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors"
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors"
         >
           <option value="">Select process...</option>
           {PROCESS_CONTEXTS.map((p) => (
@@ -445,17 +445,17 @@ function GroupPropertiesTab() {
       <SidebarLabel>Group Properties</SidebarLabel>
       <div className="space-y-3">
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
             Group Name
           </label>
           <input
             value={selectedGroup.data.label}
             onChange={(e) => updateGroupLabel(selectedGroup.id, e.target.value)}
-            className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors"
+            className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors"
           />
         </div>
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
             Color
           </label>
           <div className="flex flex-wrap gap-2">
@@ -474,20 +474,20 @@ function GroupPropertiesTab() {
 
         {/* Contained systems summary */}
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
             Systems in Group
           </label>
           {containedSystems.length > 0 ? (
             <div className="space-y-1">
               {containedSystems.map((n) => (
-                <div key={n.id} className="text-[10px] text-[#94A3B8] bg-[#151E2E] rounded px-2 py-1 border border-[#374A5E]/20">
+                <div key={n.id} className="text-[10px] text-[var(--m12-text-faint)] bg-[var(--m12-bg)] rounded px-2 py-1 border border-[var(--m12-border)]/20">
                   {n.data.label}
                   {n.data.physicalSystem && <span className="text-[#06B6D4] ml-1">({n.data.physicalSystem})</span>}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-[10px] text-[#374A5E] italic">
+            <p className="text-[10px] text-[var(--m12-border)] italic">
               No systems inside this group yet. Drag nodes into the group area.
             </p>
           )}
@@ -495,7 +495,7 @@ function GroupPropertiesTab() {
 
         {/* Save as reusable template */}
         {containedSystems.length > 0 && (
-          <div className="pt-2 border-t border-[#374A5E]/30">
+          <div className="pt-2 border-t border-[var(--m12-border)]/30">
             {!showSave ? (
               <button
                 onClick={() => { setShowSave(true); setTemplateName(selectedGroup.data.label) }}
@@ -516,9 +516,9 @@ function GroupPropertiesTab() {
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder="e.g., SAP ECC Integration Stack"
-                  className="w-full bg-[#151E2E] border border-[#F97316]/40 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#F97316] transition-colors placeholder:text-[#374A5E]"
+                  className="w-full bg-[var(--m12-bg)] border border-[#F97316]/40 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] outline-none focus:border-[#F97316] transition-colors placeholder:text-[var(--m12-border)]"
                 />
-                <p className="text-[9px] text-[#64748B]">
+                <p className="text-[9px] text-[var(--m12-text-muted)]">
                   Saves {containedSystems.length} system{containedSystems.length !== 1 ? 's' : ''} and {containedEdges.length} connection{containedEdges.length !== 1 ? 's' : ''} as a reusable template for your organization.
                 </p>
                 <div className="flex gap-2">
@@ -531,7 +531,7 @@ function GroupPropertiesTab() {
                   </button>
                   <button
                     onClick={() => setShowSave(false)}
-                    className="text-xs text-[#64748B] hover:text-[#CBD5E1] px-3 py-2 transition-colors"
+                    className="text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] px-3 py-2 transition-colors"
                   >
                     Cancel
                   </button>
@@ -569,7 +569,7 @@ function ModuleEditor({ nodeId }: { nodeId: string }) {
   return (
     <div className="mt-4">
       <SidebarLabel>Modules</SidebarLabel>
-      <p className="text-[11px] text-[#64748B] mb-2">
+      <p className="text-[11px] text-[var(--m12-text-muted)] mb-2">
         Sub-components within this system (e.g., MM, FI, SD).
       </p>
 
@@ -584,11 +584,11 @@ function ModuleEditor({ nodeId }: { nodeId: string }) {
             onDragLeave={() => setDragOverIdx(null)}
             onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && dragIdx !== idx) reorderModules(nodeId, dragIdx, idx); setDragIdx(null); setDragOverIdx(null) }}
             onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
-            className={`flex items-center gap-1.5 bg-[#151E2E] border rounded-lg px-2 py-1.5 transition-all ${
-              dragIdx === idx ? 'opacity-40 border-[#06B6D4]/40' : dragOverIdx === idx ? 'border-[#06B6D4]' : 'border-[#374A5E]/40'
+            className={`flex items-center gap-1.5 bg-[var(--m12-bg)] border rounded-lg px-2 py-1.5 transition-all ${
+              dragIdx === idx ? 'opacity-40 border-[#06B6D4]/40' : dragOverIdx === idx ? 'border-[#06B6D4]' : 'border-[var(--m12-border)]/40'
             }`}
           >
-            <div className="cursor-grab active:cursor-grabbing text-[#374A5E] hover:text-[#64748B] shrink-0">
+            <div className="cursor-grab active:cursor-grabbing text-[var(--m12-border)] hover:text-[var(--m12-text-muted)] shrink-0">
               <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor">
                 <circle cx="2" cy="1.5" r="1"/><circle cx="6" cy="1.5" r="1"/>
                 <circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/>
@@ -598,11 +598,11 @@ function ModuleEditor({ nodeId }: { nodeId: string }) {
             <input
               value={mod.name}
               onChange={(e) => updateModule(nodeId, mod.id, { name: e.target.value })}
-              className="flex-1 bg-transparent text-xs text-[#CBD5E1] outline-none min-w-0"
+              className="flex-1 bg-transparent text-xs text-[var(--m12-text-secondary)] outline-none min-w-0"
             />
             <button
               onClick={() => removeModule(nodeId, mod.id)}
-              className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0"
+              className="text-[var(--m12-border)] hover:text-red-400 transition-colors shrink-0"
             >
               <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
             </button>
@@ -617,7 +617,7 @@ function ModuleEditor({ nodeId }: { nodeId: string }) {
           onChange={(e) => setNewModuleName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           placeholder="e.g., MM, FI, SD..."
-          className="flex-1 bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E]"
+          className="flex-1 bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
         />
         <button
           onClick={handleAdd}
@@ -647,8 +647,8 @@ function PropertiesTab() {
   if (!selectedNode) {
     return (
       <div className="text-center py-12">
-        <div className="text-[#374A5E] text-3xl mb-3">&#9634;</div>
-        <p className="text-sm text-[#64748B]">Select a system node to view properties</p>
+        <div className="text-[var(--m12-border)] text-3xl mb-3">&#9634;</div>
+        <p className="text-sm text-[var(--m12-text-muted)]">Select a system node to view properties</p>
       </div>
     )
   }
@@ -658,44 +658,44 @@ function PropertiesTab() {
       <SidebarLabel>System Properties</SidebarLabel>
       <div className="space-y-3">
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
             Name
           </label>
           <input
             value={selectedNode.data.label}
             onChange={(e) => updateSystemLabel(selectedNode.id, e.target.value)}
-            className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors"
+            className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors"
           />
         </div>
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
             Physical System
           </label>
           <input
             value={selectedNode.data.physicalSystem || ''}
             onChange={(e) => updateSystemPhysical(selectedNode.id, e.target.value)}
             placeholder="e.g., SAP S/4HANA, Oracle PeopleSoft"
-            className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E]"
+            className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
           />
         </div>
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
             Logical Type
           </label>
-          <div className="bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2">
-            <div className="text-sm text-[#64748B]">
+          <div className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2">
+            <div className="text-sm text-[var(--m12-text-muted)]">
               {selectedNode.data.systemType.toUpperCase()}
             </div>
-            <div className="text-[10px] text-[#94A3B8] mt-0.5">
+            <div className="text-[10px] text-[var(--m12-text-faint)] mt-0.5">
               {SYSTEM_TEMPLATES.find((t) => t.type === selectedNode.data.systemType)?.description ?? ''}
             </div>
           </div>
         </div>
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
             Node ID
           </label>
-          <div className="bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-[10px] text-[#374A5E] font-[family-name:var(--font-space-mono)] truncate">
+          <div className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2 text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)] truncate">
             {selectedNode.id}
           </div>
         </div>
@@ -754,7 +754,7 @@ function CopyFromSibling({ edgeId, sourceId, targetId }: { edgeId: string; sourc
     <div className="mb-3">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-[10px] text-[#64748B] hover:text-[#CBD5E1] transition-colors"
+        className="flex items-center gap-1.5 text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors"
       >
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
           <rect x="2" y="4" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
@@ -776,22 +776,22 @@ function CopyFromSibling({ edgeId, sourceId, targetId }: { edgeId: string; sourc
               <button
                 key={e.id}
                 onClick={() => handleCopy(e.id)}
-                className="flex items-center gap-2 w-full text-left bg-[#151E2E] hover:bg-[#1F2C3F] border border-[#374A5E]/30 hover:border-[#374A5E]/60 rounded-lg px-3 py-2 transition-colors"
+                className="flex items-center gap-2 w-full text-left bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 hover:border-[var(--m12-border)]/60 rounded-lg px-3 py-2 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 text-[10px]">
-                    <span className="text-[#CBD5E1] truncate max-w-[80px]">{src?.data.label ?? '?'}</span>
-                    <span className="text-[#64748B]">→</span>
-                    <span className="text-[#CBD5E1] truncate max-w-[80px]">{tgt?.data.label ?? '?'}</span>
+                    <span className="text-[var(--m12-text-secondary)] truncate max-w-[80px]">{src?.data.label ?? '?'}</span>
+                    <span className="text-[var(--m12-text-muted)]">→</span>
+                    <span className="text-[var(--m12-text-secondary)] truncate max-w-[80px]">{tgt?.data.label ?? '?'}</span>
                   </div>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {(e.data?.dataElements ?? []).slice(0, 3).map((el) => (
-                      <span key={el.id} className="text-[8px] bg-[#0F172A] text-[#94A3B8] px-1 py-0.5 rounded border border-[#374A5E]/20">
+                      <span key={el.id} className="text-[8px] bg-[var(--m12-bg-deep)] text-[var(--m12-text-faint)] px-1 py-0.5 rounded border border-[var(--m12-border)]/20">
                         {el.name}
                       </span>
                     ))}
                     {elCount > 3 && (
-                      <span className="text-[8px] text-[#64748B]">+{elCount - 3}</span>
+                      <span className="text-[8px] text-[var(--m12-text-muted)]">+{elCount - 3}</span>
                     )}
                   </div>
                 </div>
@@ -815,7 +815,7 @@ function ArtifactTagger({ edgeId, taggedIds, artifactSequences }: { edgeId: stri
     return (
       <div className="mb-4">
         <SidebarLabel>Output Artifacts</SidebarLabel>
-        <p className="text-[10px] text-[#374A5E] italic">
+        <p className="text-[10px] text-[var(--m12-border)] italic">
           No artifacts defined. Add them in the Data tab (click canvas first).
         </p>
       </div>
@@ -825,7 +825,7 @@ function ArtifactTagger({ edgeId, taggedIds, artifactSequences }: { edgeId: stri
   return (
     <div className="mb-4">
       <SidebarLabel>Output Artifacts</SidebarLabel>
-      <p className="text-[11px] text-[#64748B] mb-2">
+      <p className="text-[11px] text-[var(--m12-text-muted)] mb-2">
         Tag artifacts and set step order for each.
       </p>
       <div className="space-y-1">
@@ -838,7 +838,7 @@ function ArtifactTagger({ edgeId, taggedIds, artifactSequences }: { edgeId: stri
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
                 isTagged
                   ? 'bg-[#F97316]/10 border border-[#F97316]/40'
-                  : 'bg-[#151E2E] border border-[#374A5E]/30 hover:border-[#374A5E]/60'
+                  : 'bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 hover:border-[var(--m12-border)]/60'
               }`}
             >
               <button
@@ -846,7 +846,7 @@ function ArtifactTagger({ edgeId, taggedIds, artifactSequences }: { edgeId: stri
                 className="flex items-center gap-2 flex-1 min-w-0 text-left"
               >
                 <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
-                  isTagged ? 'border-[#F97316] bg-[#F97316]' : 'border-[#374A5E]'
+                  isTagged ? 'border-[#F97316] bg-[#F97316]' : 'border-[var(--m12-border)]'
                 }`}>
                   {isTagged && (
                     <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
@@ -854,7 +854,7 @@ function ArtifactTagger({ edgeId, taggedIds, artifactSequences }: { edgeId: stri
                     </svg>
                   )}
                 </div>
-                <span className={`text-xs transition-colors truncate ${isTagged ? 'text-[#CBD5E1] font-medium' : 'text-[#64748B]'}`}>
+                <span className={`text-xs transition-colors truncate ${isTagged ? 'text-[var(--m12-text-secondary)] font-medium' : 'text-[var(--m12-text-muted)]'}`}>
                   {art.name}
                 </span>
               </button>
@@ -870,7 +870,7 @@ function ArtifactTagger({ edgeId, taggedIds, artifactSequences }: { edgeId: stri
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Step"
                   title="Step sequence for this artifact"
-                  className="w-12 bg-[#0F172A] border border-[#374A5E]/50 rounded px-1.5 py-1 text-center text-[10px] text-[#F8FAFC] font-bold font-[family-name:var(--font-space-mono)] outline-none focus:border-[#F97316] transition-colors placeholder:text-[#374A5E] placeholder:font-normal shrink-0"
+                  className="w-12 bg-[var(--m12-bg-deep)] border border-[var(--m12-border)]/50 rounded px-1.5 py-1 text-center text-[10px] text-[var(--m12-text)] font-bold font-[family-name:var(--font-space-mono)] outline-none focus:border-[#F97316] transition-colors placeholder:text-[var(--m12-border)] placeholder:font-normal shrink-0"
                 />
               )}
             </div>
@@ -917,7 +917,7 @@ function ArtifactsManager() {
   return (
     <div className="mb-5">
       <SidebarLabel>Output Artifacts</SidebarLabel>
-      <p className="text-[11px] text-[#64748B] mb-3">
+      <p className="text-[11px] text-[var(--m12-text-muted)] mb-3">
         Deliverables produced by data flows. Click to spotlight.
       </p>
 
@@ -931,7 +931,7 @@ function ArtifactsManager() {
               className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-all cursor-pointer ${
                 isActive
                   ? 'bg-[#F97316]/10 border border-[#F97316]/40 shadow-[0_0_12px_rgba(249,115,22,0.15)]'
-                  : 'bg-[#151E2E] border border-[#374A5E]/30 hover:border-[#F97316]/30'
+                  : 'bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 hover:border-[#F97316]/30'
               }`}
             >
               <button
@@ -944,7 +944,7 @@ function ArtifactsManager() {
                     value={art.name}
                     onChange={(e) => { e.stopPropagation(); updateArtifact(art.id, { name: e.target.value }) }}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-full bg-transparent text-xs text-[#CBD5E1] outline-none font-medium"
+                    className="w-full bg-transparent text-xs text-[var(--m12-text-secondary)] outline-none font-medium"
                   />
                   <div className="flex items-center gap-2">
                     {count > 0 && (
@@ -953,14 +953,14 @@ function ArtifactsManager() {
                       </span>
                     )}
                     {count === 0 && (
-                      <span className="text-[8px] text-[#374A5E] italic">untagged</span>
+                      <span className="text-[8px] text-[var(--m12-border)] italic">untagged</span>
                     )}
                   </div>
                 </div>
               </button>
               <button
                 onClick={() => { if (isActive) setSpotlightArtifact(null); removeArtifact(art.id) }}
-                className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0"
+                className="text-[var(--m12-border)] hover:text-red-400 transition-colors shrink-0"
               >
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
               </button>
@@ -976,7 +976,7 @@ function ArtifactsManager() {
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           placeholder="New artifact name..."
-          className="flex-1 bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#F97316] transition-colors placeholder:text-[#374A5E]"
+          className="flex-1 bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] outline-none focus:border-[#F97316] transition-colors placeholder:text-[var(--m12-border)]"
         />
         <button
           onClick={handleAdd}
@@ -1011,7 +1011,7 @@ function ArtifactsManager() {
           </span>
           <button
             onClick={() => setSpotlightArtifact(null)}
-            className="text-[9px] text-[#64748B] hover:text-[#CBD5E1] transition-colors"
+            className="text-[9px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors"
           >
             Clear
           </button>
@@ -1083,7 +1083,7 @@ function ConnectionsCatalog() {
       <ArtifactsManager />
 
       <SidebarLabel>All Connections</SidebarLabel>
-      <p className="text-[11px] text-[#64748B] mb-3">
+      <p className="text-[11px] text-[var(--m12-text-muted)] mb-3">
         {edges.length} connection{edges.length !== 1 ? 's' : ''} in this diagram. Click to edit.
       </p>
 
@@ -1092,7 +1092,7 @@ function ConnectionsCatalog() {
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors"
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors"
         >
           <option value="">All systems</option>
           {systemOptions.map(([id, info]) => (
@@ -1105,13 +1105,13 @@ function ConnectionsCatalog() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search connections..."
-          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E]"
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
         />
       </div>
 
       {/* Results count */}
       {(filter || search) && (
-        <div className="text-[10px] text-[#64748B] mb-2 font-[family-name:var(--font-space-mono)]">
+        <div className="text-[10px] text-[var(--m12-text-muted)] mb-2 font-[family-name:var(--font-space-mono)]">
           {filteredEdges.length} of {edges.length} shown
         </div>
       )}
@@ -1128,12 +1128,12 @@ function ConnectionsCatalog() {
             <button
               key={e.id}
               onClick={() => handleSelect(e.id)}
-              className="w-full text-left bg-[#151E2E] hover:bg-[#1F2C3F] border border-[#374A5E]/30 hover:border-[#374A5E]/60 rounded-lg px-3 py-2 transition-colors group"
+              className="w-full text-left bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 hover:border-[var(--m12-border)]/60 rounded-lg px-3 py-2 transition-colors group"
             >
               {/* Source → Target */}
               <div className="flex items-center gap-1.5 mb-1">
                 <div className="truncate max-w-[110px]">
-                  <span className="text-[11px] font-medium text-[#CBD5E1]">
+                  <span className="text-[11px] font-medium text-[var(--m12-text-secondary)]">
                     {srcNode.data.label}
                   </span>
                   {srcNode.data.physicalSystem && (
@@ -1142,11 +1142,11 @@ function ConnectionsCatalog() {
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] text-[#64748B] shrink-0">
+                <span className="text-[10px] text-[var(--m12-text-muted)] shrink-0">
                   {isBidi ? '↔' : '→'}
                 </span>
                 <div className="truncate max-w-[110px]">
-                  <span className="text-[11px] font-medium text-[#CBD5E1]">
+                  <span className="text-[11px] font-medium text-[var(--m12-text-secondary)]">
                     {tgtNode.data.label}
                   </span>
                   {tgtNode.data.physicalSystem && (
@@ -1162,19 +1162,19 @@ function ConnectionsCatalog() {
                   {elements.slice(0, 3).map((el) => (
                     <span
                       key={el.id}
-                      className="text-[9px] bg-[#1A2435] text-[#94A3B8] px-1.5 py-0.5 rounded border border-[#374A5E]/30"
+                      className="text-[9px] bg-[var(--m12-bg-secondary)] text-[var(--m12-text-faint)] px-1.5 py-0.5 rounded border border-[var(--m12-border)]/30"
                     >
                       {el.name}
                     </span>
                   ))}
                   {elements.length > 3 && (
-                    <span className="text-[9px] text-[#64748B] px-1 py-0.5">
+                    <span className="text-[9px] text-[var(--m12-text-muted)] px-1 py-0.5">
                       +{elements.length - 3} more
                     </span>
                   )}
                 </div>
               ) : (
-                <span className="text-[9px] text-[#374A5E] italic">No data elements</span>
+                <span className="text-[9px] text-[var(--m12-border)] italic">No data elements</span>
               )}
             </button>
           )
@@ -1183,9 +1183,9 @@ function ConnectionsCatalog() {
 
       {edges.length === 0 && (
         <div className="text-center py-8">
-          <div className="text-[#374A5E] text-2xl mb-2">&#8646;</div>
-          <p className="text-xs text-[#64748B] mb-1">No connections yet</p>
-          <p className="text-[10px] text-[#374A5E]">
+          <div className="text-[var(--m12-border)] text-2xl mb-2">&#8646;</div>
+          <p className="text-xs text-[var(--m12-text-muted)] mb-1">No connections yet</p>
+          <p className="text-[10px] text-[var(--m12-border)]">
             Use the Connect button in the toolbar or drag between system handles to create connections.
           </p>
         </div>
@@ -1193,7 +1193,7 @@ function ConnectionsCatalog() {
 
       {edges.length > 0 && filteredEdges.length === 0 && (
         <div className="text-center py-6">
-          <p className="text-xs text-[#64748B]">No connections match your filter</p>
+          <p className="text-xs text-[var(--m12-text-muted)]">No connections match your filter</p>
         </div>
       )}
     </div>
@@ -1237,13 +1237,13 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
 
       {/* Source dropdown */}
       <div>
-        <label className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+        <label className="text-[9px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
           Source
         </label>
         <select
           value={edge.source}
           onChange={(e) => updateEdgeEndpoint(edgeId, 'source', e.target.value)}
-          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#06B6D4] transition-colors"
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] outline-none focus:border-[#06B6D4] transition-colors"
         >
           {nodes.map((n) => (
             <option key={n.id} value={n.id} disabled={n.id === edge.target}>
@@ -1255,7 +1255,7 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
 
       {/* Direction indicator */}
       <div className="flex items-center justify-center">
-        <div className="flex items-center gap-2 text-[#64748B]">
+        <div className="flex items-center gap-2 text-[var(--m12-text-muted)]">
           <div className="h-px w-8 bg-[#374A5E]" />
           <span className="text-xs">{edge.data?.direction === 'bidirectional' ? '↕' : '↓'}</span>
           <div className="h-px w-8 bg-[#374A5E]" />
@@ -1264,13 +1264,13 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
 
       {/* Target dropdown */}
       <div>
-        <label className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] block mb-1">
+        <label className="text-[9px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
           Target
         </label>
         <select
           value={edge.target}
           onChange={(e) => updateEdgeEndpoint(edgeId, 'target', e.target.value)}
-          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-1.5 text-xs text-[#F8FAFC] outline-none focus:border-[#06B6D4] transition-colors"
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] outline-none focus:border-[#06B6D4] transition-colors"
         >
           {nodes.map((n) => (
             <option key={n.id} value={n.id} disabled={n.id === edge.source}>
@@ -1284,7 +1284,7 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
       <div className="flex gap-2">
         <button
           onClick={() => copyEdgeData(edgeId)}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-[#151E2E] hover:bg-[#1F2C3F] border border-[#374A5E]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-1.5 text-xs text-[#94A3B8] hover:text-[#06B6D4] transition-all"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text-faint)] hover:text-[#06B6D4] transition-all"
           title="Copy data elements (Ctrl+C)"
         >
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
@@ -1296,7 +1296,7 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
         <button
           onClick={() => { pasteEdgeData(edgeId) }}
           disabled={!copiedEdgeData}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-[#151E2E] hover:bg-[#1F2C3F] border border-[#374A5E]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-1.5 text-xs text-[#94A3B8] hover:text-[#06B6D4] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[#374A5E]/40 disabled:hover:text-[#94A3B8]"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text-faint)] hover:text-[#06B6D4] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[var(--m12-border)]/40 disabled:hover:text-[var(--m12-text-faint)]"
           title="Paste data elements (Ctrl+V)"
         >
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
@@ -1317,7 +1317,7 @@ function ConnectionHeader({ edgeId }: { edgeId: string }) {
         </div>
       )}
 
-      <div className="border-b border-[#374A5E]/30" />
+      <div className="border-b border-[var(--m12-border)]/30" />
     </div>
   )
 }
@@ -1398,7 +1398,7 @@ function ElementsTab() {
       {/* Sequence is now per-artifact — shown in the artifact tagger below */}
 
       <SidebarLabel>Data Elements</SidebarLabel>
-      <p className="text-[11px] text-[#64748B] mb-4">
+      <p className="text-[11px] text-[var(--m12-text-muted)] mb-4">
         Data elements flowing through this connection.
       </p>
 
@@ -1431,17 +1431,17 @@ function ElementsTab() {
               setDragOverIndex(null)
             }}
             onDragEnd={() => { setDragIndex(null); setDragOverIndex(null) }}
-            className={`bg-[#151E2E] border rounded-lg px-3 py-2 transition-all ${
+            className={`bg-[var(--m12-bg)] border rounded-lg px-3 py-2 transition-all ${
               dragIndex === idx
                 ? 'opacity-40 border-[#06B6D4]/40'
                 : dragOverIndex === idx
                   ? 'border-[#06B6D4] shadow-[0_0_8px_rgba(6,182,212,0.15)]'
-                  : 'border-[#374A5E]/40'
+                  : 'border-[var(--m12-border)]/40'
             }`}
           >
             <div className="flex items-center gap-2">
               {/* Drag handle */}
-              <div className="cursor-grab active:cursor-grabbing text-[#374A5E] hover:text-[#64748B] transition-colors shrink-0" title="Drag to reorder">
+              <div className="cursor-grab active:cursor-grabbing text-[var(--m12-border)] hover:text-[var(--m12-text-muted)] transition-colors shrink-0" title="Drag to reorder">
                 <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
                   <circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/>
                   <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
@@ -1456,15 +1456,15 @@ function ElementsTab() {
                       name: e.target.value,
                     })
                   }
-                  className="w-full bg-transparent text-xs text-[#CBD5E1] outline-none"
+                  className="w-full bg-transparent text-xs text-[var(--m12-text-secondary)] outline-none"
                 />
-                <div className="text-[9px] text-[#64748B] uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
+                <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
                   {el.elementType.replace('_', ' ')}
                 </div>
               </div>
               <button
                 onClick={() => removeDataElement(selectedEdge.id, el.id)}
-                className="text-[#64748B] hover:text-red-400 transition-colors shrink-0"
+                className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
               </button>
@@ -1479,7 +1479,7 @@ function ElementsTab() {
                     processContext: e.target.value || undefined,
                   })
                 }
-                className="w-full bg-[#0F172A] border border-[#374A5E]/30 rounded px-2 py-1 text-[10px] text-[#64748B] outline-none focus:border-[#2563EB] transition-colors"
+                className="w-full bg-[var(--m12-bg-deep)] border border-[var(--m12-border)]/30 rounded px-2 py-1 text-[10px] text-[var(--m12-text-muted)] outline-none focus:border-[#2563EB] transition-colors"
               >
                 <option value="">Value stream...</option>
                 {PROCESS_CONTEXTS.map((p) => (
@@ -1500,7 +1500,7 @@ function ElementsTab() {
                 >
                   <path d="M3 1l4 4-4 4" stroke="#64748B" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] font-bold group-hover/tp:text-[#94A3B8] transition-colors">
+                <span className="text-[9px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold group-hover/tp:text-[var(--m12-text-faint)] transition-colors">
                   Technical Details
                 </span>
                 {(el.technicalProperties?.length ?? 0) > 0 && (
@@ -1521,7 +1521,7 @@ function ElementsTab() {
                           onChange={(e) =>
                             updateTechnicalProperty(selectedEdge.id, el.id, prop.id, { key: e.target.value })
                           }
-                          className="w-full bg-transparent text-[9px] text-[#64748B] outline-none font-[family-name:var(--font-space-mono)] uppercase tracking-wider"
+                          className="w-full bg-transparent text-[9px] text-[var(--m12-text-muted)] outline-none font-[family-name:var(--font-space-mono)] uppercase tracking-wider"
                         />
                         <input
                           value={prop.value}
@@ -1529,12 +1529,12 @@ function ElementsTab() {
                             updateTechnicalProperty(selectedEdge.id, el.id, prop.id, { value: e.target.value })
                           }
                           placeholder="Enter value..."
-                          className="w-full bg-transparent text-[11px] text-[#CBD5E1] outline-none placeholder:text-[#374A5E]"
+                          className="w-full bg-transparent text-[11px] text-[var(--m12-text-secondary)] outline-none placeholder:text-[var(--m12-border)]"
                         />
                       </div>
                       <button
                         onClick={() => removeTechnicalProperty(selectedEdge.id, el.id, prop.id)}
-                        className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0 mt-1"
+                        className="text-[var(--m12-border)] hover:text-red-400 transition-colors shrink-0 mt-1"
                       >
                         <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                       </button>
@@ -1550,7 +1550,7 @@ function ElementsTab() {
                         <button
                           key={preset}
                           onClick={() => addTechnicalProperty(selectedEdge.id, el.id, { key: preset, value: '' })}
-                          className="text-[8px] bg-[#0F172A] text-[#64748B] hover:text-[#CBD5E1] hover:border-[#374A5E] border border-[#374A5E]/30 px-1.5 py-0.5 rounded transition-colors"
+                          className="text-[8px] bg-[var(--m12-bg-deep)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)] border border-[var(--m12-border)]/30 px-1.5 py-0.5 rounded transition-colors"
                         >
                           + {preset}
                         </button>
@@ -1562,7 +1562,7 @@ function ElementsTab() {
 
             {/* Attributes for data objects */}
             {el.elementType === 'data_object' && (
-              <div className="mt-2 ml-2 pl-2 border-l border-[#374A5E]/40">
+              <div className="mt-2 ml-2 pl-2 border-l border-[var(--m12-border)]/40">
                 {(el.attributes || []).map((attr) => (
                   <div key={attr.id} className="flex items-center gap-1.5 mb-1">
                     <input
@@ -1572,11 +1572,11 @@ function ElementsTab() {
                           name: e.target.value,
                         })
                       }
-                      className="flex-1 bg-transparent text-[11px] text-[#94A3B8] outline-none"
+                      className="flex-1 bg-transparent text-[11px] text-[var(--m12-text-faint)] outline-none"
                     />
                     <button
                       onClick={() => removeAttribute(selectedEdge.id, el.id, attr.id)}
-                      className="text-[#374A5E] hover:text-red-400 transition-colors shrink-0"
+                      className="text-[var(--m12-border)] hover:text-red-400 transition-colors shrink-0"
                     >
                       <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                     </button>
@@ -1590,7 +1590,7 @@ function ElementsTab() {
                     }
                     onKeyDown={(e) => e.key === 'Enter' && handleAddAttr(el.id)}
                     placeholder="Add attribute..."
-                    className="flex-1 bg-transparent text-[10px] text-[#64748B] outline-none placeholder:text-[#374A5E]"
+                    className="flex-1 bg-transparent text-[10px] text-[var(--m12-text-muted)] outline-none placeholder:text-[var(--m12-border)]"
                   />
                   <button
                     onClick={() => handleAddAttr(el.id)}
@@ -1605,7 +1605,7 @@ function ElementsTab() {
             {/* Per-element artifact tags */}
             {artifacts.length > 0 && (
               <div className="mt-2">
-                <div className="text-[9px] uppercase tracking-wider text-[#64748B] font-[family-name:var(--font-space-mono)] font-bold mb-1">
+                <div className="text-[9px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-1">
                   Artifacts
                 </div>
                 <div className="flex flex-wrap gap-1">
@@ -1618,7 +1618,7 @@ function ElementsTab() {
                         className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] transition-all ${
                           isTagged
                             ? 'bg-[#F97316]/15 border border-[#F97316]/40 text-[#FB923C] font-medium'
-                            : 'bg-[#151E2E] border border-[#374A5E]/30 text-[#64748B] hover:border-[#F97316]/30 hover:text-[#F97316]/70'
+                            : 'bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 text-[var(--m12-text-muted)] hover:border-[#F97316]/30 hover:text-[#F97316]/70'
                         }`}
                       >
                         {isTagged && (
@@ -1638,7 +1638,7 @@ function ElementsTab() {
         {hasSidebarOverflow && (
           <button
             onClick={() => setShowAllElements(!showAllElements)}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-[#374A5E]/40 hover:border-[#06B6D4]/40 text-[#64748B] hover:text-[#06B6D4] transition-all"
+            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-[var(--m12-border)]/40 hover:border-[#06B6D4]/40 text-[var(--m12-text-muted)] hover:text-[#06B6D4] transition-all"
           >
             <svg
               width="10" height="10" viewBox="0 0 10 10" fill="none"
@@ -1652,7 +1652,7 @@ function ElementsTab() {
           </button>
         )}
         {dataElements.length === 0 && (
-          <div className="text-xs text-[#374A5E] text-center py-3 border border-dashed border-[#374A5E]/40 rounded-lg">
+          <div className="text-xs text-[var(--m12-border)] text-center py-3 border border-dashed border-[var(--m12-border)]/40 rounded-lg">
             No data elements yet
           </div>
         )}
@@ -1672,12 +1672,12 @@ function ElementsTab() {
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           placeholder="e.g., Purchase Order"
-          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E]"
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
         />
         <select
           value={newType}
           onChange={(e) => setNewType(e.target.value as DataElementType)}
-          className="w-full bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors"
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors"
         >
           {ELEMENT_TYPE_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -1708,16 +1708,16 @@ function NotesTab() {
   return (
     <div className="flex flex-col h-full">
       <SidebarLabel>Diagram Notes</SidebarLabel>
-      <p className="text-[11px] text-[#64748B] mb-3">
+      <p className="text-[11px] text-[var(--m12-text-muted)] mb-3">
         Add notes, decisions, and context for this diagram.
       </p>
       <textarea
         value={meta.notes || ''}
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Type your notes here...&#10;&#10;e.g., Design decisions, open questions, change history..."
-        className="flex-1 min-h-[200px] bg-[#151E2E] border border-[#374A5E]/60 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[#374A5E] resize-none leading-relaxed"
+        className="flex-1 min-h-[200px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)] resize-none leading-relaxed"
       />
-      <div className="mt-2 text-[10px] text-[#374A5E] font-[family-name:var(--font-space-mono)]">
+      <div className="mt-2 text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
         Notes are saved with the diagram
       </div>
     </div>
@@ -1740,7 +1740,7 @@ function TabButton({
       className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors ${
         active
           ? 'text-[#06B6D4] border-b-2 border-[#06B6D4]'
-          : 'text-[#64748B] hover:text-[#CBD5E1] border-b-2 border-transparent'
+          : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] border-b-2 border-transparent'
       }`}
     >
       {children}
@@ -1750,7 +1750,7 @@ function TabButton({
 
 function SidebarLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] uppercase tracking-widest text-[#64748B] font-[family-name:var(--font-space-mono)] font-bold mb-2">
+    <div className="text-[10px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-2">
       {children}
     </div>
   )
