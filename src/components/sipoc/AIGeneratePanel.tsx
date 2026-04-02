@@ -6,6 +6,8 @@ import { PERSONA_COLORS } from '@/lib/sipoc/types'
 
 // ─── Types for the AI response ──────────────────────────
 interface AISuggestionInput {
+  status: 'new' | 'enhancement'
+  existingProduct?: string
   informationProduct: string
   category?: string
   supplierPersonas: { name: string; role?: string }[]
@@ -14,6 +16,8 @@ interface AISuggestionInput {
 }
 
 interface AISuggestionOutput {
+  status: 'new' | 'enhancement'
+  existingProduct?: string
   informationProduct: string
   category?: string
   consumerPersonas: { name: string; role?: string }[]
@@ -96,8 +100,11 @@ export default function AIGeneratePanel({
   const personas = useSIPOCStore(s => s.personas)
   const informationProducts = useSIPOCStore(s => s.informationProducts)
   const logicalSystems = useSIPOCStore(s => s.logicalSystems)
+  const capInputs = useSIPOCStore(s => s.inputs[capabilityId] || [])
+  const capOutputs = useSIPOCStore(s => s.outputs[capabilityId] || [])
 
   const capability = capabilities.find(c => c.id === capabilityId)
+  const hasExistingData = capInputs.length > 0 || capOutputs.length > 0
 
   const [prompt, setPrompt] = useState(capability?.name || '')
   const [loading, setLoading] = useState(false)
@@ -112,6 +119,10 @@ export default function AIGeneratePanel({
     setError(null)
     setSuggestion(null)
 
+    // Build current capability data for enhancement mode
+    const hydrated = useSIPOCStore.getState().getHydratedCapabilities()
+    const currentCap = hydrated.find(c => c.id === capabilityId)
+
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
@@ -125,6 +136,19 @@ export default function AIGeneratePanel({
             existingPersonas: personas.map(p => p.name),
             existingInformationProducts: informationProducts.map(ip => ip.name),
             existingLogicalSystems: logicalSystems.map(s => s.name),
+            currentInputs: currentCap?.inputs.map(inp => ({
+              informationProduct: inp.informationProduct.name,
+              category: inp.informationProduct.category,
+              supplierPersonas: inp.supplierPersonas.map(p => p.name),
+              sourceSystems: inp.sourceSystems.map(s => s.name),
+              dimensions: (inp.dimensions || []).map(d => d.name),
+            })) || [],
+            currentOutputs: currentCap?.outputs.map(out => ({
+              informationProduct: out.informationProduct.name,
+              category: out.informationProduct.category,
+              consumerPersonas: out.consumerPersonas.map(p => p.name),
+              dimensions: (out.dimensions || []).map(d => d.name),
+            })) || [],
           },
         }),
       })
@@ -142,7 +166,7 @@ export default function AIGeneratePanel({
     } finally {
       setLoading(false)
     }
-  }, [prompt, capability, personas, informationProducts, logicalSystems])
+  }, [prompt, capability, capabilityId, personas, informationProducts, logicalSystems])
 
   const handleApply = useCallback(async () => {
     if (!suggestion || !selection || !capabilityId) return
@@ -181,47 +205,63 @@ export default function AIGeneratePanel({
         if (!inputSel.selected) continue
         const idx = Number(idxStr)
         const inp = suggestion.inputs[idx]
+        const isEnhancement = inp.status === 'enhancement'
 
-        // Create/find the information product
+        // Resolve the information product
         const ipId = await getOrCreateIP(inp.informationProduct, inp.category)
 
-        // Add as input to capability
-        await store.addInput(capabilityId, ipId)
+        // For enhancements, find the existing input record; for new, create one
+        let targetInput: { id: string; supplier_persona_ids: string[]; source_system_ids: string[] } | undefined
 
-        // Get the newly created input record
-        const currentInputs = useSIPOCStore.getState().inputs[capabilityId] || []
-        const newInput = currentInputs.find(i => i.information_product_id === ipId)
-        if (!newInput) continue
+        if (isEnhancement) {
+          const currentInputs = useSIPOCStore.getState().inputs[capabilityId] || []
+          // Match by IP name (case-insensitive) against existing inputs
+          const matchName = (inp.existingProduct || inp.informationProduct).toLowerCase()
+          const existingIPs = useSIPOCStore.getState().informationProducts
+          targetInput = currentInputs.find(ci => {
+            const cipName = existingIPs.find(ip => ip.id === ci.information_product_id)?.name?.toLowerCase()
+            return cipName === matchName
+          })
+        }
 
-        // Add supplier personas
-        const supplierIds: string[] = []
+        if (!targetInput) {
+          // Create new input
+          await store.addInput(capabilityId, ipId)
+          const currentInputs = useSIPOCStore.getState().inputs[capabilityId] || []
+          targetInput = currentInputs.find(i => i.information_product_id === ipId)
+        }
+
+        if (!targetInput) continue
+
+        // Add supplier personas (merge with existing)
+        const newSupplierIds: string[] = [...(targetInput.supplier_persona_ids || [])]
         for (const [pi, selected] of Object.entries(inputSel.personas)) {
           if (!selected) continue
           const persona = inp.supplierPersonas[Number(pi)]
           const personaId = await getOrCreatePersona(persona.name, persona.role)
-          supplierIds.push(personaId)
+          if (!newSupplierIds.includes(personaId)) newSupplierIds.push(personaId)
         }
-        if (supplierIds.length > 0) {
-          await store.updateInputSuppliers(newInput.id, capabilityId, supplierIds)
+        if (newSupplierIds.length > (targetInput.supplier_persona_ids || []).length) {
+          await store.updateInputSuppliers(targetInput.id, capabilityId, newSupplierIds)
         }
 
-        // Add source systems
-        const systemIds: string[] = []
+        // Add source systems (merge with existing)
+        const newSystemIds: string[] = [...(targetInput.source_system_ids || [])]
         for (const [si, selected] of Object.entries(inputSel.systems)) {
           if (!selected) continue
           const sys = inp.sourceSystems[Number(si)]
           const sysId = await getOrCreateSystem(sys.name, sys.systemType)
-          systemIds.push(sysId)
+          if (!newSystemIds.includes(sysId)) newSystemIds.push(sysId)
         }
-        if (systemIds.length > 0) {
-          await store.updateInputSystems(newInput.id, capabilityId, systemIds)
+        if (newSystemIds.length > (targetInput.source_system_ids || []).length) {
+          await store.updateInputSystems(targetInput.id, capabilityId, newSystemIds)
         }
 
         // Add dimensions
         for (const [di, selected] of Object.entries(inputSel.dimensions)) {
           if (!selected) continue
           const dim = inp.dimensions[Number(di)]
-          await store.addDimension('input', newInput.id, capabilityId, dim.name)
+          await store.addDimension('input', targetInput.id, capabilityId, dim.name)
         }
       }
 
@@ -230,31 +270,47 @@ export default function AIGeneratePanel({
         if (!outputSel.selected) continue
         const idx = Number(idxStr)
         const out = suggestion.outputs[idx]
+        const isEnhancement = out.status === 'enhancement'
 
         const ipId = await getOrCreateIP(out.informationProduct, out.category)
-        await store.addOutput(capabilityId, ipId)
 
-        const currentOutputs = useSIPOCStore.getState().outputs[capabilityId] || []
-        const newOutput = currentOutputs.find(o => o.information_product_id === ipId)
-        if (!newOutput) continue
+        let targetOutput: { id: string; consumer_persona_ids: string[] } | undefined
 
-        // Add consumer personas
-        const consumerIds: string[] = []
+        if (isEnhancement) {
+          const currentOutputs = useSIPOCStore.getState().outputs[capabilityId] || []
+          const matchName = (out.existingProduct || out.informationProduct).toLowerCase()
+          const existingIPs = useSIPOCStore.getState().informationProducts
+          targetOutput = currentOutputs.find(co => {
+            const copName = existingIPs.find(ip => ip.id === co.information_product_id)?.name?.toLowerCase()
+            return copName === matchName
+          })
+        }
+
+        if (!targetOutput) {
+          await store.addOutput(capabilityId, ipId)
+          const currentOutputs = useSIPOCStore.getState().outputs[capabilityId] || []
+          targetOutput = currentOutputs.find(o => o.information_product_id === ipId)
+        }
+
+        if (!targetOutput) continue
+
+        // Add consumer personas (merge with existing)
+        const newConsumerIds: string[] = [...(targetOutput.consumer_persona_ids || [])]
         for (const [pi, selected] of Object.entries(outputSel.personas)) {
           if (!selected) continue
           const persona = out.consumerPersonas[Number(pi)]
           const personaId = await getOrCreatePersona(persona.name, persona.role)
-          consumerIds.push(personaId)
+          if (!newConsumerIds.includes(personaId)) newConsumerIds.push(personaId)
         }
-        if (consumerIds.length > 0) {
-          await store.updateOutputConsumers(newOutput.id, capabilityId, consumerIds)
+        if (newConsumerIds.length > (targetOutput.consumer_persona_ids || []).length) {
+          await store.updateOutputConsumers(targetOutput.id, capabilityId, newConsumerIds)
         }
 
         // Add dimensions
         for (const [di, selected] of Object.entries(outputSel.dimensions)) {
           if (!selected) continue
           const dim = out.dimensions[Number(di)]
-          await store.addDimension('output', newOutput.id, capabilityId, dim.name)
+          await store.addDimension('output', targetOutput.id, capabilityId, dim.name)
         }
       }
 
@@ -331,6 +387,7 @@ export default function AIGeneratePanel({
               <div className="text-sm font-semibold text-[var(--m12-text)]">AI SIPOC Generator</div>
               <div className="text-[10px] text-[var(--m12-text-muted)]">
                 {capability ? `For: ${capability.name}` : 'Generate SIPOC data'}
+                {hasExistingData && <span className="ml-1.5 text-[#06B6D4]">(Enhancement mode)</span>}
               </div>
             </div>
           </div>
@@ -402,7 +459,16 @@ export default function AIGeneratePanel({
                       <div className="flex items-start gap-2 px-3 py-2.5">
                         <Check checked={selection.inputs[idx]?.selected} onChange={() => toggleInput(idx)} size="md" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-[11px] font-semibold text-[var(--m12-text)]">{inp.informationProduct}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-[11px] font-semibold text-[var(--m12-text)]">{inp.informationProduct}</div>
+                            <span className={`text-[7px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              inp.status === 'enhancement'
+                                ? 'bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30'
+                                : 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30'
+                            }`}>
+                              {inp.status === 'enhancement' ? 'Enhance' : 'New'}
+                            </span>
+                          </div>
                           {inp.category && (
                             <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{inp.category}</span>
                           )}
@@ -487,7 +553,16 @@ export default function AIGeneratePanel({
                       <div className="flex items-start gap-2 px-3 py-2.5">
                         <Check checked={selection.outputs[idx]?.selected} onChange={() => toggleOutput(idx)} size="md" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-[11px] font-semibold text-[var(--m12-text)]">{out.informationProduct}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-[11px] font-semibold text-[var(--m12-text)]">{out.informationProduct}</div>
+                            <span className={`text-[7px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              out.status === 'enhancement'
+                                ? 'bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30'
+                                : 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30'
+                            }`}>
+                              {out.status === 'enhancement' ? 'Enhance' : 'New'}
+                            </span>
+                          </div>
                           {out.category && (
                             <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{out.category}</span>
                           )}

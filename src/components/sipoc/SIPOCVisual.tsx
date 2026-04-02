@@ -24,18 +24,18 @@ function ColumnHeader({ label, color, letter }: { label: string; color: string; 
 // ─── Persona/System chip ────────────────────────────────
 function PersonaChip({ name, color }: { name: string; color: string }) {
   return (
-    <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 rounded-full px-2.5 py-1 shadow-sm">
+    <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 rounded-full px-2.5 py-1 shadow-sm max-w-full">
       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-      <span className="text-[10px] font-medium text-[var(--m12-text-secondary)] whitespace-nowrap">{name}</span>
+      <span className="text-[10px] font-medium text-[var(--m12-text-secondary)] truncate">{name}</span>
     </div>
   )
 }
 
 function SystemChip({ name, color }: { name: string; color?: string }) {
   return (
-    <div className="flex items-center gap-1.5 bg-[var(--m12-bg)]/80 border border-[var(--m12-border)]/20 rounded px-2 py-0.5">
+    <div className="flex items-center gap-1.5 bg-[var(--m12-bg)]/80 border border-[var(--m12-border)]/20 rounded px-2 py-0.5 max-w-full">
       <div className="w-1.5 h-1.5 rounded-sm shrink-0" style={{ backgroundColor: color || '#64748B' }} />
-      <span className="text-[8px] font-medium text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase whitespace-nowrap">{name}</span>
+      <span className="text-[8px] font-medium text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase truncate">{name}</span>
     </div>
   )
 }
@@ -154,7 +154,7 @@ function OutputLane({ output, showDimensions }: {
       <HArrow muted={!hasConsumers} />
 
       {/* Consumers for this output */}
-      <div className="flex-1 flex flex-wrap gap-1 min-w-0">
+      <div className="flex-1 flex flex-wrap gap-1 min-w-0 overflow-hidden">
         {output.consumerPersonas.map(p => (
           <PersonaChip key={p.id} name={p.name} color={p.color} />
         ))}

@@ -40,6 +40,7 @@ function MultiSelect<T extends { id: string; name: string }>({
   selectedIds,
   onChange,
   colorFn,
+  groupFn,
   emptyLabel,
   placeholder,
 }: {
@@ -47,6 +48,7 @@ function MultiSelect<T extends { id: string; name: string }>({
   selectedIds: string[]
   onChange: (ids: string[]) => void
   colorFn?: (item: T) => string | undefined
+  groupFn?: (item: T) => string
   emptyLabel: string
   placeholder?: string
 }) {
@@ -65,6 +67,41 @@ function MultiSelect<T extends { id: string; name: string }>({
   }
 
   const selectedItems = items.filter(i => selectedIds.includes(i.id))
+
+  // Group items if groupFn provided
+  const grouped = groupFn ? (() => {
+    const groups = new Map<string, T[]>()
+    items.forEach(item => {
+      const group = groupFn(item)
+      if (!groups.has(group)) groups.set(group, [])
+      groups.get(group)!.push(item)
+    })
+    return groups
+  })() : null
+
+  const renderItem = (item: T) => {
+    const isSelected = selectedIds.includes(item.id)
+    const color = colorFn?.(item)
+    return (
+      <button
+        key={item.id}
+        onClick={() => toggle(item.id)}
+        className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${
+          isSelected ? 'bg-[#2563EB]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'
+        }`}
+      >
+        <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#2563EB] border-[#2563EB]' : 'border-[var(--m12-border)]'}`}>
+          {isSelected && (
+            <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+              <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        {color && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />}
+        <span className="flex-1 truncate">{item.name}</span>
+      </button>
+    )
+  }
 
   return (
     <div className="relative">
@@ -97,30 +134,19 @@ function MultiSelect<T extends { id: string; name: string }>({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden max-h-[200px] overflow-y-auto">
-            {items.map(item => {
-              const isSelected = selectedIds.includes(item.id)
-              const color = colorFn?.(item)
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => toggle(item.id)}
-                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${
-                    isSelected ? 'bg-[#2563EB]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'
-                  }`}
-                >
-                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#2563EB] border-[#2563EB]' : 'border-[var(--m12-border)]'}`}>
-                    {isSelected && (
-                      <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
-                        <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden max-h-[240px] overflow-y-auto">
+            {grouped ? (
+              [...grouped.entries()].map(([group, groupItems]) => (
+                <div key={group}>
+                  <div className="px-2.5 py-1 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold bg-[var(--m12-bg)]/60 border-b border-[var(--m12-border)]/20 sticky top-0">
+                    {group}
                   </div>
-                  {color && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />}
-                  <span className="flex-1 truncate">{item.name}</span>
-                </button>
-              )
-            })}
+                  {groupItems.map(renderItem)}
+                </div>
+              ))
+            ) : (
+              items.map(renderItem)
+            )}
           </div>
         </>
       )}
@@ -297,7 +323,12 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     selectedIds={input.source_system_ids}
                     onChange={ids => updateInputSystems(input.id, capabilityId, ids)}
                     colorFn={s => s.color || '#64748B'}
+                    groupFn={s => {
+                      const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
+                      return tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
+                    }}
                     emptyLabel="Create logical systems first"
+                    placeholder="Select source systems..."
                   />
                 </div>
                 {/* Data Objects */}

@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
       return handleImplement(context)
     } else if (action === 'sipoc-generate') {
       return handleSIPOCGenerate(prompt, context)
+    } else if (action === 'sipoc-analyze') {
+      return handleSIPOCAnalyze(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -340,14 +342,49 @@ async function handleSIPOCGenerate(prompt: string, context?: {
   existingPersonas?: string[]
   existingInformationProducts?: string[]
   existingLogicalSystems?: string[]
+  currentInputs?: {
+    informationProduct: string
+    category?: string
+    supplierPersonas: string[]
+    sourceSystems: string[]
+    dimensions: string[]
+  }[]
+  currentOutputs?: {
+    informationProduct: string
+    category?: string
+    consumerPersonas: string[]
+    dimensions: string[]
+  }[]
 }) {
-  const contextBlock = context ? `
-EXISTING ENTITIES (reuse these names when applicable):
+  const hasExistingData = (context?.currentInputs?.length || 0) > 0 || (context?.currentOutputs?.length || 0) > 0
+
+  const entitiesBlock = context ? `
+EXISTING ORG ENTITIES (reuse these names when applicable):
 - Personas already defined: ${(context.existingPersonas || []).join(', ') || 'None'}
 - Information Products already defined: ${(context.existingInformationProducts || []).join(', ') || 'None'}
 - Logical Systems already defined: ${(context.existingLogicalSystems || []).join(', ') || 'None'}
 ${context.capabilityName ? `\nCapability being modeled: ${context.capabilityName}` : ''}
 ${context.capabilityDescription ? `Description: ${context.capabilityDescription}` : ''}` : ''
+
+  const currentDataBlock = hasExistingData ? `
+CURRENT CAPABILITY DATA (already configured — analyze for gaps and enhancements):
+Current Inputs:
+${JSON.stringify(context!.currentInputs, null, 2)}
+
+Current Outputs:
+${JSON.stringify(context!.currentOutputs, null, 2)}` : ''
+
+  const modeInstructions = hasExistingData
+    ? `This capability already has data configured. Your job is to:
+1. Analyze what is already there for completeness
+2. Suggest NEW inputs/outputs that are missing
+3. For EXISTING inputs/outputs, suggest additional suppliers, source systems, consumers, or dimensions that are missing
+4. Mark each item with "status": "new" for brand new items, or "enhancement" for additions to existing items
+5. For enhancements, set "existingProduct" to the exact name of the existing information product being enhanced
+6. Do NOT re-suggest items that are already fully configured`
+    : `Generate a comprehensive SIPOC breakdown from scratch.
+- Generate 4-8 inputs and 3-6 outputs for a typical L3 capability
+- Mark all items with "status": "new"`
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -356,8 +393,11 @@ ${context.capabilityDescription ? `Description: ${context.capabilityDescription}
     messages: [
       {
         role: 'user',
-        content: `Generate a comprehensive SIPOC breakdown for the following L3 BPML capability/process. Return ONLY valid JSON.
-${contextBlock}
+        content: `${modeInstructions}
+
+Return ONLY valid JSON.
+${entitiesBlock}
+${currentDataBlock}
 
 User request: ${prompt}
 
@@ -365,13 +405,15 @@ Return this exact JSON structure:
 {
   "inputs": [
     {
+      "status": "new|enhancement",
+      "existingProduct": "Only for enhancements — exact name of the existing info product",
       "informationProduct": "Name of the information product / data object",
       "category": "Financial|Operational|Engineering|Supply Chain|Human Resources|Compliance|Customer|Program Management|Quality|Other",
       "supplierPersonas": [
         { "name": "Role Name", "role": "Brief role description" }
       ],
       "sourceSystems": [
-        { "name": "System Name", "systemType": "erp|crm|plm|scm|middleware|database|data_warehouse|analytics|mes|clm|cloud|legacy|ppm|ims|hcm|custom" }
+        { "name": "System Name", "systemType": "erp|crm|plm|scm|middleware|database|data_warehouse|analytics|mes|clm|cloud|legacy|ppm|ims|hcm|fpa|custom" }
       ],
       "dimensions": [
         { "name": "Dimension/attribute name" }
@@ -380,6 +422,8 @@ Return this exact JSON structure:
   ],
   "outputs": [
     {
+      "status": "new|enhancement",
+      "existingProduct": "Only for enhancements — exact name of the existing info product",
       "informationProduct": "Name of the output information product",
       "category": "Financial|Operational|Engineering|Supply Chain|Human Resources|Compliance|Customer|Program Management|Quality|Other",
       "consumerPersonas": [
@@ -393,13 +437,13 @@ Return this exact JSON structure:
 }
 
 Guidelines:
-- Generate 4-8 inputs and 3-6 outputs for a typical L3 capability
 - Each input should have 1-3 supplier personas and 1-2 source systems
 - Each input/output should have 2-5 dimensions (the key attributes/fields of that data object)
 - Each output should have 1-3 consumer personas
 - Use realistic A&D terminology and role names
-- Reuse existing entity names from the context when they match
+- Reuse existing entity names from the org context when they match
 - Dimensions should represent the key data fields or measures within the information product
+- For enhancements: only include the NEW suppliers, systems, consumers, or dimensions being added — not what already exists
 
 No markdown, no explanation, just the JSON object.`,
       },
@@ -413,6 +457,102 @@ No markdown, no explanation, just the JSON object.`,
     json = JSON.parse(cleaned)
   } catch {
     return NextResponse.json({ error: 'Failed to parse SIPOC generation', raw: text }, { status: 500 })
+  }
+
+  return NextResponse.json(json)
+}
+
+// ─── SIPOC Analysis ─────────────────────────────────────
+
+async function handleSIPOCAnalyze(context: {
+  mapTitle: string
+  capabilities: {
+    name: string
+    description?: string
+    inputs: {
+      informationProduct: string
+      category?: string
+      supplierPersonas: string[]
+      sourceSystems: string[]
+      dimensions: string[]
+    }[]
+    outputs: {
+      informationProduct: string
+      category?: string
+      consumerPersonas: string[]
+      dimensions: string[]
+    }[]
+  }[]
+}) {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: SIPOC_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Analyze this SIPOC Capability Map for completeness, quality, and opportunities. Return ONLY valid JSON.
+
+CAPABILITY MAP: "${context.mapTitle}"
+
+CAPABILITIES:
+${JSON.stringify(context.capabilities, null, 2)}
+
+Analyze the map and return this exact JSON structure:
+{
+  "overallScore": 75,
+  "summary": "One paragraph executive summary of the capability map's maturity and completeness.",
+  "strengths": [
+    "Specific strength observed in the map"
+  ],
+  "gaps": [
+    {
+      "type": "missing_input|missing_output|missing_supplier|missing_consumer|missing_system|missing_dimension|missing_capability|data_governance",
+      "capability": "Which capability this applies to (or 'Overall' for map-level)",
+      "title": "Short title of the gap",
+      "description": "Detailed explanation of what's missing and why it matters",
+      "priority": "high|medium|low"
+    }
+  ],
+  "suggestions": [
+    {
+      "type": "new_input|new_output|new_capability|new_persona|new_system|reuse_opportunity|dimension_detail|process_improvement",
+      "capability": "Which capability this applies to (or 'Overall')",
+      "title": "Short title",
+      "description": "Actionable suggestion with specific details",
+      "impact": "high|medium|low"
+    }
+  ],
+  "dataGovernance": [
+    "Observation about data ownership, lineage, quality, or governance"
+  ],
+  "crossCapabilityInsights": [
+    "Insight about how capabilities relate to each other, shared information products, or upstream/downstream dependencies"
+  ]
+}
+
+Guidelines:
+- Score from 0-100 based on completeness of S, I, P, O, C coverage
+- Identify 2-4 strengths
+- Identify 3-8 specific gaps with priority
+- Provide 3-8 actionable suggestions
+- Include 2-4 data governance observations
+- Include 1-3 cross-capability insights if multiple capabilities exist
+- Be specific — reference actual information products, personas, and systems from the map
+- Think about A&D industry standards and best practices
+
+No markdown, no explanation, just the JSON object.`,
+      },
+    ],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  let json
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    json = JSON.parse(cleaned)
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse SIPOC analysis', raw: text }, { status: 500 })
   }
 
   return NextResponse.json(json)

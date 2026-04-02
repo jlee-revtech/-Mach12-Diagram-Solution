@@ -7,6 +7,7 @@ import { useSIPOCStore } from '@/lib/sipoc/store'
 import SIPOCVisual from '@/components/sipoc/SIPOCVisual'
 import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
+import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -22,6 +23,8 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [titleInput, setTitleInput] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [showAI, setShowAI] = useState(false)
+  const [showAnalysis, setShowAnalysis] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -115,6 +118,18 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
 
         <div className="flex-1" />
 
+        {/* AI analyze button */}
+        <button
+          onClick={() => setShowAnalysis(true)}
+          className="flex items-center gap-1.5 border border-[#06B6D4]/40 hover:bg-[#06B6D4]/10 text-[#06B6D4] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M6 3.5v3M6 8.5v.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          Analyze
+        </button>
+
         {/* AI generate button */}
         {selectedCapabilityId && (
           <button
@@ -150,8 +165,19 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           <SIPOCVisual />
         </div>
 
+        {/* Sidebar toggle */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="w-5 shrink-0 flex items-center justify-center bg-[var(--m12-bg-card)] border-l border-[var(--m12-border)]/40 hover:bg-[var(--m12-bg)] transition-colors"
+          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`text-[var(--m12-text-muted)] transition-transform ${sidebarOpen ? '' : 'rotate-180'}`}>
+            <path d="M6.5 2L3.5 5L6.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+
         {/* Editor sidebar */}
-        {organization && <CapabilityEditor orgId={organization.id} />}
+        {organization && sidebarOpen && <CapabilityEditor orgId={organization.id} />}
       </div>
 
       {/* AI Generate Panel */}
@@ -161,6 +187,11 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           orgId={organization.id}
           onClose={() => setShowAI(false)}
         />
+      )}
+
+      {/* AI Analyze Panel */}
+      {showAnalysis && (
+        <AIAnalyzePanel onClose={() => setShowAnalysis(false)} />
       )}
     </div>
   )
