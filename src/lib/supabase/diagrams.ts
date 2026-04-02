@@ -27,9 +27,10 @@ function headers(token?: string): Record<string, string> {
   }
 }
 
-export async function listDiagrams(orgId: string): Promise<DiagramRow[]> {
+export async function listDiagrams(orgId: string, includeArchived = false): Promise<DiagramRow[]> {
+  const archiveFilter = includeArchived ? '' : '&archived_at=is.null'
   const res = await fetch(
-    `${URL}/rest/v1/diagrams?organization_id=eq.${orgId}&select=*&order=updated_at.desc`,
+    `${URL}/rest/v1/diagrams?organization_id=eq.${orgId}${archiveFilter}&select=*&order=updated_at.desc`,
     { headers: headers() }
   )
   if (!res.ok) return []
@@ -74,23 +75,40 @@ export async function saveDiagram(
 ): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/diagrams?id=eq.${id}`, {
     method: 'PATCH',
-    headers: { ...headers(), 'Prefer': 'return=minimal' },
+    headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ ...updates, updated_by: userId }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.message || 'Failed to save diagram')
   }
+  const rows = await res.json()
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('Save failed: diagram not found in database')
+  }
 }
 
-export async function deleteDiagram(id: string): Promise<void> {
+export async function archiveDiagram(id: string): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/diagrams?id=eq.${id}`, {
-    method: 'DELETE',
-    headers: headers(),
+    method: 'PATCH',
+    headers: { ...headers(), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ archived_at: new Date().toISOString() }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.message || 'Failed to delete diagram')
+    throw new Error(err.message || 'Failed to archive diagram')
+  }
+}
+
+export async function restoreDiagram(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/diagrams?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ archived_at: null }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to restore diagram')
   }
 }
 

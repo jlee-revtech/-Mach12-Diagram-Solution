@@ -1165,11 +1165,18 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   // ─── Persistence (Supabase) ────────────────────────────
   saveDiagram: async (userId: string) => {
     const { meta, nodes, edges, artifacts, groups } = get()
+    const canvasData = { nodes, edges, notes: meta.notes, artifacts, groups }
+    // Local backup in case remote save fails silently
+    try {
+      localStorage.setItem(`m12-backup-${meta.id}`, JSON.stringify({
+        meta, canvasData, savedAt: new Date().toISOString(),
+      }))
+    } catch { /* quota exceeded — ignore */ }
     await saveDiagramApi(meta.id, userId, {
       title: meta.title,
       description: meta.description,
       process_context: meta.processContext,
-      canvas_data: { nodes, edges, notes: meta.notes, artifacts, groups },
+      canvas_data: canvasData,
     })
     set({ meta: { ...meta, updatedAt: new Date().toISOString() } })
   },

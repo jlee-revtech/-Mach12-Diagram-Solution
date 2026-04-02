@@ -9,7 +9,8 @@ interface CollabUser {
 
 // ─── Presence Badge (who's here) ────────────────────────
 export function PresenceBadge({ users, connected }: { users: CollabUser[]; connected: boolean }) {
-  if (!connected && users.length === 0) return null
+  // Only show when there are actual remote collaborators
+  if (users.length === 0) return null
 
   return (
     <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 bg-[var(--m12-bg-card)]/90 backdrop-blur-sm border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5">

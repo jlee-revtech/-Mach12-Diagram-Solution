@@ -25,6 +25,7 @@ export interface DiagramRow {
   updated_by: string | null
   created_at: string
   updated_at: string
+  archived_at: string | null
 }
 
 export interface DiagramPermission {

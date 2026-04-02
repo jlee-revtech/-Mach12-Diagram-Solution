@@ -200,6 +200,25 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [systemNodes, edges, groups, artifacts, user])
 
+  // Flush unsaved changes on unmount (e.g. navigating away)
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      const state = useDiagramStore.getState()
+      if (!user || savingRef.current) return
+      const fp = JSON.stringify({
+        n: state.nodes,
+        e: state.edges,
+        g: state.groups,
+        a: state.artifacts,
+      })
+      if (fp !== lastSaveRef.current) {
+        state.saveDiagram(user.id).catch(() => {})
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -417,7 +436,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
             maskColor="var(--m12-minimap-mask)"
             style={{ width: 160, height: 100, backgroundColor: 'var(--m12-minimap-bg)', borderColor: 'var(--m12-border)', borderRadius: 8 }}
           />
-          <div className="absolute bottom-2 left-2 text-[10px] text-[var(--m12-border)]/60 select-none pointer-events-none">
+          <div className="absolute bottom-1 right-1 text-[9px] text-[var(--m12-border)]/50 select-none pointer-events-none">
             v{process.env.NEXT_PUBLIC_APP_VERSION}
           </div>
         </ReactFlow>

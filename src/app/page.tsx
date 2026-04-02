@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
-import { listDiagrams, createDiagram, deleteDiagram as deleteDiagramApi } from '@/lib/supabase/diagrams'
+import { listDiagrams, createDiagram, archiveDiagram, restoreDiagram } from '@/lib/supabase/diagrams'
 import type { DiagramRow } from '@/lib/supabase/types'
 
 export default function Dashboard() {
   const [diagrams, setDiagrams] = useState<DiagramRow[]>([])
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
+  const [showArchived, setShowArchived] = useState(false)
   const router = useRouter()
   const { user, profile, organization, organizations, loading, signOut, switchOrg } = useAuth()
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
@@ -20,13 +21,17 @@ export default function Dashboard() {
   }, [user, organization, loading, router])
 
   // Load diagrams
-  useEffect(() => {
-    if (organization) {
-      listDiagrams(organization.id)
-        .then(setDiagrams)
-        .finally(() => setLoadingDiagrams(false))
-    }
+  const loadAll = useCallback(async () => {
+    if (!organization) return
+    setLoadingDiagrams(true)
+    const all = await listDiagrams(organization.id, true)
+    setDiagrams(all)
+    setLoadingDiagrams(false)
   }, [organization])
+
+  useEffect(() => {
+    loadAll()
+  }, [loadAll])
 
   const handleNew = useCallback(async () => {
     if (!organization || !user) return
@@ -34,17 +39,29 @@ export default function Dashboard() {
     router.push(`/diagram/${diagram.id}`)
   }, [organization, user, router])
 
-  const handleDelete = useCallback(
+  const handleArchive = useCallback(
     async (id: string, e: React.MouseEvent) => {
       e.stopPropagation()
-      if (!confirm('Delete this diagram?') || !organization) return
-      await deleteDiagramApi(id)
-      setDiagrams(await listDiagrams(organization.id))
+      if (!confirm('Archive this diagram? You can restore it later.')) return
+      await archiveDiagram(id)
+      await loadAll()
     },
-    [organization]
+    [loadAll]
+  )
+
+  const handleRestore = useCallback(
+    async (id: string, e: React.MouseEvent) => {
+      e.stopPropagation()
+      await restoreDiagram(id)
+      await loadAll()
+    },
+    [loadAll]
   )
 
   if (loading || !user || !organization) return null
+
+  const activeDiagrams = diagrams.filter((d) => !d.archived_at)
+  const archivedDiagrams = diagrams.filter((d) => d.archived_at)
 
   return (
     <div className="min-h-screen bg-[var(--m12-bg)] p-8">
@@ -89,7 +106,7 @@ export default function Dashboard() {
                             await switchOrg(org.id)
                             setOrgMenuOpen(false)
                             setLoadingDiagrams(true)
-                            listDiagrams(org.id).then(setDiagrams).finally(() => setLoadingDiagrams(false))
+                            listDiagrams(org.id, true).then(setDiagrams).finally(() => setLoadingDiagrams(false))
                           }}
                           className={`flex items-center gap-2 w-full text-left px-3 py-2 text-xs transition-colors ${
                             org.id === organization.id
@@ -143,7 +160,7 @@ export default function Dashboard() {
         {/* Diagram grid */}
         {loadingDiagrams ? (
           <div className="text-center py-24 text-[var(--m12-text-muted)] text-sm">Loading diagrams...</div>
-        ) : diagrams.length === 0 ? (
+        ) : activeDiagrams.length === 0 && archivedDiagrams.length === 0 ? (
           <div className="text-center py-24 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
             <div className="text-5xl mb-4 opacity-20">&#9634;</div>
             <h2 className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">
@@ -163,57 +180,121 @@ export default function Dashboard() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* New diagram card */}
-            <button
-              onClick={handleNew}
-              className="flex flex-col items-center justify-center border-2 border-dashed border-[var(--m12-border)]/40 hover:border-[#2563EB]/60 rounded-xl p-8 transition-colors group"
-            >
-              <svg
-                width="32" height="32" viewBox="0 0 32 32" fill="none"
-                className="text-[var(--m12-border)] group-hover:text-[#2563EB] transition-colors mb-2"
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* New diagram card */}
+              <button
+                onClick={handleNew}
+                className="flex flex-col items-center justify-center border-2 border-dashed border-[var(--m12-border)]/40 hover:border-[#2563EB]/60 rounded-xl p-8 transition-colors group"
               >
-                <path d="M16 8v16M8 16h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              <span className="text-sm text-[var(--m12-text-muted)] group-hover:text-[var(--m12-text-secondary)] transition-colors">
-                New Diagram
-              </span>
-            </button>
+                <svg
+                  width="32" height="32" viewBox="0 0 32 32" fill="none"
+                  className="text-[var(--m12-border)] group-hover:text-[#2563EB] transition-colors mb-2"
+                >
+                  <path d="M16 8v16M8 16h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <span className="text-sm text-[var(--m12-text-muted)] group-hover:text-[var(--m12-text-secondary)] transition-colors">
+                  New Diagram
+                </span>
+              </button>
 
-            {/* Existing diagrams */}
-            {diagrams.map((d) => (
-              <div
-                key={d.id}
-                onClick={() => router.push(`/diagram/${d.id}`)}
-                className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl p-5 cursor-pointer transition-all card-glow"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">
-                    {d.title}
-                  </h3>
-                  <button
-                    onClick={(e) => handleDelete(d.id, e)}
-                    className="text-[var(--m12-border)] hover:text-red-400 transition-colors ml-2 shrink-0"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </button>
+              {/* Active diagrams */}
+              {activeDiagrams.map((d) => (
+                <div
+                  key={d.id}
+                  onClick={() => router.push(`/diagram/${d.id}`)}
+                  className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl p-5 cursor-pointer transition-all card-glow"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">
+                      {d.title}
+                    </h3>
+                    <button
+                      onClick={(e) => handleArchive(d.id, e)}
+                      title="Archive diagram"
+                      className="text-[var(--m12-border)] hover:text-[#EAB308] transition-colors ml-2 shrink-0"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                        <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
+                        <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                  {d.process_context && (
+                    <div className="inline-flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-0.5 mb-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
+                      <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider">
+                        {d.process_context}
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
+                    Updated {new Date(d.updated_at).toLocaleDateString()}
+                  </div>
                 </div>
-                {d.process_context && (
-                  <div className="inline-flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-0.5 mb-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-                    <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider">
-                      {d.process_context}
-                    </span>
+              ))}
+            </div>
+
+            {/* Archived section */}
+            {archivedDiagrams.length > 0 && (
+              <div className="mt-8">
+                <button
+                  onClick={() => setShowArchived(!showArchived)}
+                  className="flex items-center gap-2 text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors mb-3"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${showArchived ? 'rotate-90' : ''}`}>
+                    <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="opacity-60">
+                    <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                  Archived ({archivedDiagrams.length})
+                </button>
+
+                {showArchived && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {archivedDiagrams.map((d) => (
+                      <div
+                        key={d.id}
+                        className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/20 rounded-xl p-5 opacity-60 hover:opacity-80 transition-all"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">
+                            {d.title}
+                          </h3>
+                          <button
+                            onClick={(e) => handleRestore(d.id, e)}
+                            title="Restore diagram"
+                            className="text-[var(--m12-border)] hover:text-[#10B981] transition-colors ml-2 shrink-0 text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider flex items-center gap-1"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                              <path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M7 3L4 6l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            Restore
+                          </button>
+                        </div>
+                        {d.process_context && (
+                          <div className="inline-flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-0.5 mb-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
+                            <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider">
+                              {d.process_context}
+                            </span>
+                          </div>
+                        )}
+                        <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
+                          Archived {new Date(d.archived_at!).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-                <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
-                  Updated {new Date(d.updated_at).toLocaleDateString()}
-                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
