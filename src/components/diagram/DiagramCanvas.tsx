@@ -16,7 +16,7 @@ import '@xyflow/react/dist/style.css'
 
 import { useDiagramStore } from '@/lib/diagram/store'
 import { useAuth } from '@/lib/supabase/auth-context'
-import { useCollaboration } from '@/lib/collab/useCollaboration'
+// import { useCollaboration } from '@/lib/collab/useCollaboration'
 import SystemNodeComponent from './SystemNode'
 import GroupNodeComponent from './GroupNode'
 import DataFlowEdgeComponent, { EdgeMarkerDefs } from './DataFlowEdge'
@@ -64,14 +64,16 @@ function ArtifactSpotlightBar() {
 }
 
 function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const [aiOpen, setAiOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-  const { connected, users, syncToYjs, updateCursor, seedFromStore } = useCollaboration(
-    diagramId,
-    profile?.display_name || user?.email || 'Anonymous'
-  )
+  // Collaboration disabled — WS server creates ghost sessions when not running
+  const connected = false
+  const users: any[] = []
+  const syncToYjs = useCallback(() => {}, [])
+  const updateCursor = useCallback((_x: number, _y: number) => {}, [])
+  const seedFromStore = useCallback(() => {}, [])
   const systemNodes = useDiagramStore((s) => s.nodes)
   const groups = useDiagramStore((s) => s.groups)
   const edges = useDiagramStore((s) => s.edges)
