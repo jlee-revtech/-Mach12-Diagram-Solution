@@ -24,8 +24,14 @@ function ColumnHeader({ label, color, letter }: { label: string; color: string; 
 // ─── Persona/System chip ────────────────────────────────
 function PersonaChip({ name, color }: { name: string; color: string }) {
   return (
-    <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 rounded-full px-2.5 py-1 shadow-sm max-w-full">
-      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+    <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 rounded-full pl-1 pr-2.5 py-0.5 shadow-sm max-w-full">
+      {/* Person avatar circle */}
+      <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: color + '25' }}>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <circle cx="6" cy="4" r="2.2" fill={color} />
+          <path d="M2 10.5c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill={color} fillOpacity="0.3" />
+        </svg>
+      </div>
       <span className="text-[10px] font-medium text-[var(--m12-text-secondary)] truncate">{name}</span>
     </div>
   )

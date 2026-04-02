@@ -73,7 +73,7 @@ function SectionTitle({ icon, label, count }: { icon: React.ReactNode; label: st
   )
 }
 
-export default function AIAnalyzePanel({ onClose }: { onClose: () => void }) {
+export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () => void; onImplement?: (capabilityName: string, prompt: string) => void }) {
   const map = useSIPOCStore(s => s.map)
   const hydratedCaps = useSIPOCStore(s => s.getHydratedCapabilities)
 
@@ -244,6 +244,16 @@ export default function AIAnalyzePanel({ onClose }: { onClose: () => void }) {
                             )}
                           </div>
                           <div className="text-[10px] text-[var(--m12-text-secondary)] leading-relaxed pl-3.5">{gap.description}</div>
+                          {onImplement && gap.capability !== 'Overall' && (
+                            <div className="pl-3.5 mt-1.5">
+                              <button
+                                onClick={() => onImplement(gap.capability, `Address gap: ${gap.title} — ${gap.description}`)}
+                                className="text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                              >
+                                Implement with AI →
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -272,6 +282,16 @@ export default function AIAnalyzePanel({ onClose }: { onClose: () => void }) {
                             )}
                           </div>
                           <div className="text-[10px] text-[var(--m12-text-secondary)] leading-relaxed">{sug.description}</div>
+                          {onImplement && sug.capability !== 'Overall' && (
+                            <div className="mt-1.5">
+                              <button
+                                onClick={() => onImplement(sug.capability, `Implement suggestion: ${sug.title} — ${sug.description}`)}
+                                className="text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                              >
+                                Implement with AI →
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )
                     })}

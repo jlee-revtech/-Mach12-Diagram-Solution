@@ -90,10 +90,12 @@ function Check({ checked, onChange, size = 'sm' }: { checked: boolean; onChange:
 export default function AIGeneratePanel({
   capabilityId,
   orgId,
+  initialPrompt,
   onClose,
 }: {
   capabilityId: string
   orgId: string
+  initialPrompt?: string
   onClose: () => void
 }) {
   const capabilities = useSIPOCStore(s => s.capabilities)
@@ -106,7 +108,7 @@ export default function AIGeneratePanel({
   const capability = capabilities.find(c => c.id === capabilityId)
   const hasExistingData = capInputs.length > 0 || capOutputs.length > 0
 
-  const [prompt, setPrompt] = useState(capability?.name || '')
+  const [prompt, setPrompt] = useState(initialPrompt || capability?.name || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null)

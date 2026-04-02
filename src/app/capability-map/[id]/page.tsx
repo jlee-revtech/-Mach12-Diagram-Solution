@@ -8,6 +8,7 @@ import SIPOCVisual from '@/components/sipoc/SIPOCVisual'
 import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
+import { exportSIPOCPdf, exportSIPOCExcel } from '@/lib/export/sipoc'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -25,6 +26,8 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [showAI, setShowAI] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -118,6 +121,56 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
 
         <div className="flex-1" />
 
+        {/* Export dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setExportMenuOpen(!exportMenuOpen)}
+            className="flex items-center gap-1.5 border border-[var(--m12-border)]/40 hover:bg-[var(--m12-bg)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 2v6M3.5 5.5L6 8l2.5-2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 9.5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            Export
+          </button>
+          {exportMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} />
+              <div className="absolute right-0 top-full mt-1 z-50 w-44 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden">
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false)
+                    const caps = useSIPOCStore.getState().getHydratedCapabilities()
+                    exportSIPOCPdf(map.title, caps)
+                  }}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <rect x="2" y="1" width="8" height="10" rx="1" stroke="currentColor" strokeWidth="1" />
+                    <path d="M4 4h4M4 6h4M4 8h2" stroke="currentColor" strokeWidth="0.7" strokeLinecap="round" />
+                  </svg>
+                  Export as PDF
+                </button>
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false)
+                    const store = useSIPOCStore.getState()
+                    const caps = store.getHydratedCapabilities()
+                    exportSIPOCExcel(map.title, caps, store.personas, store.informationProducts, store.logicalSystems)
+                  }}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <rect x="2" y="1" width="8" height="10" rx="1" stroke="#10B981" strokeWidth="1" />
+                    <path d="M4.5 4.5L7.5 7.5M7.5 4.5L4.5 7.5" stroke="#10B981" strokeWidth="1" strokeLinecap="round" />
+                  </svg>
+                  Export as Excel
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* AI analyze button */}
         <button
           onClick={() => setShowAnalysis(true)}
@@ -185,13 +238,27 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         <AIGeneratePanel
           capabilityId={selectedCapabilityId}
           orgId={organization.id}
-          onClose={() => setShowAI(false)}
+          initialPrompt={aiPromptOverride || undefined}
+          onClose={() => { setShowAI(false); setAiPromptOverride(null) }}
         />
       )}
 
       {/* AI Analyze Panel */}
       {showAnalysis && (
-        <AIAnalyzePanel onClose={() => setShowAnalysis(false)} />
+        <AIAnalyzePanel
+          onClose={() => setShowAnalysis(false)}
+          onImplement={(capabilityName, prompt) => {
+            // Find the capability by name and select it
+            const caps = useSIPOCStore.getState().capabilities
+            const cap = caps.find(c => c.name === capabilityName)
+            if (cap) {
+              useSIPOCStore.getState().setSelectedCapability(cap.id)
+            }
+            setAiPromptOverride(prompt)
+            setShowAnalysis(false)
+            setShowAI(true)
+          }}
+        />
       )}
     </div>
   )
