@@ -8,6 +8,7 @@ import {
   MiniMap,
   ReactFlowProvider,
   ConnectionMode,
+  SelectionMode,
   applyNodeChanges,
   type NodeChange,
 } from '@xyflow/react'
@@ -393,6 +394,10 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           maxZoom={4}
           snapToGrid
           snapGrid={[16, 16]}
+          selectionOnDrag
+          selectionMode={SelectionMode.Partial}
+          panOnDrag={[1, 2]}
+          panOnScroll
           connectionMode={ConnectionMode.Loose}
           connectionLineStyle={{ stroke: reconnecting ? '#06B6D4' : '#2563EB', strokeWidth: 2.5, strokeDasharray: '6 3' }}
           proOptions={{ hideAttribution: true }}

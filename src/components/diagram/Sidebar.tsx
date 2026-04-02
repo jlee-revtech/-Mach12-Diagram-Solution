@@ -101,7 +101,7 @@ function GroupTemplatesSection() {
       const id = addSystem(
         sys.systemType as any,
         sys.label,
-        { x: pos.x + sys.relativeX + 20, y: pos.y + sys.relativeY + 30 }
+        { x: pos.x + sys.relativeX, y: pos.y + sys.relativeY }
       )
       newNodeIds.push(id)
       // Apply physical system and modules
