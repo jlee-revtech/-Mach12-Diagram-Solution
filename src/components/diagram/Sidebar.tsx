@@ -407,6 +407,14 @@ function GroupPropertiesTab() {
           data: e.data,
         })),
       })
+      // Mark the group as a saved template
+      useDiagramStore.setState({
+        groups: useDiagramStore.getState().groups.map((g) =>
+          g.id === selectedGroupId
+            ? { ...g, data: { ...g.data, isTemplate: true, templateName: templateName.trim() } }
+            : g
+        ),
+      })
       setSaved(true)
       setTimeout(() => { setSaved(false); setShowSave(false) }, 2000)
     } catch (err) {

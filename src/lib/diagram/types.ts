@@ -43,6 +43,8 @@ export type SystemNode = Node<SystemData, 'system'>
 export interface SystemGroupData extends Record<string, unknown> {
   label: string
   color?: string
+  isTemplate?: boolean
+  templateName?: string
 }
 
 export type SystemGroupNode = Node<SystemGroupData, 'systemGroup'>
