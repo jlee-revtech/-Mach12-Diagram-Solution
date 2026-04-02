@@ -351,20 +351,24 @@ function GroupPropertiesTab() {
   if (!selectedGroup) return null
 
   // Find systems visually inside this group's bounding box
+  // Use the node's center point for overlap detection with generous tolerance
   const groupBounds = {
     x: selectedGroup.position.x,
     y: selectedGroup.position.y,
-    w: (selectedGroup.style?.width as number) || 500,
-    h: (selectedGroup.style?.height as number) || 400,
+    w: (selectedGroup.width as number) || (selectedGroup.style?.width as number) || 500,
+    h: (selectedGroup.height as number) || (selectedGroup.style?.height as number) || 400,
   }
+  const PAD = 40 // tolerance padding
   const containedSystems = nodes.filter((n) => {
-    const nx = n.position.x
-    const ny = n.position.y
+    const nw = (n.width as number) || 220
+    const nh = (n.height as number) || 80
+    const cx = n.position.x + nw / 2
+    const cy = n.position.y + nh / 2
     return (
-      nx >= groupBounds.x &&
-      ny >= groupBounds.y &&
-      nx <= groupBounds.x + groupBounds.w &&
-      ny <= groupBounds.y + groupBounds.h
+      cx >= groupBounds.x - PAD &&
+      cy >= groupBounds.y - PAD &&
+      cx <= groupBounds.x + groupBounds.w + PAD &&
+      cy <= groupBounds.y + groupBounds.h + PAD
     )
   })
   const containedIds = new Set(containedSystems.map((n) => n.id))
