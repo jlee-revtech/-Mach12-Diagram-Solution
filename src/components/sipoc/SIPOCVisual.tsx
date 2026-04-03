@@ -409,8 +409,11 @@ export default function SIPOCVisual() {
     )
   }
 
-  // Render a single L3 SIPOC block
-  const renderL3 = (capId: string) => {
+  // Check if a capability is a leaf (no children in the tree)
+  const isLeaf = (id: string) => !rawCapabilities.some(c => c.parent_id === id)
+
+  // Render a leaf capability as a SIPOC block
+  const renderLeaf = (capId: string) => {
     const cap = getHydrated(capId)
     if (!cap) return null
     return (
@@ -487,16 +490,26 @@ export default function SIPOCVisual() {
                   </span>
                   {l1Collapsed && (
                     <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-                      {l1.children.reduce((sum, l2) => sum + (l2.children?.length || 0), 0)} capabilities
+                      {l1.children.reduce((sum, l2) => sum + Math.max(l2.children?.length || 0, 1), 0)} capabilities
                     </span>
                   )}
                 </button>
 
-                {!l1Collapsed && (
+                {!l1Collapsed && l1.children.length === 0 && (
+                  <div className="pl-4">{renderLeaf(l1.id)}</div>
+                )}
+
+                {!l1Collapsed && l1.children.length > 0 && (
                   <div className="space-y-4 pl-4 border-l-2" style={{ borderColor: l1Color + '30' }}>
                     {l1.children.sort((a, b) => a.sort_order - b.sort_order).map(l2 => {
                       const l2Collapsed = collapsedGroups.has(l2.id)
                       const l3Caps = l2.children || []
+                      const l2IsLeaf = l3Caps.length === 0
+
+                      // If L2 is a leaf node (no L3 children), render it directly as a SIPOC block
+                      if (l2IsLeaf) {
+                        return <div key={l2.id} className="pl-2">{renderLeaf(l2.id)}</div>
+                      }
 
                       return (
                         <div key={l2.id} className="space-y-2">
@@ -523,10 +536,7 @@ export default function SIPOCVisual() {
                           {/* L3 SIPOC blocks */}
                           {!l2Collapsed && (
                             <div className="space-y-3 pl-4">
-                              {l3Caps.sort((a, b) => a.sort_order - b.sort_order).map(l3 => renderL3(l3.id))}
-                              {l3Caps.length === 0 && (
-                                <div className="text-[10px] text-[var(--m12-text-faint)] italic py-2 pl-2">No L3 functionalities</div>
-                              )}
+                              {l3Caps.sort((a, b) => a.sort_order - b.sort_order).map(l3 => renderLeaf(l3.id))}
                             </div>
                           )}
                         </div>
@@ -552,7 +562,7 @@ export default function SIPOCVisual() {
                 </span>
               </div>
               <div className="space-y-3 pl-4 border-l-2 border-[var(--m12-border)]/20">
-                {orphanL3s.map(cap => renderL3(cap.id))}
+                {orphanL3s.map(cap => renderLeaf(cap.id))}
               </div>
             </div>
           )}
@@ -560,7 +570,7 @@ export default function SIPOCVisual() {
       ) : (
         /* Flat view (no hierarchy defined yet) */
         <div className="space-y-3">
-          {capabilities.map(cap => renderL3(cap.id))}
+          {capabilities.map(cap => renderLeaf(cap.id))}
         </div>
       )}
     </div>
