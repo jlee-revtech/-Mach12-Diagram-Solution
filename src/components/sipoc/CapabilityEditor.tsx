@@ -235,6 +235,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const removeInput = useSIPOCStore(s => s.removeInput)
   const updateInputSuppliers = useSIPOCStore(s => s.updateInputSuppliers)
   const updateInputSystems = useSIPOCStore(s => s.updateInputSystems)
+  const updateInputFeedingSystem = useSIPOCStore(s => s.updateInputFeedingSystem)
   const addOutput = useSIPOCStore(s => s.addOutput)
   const removeOutput = useSIPOCStore(s => s.removeOutput)
   const updateOutputConsumers = useSIPOCStore(s => s.updateOutputConsumers)
@@ -315,15 +316,14 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     emptyLabel="Create personas first"
                   />
                 </div>
-                {/* Source systems (ordered flow) */}
+                {/* Source systems (ordered upstream flow) */}
                 <div>
                   <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
-                    Source System Flow
+                    Source Systems
                     {input.source_system_ids.length > 1 && (
-                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(order = data flow sequence)</span>
+                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(order = data lineage)</span>
                     )}
                   </div>
-                  {/* Ordered flow display */}
                   {input.source_system_ids.length > 0 && (
                     <div className="space-y-0 mb-2">
                       {input.source_system_ids.map((sysId, idx) => {
@@ -334,7 +334,6 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                         const isLast = idx === input.source_system_ids.length - 1
                         return (
                           <div key={sysId}>
-                            {/* Arrow between items */}
                             {idx > 0 && (
                               <div className="flex items-center justify-center py-0.5">
                                 <svg width="10" height="12" viewBox="0 0 10 12" fill="none" className="text-[var(--m12-border)]">
@@ -343,61 +342,27 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                               </div>
                             )}
                             <div className="flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg px-2 py-1.5 group/sys">
-                              {/* System color + type badge */}
                               <div className="w-2 h-2 rounded shrink-0" style={{ backgroundColor: sys.color || tmpl?.color || '#64748B' }} />
                               <div className="flex-1 min-w-0">
                                 <div className="text-[10px] font-medium text-[var(--m12-text)] truncate">{sys.name}</div>
-                                {tmpl && (
-                                  <div className="text-[7px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{tmpl.label}</div>
-                                )}
+                                {tmpl && <div className="text-[7px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{tmpl.label}</div>}
                               </div>
-                              {/* Step indicator */}
-                              <span className={`text-[7px] font-[family-name:var(--font-space-mono)] font-bold ${isLast && input.source_system_ids.length > 1 ? 'text-[#EAB308]' : 'text-[var(--m12-text-faint)]'}`}>
-                                {isFirst && input.source_system_ids.length > 1 ? 'ORIGIN' : isLast && input.source_system_ids.length > 1 ? 'FEEDS' : `#${idx + 1}`}
+                              <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] font-bold">
+                                {isFirst && input.source_system_ids.length > 1 ? 'ORIGIN' : `#${idx + 1}`}
                               </span>
-                              {/* Reorder + remove controls */}
                               <div className="flex items-center gap-0.5 opacity-0 group-hover/sys:opacity-100 transition-opacity">
                                 {!isFirst && (
-                                  <button
-                                    onClick={() => {
-                                      const ids = [...input.source_system_ids]
-                                      ;[ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]]
-                                      updateInputSystems(input.id, capabilityId, ids)
-                                    }}
-                                    className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5"
-                                    title="Move up"
-                                  >
-                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                                      <path d="M4 1.5L1.5 4.5h5L4 1.5z" fill="currentColor" />
-                                    </svg>
+                                  <button onClick={() => { const ids = [...input.source_system_ids]; [ids[idx-1],ids[idx]]=[ids[idx],ids[idx-1]]; updateInputSystems(input.id, capabilityId, ids) }} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5" title="Move up">
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5L1.5 4.5h5L4 1.5z" fill="currentColor" /></svg>
                                   </button>
                                 )}
                                 {!isLast && (
-                                  <button
-                                    onClick={() => {
-                                      const ids = [...input.source_system_ids]
-                                      ;[ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]]
-                                      updateInputSystems(input.id, capabilityId, ids)
-                                    }}
-                                    className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5"
-                                    title="Move down"
-                                  >
-                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                                      <path d="M4 6.5L1.5 3.5h5L4 6.5z" fill="currentColor" />
-                                    </svg>
+                                  <button onClick={() => { const ids = [...input.source_system_ids]; [ids[idx],ids[idx+1]]=[ids[idx+1],ids[idx]]; updateInputSystems(input.id, capabilityId, ids) }} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5" title="Move down">
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 6.5L1.5 3.5h5L4 6.5z" fill="currentColor" /></svg>
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => {
-                                    const ids = input.source_system_ids.filter(id => id !== sysId)
-                                    updateInputSystems(input.id, capabilityId, ids)
-                                  }}
-                                  className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors p-0.5"
-                                  title="Remove"
-                                >
-                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                                    <path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-                                  </svg>
+                                <button onClick={() => updateInputSystems(input.id, capabilityId, input.source_system_ids.filter(id => id !== sysId))} className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors p-0.5" title="Remove">
+                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
                                 </button>
                               </div>
                             </div>
@@ -406,14 +371,11 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                       })}
                     </div>
                   )}
-                  {/* Add system selector */}
                   <MultiSelect
-                    items={logicalSystems.filter(s => !input.source_system_ids.includes(s.id))}
+                    items={logicalSystems.filter(s => !input.source_system_ids.includes(s.id) && s.id !== input.feeding_system_id)}
                     selectedIds={[]}
                     onChange={newIds => {
-                      if (newIds.length > 0) {
-                        updateInputSystems(input.id, capabilityId, [...input.source_system_ids, ...newIds])
-                      }
+                      if (newIds.length > 0) updateInputSystems(input.id, capabilityId, [...input.source_system_ids, ...newIds])
                     }}
                     colorFn={s => s.color || '#64748B'}
                     groupFn={s => {
@@ -421,8 +383,41 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                       return tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
                     }}
                     emptyLabel="No more systems to add"
-                    placeholder="+ Add system to flow..."
+                    placeholder="+ Add source system..."
                   />
+                </div>
+                {/* Feeding system (single select) */}
+                <div>
+                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                    Feeding System
+                    <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(delivers to process)</span>
+                  </div>
+                  {(() => {
+                    const feedSys = input.feeding_system_id ? logicalSystems.find(s => s.id === input.feeding_system_id) : null
+                    const feedTmpl = feedSys ? SYSTEM_TEMPLATES.find(t => t.type === feedSys.system_type) : null
+                    return (
+                      <div className="relative">
+                        <select
+                          value={input.feeding_system_id || ''}
+                          onChange={e => updateInputFeedingSystem(input.id, capabilityId, e.target.value || null)}
+                          className="w-full bg-[var(--m12-bg-input)] border border-[#EAB308]/30 rounded-lg px-2.5 py-2 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#EAB308]/60 appearance-none pr-7"
+                          style={feedSys ? { borderLeftWidth: 3, borderLeftColor: feedSys.color || feedTmpl?.color || '#64748B' } : {}}
+                        >
+                          <option value="">None</option>
+                          {logicalSystems
+                            .filter(s => !input.source_system_ids.includes(s.id))
+                            .map(s => {
+                              const t = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
+                              return <option key={s.id} value={s.id}>{s.name}{t ? ` (${t.label})` : ''}</option>
+                            })
+                          }
+                        </select>
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--m12-text-muted)] pointer-events-none">
+                          <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )
+                  })()}
                 </div>
                 {/* Data Objects */}
                 <DimensionsEditor

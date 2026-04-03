@@ -126,10 +126,9 @@ function InputLane({ input, showDimensions }: {
   input: HydratedCapability['inputs'][0]
   showDimensions: boolean
 }) {
-  const hasSuppliers = input.supplierPersonas.length > 0 || input.sourceSystems.length > 0
-  const systems = input.sourceSystems
-  const originSystems = systems.length > 1 ? systems.slice(0, -1) : []
-  const feedingSystem = systems.length > 0 ? systems[systems.length - 1] : null
+  const hasSuppliers = input.supplierPersonas.length > 0 || input.sourceSystems.length > 0 || !!input.feedingSystem
+  const sourceSystems = input.sourceSystems
+  const feedingSystem = input.feedingSystem
 
   return (
     <div className="flex items-center gap-2">
@@ -143,10 +142,10 @@ function InputLane({ input, showDimensions }: {
             ))}
           </div>
         )}
-        {/* Origin systems flow (all except last) */}
-        {originSystems.length > 0 && (
+        {/* Source systems flow (upstream lineage) */}
+        {sourceSystems.length > 0 && (
           <div className="flex items-center gap-0.5 flex-wrap justify-end">
-            {originSystems.map((s, i) => (
+            {sourceSystems.map((s, i) => (
               <div key={s.id} className="flex items-center gap-0.5">
                 {i > 0 && <MiniArrow />}
                 <SystemChip name={s.name} color={s.color} />

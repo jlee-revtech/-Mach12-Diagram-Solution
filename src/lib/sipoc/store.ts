@@ -54,6 +54,7 @@ interface SIPOCState {
   removeInput: (inputId: string, capabilityId: string) => Promise<void>
   updateInputSuppliers: (inputId: string, capabilityId: string, personaIds: string[]) => Promise<void>
   updateInputSystems: (inputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
+  updateInputFeedingSystem: (inputId: string, capabilityId: string, systemId: string | null) => Promise<void>
 
   // ─── Output CRUD ──────────────────────────────────────
   addOutput: (capabilityId: string, informationProductId: string) => Promise<void>
@@ -240,6 +241,18 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     })
   },
 
+  updateInputFeedingSystem: async (inputId, capabilityId, systemId) => {
+    await api.updateCapabilityInput(inputId, { feeding_system_id: systemId })
+    set({
+      inputs: {
+        ...get().inputs,
+        [capabilityId]: (get().inputs[capabilityId] || []).map(i =>
+          i.id === inputId ? { ...i, feeding_system_id: systemId } : i
+        ),
+      },
+    })
+  },
+
   // ─── Output CRUD ──────────────────────────────────────
 
   addOutput: async (capabilityId, informationProductId) => {
@@ -399,6 +412,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         sourceSystems: input.source_system_ids
           .map(id => sysMap.get(id))
           .filter((s): s is LogicalSystem => !!s),
+        feedingSystem: input.feeding_system_id ? sysMap.get(input.feeding_system_id) || null : null,
       })),
       outputs: (outputs[cap.id] || []).map(output => ({
         ...output,

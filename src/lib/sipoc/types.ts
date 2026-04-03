@@ -72,7 +72,8 @@ export interface CapabilityInput {
   capability_id: string
   information_product_id: string
   supplier_persona_ids: string[]
-  source_system_ids: string[]
+  source_system_ids: string[]       // upstream system flow (ordered)
+  feeding_system_id: string | null   // single system that feeds the process
   dimensions: Dimension[]
   sort_order: number
   created_at: string
@@ -95,6 +96,7 @@ export interface HydratedCapability extends Capability {
     informationProduct: InformationProduct
     supplierPersonas: Persona[]
     sourceSystems: LogicalSystem[]
+    feedingSystem: LogicalSystem | null
   })[]
   outputs: (CapabilityOutput & {
     informationProduct: InformationProduct
