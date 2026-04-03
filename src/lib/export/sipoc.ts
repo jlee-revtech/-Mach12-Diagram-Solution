@@ -817,244 +817,228 @@ function svgColumnHeader(x: number, y: number, letter: string, label: string, co
   ].join('\n')
 }
 
+// ─── Lane height calculator ─────────────────────────────
+
+function calcSupplierH(inp: HydratedCapability['inputs'][number]): number {
+  const personaH = Math.max(inp.supplierPersonas.length, 0) * 24
+  const sysH = inp.sourceSystems.length > 0 ? 22 : 0
+  return Math.max(personaH + sysH, 20)
+}
+
+function calcIPCardH(name: string, category: string | undefined, dims: string[], colW: number): number {
+  const lines = wrapText(name, colW - 16, 8)
+  return lines.length * 12 + (category ? 12 : 0) + (dims.length > 0 ? dims.length * 11 + 6 : 0) + 16
+}
+
+function calcLaneH(leftH: number, rightH: number): number {
+  return Math.max(leftH, rightH) + 16
+}
+
 export function exportSIPOCSvg(
   title: string,
   capabilities: HydratedCapability[]
 ): void {
-  const COL_W = 200
-  const PROC_W = 180
-  const GAP = 30
-  const CAP_GAP = 50
+  const COL_W = 220
+  const PROC_W = 160
+  const ARROW_W = 24
   const MARGIN = 40
+  const CAP_GAP = 40
   const HEADER_H = 50
 
-  // Total width: S + gap + I + gap + P + gap + O + gap + C + margins
-  const totalW = MARGIN * 2 + COL_W * 4 + PROC_W + GAP * 4
+  // Layout: [M] S [→] I [→] P [→] O [→] C [M]
+  const totalW = MARGIN + COL_W + ARROW_W + COL_W + ARROW_W + PROC_W + ARROW_W + COL_W + ARROW_W + COL_W + MARGIN
+  const colX = {
+    s: MARGIN,
+    a1: MARGIN + COL_W,
+    i: MARGIN + COL_W + ARROW_W,
+    a2: MARGIN + COL_W * 2 + ARROW_W,
+    p: MARGIN + COL_W * 2 + ARROW_W * 2,
+    a3: MARGIN + COL_W * 2 + ARROW_W * 2 + PROC_W,
+    o: MARGIN + COL_W * 2 + ARROW_W * 2 + PROC_W + ARROW_W,
+    a4: MARGIN + COL_W * 3 + ARROW_W * 2 + PROC_W,
+    c: MARGIN + COL_W * 3 + ARROW_W * 3 + PROC_W,
+  }
 
-  // Pre-calculate heights for each capability
-  const capHeights: number[] = []
+  // Two-pass: first calculate all heights, then render
+  type CapLayout = { headerY: number; colHeaderY: number; contentY: number; laneYs: number[]; totalH: number }
+  const layouts: CapLayout[] = []
+
+  let globalY = MARGIN + 70
+
   capabilities.forEach(cap => {
-    const inputCount = Math.max(cap.inputs.length, 1)
-    const outputCount = Math.max(cap.outputs.length, 1)
+    const headerY = globalY
+    const colHeaderY = headerY + HEADER_H + 8
+    const contentY = colHeaderY + 30
+    const maxLanes = Math.max(cap.inputs.length, cap.outputs.length, 1)
 
-    // Estimate height per input lane
-    let maxInputH = 0
-    cap.inputs.forEach(inp => {
-      const personaH = Math.max(inp.supplierPersonas.length, 1) * 24
-      const systemH = inp.sourceSystems.length > 0 ? 24 : 0
-      const supplierH = personaH + systemH + 8
+    const laneYs: number[] = []
+    let laneY = contentY
+    for (let li = 0; li < maxLanes; li++) {
+      laneYs.push(laneY)
+      const inp = cap.inputs[li]
+      const out = cap.outputs[li]
 
-      const nameLines = wrapText(inp.informationProduct.name, COL_W - 20, 8).length
-      const dimH = (inp.dimensions || []).length * 11
-      const cardH = nameLines * 12 + (inp.informationProduct.category ? 12 : 0) + dimH + 20
-      const feedH = inp.feedingSystem ? 24 : 0
+      let leftH = 20
+      if (inp) {
+        const supH = calcSupplierH(inp)
+        const cardH = calcIPCardH(inp.informationProduct.name, inp.informationProduct.category, (inp.dimensions || []).map(d => d.name), COL_W) + (inp.feedingSystem ? 22 : 0)
+        leftH = Math.max(supH, cardH)
+      }
 
-      maxInputH += Math.max(supplierH, cardH + feedH) + 12
-    })
+      let rightH = 20
+      if (out) {
+        const cardH = calcIPCardH(out.informationProduct.name, out.informationProduct.category, (out.dimensions || []).map(d => d.name), COL_W)
+        const consH = Math.max(out.consumerPersonas.length, 0) * 24
+        rightH = Math.max(cardH, consH || 20)
+      }
 
-    let maxOutputH = 0
-    cap.outputs.forEach(out => {
-      const nameLines = wrapText(out.informationProduct.name, COL_W - 20, 8).length
-      const dimH = (out.dimensions || []).length * 11
-      const cardH = nameLines * 12 + (out.informationProduct.category ? 12 : 0) + dimH + 20
+      laneY += Math.max(leftH, rightH) + 16
+    }
 
-      const personaH = Math.max(out.consumerPersonas.length, 1) * 24 + 8
-      maxOutputH += Math.max(cardH, personaH) + 12
-    })
-
-    const contentH = Math.max(maxInputH, maxOutputH, 100)
-    capHeights.push(HEADER_H + 40 + contentH + 20) // header + col headers + content + padding
+    const totalH = laneY - headerY + 16
+    layouts.push({ headerY, colHeaderY, contentY, laneYs, totalH })
+    globalY = laneY + CAP_GAP
   })
 
-  const totalH = MARGIN * 2 + 80 + capHeights.reduce((a, b) => a + b + CAP_GAP, 0)
+  const totalH = globalY + 20
 
-  // Build SVG
+  // ── Render ──
   const parts: string[] = []
 
-  // Arrow marker defs
-  const arrowColors = [SVG_COLORS.orange, SVG_COLORS.yellow, SVG_COLORS.blue, SVG_COLORS.green]
-  const defs = arrowColors.map(c =>
-    `<marker id="arrow-${c.replace('#', '')}" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L6 3L0 6z" fill="${c}" opacity="0.5"/></marker>`
-  ).join('\n')
-
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">`)
-  parts.push(`<defs>${defs}<style>text { dominant-baseline: auto; }</style></defs>`)
-
-  // Background
+  parts.push(`<defs><style>text { dominant-baseline: auto; }</style></defs>`)
   parts.push(`<rect width="${totalW}" height="${totalH}" fill="${SVG_COLORS.bg}"/>`)
 
-  // Title header
-  parts.push(svgText(MARGIN, MARGIN + 24, 'MACH12', 20, SVG_COLORS.blue, { bold: true, family: 'monospace' }))
-  parts.push(svgText(MARGIN + 100, MARGIN + 24, `/ ${title}`, 14, SVG_COLORS.text))
-  parts.push(svgText(MARGIN, MARGIN + 44, `${capabilities.length} Capabilit${capabilities.length === 1 ? 'y' : 'ies'} · SIPOC Export · ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 8, SVG_COLORS.muted, { family: 'monospace' }))
+  // Title
+  parts.push(svgText(MARGIN, MARGIN + 20, 'MACH12', 18, SVG_COLORS.blue, { bold: true, family: 'monospace' }))
+  parts.push(svgText(MARGIN + 90, MARGIN + 20, `/ ${title}`, 13, SVG_COLORS.text))
+  parts.push(svgText(MARGIN, MARGIN + 38, `${capabilities.length} Capabilities · SIPOC Export · ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 7, SVG_COLORS.muted, { family: 'monospace' }))
 
-  let globalY = MARGIN + 80
+  capabilities.forEach((cap, ci) => {
+    const L = layouts[ci]
+    const maxLanes = Math.max(cap.inputs.length, cap.outputs.length, 1)
+    const sectionW = totalW - MARGIN * 2 + 20
 
-  capabilities.forEach((cap, capIdx) => {
-    const capH = capHeights[capIdx]
-    const startY = globalY
+    // Section background
+    parts.push(svgRoundedRect(MARGIN - 10, L.headerY, sectionW, L.totalH, 8, '#1A2538', SVG_COLORS.border))
 
-    // Capability section background
-    parts.push(svgRoundedRect(MARGIN - 10, startY, totalW - MARGIN * 2 + 20, capH, 8, '#1A2538', SVG_COLORS.border))
+    // Header bar
+    parts.push(svgRoundedRect(MARGIN - 10, L.headerY, sectionW, HEADER_H, 8, SVG_COLORS.cardBg))
+    parts.push(`<rect x="${MARGIN - 10}" y="${L.headerY + HEADER_H - 8}" width="${sectionW}" height="8" fill="${SVG_COLORS.cardBg}"/>`)
 
-    // Capability header bar
-    parts.push(svgRoundedRect(MARGIN - 10, startY, totalW - MARGIN * 2 + 20, HEADER_H, 8, SVG_COLORS.cardBg))
-    parts.push(`<rect x="${MARGIN - 10}" y="${startY + HEADER_H - 8}" width="${totalW - MARGIN * 2 + 20}" height="8" fill="${SVG_COLORS.cardBg}"/>`)
+    parts.push(svgText(MARGIN + 6, L.headerY + 20, `${ci + 1}.`, 10, SVG_COLORS.blue, { bold: true, family: 'monospace' }))
+    parts.push(svgText(MARGIN + 26, L.headerY + 20, cap.name, 12, SVG_COLORS.text, { bold: true }))
+    if (cap.description) parts.push(svgText(MARGIN + 26, L.headerY + 36, cap.description.slice(0, 100), 7, SVG_COLORS.muted))
 
-    // Capability name
-    parts.push(svgText(MARGIN + 8, startY + 22, `${capIdx + 1}.`, 10, SVG_COLORS.blue, { bold: true, family: 'monospace' }))
-    parts.push(svgText(MARGIN + 28, startY + 22, cap.name, 13, SVG_COLORS.text, { bold: true }))
-    if (cap.description) {
-      parts.push(svgText(MARGIN + 28, startY + 38, cap.description.slice(0, 120), 8, SVG_COLORS.muted))
-    }
-
-    // I/O count
-    const countText = `${cap.inputs.length} inputs · ${cap.outputs.length} outputs`
-    parts.push(svgText(totalW - MARGIN - 10, startY + 22, countText, 8, SVG_COLORS.muted, { anchor: 'end', family: 'monospace' }))
-
-    // System
-    if (cap.system) {
-      parts.push(svgText(totalW - MARGIN - 10, startY + 36, `System: ${cap.system.name}`, 7, SVG_COLORS.blue, { anchor: 'end' }))
-    }
+    const ioText = `${cap.inputs.length} inputs · ${cap.outputs.length} outputs`
+    parts.push(svgText(totalW - MARGIN - 10, L.headerY + 20, ioText, 7, SVG_COLORS.muted, { anchor: 'end', family: 'monospace' }))
+    if (cap.system) parts.push(svgText(totalW - MARGIN - 10, L.headerY + 34, `System: ${cap.system.name}`, 7, SVG_COLORS.blue, { anchor: 'end' }))
 
     // Column headers
-    const colHeaderY = startY + HEADER_H + 10
-    const colX = {
-      s: MARGIN,
-      i: MARGIN + COL_W + GAP,
-      p: MARGIN + (COL_W + GAP) * 2,
-      o: MARGIN + (COL_W + GAP) * 2 + PROC_W + GAP,
-      c: MARGIN + (COL_W + GAP) * 2 + PROC_W + GAP + COL_W + GAP,
-    }
+    parts.push(svgColumnHeader(colX.s, L.colHeaderY, 'S', 'SUPPLIERS', SVG_COLORS.orange))
+    parts.push(svgColumnHeader(colX.i, L.colHeaderY, 'I', 'INPUTS', SVG_COLORS.yellow))
+    parts.push(svgColumnHeader(colX.p, L.colHeaderY, 'P', 'PROCESS', SVG_COLORS.blue))
+    parts.push(svgColumnHeader(colX.o, L.colHeaderY, 'O', 'OUTPUTS', SVG_COLORS.green))
+    parts.push(svgColumnHeader(colX.c, L.colHeaderY, 'C', 'CUSTOMERS', SVG_COLORS.violet))
 
-    parts.push(svgColumnHeader(colX.s, colHeaderY, 'S', 'SUPPLIERS', SVG_COLORS.orange))
-    parts.push(svgColumnHeader(colX.i, colHeaderY, 'I', 'INPUTS', SVG_COLORS.yellow))
-    parts.push(svgColumnHeader(colX.p, colHeaderY, 'P', 'PROCESS', SVG_COLORS.blue))
-    parts.push(svgColumnHeader(colX.o, colHeaderY, 'O', 'OUTPUTS', SVG_COLORS.green))
-    parts.push(svgColumnHeader(colX.c, colHeaderY, 'C', 'CUSTOMERS', SVG_COLORS.violet))
-
-    const contentY = colHeaderY + 34
-
-    // Process box (centered, spans full content height)
-    const procContentH = capH - HEADER_H - 64
-    parts.push(svgRoundedRect(colX.p, contentY, PROC_W, Math.max(procContentH, 60), 8, '#1B3355', SVG_COLORS.blue + '50'))
-    const procCenterY = contentY + Math.max(procContentH, 60) / 2
-    const procNameLines = wrapText(cap.name, PROC_W - 20, 10)
-    let procTextY = procCenterY - (procNameLines.length * 14) / 2
-    parts.push(svgText(colX.p + PROC_W / 2, procTextY - 6, `L${cap.level} ${cap.level === 3 ? 'FUNCTIONALITY' : cap.level === 2 ? 'CAPABILITY' : 'CORE AREA'}`, 6, SVG_COLORS.blue, { anchor: 'middle', bold: true, family: 'monospace' }))
-    procNameLines.forEach(line => {
-      parts.push(svgText(colX.p + PROC_W / 2, procTextY + 10, line, 11, SVG_COLORS.text, { bold: true, anchor: 'middle' }))
-      procTextY += 14
+    // Process block (spans all lanes)
+    const procH = (L.laneYs[maxLanes - 1] || L.contentY) - L.contentY + 60
+    parts.push(svgRoundedRect(colX.p, L.contentY, PROC_W, Math.max(procH, 60), 6, '#1B3355', SVG_COLORS.blue + '40'))
+    const procMidY = L.contentY + Math.max(procH, 60) / 2
+    const procLines = wrapText(cap.name, PROC_W - 16, 10)
+    let procTY = procMidY - (procLines.length * 13) / 2 - 6
+    parts.push(svgText(colX.p + PROC_W / 2, procTY, `L${cap.level} ${cap.level === 3 ? 'FUNCTIONALITY' : cap.level === 2 ? 'CAPABILITY' : 'CORE AREA'}`, 6, SVG_COLORS.blue, { anchor: 'middle', bold: true, family: 'monospace' }))
+    procTY += 14
+    procLines.forEach(line => {
+      parts.push(svgText(colX.p + PROC_W / 2, procTY, line, 10, SVG_COLORS.text, { bold: true, anchor: 'middle' }))
+      procTY += 13
     })
 
-    // Input lanes
-    let inputLaneY = contentY
-    cap.inputs.forEach(inp => {
-      const laneStartY = inputLaneY
+    // Render lanes
+    for (let li = 0; li < maxLanes; li++) {
+      const laneY = L.laneYs[li]
+      const inp = cap.inputs[li]
+      const out = cap.outputs[li]
 
-      // Suppliers
-      let chipY = inputLaneY
-      if (inp.supplierPersonas.length > 0) {
-        inp.supplierPersonas.forEach(p => {
-          const pill = svgPersonaPill(colX.s, chipY, p.name, p.color)
-          parts.push(pill.svg)
-          chipY += pill.h
-        })
-      } else {
-        parts.push(svgText(colX.s + 4, chipY + 12, 'No suppliers', 7, SVG_COLORS.muted, { family: 'monospace' }))
-        chipY += 20
+      // ── Left side: Supplier → Input ──
+      if (inp) {
+        // Suppliers
+        let chipY = laneY
+        if (inp.supplierPersonas.length > 0) {
+          inp.supplierPersonas.forEach(p => {
+            const pill = svgPersonaPill(colX.s, chipY, p.name, p.color)
+            parts.push(pill.svg)
+            chipY += pill.h
+          })
+        }
+        if (inp.sourceSystems.length > 0) {
+          let sysX = colX.s
+          inp.sourceSystems.forEach((sys, si) => {
+            if (si > 0) {
+              parts.push(svgText(sysX + 2, chipY + 10, '→', 7, SVG_COLORS.muted))
+              sysX += 12
+            }
+            const chip = svgSystemChip(sysX, chipY, sys.name, sys.color || '#64748B')
+            parts.push(chip.svg)
+            sysX += chip.w + 4
+          })
+        }
+        if (inp.supplierPersonas.length === 0 && inp.sourceSystems.length === 0) {
+          parts.push(svgText(colX.s + 4, laneY + 12, 'No suppliers', 7, SVG_COLORS.muted))
+        }
+
+        // Input card
+        const card = svgIPCard(colX.i, laneY, COL_W, inp.informationProduct.name, inp.informationProduct.category, (inp.dimensions || []).map(d => d.name), SVG_COLORS.yellow)
+        parts.push(card.svg)
+        if (inp.feedingSystem) {
+          const fy = laneY + card.h + 2
+          const feed = svgSystemChip(colX.i + 10, fy, inp.feedingSystem.name, inp.feedingSystem.color || '#64748B')
+          parts.push(feed.svg)
+          parts.push(svgText(colX.i + 14 + feed.w, fy + 10, 'FEEDS', 5, SVG_COLORS.muted, { family: 'monospace' }))
+        }
+
+        // Arrows: S → I → P (simple horizontal lines)
+        const arrowMidY = laneY + card.h / 2
+        parts.push(`<line x1="${colX.a1 + 2}" y1="${arrowMidY}" x2="${colX.i - 2}" y2="${arrowMidY}" stroke="${SVG_COLORS.orange}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>`)
+        parts.push(`<line x1="${colX.a2 + 2}" y1="${arrowMidY}" x2="${colX.p - 2}" y2="${arrowMidY}" stroke="${SVG_COLORS.yellow}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>`)
       }
 
-      // Source systems
-      if (inp.sourceSystems.length > 0) {
-        let sysX = colX.s
-        inp.sourceSystems.forEach((sys, si) => {
-          if (si > 0) {
-            parts.push(svgText(sysX, chipY + 10, '→', 8, SVG_COLORS.muted))
-            sysX += 12
-          }
-          const chip = svgSystemChip(sysX, chipY, sys.name, sys.color || '#64748B')
-          parts.push(chip.svg)
-          sysX += chip.w + 4
-        })
-        chipY += 22
+      // ── Right side: Output → Customer ──
+      if (out) {
+        // Output card
+        const card = svgIPCard(colX.o, laneY, COL_W, out.informationProduct.name, out.informationProduct.category, (out.dimensions || []).map(d => d.name), SVG_COLORS.green)
+        parts.push(card.svg)
+
+        // Consumers
+        let chipY = laneY
+        if (out.consumerPersonas.length > 0) {
+          out.consumerPersonas.forEach(p => {
+            const pill = svgPersonaPill(colX.c, chipY, p.name, p.color)
+            parts.push(pill.svg)
+            chipY += pill.h
+          })
+        } else {
+          parts.push(svgText(colX.c + 4, laneY + 12, 'No consumers', 7, SVG_COLORS.muted))
+        }
+
+        // Arrows: P → O → C
+        const arrowMidY = laneY + card.h / 2
+        parts.push(`<line x1="${colX.a3 + 2}" y1="${arrowMidY}" x2="${colX.o - 2}" y2="${arrowMidY}" stroke="${SVG_COLORS.blue}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>`)
+        parts.push(`<line x1="${colX.a4 + 2}" y1="${arrowMidY}" x2="${colX.c - 2}" y2="${arrowMidY}" stroke="${SVG_COLORS.green}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>`)
       }
 
-      const supplierEndY = chipY
-
-      // Input IP card
-      const card = svgIPCard(colX.i, inputLaneY, COL_W, inp.informationProduct.name, inp.informationProduct.category, (inp.dimensions || []).map(d => d.name), SVG_COLORS.yellow)
-      parts.push(card.svg)
-
-      let cardBottomY = inputLaneY + card.h
-      if (inp.feedingSystem) {
-        const feed = svgSystemChip(colX.i + 8, cardBottomY + 4, inp.feedingSystem.name, inp.feedingSystem.color || '#64748B')
-        parts.push(svgText(colX.i + 2, cardBottomY + 14, '→', 8, SVG_COLORS.yellow + '80'))
-        parts.push(feed.svg)
-        parts.push(svgText(colX.i + 12 + feed.w, cardBottomY + 14, 'FEEDS', 5, SVG_COLORS.muted, { family: 'monospace' }))
-        cardBottomY += 24
+      // Empty placeholders
+      if (!inp && cap.inputs.length === 0 && li === 0) {
+        parts.push(svgText(colX.s + COL_W / 2, laneY + 14, 'No inputs', 8, SVG_COLORS.muted, { anchor: 'middle' }))
       }
-
-      // Flow arrow: supplier → input
-      const arrowY = laneStartY + Math.max(supplierEndY - laneStartY, card.h) / 2
-      parts.push(svgFlowArrow(colX.s + COL_W - 10, arrowY, colX.i - 4, arrowY, SVG_COLORS.orange))
-
-      // Flow arrow: input → process
-      parts.push(svgFlowArrow(colX.i + COL_W - 4, arrowY, colX.p - 4, arrowY, SVG_COLORS.yellow))
-
-      inputLaneY = Math.max(supplierEndY, cardBottomY) + 16
-    })
-
-    if (cap.inputs.length === 0) {
-      parts.push(svgText(colX.s + COL_W / 2, contentY + 30, 'No inputs', 8, SVG_COLORS.muted, { anchor: 'middle' }))
-      parts.push(svgText(colX.i + COL_W / 2, contentY + 30, 'No inputs', 8, SVG_COLORS.muted, { anchor: 'middle' }))
+      if (!out && cap.outputs.length === 0 && li === 0) {
+        parts.push(svgText(colX.o + COL_W / 2, laneY + 14, 'No outputs', 8, SVG_COLORS.muted, { anchor: 'middle' }))
+      }
     }
-
-    // Output lanes
-    let outputLaneY = contentY
-    cap.outputs.forEach(out => {
-      const laneStartY = outputLaneY
-
-      // Output IP card
-      const card = svgIPCard(colX.o, outputLaneY, COL_W, out.informationProduct.name, out.informationProduct.category, (out.dimensions || []).map(d => d.name), SVG_COLORS.green)
-      parts.push(card.svg)
-
-      // Consumers
-      let chipY = outputLaneY
-      if (out.consumerPersonas.length > 0) {
-        out.consumerPersonas.forEach(p => {
-          const pill = svgPersonaPill(colX.c, chipY, p.name, p.color)
-          parts.push(pill.svg)
-          chipY += pill.h
-        })
-      } else {
-        parts.push(svgText(colX.c + 4, chipY + 12, 'No consumers', 7, SVG_COLORS.muted, { family: 'monospace' }))
-        chipY += 20
-      }
-
-      const consumerEndY = chipY
-
-      // Flow arrow: process → output
-      const arrowY = laneStartY + Math.max(consumerEndY - laneStartY, card.h) / 2
-      parts.push(svgFlowArrow(colX.p + PROC_W + 4, arrowY, colX.o - 4, arrowY, SVG_COLORS.blue))
-
-      // Flow arrow: output → customer
-      parts.push(svgFlowArrow(colX.o + COL_W - 4, arrowY, colX.c - 4, arrowY, SVG_COLORS.green))
-
-      outputLaneY = Math.max(laneStartY + card.h, consumerEndY) + 16
-    })
-
-    if (cap.outputs.length === 0) {
-      parts.push(svgText(colX.o + COL_W / 2, contentY + 30, 'No outputs', 8, SVG_COLORS.muted, { anchor: 'middle' }))
-      parts.push(svgText(colX.c + COL_W / 2, contentY + 30, 'No outputs', 8, SVG_COLORS.muted, { anchor: 'middle' }))
-    }
-
-    globalY += capH + CAP_GAP
   })
 
   // Footer
-  parts.push(svgText(MARGIN, totalH - 16, 'Generated by Mach12.ai', 7, SVG_COLORS.border, { family: 'monospace' }))
-
+  parts.push(svgText(MARGIN, totalH - 10, 'Generated by Mach12.ai', 7, SVG_COLORS.border, { family: 'monospace' }))
   parts.push('</svg>')
 
   // Download

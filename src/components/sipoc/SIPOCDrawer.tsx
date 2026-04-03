@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { HydratedCapability, Persona, LogicalSystem, InformationProduct, Dimension } from '@/lib/sipoc/types'
+import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx, exportSIPOCSvg } from '@/lib/export/sipoc'
 
 // ─── SIPOC color tokens ──────────────────────────────────
 const SIPOC = {
@@ -347,12 +348,73 @@ function SIPOCFlowContent({ capability, onOpenEditor }: { capability: HydratedCa
   )
 }
 
+// ─── Export menu (for individual SIPOC) ──────────────────
+
+function ExportMenu({ hydrated, mapTitle, orgId }: { hydrated: HydratedCapability | null; mapTitle: string; orgId: string }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  if (!hydrated) return null
+
+  const capName = hydrated.name
+  const exportCaps = [hydrated]
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
+          open ? 'bg-[var(--m12-bg)] text-[var(--m12-text)]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)]'
+        }`}
+      >
+        <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+          <path d="M6 2v5M4 5.5L6 7.5l2-2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2 9h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+        Export
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden">
+          <div className="px-2.5 py-1.5 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-wider border-b border-[var(--m12-border)]/20">
+            {capName}
+          </div>
+          {[
+            { label: 'PDF', fn: () => exportSIPOCPdf(capName, exportCaps) },
+            { label: 'Excel', fn: () => { const s = useSIPOCStore.getState(); exportSIPOCExcel(capName, exportCaps, s.personas, s.informationProducts, s.logicalSystems) } },
+            { label: 'PowerPoint', fn: () => exportSIPOCPptx(capName, exportCaps) },
+            { label: 'SVG', fn: () => exportSIPOCSvg(capName, exportCaps) },
+          ].map(({ label, fn }) => (
+            <button
+              key={label}
+              onClick={() => { setOpen(false); fn() }}
+              className="w-full text-left px-2.5 py-1.5 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors"
+            >
+              Export as {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Drawer ─────────────────────────────────────────
 
-export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, children }: {
+export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowAI, mapTitle, children }: {
   orgId: string
   editorOpen: boolean
   onToggleEditor: () => void
+  onShowAI: () => void
+  mapTitle: string
   children?: React.ReactNode
 }) {
   const drawerOpen = useSIPOCStore(s => s.drawerOpen)
@@ -536,6 +598,20 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, childre
             </svg>
           </button>
         </div>
+
+        {/* Export dropdown */}
+        <ExportMenu hydrated={hydrated} mapTitle={mapTitle} orgId={orgId} />
+
+        {/* AI Generate */}
+        <button
+          onClick={onShowAI}
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider bg-gradient-to-r from-[#8B5CF6] to-[#2563EB] text-white hover:from-[#7C3AED] hover:to-[#3B82F6] transition-all"
+        >
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+            <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="white" />
+          </svg>
+          AI Generate
+        </button>
 
         {/* Edit toggle */}
         <button
