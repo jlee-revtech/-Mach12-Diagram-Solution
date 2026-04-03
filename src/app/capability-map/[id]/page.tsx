@@ -142,7 +142,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* MAP area (hidden in fullscreen) */}
         {!drawerFullscreen && (
-          <div className="flex-1 overflow-auto p-6 min-h-0">
+          <div className="flex-1 overflow-auto p-6 min-h-0 min-w-0">
             <CapabilityMapView
               onSelectCapability={(id) => {
                 useSIPOCStore.getState().setSelectedCapability(id)

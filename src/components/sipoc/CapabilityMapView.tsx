@@ -400,7 +400,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
   }, [capabilities, updateCapability])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0 w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -475,7 +475,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
 
       {/* Columns */}
       {l1Roots.length > 0 ? (
-        <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: 300 }}>
+        <div className="flex gap-3 pb-4" style={{ minHeight: 300 }}>
           {l1Roots.map((l1, i) => (
             <L1Column
               key={l1.id}
