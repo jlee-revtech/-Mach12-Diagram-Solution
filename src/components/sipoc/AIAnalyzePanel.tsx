@@ -91,7 +91,7 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
       mapTitle: map?.title || 'Untitled',
       capabilities: capabilities.map(cap => ({
         name: cap.name,
-        description: cap.description,
+        features: cap.features || [],
         inputs: cap.inputs.map(inp => ({
           informationProduct: inp.informationProduct.name,
           category: inp.informationProduct.category,

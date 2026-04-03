@@ -237,7 +237,7 @@ export default function ExecutiveSummary({ onClose }: { onClose: () => void }) {
       mapTitle: map?.title || 'Untitled',
       capabilities: capabilities.map(cap => ({
         name: cap.name,
-        description: cap.description,
+        features: cap.features || [],
         system: cap.system?.name || null,
         inputs: cap.inputs.map(inp => ({
           informationProduct: inp.informationProduct.name,

@@ -107,8 +107,10 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
             <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5v5M1.5 4h5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
           </button>
         </div>
-        {node.description && (
-          <div className="text-[8px] text-[var(--m12-text-muted)] leading-tight mt-0.5">{node.description}</div>
+        {(node.features || []).length > 0 && (
+          <div className="text-[8px] text-[var(--m12-text-muted)] leading-tight mt-0.5">
+            {node.features!.slice(0, 2).join(' · ')}{node.features!.length > 2 ? ` +${node.features!.length - 2}` : ''}
+          </div>
         )}
       </div>
       {node.children.length > 0 && (

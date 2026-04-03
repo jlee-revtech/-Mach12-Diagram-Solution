@@ -56,6 +56,7 @@ export interface Capability {
   level: number               // 1 = Core Area, 2 = Capability, 3 = Functionality (SIPOC)
   name: string
   description?: string
+  features?: string[]
   color?: string | null        // accent color for L1/L2 groupings
   system_id?: string | null
   sort_order: number
@@ -76,7 +77,7 @@ export interface CapabilityTemplateRow {
   description: string | null
   created_by: string | null
   template_data: {
-    capability: { name: string; description?: string; level: number; color?: string }
+    capability: { name: string; description?: string; features?: string[]; level: number; color?: string }
     system?: string  // system name
     inputs: {
       informationProduct: { name: string; category?: string }

@@ -149,8 +149,10 @@ export default function SIPOCTemplatesPanel({ orgId, onClose }: Props) {
                       <div className="mb-3">
                         <div className="text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-wider mb-1">Capability</div>
                         <div className="text-[10px] text-[var(--m12-text)]">{td.capability.name}</div>
-                        {td.capability.description && (
-                          <div className="text-[9px] text-[var(--m12-text-muted)] mt-0.5">{td.capability.description}</div>
+                        {(td.capability.features || []).length > 0 && (
+                          <div className="text-[9px] text-[var(--m12-text-muted)] mt-0.5">
+                            {td.capability.features!.map(f => `• ${f}`).join(' ')}
+                          </div>
                         )}
                         {td.system && (
                           <div className="flex items-center gap-1 mt-1">

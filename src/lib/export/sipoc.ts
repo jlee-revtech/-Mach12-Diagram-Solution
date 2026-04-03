@@ -480,9 +480,9 @@ export function exportSIPOCPptx(
     slide.addText(cap.name, {
       x: 0.4, y: 0.15, w: 8, h: 0.35, fontSize: 14, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial',
     })
-    if (cap.description) {
-      slide.addText(cap.description, {
-        x: 0.4, y: 0.5, w: 10, h: 0.25, fontSize: 8, color: PPTX_COLORS.muted, fontFace: 'Arial',
+    if (cap.features && cap.features.length > 0) {
+      slide.addText(cap.features.map(f => `• ${f}`).join('\n'), {
+        x: 0.4, y: 0.5, w: 10, h: 0.25, fontSize: 8, color: PPTX_COLORS.muted, fontFace: 'Arial', wrap: true,
       })
     }
 

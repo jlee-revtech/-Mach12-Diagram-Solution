@@ -420,13 +420,50 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
           onChange={e => updateCapability(capabilityId, { name: e.target.value })}
           className="w-full bg-transparent border-b border-[var(--m12-border)]/40 focus:border-[#2563EB] text-sm font-semibold text-[var(--m12-text)] py-1 focus:outline-none transition-colors"
         />
-        <textarea
-          value={capability.description || ''}
-          onChange={e => updateCapability(capabilityId, { description: e.target.value })}
-          placeholder="Description..."
-          rows={2}
-          className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-2.5 py-1.5 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 resize-none"
-        />
+        {/* Features */}
+        <div className="space-y-1.5">
+          <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
+            Features
+            <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(what this capability does)</span>
+          </div>
+          {(capability.features || []).map((feat, i) => (
+            <div key={i} className="flex items-center gap-1.5 group/feat">
+              <span className="text-[var(--m12-text-faint)] text-[9px] shrink-0">•</span>
+              <input
+                value={feat}
+                onChange={e => {
+                  const updated = [...(capability.features || [])]
+                  updated[i] = e.target.value
+                  updateCapability(capabilityId, { features: updated })
+                }}
+                className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+              />
+              <button
+                onClick={() => {
+                  const updated = (capability.features || []).filter((_, j) => j !== i)
+                  updateCapability(capabilityId, { features: updated })
+                }}
+                className="w-5 h-5 rounded flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/feat:opacity-100"
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => {
+              const updated = [...(capability.features || []), '']
+              updateCapability(capabilityId, { features: updated })
+            }}
+            className="text-[9px] text-[#2563EB] hover:text-[#3B82F6] font-medium transition-colors flex items-center gap-1"
+          >
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <path d="M4 1v6M1 4h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            Add feature
+          </button>
+        </div>
       </div>
 
       {/* System (where this capability is performed) */}

@@ -317,8 +317,15 @@ function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: 
               L{capability.level} {capability.level === 1 ? 'Core Area' : capability.level === 2 ? 'Capability' : 'Functionality'}
             </div>
             <div className="text-sm font-bold text-[var(--m12-text)] leading-snug">{capability.name}</div>
-            {capability.description && (
-              <div className="text-[10px] text-[var(--m12-text-secondary)] leading-snug mt-2">{capability.description}</div>
+            {(capability.features || []).length > 0 && (
+              <div className="mt-2 space-y-0.5">
+                {capability.features!.map((feat, i) => (
+                  <div key={i} className="text-[9px] text-[var(--m12-text-secondary)] leading-snug flex items-start gap-1">
+                    <span className="text-[var(--m12-text-faint)] mt-px">•</span>
+                    <span>{feat}</span>
+                  </div>
+                ))}
+              </div>
             )}
             {capability.system && (
               <div className="flex justify-center mt-3">
@@ -372,7 +379,7 @@ function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: 
 
 function hydratedToTemplate(cap: HydratedCapability): CapabilityTemplateRow['template_data'] {
   return {
-    capability: { name: cap.name, description: cap.description, level: cap.level, color: cap.color || undefined },
+    capability: { name: cap.name, description: cap.description, features: cap.features || [], level: cap.level, color: cap.color || undefined },
     system: cap.system?.name,
     inputs: cap.inputs.map(inp => ({
       informationProduct: { name: inp.informationProduct.name, category: inp.informationProduct.category },

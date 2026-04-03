@@ -134,7 +134,7 @@ export default function AIGeneratePanel({
           prompt: prompt.trim(),
           context: {
             capabilityName: capability?.name,
-            capabilityDescription: capability?.description,
+            capabilityFeatures: capability?.features || [],
             existingPersonas: personas.map(p => p.name),
             existingInformationProducts: informationProducts.map(ip => ip.name),
             existingLogicalSystems: logicalSystems.map(s => s.name),
