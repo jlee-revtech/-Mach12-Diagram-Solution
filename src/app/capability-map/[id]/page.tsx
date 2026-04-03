@@ -4,7 +4,7 @@ import { use, useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
+import SIPOCDrawer from '@/components/sipoc/SIPOCDrawer'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
@@ -26,7 +26,6 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [editingTitle, setEditingTitle] = useState(false)
   const [showAI, setShowAI] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
   const [showExecSummary, setShowExecSummary] = useState(false)
@@ -227,31 +226,19 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
 
       </div>
 
-      {/* Main content: visual + editor */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Visual area */}
-        <div className="flex-1 overflow-auto p-6">
+      {/* Main content: MAP + SIPOC drawer */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* MAP area */}
+        <div className="flex-1 overflow-auto p-6 min-h-0">
           <CapabilityMapView
             onSelectCapability={(id) => {
               useSIPOCStore.getState().setSelectedCapability(id)
-              setSidebarOpen(true)
             }}
           />
         </div>
 
-        {/* Sidebar toggle */}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="w-5 shrink-0 flex items-center justify-center bg-[var(--m12-bg-card)] border-l border-[var(--m12-border)]/40 hover:bg-[var(--m12-bg)] transition-colors"
-          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`text-[var(--m12-text-muted)] transition-transform ${sidebarOpen ? '' : 'rotate-180'}`}>
-            <path d="M6.5 2L3.5 5L6.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-
-        {/* Editor sidebar */}
-        {organization && sidebarOpen && <CapabilityEditor orgId={organization.id} />}
+        {/* SIPOC Drawer */}
+        {organization && <SIPOCDrawer orgId={organization.id} />}
       </div>
 
       {/* AI Generate Panel */}

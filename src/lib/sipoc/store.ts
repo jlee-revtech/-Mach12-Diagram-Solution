@@ -36,6 +36,8 @@ interface SIPOCState {
   setFocusedItem: (id: string | null) => void
   editingEntityType: 'persona' | 'informationProduct' | 'logicalSystem' | null
   editingEntityId: string | null
+  drawerOpen: boolean
+  drawerHeight: number
 
   // ─── Data loading ─────────────────────────────────────
   loadMap: (mapId: string) => Promise<boolean>
@@ -104,6 +106,8 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   setFocusedItem: (id) => set({ focusedItemId: id }),
   editingEntityType: null,
   editingEntityId: null,
+  drawerOpen: false,
+  drawerHeight: 420,
 
   // ─── Data loading ─────────────────────────────────────
 
@@ -206,7 +210,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     })
   },
 
-  setSelectedCapability: (id) => set({ selectedCapabilityId: id }),
+  setSelectedCapability: (id) => set({ selectedCapabilityId: id, drawerOpen: id !== null }),
 
   getCapabilityTree: () => {
     const { capabilities } = get()
