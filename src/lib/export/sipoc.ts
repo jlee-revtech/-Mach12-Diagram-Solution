@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import * as XLSX from 'xlsx'
+import PptxGenJS from 'pptxgenjs'
 import type { HydratedCapability } from '@/lib/sipoc/types'
 
 function sanitizeFilename(title: string): string {
@@ -380,4 +381,316 @@ export function exportSIPOCExcel(
   XLSX.utils.book_append_sheet(wb, wsRegistry, 'Entity Registry')
 
   XLSX.writeFile(wb, `${sanitizeFilename(title)}_SIPOC.xlsx`)
+}
+
+// ─── PowerPoint Export ──────────────────────────────────
+
+const PPTX_COLORS = {
+  bg: '151E2E',
+  cardBg: '1F2C3F',
+  border: '374A5E',
+  text: 'F8FAFC',
+  textSec: 'CBD5E1',
+  muted: '64748B',
+  blue: '2563EB',
+  orange: 'F97316',
+  yellow: 'EAB308',
+  green: '10B981',
+  violet: '8B5CF6',
+  cyan: '06B6D4',
+  white: 'FFFFFF',
+}
+
+function stripHash(color: string): string {
+  return color.replace('#', '')
+}
+
+export function exportSIPOCPptx(
+  title: string,
+  capabilities: HydratedCapability[]
+): void {
+  const pptx = new PptxGenJS()
+  pptx.layout = 'LAYOUT_WIDE' // 13.33 x 7.5 inches
+  pptx.author = 'Mach12.ai'
+  pptx.title = title
+
+  const W = 13.33
+  const H = 7.5
+
+  // ── Helper: Add footer to every slide ─────────────────
+  const addFooter = (slide: PptxGenJS.Slide, subtitle?: string) => {
+    slide.addText(
+      [
+        { text: 'MACH12', options: { fontSize: 7, color: PPTX_COLORS.blue, bold: true, fontFace: 'Arial' } },
+        { text: subtitle ? `  |  ${subtitle}` : '', options: { fontSize: 6, color: PPTX_COLORS.muted, fontFace: 'Arial' } },
+      ],
+      { x: 0.4, y: H - 0.35, w: 6, h: 0.25 }
+    )
+    slide.addText(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }), {
+      x: W - 2.5, y: H - 0.35, w: 2.1, h: 0.25, fontSize: 6, color: PPTX_COLORS.muted, fontFace: 'Arial', align: 'right',
+    })
+  }
+
+  // ── Slide 1: Title slide ──────────────────────────────
+  const titleSlide = pptx.addSlide()
+  titleSlide.background = { color: PPTX_COLORS.bg }
+
+  // Accent bar
+  titleSlide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.08, h: H, fill: { color: PPTX_COLORS.blue } })
+
+  titleSlide.addText('MACH12', {
+    x: 0.6, y: 1.5, w: 5, h: 0.6, fontSize: 32, color: PPTX_COLORS.blue, bold: true, fontFace: 'Arial',
+  })
+  titleSlide.addText(title, {
+    x: 0.6, y: 2.2, w: 8, h: 0.5, fontSize: 22, color: PPTX_COLORS.text, fontFace: 'Arial',
+  })
+  titleSlide.addText('SIPOC Capability Map', {
+    x: 0.6, y: 2.8, w: 5, h: 0.35, fontSize: 12, color: PPTX_COLORS.muted, fontFace: 'Arial',
+  })
+
+  // Capability summary
+  titleSlide.addText(`${capabilities.length} Capabilit${capabilities.length === 1 ? 'y' : 'ies'}`, {
+    x: 0.6, y: 3.5, w: 5, h: 0.3, fontSize: 10, color: PPTX_COLORS.textSec, fontFace: 'Arial',
+  })
+
+  capabilities.forEach((cap, i) => {
+    const totalInputs = cap.inputs.length
+    const totalOutputs = cap.outputs.length
+    titleSlide.addText(
+      [
+        { text: `${i + 1}. `, options: { color: PPTX_COLORS.muted, fontSize: 9 } },
+        { text: cap.name, options: { color: PPTX_COLORS.textSec, fontSize: 9 } },
+        { text: `   ${totalInputs} inputs, ${totalOutputs} outputs`, options: { color: PPTX_COLORS.muted, fontSize: 7 } },
+      ],
+      { x: 0.8, y: 3.9 + i * 0.28, w: 8, h: 0.25, fontFace: 'Arial' }
+    )
+  })
+
+  addFooter(titleSlide)
+
+  // ── One slide per capability ──────────────────────────
+  capabilities.forEach(cap => {
+    const slide = pptx.addSlide()
+    slide.background = { color: PPTX_COLORS.bg }
+
+    // Accent bar
+    slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.04, fill: { color: PPTX_COLORS.blue } })
+
+    // Capability name header
+    slide.addText(cap.name, {
+      x: 0.4, y: 0.15, w: 8, h: 0.35, fontSize: 14, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial',
+    })
+    if (cap.description) {
+      slide.addText(cap.description, {
+        x: 0.4, y: 0.5, w: 10, h: 0.25, fontSize: 8, color: PPTX_COLORS.muted, fontFace: 'Arial',
+      })
+    }
+
+    // SIPOC column headers
+    const colX = [0.3, 2.8, 5.6, 8.0, 10.8]
+    const colW = [2.3, 2.6, 2.2, 2.6, 2.3]
+    const colLabels = ['SUPPLIERS', 'INPUTS', 'PROCESS', 'OUTPUTS', 'CUSTOMERS']
+    const colColors = [PPTX_COLORS.orange, PPTX_COLORS.yellow, PPTX_COLORS.blue, PPTX_COLORS.green, PPTX_COLORS.violet]
+    const headerY = 0.85
+
+    colLabels.forEach((label, i) => {
+      // Letter badge
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: colX[i] + colW[i] / 2 - 0.15, y: headerY, w: 0.3, h: 0.3,
+        rectRadius: 0.06, fill: { color: colColors[i] },
+      })
+      slide.addText(label[0], {
+        x: colX[i] + colW[i] / 2 - 0.15, y: headerY, w: 0.3, h: 0.3,
+        fontSize: 10, color: PPTX_COLORS.white, bold: true, fontFace: 'Arial', align: 'center', valign: 'middle',
+      })
+      // Label
+      slide.addText(label, {
+        x: colX[i], y: headerY + 0.33, w: colW[i], h: 0.2,
+        fontSize: 6, color: PPTX_COLORS.muted, fontFace: 'Arial', align: 'center', bold: true,
+      })
+    })
+
+    // Horizontal divider
+    slide.addShape(pptx.ShapeType.line, {
+      x: 0.3, y: headerY + 0.58, w: W - 0.6, h: 0,
+      line: { color: PPTX_COLORS.border, width: 0.5 },
+    })
+
+    // Process box (center column)
+    const procY = 1.7
+    const procH = Math.max(1.0, (Math.max(cap.inputs.length, cap.outputs.length) * 0.7) + 0.3)
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: colX[2], y: procY, w: colW[2], h: procH,
+      rectRadius: 0.1,
+      fill: { color: '1A3A6B' },
+      line: { color: PPTX_COLORS.blue, width: 1.5 },
+    })
+    slide.addText(cap.name, {
+      x: colX[2] + 0.15, y: procY + procH / 2 - 0.25, w: colW[2] - 0.3, h: 0.35,
+      fontSize: 10, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', align: 'center', valign: 'middle',
+      wrap: true,
+    })
+    slide.addText('L3 CAPABILITY', {
+      x: colX[2], y: procY + procH - 0.3, w: colW[2], h: 0.2,
+      fontSize: 5, color: PPTX_COLORS.blue, fontFace: 'Arial', align: 'center', bold: true,
+    })
+
+    // ── Input lanes ─────────────────────────────────────
+    let laneY = 1.7
+
+    cap.inputs.forEach(inp => {
+      const dims = (inp.dimensions || [])
+      const cardH = 0.45 + (dims.length > 0 ? dims.length * 0.13 + 0.1 : 0)
+
+      // Supplier personas (col 0)
+      let chipY = laneY
+      inp.supplierPersonas.forEach(p => {
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: colX[0], y: chipY, w: colW[0], h: 0.22,
+          rectRadius: 0.11, fill: { color: PPTX_COLORS.cardBg },
+          line: { color: PPTX_COLORS.border, width: 0.4 },
+        })
+        // Person icon dot
+        slide.addShape(pptx.ShapeType.ellipse, {
+          x: colX[0] + 0.08, y: chipY + 0.05, w: 0.12, h: 0.12,
+          fill: { color: stripHash(p.color) },
+        })
+        slide.addText(p.name, {
+          x: colX[0] + 0.25, y: chipY, w: colW[0] - 0.35, h: 0.22,
+          fontSize: 7, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle',
+        })
+        chipY += 0.26
+      })
+      // Source systems
+      inp.sourceSystems.forEach(s => {
+        slide.addText(s.name, {
+          x: colX[0] + 0.1, y: chipY, w: colW[0] - 0.2, h: 0.18,
+          fontSize: 5.5, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
+        })
+        chipY += 0.18
+      })
+
+      // Arrow S→I
+      const arrowY = laneY + cardH / 2 - 0.02
+      slide.addShape(pptx.ShapeType.line, {
+        x: colX[0] + colW[0] + 0.05, y: arrowY, w: 0.3, h: 0,
+        line: { color: PPTX_COLORS.border, width: 0.8, endArrowType: 'triangle' },
+      })
+
+      // Input IP card (col 1)
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: colX[1], y: laneY, w: colW[1], h: cardH,
+        rectRadius: 0.06, fill: { color: PPTX_COLORS.cardBg },
+        line: { color: PPTX_COLORS.border, width: 0.4 },
+      })
+      // Yellow accent bar
+      slide.addShape(pptx.ShapeType.rect, {
+        x: colX[1], y: laneY + 0.06, w: 0.04, h: cardH - 0.12,
+        fill: { color: PPTX_COLORS.yellow },
+      })
+      slide.addText(inp.informationProduct.name, {
+        x: colX[1] + 0.12, y: laneY + 0.04, w: colW[1] - 0.2, h: 0.25,
+        fontSize: 7.5, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', valign: 'top', wrap: true,
+      })
+      if (inp.informationProduct.category) {
+        slide.addText(inp.informationProduct.category.toUpperCase(), {
+          x: colX[1] + 0.12, y: laneY + 0.28, w: colW[1] - 0.2, h: 0.14,
+          fontSize: 5, color: PPTX_COLORS.muted, fontFace: 'Arial',
+        })
+      }
+      // Dimensions
+      if (dims.length > 0) {
+        dims.forEach((dim, di) => {
+          slide.addText(`• ${dim.name}`, {
+            x: colX[1] + 0.18, y: laneY + 0.42 + di * 0.13, w: colW[1] - 0.3, h: 0.13,
+            fontSize: 5.5, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
+          })
+        })
+      }
+
+      // Arrow I→P
+      slide.addShape(pptx.ShapeType.line, {
+        x: colX[1] + colW[1] + 0.05, y: arrowY, w: colX[2] - colX[1] - colW[1] - 0.1, h: 0,
+        line: { color: PPTX_COLORS.border, width: 0.6, endArrowType: 'triangle' },
+      })
+
+      laneY += Math.max(cardH, chipY - (laneY - 0.04)) + 0.12
+    })
+
+    // ── Output lanes ────────────────────────────────────
+    let outY = 1.7
+
+    cap.outputs.forEach(out => {
+      const dims = (out.dimensions || [])
+      const cardH = 0.45 + (dims.length > 0 ? dims.length * 0.13 + 0.1 : 0)
+
+      // Arrow P→O
+      const arrowY = outY + cardH / 2 - 0.02
+      slide.addShape(pptx.ShapeType.line, {
+        x: colX[2] + colW[2] + 0.05, y: arrowY, w: colX[3] - colX[2] - colW[2] - 0.1, h: 0,
+        line: { color: PPTX_COLORS.border, width: 0.6, endArrowType: 'triangle' },
+      })
+
+      // Output IP card (col 3)
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: colX[3], y: outY, w: colW[3], h: cardH,
+        rectRadius: 0.06, fill: { color: PPTX_COLORS.cardBg },
+        line: { color: PPTX_COLORS.border, width: 0.4 },
+      })
+      // Green accent bar
+      slide.addShape(pptx.ShapeType.rect, {
+        x: colX[3], y: outY + 0.06, w: 0.04, h: cardH - 0.12,
+        fill: { color: PPTX_COLORS.green },
+      })
+      slide.addText(out.informationProduct.name, {
+        x: colX[3] + 0.12, y: outY + 0.04, w: colW[3] - 0.2, h: 0.25,
+        fontSize: 7.5, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', valign: 'top', wrap: true,
+      })
+      if (out.informationProduct.category) {
+        slide.addText(out.informationProduct.category.toUpperCase(), {
+          x: colX[3] + 0.12, y: outY + 0.28, w: colW[3] - 0.2, h: 0.14,
+          fontSize: 5, color: PPTX_COLORS.muted, fontFace: 'Arial',
+        })
+      }
+      if (dims.length > 0) {
+        dims.forEach((dim, di) => {
+          slide.addText(`• ${dim.name}`, {
+            x: colX[3] + 0.18, y: outY + 0.42 + di * 0.13, w: colW[3] - 0.3, h: 0.13,
+            fontSize: 5.5, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
+          })
+        })
+      }
+
+      // Arrow O→C
+      slide.addShape(pptx.ShapeType.line, {
+        x: colX[3] + colW[3] + 0.05, y: arrowY, w: 0.3, h: 0,
+        line: { color: PPTX_COLORS.border, width: 0.8, endArrowType: 'triangle' },
+      })
+
+      // Consumer personas (col 4)
+      let chipY = outY
+      out.consumerPersonas.forEach(p => {
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: colX[4], y: chipY, w: colW[4], h: 0.22,
+          rectRadius: 0.11, fill: { color: PPTX_COLORS.cardBg },
+          line: { color: PPTX_COLORS.border, width: 0.4 },
+        })
+        slide.addShape(pptx.ShapeType.ellipse, {
+          x: colX[4] + 0.08, y: chipY + 0.05, w: 0.12, h: 0.12,
+          fill: { color: stripHash(p.color) },
+        })
+        slide.addText(p.name, {
+          x: colX[4] + 0.25, y: chipY, w: colW[4] - 0.35, h: 0.22,
+          fontSize: 7, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle',
+        })
+        chipY += 0.26
+      })
+
+      outY += Math.max(cardH, chipY - (outY - 0.04)) + 0.12
+    })
+
+    addFooter(slide, cap.name)
+  })
+
+  pptx.writeFile({ fileName: `${sanitizeFilename(title)}_SIPOC.pptx` })
 }

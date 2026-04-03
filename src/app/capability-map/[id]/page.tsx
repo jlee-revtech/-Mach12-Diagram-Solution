@@ -8,7 +8,7 @@ import SIPOCVisual from '@/components/sipoc/SIPOCVisual'
 import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
-import { exportSIPOCPdf, exportSIPOCExcel } from '@/lib/export/sipoc'
+import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx } from '@/lib/export/sipoc'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -165,6 +165,21 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
                     <path d="M4.5 4.5L7.5 7.5M7.5 4.5L4.5 7.5" stroke="#10B981" strokeWidth="1" strokeLinecap="round" />
                   </svg>
                   Export as Excel
+                </button>
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false)
+                    const caps = useSIPOCStore.getState().getHydratedCapabilities()
+                    exportSIPOCPptx(map.title, caps)
+                  }}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <rect x="2" y="1" width="8" height="10" rx="1" stroke="#F97316" strokeWidth="1" />
+                    <path d="M4.5 4L6 6.5L7.5 4" stroke="#F97316" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M4.5 6.5L6 9L7.5 6.5" stroke="#F97316" strokeWidth="0.7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Export as PowerPoint
                 </button>
               </div>
             </>
