@@ -342,6 +342,86 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
   )
 }
 
+// ─── Recursive tree section for hierarchy ───────────────
+const L1_PALETTE = ['#2563EB', '#10B981', '#F97316', '#8B5CF6', '#06B6D4', '#EF4444', '#EAB308', '#EC4899']
+
+function TreeSection({ node, depth, collapsedGroups, toggleGroup, renderLeaf, getHydrated, isLeaf }: {
+  node: import('@/lib/sipoc/types').CapabilityTreeNode
+  depth: number
+  collapsedGroups: Set<string>
+  toggleGroup: (id: string) => void
+  renderLeaf: (id: string) => React.ReactNode
+  getHydrated: (id: string) => HydratedCapability | undefined
+  isLeaf: (id: string) => boolean
+}) {
+  const collapsed = collapsedGroups.has(node.id)
+  const nodeIsLeaf = node.children.length === 0
+  const color = node.color || L1_PALETTE[node.sort_order % L1_PALETTE.length]
+
+  // Leaf nodes render as SIPOC blocks
+  if (nodeIsLeaf) {
+    return <div style={{ paddingLeft: depth > 0 ? 8 : 0 }}>{renderLeaf(node.id)}</div>
+  }
+
+  // Branch nodes render as collapsible group headers
+  const isL1 = depth === 0 || node.level === 1
+  const childCount = node.children.reduce((sum, c) => sum + (c.children.length > 0 ? c.children.length : 1), 0)
+
+  return (
+    <div className="space-y-2">
+      {/* Group header */}
+      <button
+        onClick={() => toggleGroup(node.id)}
+        className="flex items-center gap-2.5 group w-full text-left"
+      >
+        <svg
+          width={isL1 ? 10 : 8} height={isL1 ? 10 : 8}
+          viewBox="0 0 10 10" fill="none"
+          className={`text-[var(--m12-text-muted)] transition-transform shrink-0 ${collapsed ? '' : 'rotate-90'}`}
+        >
+          <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <div
+          className={`rounded-full shrink-0 ${isL1 ? 'w-1.5 h-6' : 'w-3 h-0.5'}`}
+          style={{ backgroundColor: isL1 ? color : color + '80' }}
+        />
+        <span className={isL1 ? 'text-base font-bold text-[var(--m12-text)]' : 'text-sm font-semibold text-[var(--m12-text-secondary)]'}>
+          {node.name}
+        </span>
+        <span className="text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-wider">
+          L{node.level || depth + 1}
+        </span>
+        {collapsed && (
+          <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+            {childCount} {childCount === 1 ? 'capability' : 'capabilities'}
+          </span>
+        )}
+      </button>
+
+      {/* Children */}
+      {!collapsed && (
+        <div
+          className={`space-y-3 pl-4 ${isL1 ? 'border-l-2' : 'border-l'}`}
+          style={{ borderColor: color + (isL1 ? '30' : '20') }}
+        >
+          {node.children.sort((a, b) => a.sort_order - b.sort_order).map(child => (
+            <TreeSection
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              collapsedGroups={collapsedGroups}
+              toggleGroup={toggleGroup}
+              renderLeaf={renderLeaf}
+              getHydrated={getHydrated}
+              isLeaf={isLeaf}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main SIPOC Visual ──────────────────────────────────
 export default function SIPOCVisual() {
   const rawCapabilities = useSIPOCStore(s => s.capabilities)
@@ -382,13 +462,23 @@ export default function SIPOCVisual() {
     return useSIPOCStore.getState().getCapabilityTree()
   }, [rawCapabilities])
 
-  // Orphan L3 capabilities (no parent, not L1)
-  const orphanL3s = useMemo(() => {
-    return capabilities.filter(c => !c.parent_id && c.level !== 1 && c.level !== 2)
-  }, [capabilities])
+  // Capabilities that are in the tree as leaves vs orphans
+  const treeCapIds = useMemo(() => {
+    const ids = new Set<string>()
+    const walk = (nodes: typeof tree) => {
+      nodes.forEach(n => { ids.add(n.id); walk(n.children) })
+    }
+    walk(tree)
+    return ids
+  }, [tree])
 
-  // Check if we have any hierarchy at all
-  const hasHierarchy = tree.some(n => n.level === 1)
+  // Orphan capabilities: not part of any tree (no parent, or parent doesn't exist)
+  const orphans = useMemo(() => {
+    return capabilities.filter(c => !treeCapIds.has(c.id))
+  }, [capabilities, treeCapIds])
+
+  // Check if we have any real hierarchy (L1 nodes with children)
+  const hasHierarchy = tree.some(n => (n.level === 1 || n.level === 2) && n.children.length > 0) || tree.some(n => n.level === 1)
 
   // Default all L3 capabilities to collapsed on first load
   useEffect(() => {
@@ -431,22 +521,24 @@ export default function SIPOCVisual() {
 
   return (
     <div className="space-y-5 min-w-[1100px]">
-      {/* Header bar: column labels + controls */}
-      <div className="flex items-end justify-between px-2">
-        <div className="flex items-end gap-0 flex-1">
-          <div className="flex-1 flex justify-between px-4">
-            <ColumnHeader label="Suppliers" color="#F97316" letter="S" />
-            <ColumnHeader label="Inputs" color="#EAB308" letter="I" />
-          </div>
-          <div className="w-[232px] shrink-0 flex justify-center">
-            <ColumnHeader label="Process" color="#2563EB" letter="P" />
-          </div>
-          <div className="flex-1 flex justify-between px-4">
-            <ColumnHeader label="Outputs" color="#10B981" letter="O" />
-            <ColumnHeader label="Customers" color="#8B5CF6" letter="C" />
-          </div>
-        </div>
+      {/* SIPOC header */}
+      <div className="flex items-center justify-center gap-6">
+        <ColumnHeader label="Suppliers" color="#F97316" letter="S" />
+        <ColumnHeader label="Inputs" color="#EAB308" letter="I" />
+        <ColumnHeader label="Process" color="#2563EB" letter="P" />
+        <ColumnHeader label="Outputs" color="#10B981" letter="O" />
+        <ColumnHeader label="Customers" color="#8B5CF6" letter="C" />
       </div>
+
+      {/* Map title */}
+      {useSIPOCStore.getState().map?.title && (
+        <div className="text-center">
+          <h2 className="text-lg font-bold text-[var(--m12-text)]">{useSIPOCStore.getState().map!.title}</h2>
+          {useSIPOCStore.getState().map!.description && (
+            <p className="text-xs text-[var(--m12-text-muted)] mt-0.5">{useSIPOCStore.getState().map!.description}</p>
+          )}
+        </div>
+      )}
 
       {/* Controls */}
       <div className="flex items-center justify-end">
@@ -466,109 +558,39 @@ export default function SIPOCVisual() {
         </button>
       </div>
 
-      {/* Hierarchical rendering */}
+      {/* Render tree recursively */}
       {hasHierarchy ? (
         <div className="space-y-6">
-          {tree.filter(n => n.level === 1).map(l1 => {
-            const l1Color = l1.color || '#2563EB'
-            const l1Collapsed = collapsedGroups.has(l1.id)
+          {tree.map(node => (
+            <TreeSection
+              key={node.id}
+              node={node}
+              depth={0}
+              collapsedGroups={collapsedGroups}
+              toggleGroup={toggleGroup}
+              renderLeaf={renderLeaf}
+              getHydrated={getHydrated}
+              isLeaf={isLeaf}
+            />
+          ))}
 
-            return (
-              <div key={l1.id} className="space-y-3">
-                {/* L1 Core Area header */}
-                <button
-                  onClick={() => toggleGroup(l1.id)}
-                  className="flex items-center gap-3 group w-full text-left"
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`text-[var(--m12-text-muted)] transition-transform ${l1Collapsed ? '' : 'rotate-90'}`}>
-                    <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <div className="w-1.5 h-6 rounded-full" style={{ backgroundColor: l1Color }} />
-                  <span className="text-base font-bold text-[var(--m12-text)]">{l1.name}</span>
-                  <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-wider">
-                    L1 Core Area
-                  </span>
-                  {l1Collapsed && (
-                    <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-                      {l1.children.reduce((sum, l2) => sum + Math.max(l2.children?.length || 0, 1), 0)} capabilities
-                    </span>
-                  )}
-                </button>
-
-                {!l1Collapsed && l1.children.length === 0 && (
-                  <div className="pl-4">{renderLeaf(l1.id)}</div>
-                )}
-
-                {!l1Collapsed && l1.children.length > 0 && (
-                  <div className="space-y-4 pl-4 border-l-2" style={{ borderColor: l1Color + '30' }}>
-                    {l1.children.sort((a, b) => a.sort_order - b.sort_order).map(l2 => {
-                      const l2Collapsed = collapsedGroups.has(l2.id)
-                      const l3Caps = l2.children || []
-                      const l2IsLeaf = l3Caps.length === 0
-
-                      // If L2 is a leaf node (no L3 children), render it directly as a SIPOC block
-                      if (l2IsLeaf) {
-                        return <div key={l2.id} className="pl-2">{renderLeaf(l2.id)}</div>
-                      }
-
-                      return (
-                        <div key={l2.id} className="space-y-2">
-                          {/* L2 Capability subheader */}
-                          <button
-                            onClick={() => toggleGroup(l2.id)}
-                            className="flex items-center gap-2.5 group w-full text-left pl-2"
-                          >
-                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`text-[var(--m12-text-muted)] transition-transform ${l2Collapsed ? '' : 'rotate-90'}`}>
-                              <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: l1Color + '80' }} />
-                            <span className="text-sm font-semibold text-[var(--m12-text-secondary)]">{l2.name}</span>
-                            <span className="text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-wider">
-                              L2
-                            </span>
-                            {l2Collapsed && (
-                              <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-                                {l3Caps.length} L3
-                              </span>
-                            )}
-                          </button>
-
-                          {/* L3 SIPOC blocks */}
-                          {!l2Collapsed && (
-                            <div className="space-y-3 pl-4">
-                              {l3Caps.sort((a, b) => a.sort_order - b.sort_order).map(l3 => renderLeaf(l3.id))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                    {l1.children.length === 0 && (
-                      <div className="text-[10px] text-[var(--m12-text-faint)] italic py-2 pl-2">No L2 capabilities</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-
-          {/* Orphan L3 capabilities (not in hierarchy) */}
-          {orphanL3s.length > 0 && (
+          {/* Orphan capabilities (not in hierarchy) */}
+          {orphans.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-1.5 h-6 rounded-full bg-[var(--m12-text-faint)]" />
-                <span className="text-base font-bold text-[var(--m12-text-muted)]">Unassigned</span>
-                <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)]">
-                  {orphanL3s.length} capabilities — organize these in Map view
+                <div className="w-1.5 h-6 rounded-full bg-[#EAB308]" />
+                <span className="text-base font-bold text-[var(--m12-text)]">Unassigned</span>
+                <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)]">
+                  {orphans.length} — organize in Map view
                 </span>
               </div>
-              <div className="space-y-3 pl-4 border-l-2 border-[var(--m12-border)]/20">
-                {orphanL3s.map(cap => renderLeaf(cap.id))}
+              <div className="space-y-3 pl-4 border-l-2 border-[#EAB308]/20">
+                {orphans.map(cap => renderLeaf(cap.id))}
               </div>
             </div>
           )}
         </div>
       ) : (
-        /* Flat view (no hierarchy defined yet) */
         <div className="space-y-3">
           {capabilities.map(cap => renderLeaf(cap.id))}
         </div>
