@@ -133,6 +133,22 @@ function MultiSelect<T extends { id: string; name: string }>({
   placeholder?: string
 }) {
   const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (open) { setFilter(''); setTimeout(() => searchRef.current?.focus(), 0) }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
 
   const toggle = (id: string) => {
     onChange(
@@ -147,11 +163,14 @@ function MultiSelect<T extends { id: string; name: string }>({
   }
 
   const selectedItems = items.filter(i => selectedIds.includes(i.id))
+  const filtered = filter
+    ? items.filter(i => i.name.toLowerCase().includes(filter.toLowerCase()))
+    : items
 
-  // Group items if groupFn provided
+  // Group filtered items if groupFn provided
   const grouped = groupFn ? (() => {
     const groups = new Map<string, T[]>()
-    items.forEach(item => {
+    filtered.forEach(item => {
       const group = groupFn(item)
       if (!groups.has(group)) groups.set(group, [])
       groups.get(group)!.push(item)
@@ -177,14 +196,14 @@ function MultiSelect<T extends { id: string; name: string }>({
             </svg>
           )}
         </div>
-        {color && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />}
-        <span className="flex-1 truncate">{item.name}</span>
+        {color && <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />}
+        <span className="flex-1">{item.name}</span>
       </button>
     )
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       {/* Trigger */}
       <button
         onClick={() => setOpen(!open)}
@@ -212,23 +231,37 @@ function MultiSelect<T extends { id: string; name: string }>({
 
       {/* Dropdown */}
       {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden max-h-[240px] overflow-y-auto">
-            {grouped ? (
-              [...grouped.entries()].map(([group, groupItems]) => (
-                <div key={group}>
-                  <div className="px-2.5 py-1 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold bg-[var(--m12-bg)]/60 border-b border-[var(--m12-border)]/20 sticky top-0">
-                    {group}
+        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden min-w-full w-max max-w-[400px]">
+          {/* Search */}
+          <div className="p-1.5 border-b border-[var(--m12-border)]/20">
+            <input
+              ref={searchRef}
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              placeholder="Search..."
+              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-md px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/50"
+            />
+          </div>
+          {/* Items */}
+          <div className="max-h-[220px] overflow-y-auto">
+            {filtered.length > 0 ? (
+              grouped ? (
+                [...grouped.entries()].map(([group, groupItems]) => (
+                  <div key={group}>
+                    <div className="px-2.5 py-1 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold bg-[var(--m12-bg)]/60 border-b border-[var(--m12-border)]/20 sticky top-0">
+                      {group}
+                    </div>
+                    {groupItems.map(renderItem)}
                   </div>
-                  {groupItems.map(renderItem)}
-                </div>
-              ))
+                ))
+              ) : (
+                filtered.map(renderItem)
+              )
             ) : (
-              items.map(renderItem)
+              <div className="px-2.5 py-3 text-[10px] text-[var(--m12-text-faint)] text-center italic">No matches</div>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   )
