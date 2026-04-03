@@ -159,19 +159,11 @@ function InputLane({ input, showDimensions }: {
         )}
       </div>
 
-      {/* Arrow from left section toward IP/feeding system */}
+      {/* Arrow from left section toward IP card */}
       <HArrow muted={!hasSuppliers} />
 
-      {/* Feeding system (the last system in the chain - directly feeds the input) */}
-      {feedingSystem && (
-        <>
-          <FeedingSystemChip name={feedingSystem.name} color={feedingSystem.color} />
-          <HArrow />
-        </>
-      )}
-
       {/* Input IP card */}
-      <div className="w-[180px] shrink-0">
+      <div className="w-[170px] shrink-0">
         <IPCard
           name={input.informationProduct.name}
           category={input.informationProduct.category}
@@ -180,6 +172,14 @@ function InputLane({ input, showDimensions }: {
           accentColor="#EAB308"
         />
       </div>
+
+      {/* Feeding system (last in chain — sits between IP and Process) */}
+      {feedingSystem && (
+        <>
+          <HArrow />
+          <FeedingSystemChip name={feedingSystem.name} color={feedingSystem.color} />
+        </>
+      )}
     </div>
   )
 }
