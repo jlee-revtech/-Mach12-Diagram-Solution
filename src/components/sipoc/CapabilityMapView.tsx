@@ -159,7 +159,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
 
   return (
     <div
-      className={`flex flex-col min-w-[200px] max-w-[260px] transition-all ${
+      className={`flex flex-col w-[240px] min-w-[240px] transition-all ${
         dragOver && draggedLevel === 1
           ? dragOverLeft
             ? 'border-l-4 border-[#2563EB] rounded-xl'
@@ -194,19 +194,19 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
           e.dataTransfer.setData('text/plain', node.id)
         }}
         onDragEnd={() => { draggedId = null; draggedLevel = null }}
-        className="rounded-t-xl px-4 py-3 flex items-center justify-between cursor-grab active:cursor-grabbing"
+        className="rounded-t-xl px-4 py-3 flex items-start gap-3 cursor-grab active:cursor-grabbing min-h-[72px]"
         style={{ backgroundColor: color }}
       >
-        <div>
-          <div className="text-[9px] font-[family-name:var(--font-space-mono)] text-white/60 font-bold uppercase tracking-wider">
-            {index + 1}.
-          </div>
-          <div className="text-sm font-bold text-white leading-tight">{node.name}</div>
+        <span className="text-[11px] font-[family-name:var(--font-space-mono)] text-white/50 font-bold mt-0.5 shrink-0">
+          {index + 1}.
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-semibold text-white leading-snug">{node.name}</div>
         </div>
-        <div className="relative">
+        <div className="relative shrink-0 mt-0.5">
           <button
             onClick={() => setShowAddMenu(!showAddMenu)}
-            className="w-5 h-5 rounded flex items-center justify-center bg-white/15 hover:bg-white/25 transition-colors"
+            className="w-6 h-6 rounded-md flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M5 2v6M2 5h6" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
