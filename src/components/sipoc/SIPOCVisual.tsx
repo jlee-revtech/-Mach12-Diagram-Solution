@@ -355,6 +355,7 @@ export default function SIPOCVisual() {
 
   const [showDimensions, setShowDimensions] = useState(false)
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const initializedRef = useRef(false)
 
   const toggleCollapse = (id: string) => {
@@ -365,17 +366,40 @@ export default function SIPOCVisual() {
     })
   }
 
+  const toggleGroup = (id: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   const capabilities = useMemo(() => {
     return useSIPOCStore.getState().getHydratedCapabilities()
   }, [rawCapabilities, inputs, outputs, personas, informationProducts, logicalSystems])
 
-  // Default all capabilities to collapsed on first load
+  const tree = useMemo(() => {
+    return useSIPOCStore.getState().getCapabilityTree()
+  }, [rawCapabilities])
+
+  // Orphan L3 capabilities (no parent, not L1)
+  const orphanL3s = useMemo(() => {
+    return capabilities.filter(c => !c.parent_id && c.level !== 1 && c.level !== 2)
+  }, [capabilities])
+
+  // Check if we have any hierarchy at all
+  const hasHierarchy = tree.some(n => n.level === 1)
+
+  // Default all L3 capabilities to collapsed on first load
   useEffect(() => {
     if (!initializedRef.current && capabilities.length > 0) {
       initializedRef.current = true
       setCollapsedIds(new Set(capabilities.map(c => c.id)))
     }
   }, [capabilities])
+
+  // Find hydrated capability by id
+  const getHydrated = (id: string) => capabilities.find(c => c.id === id)
 
   if (capabilities.length === 0) {
     return (
@@ -385,22 +409,35 @@ export default function SIPOCVisual() {
     )
   }
 
+  // Render a single L3 SIPOC block
+  const renderL3 = (capId: string) => {
+    const cap = getHydrated(capId)
+    if (!cap) return null
+    return (
+      <CapabilityBlock
+        key={cap.id}
+        capability={cap}
+        isSelected={selectedCapabilityId === cap.id}
+        onSelect={() => setSelectedCapability(selectedCapabilityId === cap.id ? null : cap.id)}
+        showDimensions={showDimensions}
+        collapsed={collapsedIds.has(cap.id)}
+        onToggleCollapse={() => toggleCollapse(cap.id)}
+      />
+    )
+  }
+
   return (
     <div className="space-y-5 min-w-[1100px]">
       {/* Header bar: column labels + controls */}
       <div className="flex items-end justify-between px-2">
-        {/* SIPOC column labels */}
         <div className="flex items-end gap-0 flex-1">
-          {/* Left half labels */}
           <div className="flex-1 flex justify-between px-4">
             <ColumnHeader label="Suppliers" color="#F97316" letter="S" />
             <ColumnHeader label="Inputs" color="#EAB308" letter="I" />
           </div>
-          {/* Center spacer for Process column */}
           <div className="w-[232px] shrink-0 flex justify-center">
             <ColumnHeader label="Process" color="#2563EB" letter="P" />
           </div>
-          {/* Right half labels */}
           <div className="flex-1 flex justify-between px-4">
             <ColumnHeader label="Outputs" color="#10B981" letter="O" />
             <ColumnHeader label="Customers" color="#8B5CF6" letter="C" />
@@ -426,18 +463,106 @@ export default function SIPOCVisual() {
         </button>
       </div>
 
-      {/* Capability Blocks */}
-      {capabilities.map(cap => (
-        <CapabilityBlock
-          key={cap.id}
-          capability={cap}
-          isSelected={selectedCapabilityId === cap.id}
-          onSelect={() => setSelectedCapability(selectedCapabilityId === cap.id ? null : cap.id)}
-          showDimensions={showDimensions}
-          collapsed={collapsedIds.has(cap.id)}
-          onToggleCollapse={() => toggleCollapse(cap.id)}
-        />
-      ))}
+      {/* Hierarchical rendering */}
+      {hasHierarchy ? (
+        <div className="space-y-6">
+          {tree.filter(n => n.level === 1).map(l1 => {
+            const l1Color = l1.color || '#2563EB'
+            const l1Collapsed = collapsedGroups.has(l1.id)
+
+            return (
+              <div key={l1.id} className="space-y-3">
+                {/* L1 Core Area header */}
+                <button
+                  onClick={() => toggleGroup(l1.id)}
+                  className="flex items-center gap-3 group w-full text-left"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`text-[var(--m12-text-muted)] transition-transform ${l1Collapsed ? '' : 'rotate-90'}`}>
+                    <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <div className="w-1.5 h-6 rounded-full" style={{ backgroundColor: l1Color }} />
+                  <span className="text-base font-bold text-[var(--m12-text)]">{l1.name}</span>
+                  <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-wider">
+                    L1 Core Area
+                  </span>
+                  {l1Collapsed && (
+                    <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+                      {l1.children.reduce((sum, l2) => sum + (l2.children?.length || 0), 0)} capabilities
+                    </span>
+                  )}
+                </button>
+
+                {!l1Collapsed && (
+                  <div className="space-y-4 pl-4 border-l-2" style={{ borderColor: l1Color + '30' }}>
+                    {l1.children.sort((a, b) => a.sort_order - b.sort_order).map(l2 => {
+                      const l2Collapsed = collapsedGroups.has(l2.id)
+                      const l3Caps = l2.children || []
+
+                      return (
+                        <div key={l2.id} className="space-y-2">
+                          {/* L2 Capability subheader */}
+                          <button
+                            onClick={() => toggleGroup(l2.id)}
+                            className="flex items-center gap-2.5 group w-full text-left pl-2"
+                          >
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`text-[var(--m12-text-muted)] transition-transform ${l2Collapsed ? '' : 'rotate-90'}`}>
+                              <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: l1Color + '80' }} />
+                            <span className="text-sm font-semibold text-[var(--m12-text-secondary)]">{l2.name}</span>
+                            <span className="text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-wider">
+                              L2
+                            </span>
+                            {l2Collapsed && (
+                              <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+                                {l3Caps.length} L3
+                              </span>
+                            )}
+                          </button>
+
+                          {/* L3 SIPOC blocks */}
+                          {!l2Collapsed && (
+                            <div className="space-y-3 pl-4">
+                              {l3Caps.sort((a, b) => a.sort_order - b.sort_order).map(l3 => renderL3(l3.id))}
+                              {l3Caps.length === 0 && (
+                                <div className="text-[10px] text-[var(--m12-text-faint)] italic py-2 pl-2">No L3 functionalities</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {l1.children.length === 0 && (
+                      <div className="text-[10px] text-[var(--m12-text-faint)] italic py-2 pl-2">No L2 capabilities</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {/* Orphan L3 capabilities (not in hierarchy) */}
+          {orphanL3s.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-6 rounded-full bg-[var(--m12-text-faint)]" />
+                <span className="text-base font-bold text-[var(--m12-text-muted)]">Unassigned</span>
+                <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)]">
+                  {orphanL3s.length} capabilities — organize these in Map view
+                </span>
+              </div>
+              <div className="space-y-3 pl-4 border-l-2 border-[var(--m12-border)]/20">
+                {orphanL3s.map(cap => renderL3(cap.id))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Flat view (no hierarchy defined yet) */
+        <div className="space-y-3">
+          {capabilities.map(cap => renderL3(cap.id))}
+        </div>
+      )}
     </div>
   )
 }
