@@ -181,13 +181,16 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
 
   removeCapability: async (id) => {
     await api.deleteCapability(id)
-    const { inputs, outputs } = get()
+    const { inputs, outputs, capabilities } = get()
     const newInputs = { ...inputs }
     const newOutputs = { ...outputs }
     delete newInputs[id]
     delete newOutputs[id]
     set({
-      capabilities: get().capabilities.filter(c => c.id !== id),
+      // Remove the deleted capability; orphan its children (set parent_id to null)
+      capabilities: capabilities
+        .filter(c => c.id !== id)
+        .map(c => c.parent_id === id ? { ...c, parent_id: null } : c),
       inputs: newInputs,
       outputs: newOutputs,
       selectedCapabilityId: get().selectedCapabilityId === id ? null : get().selectedCapabilityId,
