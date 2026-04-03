@@ -690,40 +690,108 @@ async function handleSIPOCFlowDiagram(prompt: string, context: {
     outputs: { informationProduct: string; category?: string; consumerPersonas: string[] }[]
   }[]
 }) {
+  // Pre-process data into aggregated summary for the AI
+  const systemSet = new Set<string>()
+  const inputCats = new Map<string, { count: number; examples: string[] }>()
+  const outputCats = new Map<string, { count: number; examples: string[] }>()
+  const capSummaries: string[] = []
+
+  context.capabilities.forEach(cap => {
+    const sysLabel = cap.system ? ` (${cap.system})` : ''
+    capSummaries.push(`${cap.name}${sysLabel}: ${cap.inputs.length} inputs, ${cap.outputs.length} outputs`)
+    cap.inputs.forEach(inp => {
+      const cat = inp.category || 'Other'
+      const entry = inputCats.get(cat) || { count: 0, examples: [] }
+      entry.count++
+      if (entry.examples.length < 3) entry.examples.push(inp.informationProduct)
+      inputCats.set(cat, entry)
+      inp.sourceSystems.forEach(s => systemSet.add(s))
+      if (inp.feedingSystem) systemSet.add(inp.feedingSystem)
+    })
+    cap.outputs.forEach(out => {
+      const cat = out.category || 'Other'
+      const entry = outputCats.get(cat) || { count: 0, examples: [] }
+      entry.count++
+      if (entry.examples.length < 3) entry.examples.push(out.informationProduct)
+      outputCats.set(cat, entry)
+    })
+  })
+
+  const dataSummary = `
+SYSTEMS: ${[...systemSet].join(', ')}
+CAPABILITIES: ${capSummaries.join(' | ')}
+INPUT DATA DOMAINS: ${[...inputCats.entries()].map(([cat, d]) => `${cat} (${d.count} products, e.g. ${d.examples.join(', ')})`).join(' | ')}
+OUTPUT DATA DOMAINS: ${[...outputCats.entries()].map(([cat, d]) => `${cat} (${d.count} products, e.g. ${d.examples.join(', ')})`).join(' | ')}`
+
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 16000,
     messages: [
       {
         role: 'user',
-        content: `You are an expert enterprise architecture visualization designer. Create a complete, standalone SVG diagram that visualizes the high-level data flows for this SIPOC capability map.
+        content: `Create a world-class enterprise data architecture SVG diagram for an executive presentation.
 
 TITLE: "${context.mapTitle}"
 ${prompt ? `USER DIRECTION: ${prompt}` : ''}
+${dataSummary}
 
-CAPABILITY MAP DATA:
-${JSON.stringify(context.capabilities, null, 2)}
+STRICT VISUAL STANDARDS — follow every rule:
 
-REQUIREMENTS:
-1. Generate a complete, valid SVG element (starting with <svg and ending with </svg>)
-2. Canvas size: viewBox="0 0 1400 900" — designed to fit a single presentation slide (16:9)
-3. Use a LIGHT/WHITE background (#FFFFFF or #F8FAFC) — this is for executive presentations
-4. Do NOT use a simple left-to-right column layout — create an organic, visually engaging architecture diagram
-5. Group information products into higher-level data domain categories (Financial, Operational, Engineering, Supply Chain, etc.)
-6. Show SYSTEMS as major nodes/hubs (like database cylinders, rounded rectangles, or platform blocks)
-7. Show data domain groupings as labeled regions or clusters flowing between systems
-8. Use curved paths, bezier curves, or organic flow lines — NOT straight grid lines
-9. Include data flow labels on or near the paths showing what data moves between nodes
-10. Use a professional color palette: blues (#2563EB, #3B82F6), greens (#10B981), grays (#64748B, #374A5E), with accent colors for different data categories
-11. Typography: Use fontFamily="Arial, sans-serif" throughout. System names should be bold 14-16px, data labels 9-11px, category headers 11-13px
-12. Add subtle shadows, rounded corners, and professional styling — this should look like a polished consulting deliverable
-13. Show the capabilities as central process nodes that connect the input data domains to output data domains
-14. Include a title at the top and "Mach12.ai" branding in the bottom-right corner
-15. Make it visually similar to an enterprise architecture diagram you'd see from McKinsey, Deloitte, or Accenture
-16. Consider hub-and-spoke, radial, or clustered layouts — whatever best represents the actual data flow topology
-17. Aggregate individual information products into their category groupings — don't show every single product, show the domains
+CANVAS & BACKGROUND:
+- viewBox="0 0 1400 900" (16:9 slide ratio)
+- Background: clean white (#FFFFFF)
+- Add a subtle 1px border around the diagram area in #E2E8F0
 
-IMPORTANT: Return ONLY the SVG markup. No markdown code fences, no explanation, no JSON wrapper. Just the raw <svg>...</svg> element.`,
+LAYOUT PRINCIPLES:
+- Use a structured but NOT rigid grid. Think architecture blueprints, not flowcharts.
+- Place SOURCE SYSTEMS on the left third as clean rounded rectangles with a thin colored left border accent
+- Place CAPABILITIES in the center as the main process blocks
+- Place OUTPUT DATA DOMAINS on the right third
+- Vertically space elements generously — no crowding. Minimum 30px between any two elements.
+- ALL connection lines must route AROUND boxes, never through them. Use waypoints if needed.
+
+NODE STYLING (every node must follow this exactly):
+- Rounded rectangles only: rx="6" — no circles, no ellipses, no organic shapes
+- Source Systems: fill="#F1F5F9" stroke="#CBD5E1" strokeWidth="1". Left accent bar: 3px wide colored rect inside the left edge.
+  - System name: 12px bold #1E293B. Subtitle: 9px #64748B.
+- Capabilities: fill="#EFF6FF" stroke="#2563EB" strokeWidth="1.5". Must be wider (200px+).
+  - Capability name: 13px bold #1E293B. System name below: 9px #2563EB.
+- Input Data Domains: fill="#FFFBEB" stroke="#F59E0B" strokeWidth="1". Small category cards.
+  - Category name: 11px bold #92400E. Count: 9px #B45309.
+- Output Data Domains: fill="#ECFDF5" stroke="#10B981" strokeWidth="1". Small category cards.
+  - Category name: 11px bold #065F46. Count: 9px #047857.
+
+CONNECTION LINES (critical — this is what makes it professional):
+- Use ONLY orthogonal paths (horizontal and vertical segments with rounded corners) — like circuit board traces
+- Stroke: #94A3B8 strokeWidth="1.2" fill="none"
+- Add small arrowhead markers (6x4px, fill #94A3B8)
+- Lines must have clean 90-degree bends with at least 8px radius corners
+- NEVER overlap or cross through any box — route lines around obstacles
+- Add small text labels on lines (8px #94A3B8 font-family="Arial") describing the data flow category
+- Group parallel flows into single thicker lines where multiple products flow the same path
+
+TYPOGRAPHY:
+- font-family="Arial, Helvetica, sans-serif" on ALL text elements — no exceptions
+- Title: 20px bold #0F172A at top center, y=40
+- Section labels: 9px bold uppercase tracking="3" #94A3B8
+- All text must be crisp, left-aligned within cards, vertically centered
+
+ANTI-PATTERNS — do NOT do any of these:
+- No circles or ellipses for nodes
+- No gradient fills or heavy drop shadows
+- No cartoon colors (bright purple, orange fills, etc.)
+- No overlapping elements
+- No curved/bezier connection lines — use only orthogonal routing
+- No text outside of boxes except line labels and the title
+- No decorative elements, icons, or illustrations
+
+BRANDING:
+- Bottom-right: "Mach12.ai" in 8px #94A3B8
+- Bottom-left: date in 8px #CBD5E1
+
+This should look like a diagram from a Gartner research report or a McKinsey technology architecture slide — clean, minimal, precise.
+
+Return ONLY the raw <svg>...</svg> element. No markdown, no code fences, no explanation.`,
       },
     ],
   })
