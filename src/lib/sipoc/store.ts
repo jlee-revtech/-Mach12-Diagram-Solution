@@ -10,6 +10,7 @@ import type {
   LogicalSystem,
   HydratedCapability,
   Dimension,
+  CapabilityTreeNode,
 } from './types'
 import * as api from '@/lib/supabase/capability-maps'
 
@@ -45,11 +46,12 @@ interface SIPOCState {
   updateDescription: (description: string, userId: string) => Promise<void>
 
   // ─── Capability CRUD ──────────────────────────────────
-  addCapability: (name: string) => Promise<void>
-  updateCapability: (id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id'>>) => Promise<void>
+  addCapability: (name: string, parentId?: string | null, level?: number, color?: string | null) => Promise<string | undefined>
+  updateCapability: (id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'color' | 'parent_id' | 'level'>>) => Promise<void>
   removeCapability: (id: string) => Promise<void>
   reorderCapability: (id: string, newSortOrder: number) => Promise<void>
   setSelectedCapability: (id: string | null) => void
+  getCapabilityTree: () => import('./types').CapabilityTreeNode[]
 
   // ─── Input CRUD ───────────────────────────────────────
   addInput: (capabilityId: string, informationProductId: string) => Promise<void>
@@ -154,16 +156,18 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
 
   // ─── Capability CRUD ──────────────────────────────────
 
-  addCapability: async (name) => {
+  addCapability: async (name, parentId, level, color) => {
     const { map, capabilities } = get()
-    if (!map) return
-    const sortOrder = capabilities.length
-    const cap = await api.createCapability(map.id, name, sortOrder)
+    if (!map) return undefined
+    const siblings = capabilities.filter(c => c.parent_id === (parentId || null))
+    const sortOrder = siblings.length
+    const cap = await api.createCapability(map.id, name, sortOrder, parentId, level, color)
     set({
       capabilities: [...capabilities, cap],
       inputs: { ...get().inputs, [cap.id]: [] },
       outputs: { ...get().outputs, [cap.id]: [] },
     })
+    return cap.id
   },
 
   updateCapability: async (id, updates) => {
@@ -200,6 +204,17 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   setSelectedCapability: (id) => set({ selectedCapabilityId: id }),
+
+  getCapabilityTree: () => {
+    const { capabilities } = get()
+    const buildTree = (parentId: string | null): CapabilityTreeNode[] => {
+      return capabilities
+        .filter(c => (c.parent_id || null) === parentId)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(c => ({ ...c, children: buildTree(c.id) }))
+    }
+    return buildTree(null)
+  },
 
   // ─── Input CRUD ───────────────────────────────────────
 

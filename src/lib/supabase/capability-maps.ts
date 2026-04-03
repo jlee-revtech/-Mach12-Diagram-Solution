@@ -6,6 +6,7 @@ import type {
   Persona,
   InformationProduct,
   LogicalSystem,
+  CapabilityTemplateRow,
 } from '@/lib/sipoc/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -123,18 +124,32 @@ export async function listCapabilities(mapId: string): Promise<Capability[]> {
   return res.json()
 }
 
-export async function createCapability(mapId: string, name: string, sortOrder: number): Promise<Capability> {
+export async function createCapability(
+  mapId: string,
+  name: string,
+  sortOrder: number,
+  parentId?: string | null,
+  level?: number,
+  color?: string | null,
+): Promise<Capability> {
   const res = await fetch(`${URL}/rest/v1/capabilities`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
-    body: JSON.stringify({ capability_map_id: mapId, name, sort_order: sortOrder }),
+    body: JSON.stringify({
+      capability_map_id: mapId,
+      name,
+      sort_order: sortOrder,
+      parent_id: parentId || null,
+      level: level ?? 3,
+      color: color || null,
+    }),
   })
   const arr = await res.json()
   if (!res.ok) throw new Error(arr.message || 'Failed to create capability')
   return Array.isArray(arr) ? arr[0] : arr
 }
 
-export async function updateCapability(id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'sort_order'>>): Promise<void> {
+export async function updateCapability(id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'sort_order' | 'parent_id' | 'level' | 'color'>>): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/capabilities?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
@@ -407,5 +422,44 @@ export async function deleteLogicalSystem(id: string): Promise<void> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.message || 'Failed to delete logical system')
+  }
+}
+
+// ─── Capability Templates (org-scoped) ─────────────────
+
+export async function listCapabilityTemplates(orgId: string): Promise<CapabilityTemplateRow[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/capability_templates?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function createCapabilityTemplate(
+  orgId: string,
+  userId: string,
+  name: string,
+  description: string | null,
+  templateData: CapabilityTemplateRow['template_data']
+): Promise<CapabilityTemplateRow> {
+  const res = await fetch(`${URL}/rest/v1/capability_templates`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ organization_id: orgId, name, description, created_by: userId, template_data: templateData }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to save template')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function deleteCapabilityTemplate(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/capability_templates?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to delete template')
   }
 }

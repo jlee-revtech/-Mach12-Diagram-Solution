@@ -9,6 +9,7 @@ import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
+import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx } from '@/lib/export/sipoc'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +31,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
   const [showExecSummary, setShowExecSummary] = useState(false)
+  const [viewMode, setViewMode] = useState<'sipoc' | 'map'>('sipoc')
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -107,18 +109,37 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         ) : (
           <button
             onClick={() => setEditingTitle(true)}
-            className="text-base font-semibold text-[var(--m12-text)] hover:text-[#2563EB] transition-colors truncate max-w-[400px]"
+            className="flex items-center gap-1.5 group text-base font-semibold text-[var(--m12-text)] hover:text-[#2563EB] transition-colors truncate max-w-[400px]"
           >
             {map.title}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="opacity-0 group-hover:opacity-60 transition-opacity shrink-0">
+              <path d="M8.5 1.5l2 2M1.5 8.5l-.5 2.5 2.5-.5L9.5 4.5l-2-2-6 6z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         )}
 
-        {/* Badge */}
-        <div className="inline-flex items-center gap-1.5 bg-[#8B5CF6]/10 border border-[#8B5CF6]/30 rounded px-2 py-0.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
-          <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[#8B5CF6] uppercase tracking-wider font-bold">
+        {/* View toggle */}
+        <div className="flex bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg p-0.5">
+          <button
+            onClick={() => setViewMode('sipoc')}
+            className={`px-2.5 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
+              viewMode === 'sipoc'
+                ? 'bg-[#8B5CF6]/15 text-[#8B5CF6]'
+                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+            }`}
+          >
             SIPOC
-          </span>
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className={`px-2.5 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
+              viewMode === 'map'
+                ? 'bg-[#2563EB]/15 text-[#2563EB]'
+                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+            }`}
+          >
+            Map
+          </button>
         </div>
 
         <div className="flex-1" />
@@ -224,26 +245,37 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           </button>
         )}
 
-        {/* Add capability button */}
-        <button
-          onClick={() => {
-            const name = prompt('Capability name:')
-            if (name?.trim()) addCapability(name.trim())
-          }}
-          className="flex items-center gap-1.5 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          Add Capability
-        </button>
+        {/* Add capability button (SIPOC view only) */}
+        {viewMode === 'sipoc' && (
+          <button
+            onClick={() => {
+              const name = prompt('Capability name:')
+              if (name?.trim()) addCapability(name.trim())
+            }}
+            className="flex items-center gap-1.5 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Add Capability
+          </button>
+        )}
       </div>
 
       {/* Main content: visual + editor */}
       <div className="flex flex-1 overflow-hidden">
-        {/* SIPOC visual area */}
+        {/* Visual area */}
         <div className="flex-1 overflow-auto p-6">
-          <SIPOCVisual />
+          {viewMode === 'sipoc' ? (
+            <SIPOCVisual />
+          ) : (
+            <CapabilityMapView
+              onSelectCapability={(id) => {
+                useSIPOCStore.getState().setSelectedCapability(id)
+                setViewMode('sipoc')
+              }}
+            />
+          )}
         </div>
 
         {/* Sidebar toggle */}

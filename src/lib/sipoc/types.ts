@@ -52,10 +52,38 @@ export interface CapabilityMapRow {
 export interface Capability {
   id: string
   capability_map_id: string
+  parent_id: string | null    // null = root/L1
+  level: number               // 1 = Core Area, 2 = Capability, 3 = Functionality (SIPOC)
   name: string
   description?: string
+  color?: string | null        // accent color for L1/L2 groupings
   system_id?: string | null
   sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+// ─── Capability tree node (with children resolved) ─────
+export interface CapabilityTreeNode extends Capability {
+  children: CapabilityTreeNode[]
+}
+
+// ─── Reusable Capability Templates ─────────────────────
+export interface CapabilityTemplateRow {
+  id: string
+  organization_id: string
+  name: string
+  description: string | null
+  created_by: string | null
+  template_data: {
+    capability: { name: string; description?: string; level: number; color?: string }
+    children: {
+      name: string
+      description?: string
+      level: number
+      children: { name: string; description?: string; level: number }[]
+    }[]
+  }
   created_at: string
   updated_at: string
 }
