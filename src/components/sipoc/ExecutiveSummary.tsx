@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { HydratedCapability } from '@/lib/sipoc/types'
 
 interface CapOverview {
   name: string
@@ -66,91 +65,71 @@ const CRIT_STYLES = {
   low: { dot: 'bg-[#10B981]', text: 'text-[#10B981]' },
 }
 
-// ─── SVG Flow Diagram ───────────────────────────────────
-
-const SVG_COLORS = {
-  bg: '#151E2E',
-  cardBg: '#1F2C3F',
-  border: '#374A5E',
-  text: '#F8FAFC',
-  textSec: '#CBD5E1',
-  muted: '#64748B',
-  blue: '#2563EB',
-  orange: '#F97316',
-  yellow: '#EAB308',
-  green: '#10B981',
-  violet: '#8B5CF6',
-  cyan: '#06B6D4',
-}
-
-function buildDiagramData(capabilities: HydratedCapability[]) {
-  // Group inputs by category
-  const inputGroups = new Map<string, { products: Set<string>; caps: Set<string> }>()
-  const outputGroups = new Map<string, { products: Set<string>; caps: Set<string> }>()
-
-  capabilities.forEach(cap => {
-    cap.inputs.forEach(inp => {
-      const cat = inp.informationProduct.category || 'Other'
-      if (!inputGroups.has(cat)) inputGroups.set(cat, { products: new Set(), caps: new Set() })
-      inputGroups.get(cat)!.products.add(inp.informationProduct.name)
-      inputGroups.get(cat)!.caps.add(cap.name)
-    })
-    cap.outputs.forEach(out => {
-      const cat = out.informationProduct.category || 'Other'
-      if (!outputGroups.has(cat)) outputGroups.set(cat, { products: new Set(), caps: new Set() })
-      outputGroups.get(cat)!.products.add(out.informationProduct.name)
-      outputGroups.get(cat)!.caps.add(cap.name)
-    })
-  })
-
-  return {
-    inputGroups: [...inputGroups.entries()]
-      .map(([cat, data]) => ({ category: cat, count: data.products.size, caps: [...data.caps] }))
-      .sort((a, b) => b.count - a.count),
-    outputGroups: [...outputGroups.entries()]
-      .map(([cat, data]) => ({ category: cat, count: data.products.size, caps: [...data.caps] }))
-      .sort((a, b) => b.count - a.count),
-    capabilities: capabilities.map(cap => ({
-      name: cap.name,
-      system: cap.system?.name || null,
-      inputCount: cap.inputs.length,
-      outputCount: cap.outputs.length,
-    })),
-  }
-}
+// ─── AI-Generated SVG Flow Diagram ──────────────────────
 
 function SIPOCFlowDiagram({ mapTitle }: { mapTitle: string }) {
-  const svgRef = useRef<SVGSVGElement>(null)
-  const capabilities = useSIPOCStore(s => s.getHydratedCapabilities)
-  const hydrated = useSIPOCStore.getState().getHydratedCapabilities()
-  const data = buildDiagramData(hydrated)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [svgContent, setSvgContent] = useState<string | null>(null)
+  const [diagramLoading, setDiagramLoading] = useState(false)
+  const [diagramError, setDiagramError] = useState<string | null>(null)
+  const [userPrompt, setUserPrompt] = useState('')
 
-  const W = 1280
-  const H = Math.max(520, data.capabilities.length * 72 + 180, data.inputGroups.length * 68 + 180, data.outputGroups.length * 68 + 180)
+  const handleGenerate = useCallback(async () => {
+    setDiagramLoading(true)
+    setDiagramError(null)
 
-  // Layout columns
-  const inputColX = 40
-  const inputColW = 260
-  const capColX = 440
-  const capColW = 360
-  const outputColX = 940
-  const outputColW = 260
-  const headerY = 60
-  const startY = 120
+    const capabilities = useSIPOCStore.getState().getHydratedCapabilities()
+    const logicalSystems = useSIPOCStore.getState().logicalSystems
 
-  // Card dimensions
-  const cardH = 52
-  const groupCardH = 48
-  const gap = 14
+    const context = {
+      mapTitle,
+      capabilities: capabilities.map(cap => ({
+        name: cap.name,
+        system: cap.system?.name || null,
+        inputs: cap.inputs.map(inp => ({
+          informationProduct: inp.informationProduct.name,
+          category: inp.informationProduct.category,
+          sourceSystems: inp.sourceSystems.map(s => s.name),
+          feedingSystem: inp.feeding_system_id ? logicalSystems.find(s => s.id === inp.feeding_system_id)?.name : undefined,
+        })),
+        outputs: cap.outputs.map(out => ({
+          informationProduct: out.informationProduct.name,
+          category: out.informationProduct.category,
+          consumerPersonas: out.consumerPersonas.map(p => p.name),
+        })),
+      })),
+    }
+
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sipoc-flow-diagram',
+          prompt: userPrompt,
+          context,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed' }))
+        throw new Error(err.error || 'Failed to generate diagram')
+      }
+      const svg = await res.text()
+      setSvgContent(svg)
+    } catch (err) {
+      setDiagramError(err instanceof Error ? err.message : 'Request failed')
+    } finally {
+      setDiagramLoading(false)
+    }
+  }, [mapTitle, userPrompt])
 
   const handleDownload = () => {
-    if (!svgRef.current) return
-    const svgData = new XMLSerializer().serializeToString(svgRef.current)
-    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+    if (!svgContent) return
+    const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${mapTitle.replace(/[^a-zA-Z0-9]/g, '_')}_SIPOC_Summary.svg`
+    a.download = `${mapTitle.replace(/[^a-zA-Z0-9]/g, '_')}_Architecture_Diagram.svg`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -160,148 +139,73 @@ function SIPOCFlowDiagram({ mapTitle }: { mapTitle: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <div className="text-[9px] uppercase tracking-[0.2em] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] font-bold">Information Flow Diagram</div>
-        <button
-          onClick={handleDownload}
-          className="flex items-center gap-1.5 text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] border border-[var(--m12-border)]/30 rounded-lg px-2.5 py-1 transition-colors"
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M5 1v5.5M2.5 4.5L5 7l2.5-2.5M1.5 8.5h7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+        <div className="text-[9px] uppercase tracking-[0.2em] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] font-bold">Architecture Diagram</div>
+        {svgContent && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGenerate}
+              disabled={diagramLoading}
+              className="flex items-center gap-1.5 text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
+            >
+              Regenerate
+            </button>
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-1.5 text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] border border-[var(--m12-border)]/30 rounded-lg px-2.5 py-1 transition-colors"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M5 1v5.5M2.5 4.5L5 7l2.5-2.5M1.5 8.5h7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Download SVG
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!svgContent && !diagramLoading && (
+        <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 rounded-xl p-6">
+          <div className="text-center mb-4">
+            <div className="text-sm text-[var(--m12-text-secondary)] mb-1">Generate an architecture-level data flow diagram</div>
+            <div className="text-[10px] text-[var(--m12-text-muted)]">AI will analyze your systems and data products to create a presentation-ready visual</div>
+          </div>
+          <div className="flex gap-2 max-w-xl mx-auto">
+            <input
+              value={userPrompt}
+              onChange={e => setUserPrompt(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleGenerate()}
+              placeholder="Optional: style direction (e.g., 'hub and spoke around ERP', 'emphasize financial flows')..."
+              className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+            />
+            <button
+              onClick={handleGenerate}
+              className="bg-gradient-to-r from-[#8B5CF6] to-[#2563EB] hover:from-[#7C3AED] hover:to-[#3B82F6] text-white px-5 py-2 rounded-lg text-xs font-medium transition-all shrink-0"
+            >
+              Generate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {diagramLoading && (
+        <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 rounded-xl flex flex-col items-center justify-center py-20 gap-3">
+          <svg className="animate-spin w-10 h-10 text-[#8B5CF6]" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
           </svg>
-          Download SVG
-        </button>
-      </div>
-      <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/30 rounded-xl overflow-hidden overflow-x-auto">
-        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" className="w-full" style={{ minWidth: 900 }}>
-          <defs>
-            <marker id="arrow-right" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-              <path d="M0 0L8 3L0 6" fill={SVG_COLORS.border} />
-            </marker>
-            <filter id="card-shadow">
-              <feDropShadow dx="0" dy="1" stdDeviation="3" floodColor="#000" floodOpacity="0.15" />
-            </filter>
-          </defs>
+          <span className="text-xs text-[var(--m12-text-muted)]">Designing architecture diagram...</span>
+        </div>
+      )}
 
-          {/* Background */}
-          <rect width={W} height={H} fill={SVG_COLORS.bg} />
+      {diagramError && (
+        <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3 mb-4">{diagramError}</div>
+      )}
 
-          {/* Title */}
-          <text x={W / 2} y={30} textAnchor="middle" fill={SVG_COLORS.muted} fontSize="10" fontFamily="monospace" letterSpacing="3" fontWeight="bold">
-            {mapTitle.toUpperCase()}
-          </text>
-
-          {/* Column headers */}
-          {/* Inputs header */}
-          <rect x={inputColX + inputColW / 2 - 14} y={headerY - 6} width={28} height={28} rx={6} fill={SVG_COLORS.yellow} />
-          <text x={inputColX + inputColW / 2} y={headerY + 13} textAnchor="middle" fill="#fff" fontSize="12" fontWeight="bold" fontFamily="Arial">I</text>
-          <text x={inputColX + inputColW / 2} y={headerY + 34} textAnchor="middle" fill={SVG_COLORS.muted} fontSize="8" fontFamily="monospace" letterSpacing="2" fontWeight="bold">INPUTS</text>
-
-          {/* Process header */}
-          <rect x={capColX + capColW / 2 - 14} y={headerY - 6} width={28} height={28} rx={6} fill={SVG_COLORS.blue} />
-          <text x={capColX + capColW / 2} y={headerY + 13} textAnchor="middle" fill="#fff" fontSize="12" fontWeight="bold" fontFamily="Arial">P</text>
-          <text x={capColX + capColW / 2} y={headerY + 34} textAnchor="middle" fill={SVG_COLORS.muted} fontSize="8" fontFamily="monospace" letterSpacing="2" fontWeight="bold">PROCESS</text>
-
-          {/* Outputs header */}
-          <rect x={outputColX + outputColW / 2 - 14} y={headerY - 6} width={28} height={28} rx={6} fill={SVG_COLORS.green} />
-          <text x={outputColX + outputColW / 2} y={headerY + 13} textAnchor="middle" fill="#fff" fontSize="12" fontWeight="bold" fontFamily="Arial">O</text>
-          <text x={outputColX + outputColW / 2} y={headerY + 34} textAnchor="middle" fill={SVG_COLORS.muted} fontSize="8" fontFamily="monospace" letterSpacing="2" fontWeight="bold">OUTPUTS</text>
-
-          {/* ── Input category groups ────────────────────── */}
-          {data.inputGroups.map((grp, i) => {
-            const y = startY + i * (groupCardH + gap)
-            const midY = y + groupCardH / 2
-            return (
-              <g key={`ig-${i}`}>
-                <rect x={inputColX} y={y} width={inputColW} height={groupCardH} rx={8} fill={SVG_COLORS.cardBg} stroke={SVG_COLORS.border} strokeWidth={0.5} filter="url(#card-shadow)" />
-                <rect x={inputColX} y={y + 6} width={3} height={groupCardH - 12} rx={1.5} fill={SVG_COLORS.yellow} />
-                <text x={inputColX + 14} y={y + 20} fill={SVG_COLORS.text} fontSize="11" fontWeight="bold" fontFamily="Arial">{grp.category}</text>
-                <text x={inputColX + 14} y={y + 34} fill={SVG_COLORS.muted} fontSize="8" fontFamily="monospace">
-                  {grp.count} info product{grp.count !== 1 ? 's' : ''}
-                </text>
-                <text x={inputColX + inputColW - 12} y={y + 27} textAnchor="end" fill={SVG_COLORS.yellow} fontSize="16" fontWeight="bold" fontFamily="Arial">{grp.count}</text>
-                {/* Connection lines to capabilities */}
-                {grp.caps.map((capName, ci) => {
-                  const capIdx = data.capabilities.findIndex(c => c.name === capName)
-                  if (capIdx < 0) return null
-                  const capY = startY + capIdx * (cardH + gap) + cardH / 2
-                  return (
-                    <path
-                      key={`il-${ci}`}
-                      d={`M${inputColX + inputColW} ${midY} C${inputColX + inputColW + 60} ${midY} ${capColX - 60} ${capY} ${capColX} ${capY}`}
-                      fill="none"
-                      stroke={SVG_COLORS.yellow}
-                      strokeWidth={1}
-                      strokeOpacity={0.25}
-                      markerEnd="url(#arrow-right)"
-                    />
-                  )
-                })}
-              </g>
-            )
-          })}
-
-          {/* ── Capability cards (center) ────────────────── */}
-          {data.capabilities.map((cap, i) => {
-            const y = startY + i * (cardH + gap)
-            return (
-              <g key={`cap-${i}`}>
-                <rect x={capColX} y={y} width={capColW} height={cardH} rx={10} fill="#1A3A6B" stroke={SVG_COLORS.blue} strokeWidth={1.5} filter="url(#card-shadow)" />
-                <text x={capColX + capColW / 2} y={y + 22} textAnchor="middle" fill={SVG_COLORS.text} fontSize="12" fontWeight="bold" fontFamily="Arial">{cap.name}</text>
-                {cap.system && (
-                  <text x={capColX + capColW / 2} y={y + 36} textAnchor="middle" fill={SVG_COLORS.muted} fontSize="8" fontFamily="monospace">{cap.system}</text>
-                )}
-                {!cap.system && (
-                  <text x={capColX + capColW / 2} y={y + 36} textAnchor="middle" fill={SVG_COLORS.muted} fontSize="7" fontFamily="monospace" letterSpacing="1.5">L3 CAPABILITY</text>
-                )}
-                {/* Input/output count badges */}
-                <rect x={capColX + 8} y={y + cardH - 18} width={32} height={14} rx={3} fill={SVG_COLORS.yellow} fillOpacity={0.15} />
-                <text x={capColX + 24} y={y + cardH - 8} textAnchor="middle" fill={SVG_COLORS.yellow} fontSize="7" fontFamily="monospace" fontWeight="bold">{cap.inputCount}in</text>
-                <rect x={capColX + capColW - 40} y={y + cardH - 18} width={32} height={14} rx={3} fill={SVG_COLORS.green} fillOpacity={0.15} />
-                <text x={capColX + capColW - 24} y={y + cardH - 8} textAnchor="middle" fill={SVG_COLORS.green} fontSize="7" fontFamily="monospace" fontWeight="bold">{cap.outputCount}out</text>
-              </g>
-            )
-          })}
-
-          {/* ── Output category groups ───────────────────── */}
-          {data.outputGroups.map((grp, i) => {
-            const y = startY + i * (groupCardH + gap)
-            const midY = y + groupCardH / 2
-            return (
-              <g key={`og-${i}`}>
-                <rect x={outputColX} y={y} width={outputColW} height={groupCardH} rx={8} fill={SVG_COLORS.cardBg} stroke={SVG_COLORS.border} strokeWidth={0.5} filter="url(#card-shadow)" />
-                <rect x={outputColX} y={y + 6} width={3} height={groupCardH - 12} rx={1.5} fill={SVG_COLORS.green} />
-                <text x={outputColX + 14} y={y + 20} fill={SVG_COLORS.text} fontSize="11" fontWeight="bold" fontFamily="Arial">{grp.category}</text>
-                <text x={outputColX + 14} y={y + 34} fill={SVG_COLORS.muted} fontSize="8" fontFamily="monospace">
-                  {grp.count} info product{grp.count !== 1 ? 's' : ''}
-                </text>
-                <text x={outputColX + outputColW - 12} y={y + 27} textAnchor="end" fill={SVG_COLORS.green} fontSize="16" fontWeight="bold" fontFamily="Arial">{grp.count}</text>
-                {/* Connection lines from capabilities */}
-                {grp.caps.map((capName, ci) => {
-                  const capIdx = data.capabilities.findIndex(c => c.name === capName)
-                  if (capIdx < 0) return null
-                  const capY = startY + capIdx * (cardH + gap) + cardH / 2
-                  return (
-                    <path
-                      key={`ol-${ci}`}
-                      d={`M${capColX + capColW} ${capY} C${capColX + capColW + 60} ${capY} ${outputColX - 60} ${midY} ${outputColX} ${midY}`}
-                      fill="none"
-                      stroke={SVG_COLORS.green}
-                      strokeWidth={1}
-                      strokeOpacity={0.25}
-                      markerEnd="url(#arrow-right)"
-                    />
-                  )
-                })}
-              </g>
-            )
-          })}
-
-          {/* Footer branding */}
-          <text x={W / 2} y={H - 15} textAnchor="middle" fill={SVG_COLORS.border} fontSize="7" fontFamily="monospace">
-            MACH12.AI | {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-          </text>
-        </svg>
-      </div>
+      {svgContent && (
+        <div
+          ref={containerRef}
+          className="bg-white border border-[var(--m12-border)]/30 rounded-xl overflow-hidden overflow-x-auto"
+          dangerouslySetInnerHTML={{ __html: svgContent }}
+        />
+      )}
     </div>
   )
 }

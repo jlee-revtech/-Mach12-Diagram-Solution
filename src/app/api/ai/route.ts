@@ -87,6 +87,8 @@ export async function POST(req: NextRequest) {
       return handleSIPOCAnalyze(context)
     } else if (action === 'sipoc-executive-summary') {
       return handleSIPOCExecutiveSummary(context)
+    } else if (action === 'sipoc-flow-diagram') {
+      return handleSIPOCFlowDiagram(prompt, context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -675,4 +677,76 @@ No markdown, no explanation, just the JSON object.`,
   }
 
   return NextResponse.json(json)
+}
+
+// ─── SIPOC Flow Diagram (AI-generated SVG) ──────────────
+
+async function handleSIPOCFlowDiagram(prompt: string, context: {
+  mapTitle: string
+  capabilities: {
+    name: string
+    system?: string | null
+    inputs: { informationProduct: string; category?: string; sourceSystems: string[]; feedingSystem?: string }[]
+    outputs: { informationProduct: string; category?: string; consumerPersonas: string[] }[]
+  }[]
+}) {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 16000,
+    messages: [
+      {
+        role: 'user',
+        content: `You are an expert enterprise architecture visualization designer. Create a complete, standalone SVG diagram that visualizes the high-level data flows for this SIPOC capability map.
+
+TITLE: "${context.mapTitle}"
+${prompt ? `USER DIRECTION: ${prompt}` : ''}
+
+CAPABILITY MAP DATA:
+${JSON.stringify(context.capabilities, null, 2)}
+
+REQUIREMENTS:
+1. Generate a complete, valid SVG element (starting with <svg and ending with </svg>)
+2. Canvas size: viewBox="0 0 1400 900" — designed to fit a single presentation slide (16:9)
+3. Use a LIGHT/WHITE background (#FFFFFF or #F8FAFC) — this is for executive presentations
+4. Do NOT use a simple left-to-right column layout — create an organic, visually engaging architecture diagram
+5. Group information products into higher-level data domain categories (Financial, Operational, Engineering, Supply Chain, etc.)
+6. Show SYSTEMS as major nodes/hubs (like database cylinders, rounded rectangles, or platform blocks)
+7. Show data domain groupings as labeled regions or clusters flowing between systems
+8. Use curved paths, bezier curves, or organic flow lines — NOT straight grid lines
+9. Include data flow labels on or near the paths showing what data moves between nodes
+10. Use a professional color palette: blues (#2563EB, #3B82F6), greens (#10B981), grays (#64748B, #374A5E), with accent colors for different data categories
+11. Typography: Use fontFamily="Arial, sans-serif" throughout. System names should be bold 14-16px, data labels 9-11px, category headers 11-13px
+12. Add subtle shadows, rounded corners, and professional styling — this should look like a polished consulting deliverable
+13. Show the capabilities as central process nodes that connect the input data domains to output data domains
+14. Include a title at the top and "Mach12.ai" branding in the bottom-right corner
+15. Make it visually similar to an enterprise architecture diagram you'd see from McKinsey, Deloitte, or Accenture
+16. Consider hub-and-spoke, radial, or clustered layouts — whatever best represents the actual data flow topology
+17. Aggregate individual information products into their category groupings — don't show every single product, show the domains
+
+IMPORTANT: Return ONLY the SVG markup. No markdown code fences, no explanation, no JSON wrapper. Just the raw <svg>...</svg> element.`,
+      },
+    ],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+
+  // Extract SVG from response (handle potential markdown wrapping)
+  let svg = text.trim()
+  // Remove markdown code fences if present
+  svg = svg.replace(/```(?:svg|xml|html)?\n?/g, '').replace(/```\n?$/g, '').trim()
+
+  // Validate it looks like SVG
+  if (!svg.startsWith('<svg')) {
+    // Try to find SVG within the response
+    const match = svg.match(/<svg[\s\S]*<\/svg>/i)
+    if (match) {
+      svg = match[0]
+    } else {
+      return NextResponse.json({ error: 'AI did not return valid SVG', raw: text.substring(0, 500) }, { status: 500 })
+    }
+  }
+
+  return new Response(svg, {
+    headers: { 'Content-Type': 'image/svg+xml' },
+  })
 }
