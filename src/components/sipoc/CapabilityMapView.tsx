@@ -245,6 +245,11 @@ export default function CapabilityMapView({ onSelectCapability }: {
     return useSIPOCStore.getState().getCapabilityTree()
   }, [capabilities])
 
+  // Orphan capabilities: have no parent but aren't L1 (legacy flat capabilities)
+  const orphans = useMemo(() => {
+    return capabilities.filter(c => !c.parent_id && c.level !== 1)
+  }, [capabilities])
+
   const handleAddL1 = useCallback(async () => {
     const name = newL1Name.trim()
     if (!name) return
@@ -350,6 +355,42 @@ export default function CapabilityMapView({ onSelectCapability }: {
           </button>
         )}
       </div>
+
+      {/* Unassigned capabilities (drag these into L1 columns) */}
+      {orphans.length > 0 && (
+        <div className="bg-[var(--m12-bg-card)] border border-dashed border-[#EAB308]/40 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#EAB308]">
+              <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1" />
+              <path d="M6 3.5v3M6 8.5v.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            <span className="text-[10px] font-bold text-[#EAB308] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">
+              Unassigned Capabilities
+            </span>
+            <span className="text-[9px] text-[var(--m12-text-muted)]">— drag these into a Core Area below to organize them</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {orphans.map(cap => (
+              <div
+                key={cap.id}
+                draggable
+                onDragStart={(e) => {
+                  draggedId = cap.id
+                  draggedLevel = cap.level
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', cap.id)
+                }}
+                onDragEnd={() => { draggedId = null; draggedLevel = null }}
+                className="flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing hover:border-[#EAB308]/40 transition-colors"
+              >
+                <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>
+                <span className="text-xs font-medium text-[var(--m12-text)]">{cap.name}</span>
+                <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">L{cap.level}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Columns */}
       {tree.length > 0 ? (
