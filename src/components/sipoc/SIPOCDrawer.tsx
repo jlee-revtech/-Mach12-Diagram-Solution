@@ -250,7 +250,12 @@ function SIPOCFlowContent({ capability }: { capability: HydratedCapability }) {
 
 // ─── Main Drawer ─────────────────────────────────────────
 
-export default function SIPOCDrawer({ orgId }: { orgId: string }) {
+export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, children }: {
+  orgId: string
+  editorOpen: boolean
+  onToggleEditor: () => void
+  children?: React.ReactNode
+}) {
   const drawerOpen = useSIPOCStore(s => s.drawerOpen)
   const drawerHeight = useSIPOCStore(s => s.drawerHeight)
   const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
@@ -258,6 +263,7 @@ export default function SIPOCDrawer({ orgId }: { orgId: string }) {
 
   const [resizing, setResizing] = useState(false)
   const [contentVisible, setContentVisible] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
   const resizeRef = useRef<{ startY: number; startH: number } | null>(null)
 
   // Hydrate the selected capability
@@ -360,7 +366,7 @@ export default function SIPOCDrawer({ orgId }: { orgId: string }) {
     <div
       className="shrink-0 flex flex-col bg-[var(--m12-bg-card)] border-t border-[var(--m12-border)]/40 overflow-hidden"
       style={{
-        height: drawerOpen ? drawerHeight : 0,
+        height: drawerOpen ? (fullscreen ? 'calc(100vh - 48px)' : drawerHeight) : 0,
         transition: resizing ? 'none' : 'height 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         boxShadow: drawerOpen ? '0 -8px 30px rgba(0,0,0,0.08)' : 'none',
       }}
@@ -431,6 +437,42 @@ export default function SIPOCDrawer({ orgId }: { orgId: string }) {
           </button>
         </div>
 
+        {/* Edit toggle */}
+        <button
+          onClick={onToggleEditor}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
+            editorOpen
+              ? 'bg-[#2563EB]/15 text-[#2563EB]'
+              : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)]'
+          }`}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M7.5 1.5l1 1M1.5 7.5l-.5 2 2-.5L7.5 4.5l-1-1-5 4z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Edit
+        </button>
+
+        {/* Fullscreen toggle */}
+        <button
+          onClick={() => setFullscreen(f => !f)}
+          className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
+            fullscreen
+              ? 'text-[#2563EB] bg-[#2563EB]/10'
+              : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)]'
+          }`}
+          title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {fullscreen ? (
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M3.5 1v2.5H1M6.5 9V6.5H9M1 6.5h2.5V9M9 3.5H6.5V1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M1 3.5V1h2.5M9 6.5V9H6.5M6.5 1H9v2.5M3.5 9H1V6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+
         {/* Close */}
         <button
           onClick={close}
@@ -442,21 +484,35 @@ export default function SIPOCDrawer({ orgId }: { orgId: string }) {
         </button>
       </div>
 
-      {/* Content */}
+      {/* Content: SIPOC flow + optional editor panel */}
       <div
-        className="flex-1 overflow-hidden"
+        className="flex-1 flex overflow-hidden"
         style={{
           opacity: contentVisible ? 1 : 0,
           transition: 'opacity 250ms ease',
         }}
       >
-        {hydrated ? (
-          <SIPOCFlowContent capability={hydrated} />
-        ) : (
-          <div className="flex items-center justify-center h-full text-[var(--m12-text-faint)] text-xs">
-            Select a capability on the map to view its SIPOC
-          </div>
-        )}
+        {/* SIPOC flow (takes remaining space) */}
+        <div className="flex-1 min-w-0 overflow-hidden">
+          {hydrated ? (
+            <SIPOCFlowContent capability={hydrated} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-[var(--m12-text-faint)] text-xs">
+              Select a capability on the map to view its SIPOC
+            </div>
+          )}
+        </div>
+
+        {/* Editor panel (slides in from right) */}
+        <div
+          className="shrink-0 border-l border-[var(--m12-border)]/30 overflow-hidden"
+          style={{
+            width: editorOpen ? 380 : 0,
+            transition: 'width 300ms cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   )

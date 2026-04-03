@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import SIPOCDrawer from '@/components/sipoc/SIPOCDrawer'
+import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
@@ -26,6 +27,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [editingTitle, setEditingTitle] = useState(false)
   const [showAI, setShowAI] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
   const [showExecSummary, setShowExecSummary] = useState(false)
@@ -237,8 +239,14 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           />
         </div>
 
-        {/* SIPOC Drawer */}
-        {organization && <SIPOCDrawer orgId={organization.id} />}
+        {/* SIPOC Drawer + Editor */}
+        {organization && (
+          <SIPOCDrawer orgId={organization.id} editorOpen={editorOpen} onToggleEditor={() => setEditorOpen(e => !e)}>
+            {editorOpen && selectedCapabilityId && (
+              <CapabilityEditor orgId={organization.id} />
+            )}
+          </SIPOCDrawer>
+        )}
       </div>
 
       {/* AI Generate Panel */}
