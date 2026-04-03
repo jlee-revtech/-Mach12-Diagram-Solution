@@ -7,7 +7,7 @@ import { listDiagrams, createDiagram, archiveDiagram, restoreDiagram } from '@/l
 import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreCapabilityMap } from '@/lib/supabase/capability-maps'
 import type { DiagramRow } from '@/lib/supabase/types'
 import type { CapabilityMapRow } from '@/lib/sipoc/types'
-import { APP_VERSION } from '@/lib/version'
+import VersionBadge from '@/components/VersionBadge'
 
 export default function Dashboard() {
   const [diagrams, setDiagrams] = useState<DiagramRow[]>([])
@@ -111,7 +111,7 @@ export default function Dashboard() {
               </span>
               <span className="text-[var(--m12-text-muted)] text-lg font-light">/</span>
               <span className="text-[var(--m12-text-secondary)] text-lg font-medium">Studio</span>
-              <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] self-end mb-0.5">v{APP_VERSION}</span>
+              <span className="self-end mb-0.5"><VersionBadge /></span>
             </div>
             <div className="flex items-center gap-3 mt-1">
               {/* Org switcher */}

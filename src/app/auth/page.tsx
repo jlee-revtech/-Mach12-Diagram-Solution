@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
-import { APP_VERSION } from '@/lib/version'
+import VersionBadge from '@/components/VersionBadge'
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -74,7 +74,7 @@ export default function AuthPage() {
             MACH12
           </span>
           <span className="text-[var(--m12-text-muted)] text-xl">.AI</span>
-          <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] ml-2 self-end mb-1">v{APP_VERSION}</span>
+          <span className="self-end mb-1"><VersionBadge /></span>
           <p className="text-sm text-[var(--m12-text-muted)] mt-2">Data Architecture Diagrams</p>
         </div>
 

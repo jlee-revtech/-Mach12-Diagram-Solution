@@ -245,10 +245,23 @@ export default function CapabilityMapView({ onSelectCapability }: {
     return useSIPOCStore.getState().getCapabilityTree()
   }, [capabilities])
 
-  // Orphan capabilities: have no parent but aren't L1 (legacy flat capabilities)
-  const orphans = useMemo(() => {
-    return capabilities.filter(c => !c.parent_id && c.level !== 1)
+  // L1 nodes for columns
+  const l1Roots = useMemo(() => tree.filter(n => n.level === 1), [tree])
+
+  // All capability IDs that are part of a hierarchy (have a parent, or ARE a parent with L1 level)
+  const assignedIds = useMemo(() => {
+    const ids = new Set<string>()
+    // All L1s are "assigned"
+    capabilities.filter(c => c.level === 1).forEach(c => ids.add(c.id))
+    // Anything with a parent_id is assigned
+    capabilities.filter(c => c.parent_id).forEach(c => ids.add(c.id))
+    return ids
   }, [capabilities])
+
+  // Orphans: capabilities not assigned to any hierarchy
+  const orphans = useMemo(() => {
+    return capabilities.filter(c => !assignedIds.has(c.id))
+  }, [capabilities, assignedIds])
 
   const handleAddL1 = useCallback(async () => {
     const name = newL1Name.trim()
@@ -393,9 +406,9 @@ export default function CapabilityMapView({ onSelectCapability }: {
       )}
 
       {/* Columns */}
-      {tree.length > 0 ? (
+      {l1Roots.length > 0 ? (
         <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: 300 }}>
-          {tree.map((l1, i) => (
+          {l1Roots.map((l1, i) => (
             <L1Column
               key={l1.id}
               node={l1}
