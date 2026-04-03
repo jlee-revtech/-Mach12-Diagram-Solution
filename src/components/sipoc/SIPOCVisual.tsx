@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { HydratedCapability, Dimension } from '@/lib/sipoc/types'
 
@@ -355,6 +355,7 @@ export default function SIPOCVisual() {
 
   const [showDimensions, setShowDimensions] = useState(false)
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  const initializedRef = useRef(false)
 
   const toggleCollapse = (id: string) => {
     setCollapsedIds(prev => {
@@ -367,6 +368,14 @@ export default function SIPOCVisual() {
   const capabilities = useMemo(() => {
     return useSIPOCStore.getState().getHydratedCapabilities()
   }, [rawCapabilities, inputs, outputs, personas, informationProducts, logicalSystems])
+
+  // Default all capabilities to collapsed on first load
+  useEffect(() => {
+    if (!initializedRef.current && capabilities.length > 0) {
+      initializedRef.current = true
+      setCollapsedIds(new Set(capabilities.map(c => c.id)))
+    }
+  }, [capabilities])
 
   if (capabilities.length === 0) {
     return (
