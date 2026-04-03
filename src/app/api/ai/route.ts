@@ -85,6 +85,8 @@ export async function POST(req: NextRequest) {
       return handleSIPOCGenerate(prompt, context)
     } else if (action === 'sipoc-analyze') {
       return handleSIPOCAnalyze(context)
+    } else if (action === 'sipoc-executive-summary') {
+      return handleSIPOCExecutiveSummary(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -553,6 +555,123 @@ No markdown, no explanation, just the JSON object.`,
     json = JSON.parse(cleaned)
   } catch {
     return NextResponse.json({ error: 'Failed to parse SIPOC analysis', raw: text }, { status: 500 })
+  }
+
+  return NextResponse.json(json)
+}
+
+// ─── SIPOC Executive Summary ────────────────────────────
+
+async function handleSIPOCExecutiveSummary(context: {
+  mapTitle: string
+  capabilities: {
+    name: string
+    description?: string
+    system?: string
+    inputs: {
+      informationProduct: string
+      category?: string
+      supplierPersonas: string[]
+      sourceSystems: string[]
+      feedingSystem?: string
+      dimensions: string[]
+    }[]
+    outputs: {
+      informationProduct: string
+      category?: string
+      consumerPersonas: string[]
+      dimensions: string[]
+    }[]
+  }[]
+}) {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: SIPOC_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Create an executive-level summary of this SIPOC Capability Map for a senior architecture audience. Return ONLY valid JSON.
+
+CAPABILITY MAP: "${context.mapTitle}"
+
+FULL DATA:
+${JSON.stringify(context.capabilities, null, 2)}
+
+Return this exact JSON structure:
+{
+  "headline": "One-line headline summarizing the capability landscape (max 15 words)",
+  "executiveSummary": "2-3 paragraph executive summary. Cover the scope of capabilities, the data ecosystem, key system dependencies, and organizational touchpoints. Write for a CTO/CIO audience.",
+  "capabilityOverviews": [
+    {
+      "name": "Capability Name",
+      "system": "System it runs in (or null)",
+      "oneLiner": "One sentence describing what this capability does and why it matters",
+      "inputCount": 5,
+      "outputCount": 3,
+      "keyInputs": ["Top 3 most critical input information products"],
+      "keyOutputs": ["Top 3 most critical output information products"],
+      "criticalSystems": ["Key systems in the data flow"],
+      "riskLevel": "low|medium|high",
+      "riskNote": "Brief note on data risk or dependency concern (or null if low)"
+    }
+  ],
+  "dataLandscape": {
+    "totalInformationProducts": 25,
+    "totalDimensions": 80,
+    "categoryCounts": { "Financial": 8, "Operational": 5 },
+    "topCategories": ["Top 3 categories by count"]
+  },
+  "systemDependencies": [
+    {
+      "system": "System Name",
+      "role": "Brief description of its role in the data ecosystem",
+      "capabilitiesServed": 3,
+      "criticality": "high|medium|low"
+    }
+  ],
+  "personaMap": [
+    {
+      "persona": "Role Name",
+      "involvement": "supplier|consumer|both",
+      "capabilitiesInvolved": 4,
+      "keyContribution": "Brief note on what they supply or consume"
+    }
+  ],
+  "strategicInsights": [
+    "High-level strategic observation about the data architecture, integration patterns, or transformation opportunities"
+  ],
+  "recommendations": [
+    {
+      "priority": 1,
+      "title": "Recommendation title",
+      "description": "Actionable executive recommendation",
+      "impact": "Expected business impact"
+    }
+  ]
+}
+
+Guidelines:
+- Write for executives — focus on business impact, risk, and strategic value
+- Keep capability overviews concise and scannable
+- Identify the 3-5 most critical system dependencies
+- Highlight the top 5-8 personas by involvement
+- Provide 3-5 ranked strategic recommendations
+- Reference specific data from the map, not generic advice
+- Think about A&D enterprise architecture patterns
+
+No markdown, no explanation, just the JSON object.`,
+      },
+    ],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  let json
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    json = JSON.parse(cleaned)
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse executive summary', raw: text }, { status: 500 })
   }
 
   return NextResponse.json(json)

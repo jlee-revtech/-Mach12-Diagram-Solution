@@ -8,6 +8,7 @@ import SIPOCVisual from '@/components/sipoc/SIPOCVisual'
 import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
+import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
 import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx } from '@/lib/export/sipoc'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +29,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
+  const [showExecSummary, setShowExecSummary] = useState(false)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -100,12 +102,12 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
             onBlur={handleTitleBlur}
             onKeyDown={e => e.key === 'Enter' && handleTitleBlur()}
             autoFocus
-            className="bg-transparent border-b border-[#2563EB] text-sm font-medium text-[var(--m12-text)] py-0.5 focus:outline-none max-w-[300px]"
+            className="bg-transparent border-b border-[#2563EB] text-base font-semibold text-[var(--m12-text)] py-0.5 focus:outline-none max-w-[400px]"
           />
         ) : (
           <button
             onClick={() => setEditingTitle(true)}
-            className="text-sm font-medium text-[var(--m12-text)] hover:text-[#2563EB] transition-colors truncate max-w-[300px]"
+            className="text-base font-semibold text-[var(--m12-text)] hover:text-[#2563EB] transition-colors truncate max-w-[400px]"
           >
             {map.title}
           </button>
@@ -186,6 +188,17 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
+        {/* Executive summary button */}
+        <button
+          onClick={() => setShowExecSummary(true)}
+          className="flex items-center gap-1.5 bg-gradient-to-r from-[#8B5CF6]/20 to-[#2563EB]/20 border border-[#8B5CF6]/30 hover:border-[#8B5CF6]/50 text-[#8B5CF6] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11L6 9.5L3 11L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="currentColor" />
+          </svg>
+          Executive Summary
+        </button>
+
         {/* AI analyze button */}
         <button
           onClick={() => setShowAnalysis(true)}
@@ -256,6 +269,11 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           initialPrompt={aiPromptOverride || undefined}
           onClose={() => { setShowAI(false); setAiPromptOverride(null) }}
         />
+      )}
+
+      {/* Executive Summary */}
+      {showExecSummary && (
+        <ExecutiveSummary onClose={() => setShowExecSummary(false)} />
       )}
 
       {/* AI Analyze Panel */}

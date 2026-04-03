@@ -377,7 +377,7 @@ export default function SIPOCVisual() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 min-w-[1100px]">
       {/* Header bar: column labels + controls */}
       <div className="flex items-end justify-between px-2">
         {/* SIPOC column labels */}
