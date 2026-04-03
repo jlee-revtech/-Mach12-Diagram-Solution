@@ -516,9 +516,65 @@ export function exportSIPOCPptx(
       line: { color: PPTX_COLORS.border, width: 0.5 },
     })
 
+    // ── Dynamic scaling ─────────────────────────────────
+    // Available vertical space: from below divider (headerY + 0.58) to above footer (~7.1)
+    const contentStartY = headerY + 0.65
+    const contentEndY = 7.1
+    const availableH = contentEndY - contentStartY // ~5.47 inches
+
+    // Base dimensions (at scale 1.0)
+    const BASE_CHIP_H = 0.22
+    const BASE_CHIP_GAP = 0.04
+    const BASE_SYS_H = 0.18
+    const BASE_CARD_BASE = 0.45
+    const BASE_DIM_LINE_H = 0.13
+    const BASE_DIM_EXTRA = 0.1
+    const BASE_LANE_GAP = 0.12
+
+    // Calculate natural height needed for input lanes
+    let naturalInputH = 0
+    cap.inputs.forEach(inp => {
+      const dims = (inp.dimensions || [])
+      const cardH = BASE_CARD_BASE + (dims.length > 0 ? dims.length * BASE_DIM_LINE_H + BASE_DIM_EXTRA : 0)
+      const chipCount = inp.supplierPersonas.length
+      const sysCount = inp.sourceSystems.length
+      const chipH = chipCount * (BASE_CHIP_H + BASE_CHIP_GAP) + sysCount * BASE_SYS_H
+      naturalInputH += Math.max(cardH, chipH) + BASE_LANE_GAP
+    })
+
+    // Calculate natural height needed for output lanes
+    let naturalOutputH = 0
+    cap.outputs.forEach(out => {
+      const dims = (out.dimensions || [])
+      const cardH = BASE_CARD_BASE + (dims.length > 0 ? dims.length * BASE_DIM_LINE_H + BASE_DIM_EXTRA : 0)
+      const chipH = out.consumerPersonas.length * (BASE_CHIP_H + BASE_CHIP_GAP)
+      naturalOutputH += Math.max(cardH, chipH) + BASE_LANE_GAP
+    })
+
+    const naturalH = Math.max(naturalInputH, naturalOutputH)
+    const scale = naturalH > availableH ? availableH / naturalH : 1.0
+
+    // Scaled dimensions
+    const chipH = BASE_CHIP_H * scale
+    const chipGap = BASE_CHIP_GAP * scale
+    const sysH = BASE_SYS_H * scale
+    const cardBase = BASE_CARD_BASE * scale
+    const dimLineH = BASE_DIM_LINE_H * scale
+    const dimExtra = BASE_DIM_EXTRA * scale
+    const laneGap = BASE_LANE_GAP * scale
+
+    // Font sizes scaled
+    const fsChip = Math.max(5, 7 * scale)
+    const fsSys = Math.max(4, 5.5 * scale)
+    const fsCardName = Math.max(5.5, 7.5 * scale)
+    const fsCategory = Math.max(3.5, 5 * scale)
+    const fsDim = Math.max(4, 5.5 * scale)
+    const fsProc = Math.max(7, 10 * scale)
+    const fsProcLabel = Math.max(3.5, 5 * scale)
+
     // Process box (center column)
-    const procY = 1.7
-    const procH = Math.max(1.0, (Math.max(cap.inputs.length, cap.outputs.length) * 0.7) + 0.3)
+    const procY = contentStartY
+    const procH = Math.max(1.0 * scale, (Math.max(cap.inputs.length, cap.outputs.length) * (cardBase + laneGap)) + 0.3 * scale)
     slide.addShape(pptx.ShapeType.roundRect, {
       x: colX[2], y: procY, w: colW[2], h: procH,
       rectRadius: 0.1,
@@ -527,47 +583,47 @@ export function exportSIPOCPptx(
     })
     slide.addText(cap.name, {
       x: colX[2] + 0.15, y: procY + procH / 2 - 0.25, w: colW[2] - 0.3, h: 0.35,
-      fontSize: 10, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', align: 'center', valign: 'middle',
+      fontSize: fsProc, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', align: 'center', valign: 'middle',
       wrap: true,
     })
     slide.addText('L3 CAPABILITY', {
-      x: colX[2], y: procY + procH - 0.3, w: colW[2], h: 0.2,
-      fontSize: 5, color: PPTX_COLORS.blue, fontFace: 'Arial', align: 'center', bold: true,
+      x: colX[2], y: procY + procH - 0.25 * scale, w: colW[2], h: 0.2,
+      fontSize: fsProcLabel, color: PPTX_COLORS.blue, fontFace: 'Arial', align: 'center', bold: true,
     })
 
     // ── Input lanes ─────────────────────────────────────
-    let laneY = 1.7
+    let laneY = contentStartY
 
     cap.inputs.forEach(inp => {
       const dims = (inp.dimensions || [])
-      const cardH = 0.45 + (dims.length > 0 ? dims.length * 0.13 + 0.1 : 0)
+      const cardH = cardBase + (dims.length > 0 ? dims.length * dimLineH + dimExtra : 0)
 
       // Supplier personas (col 0)
       let chipY = laneY
       inp.supplierPersonas.forEach(p => {
         slide.addShape(pptx.ShapeType.roundRect, {
-          x: colX[0], y: chipY, w: colW[0], h: 0.22,
-          rectRadius: 0.11, fill: { color: PPTX_COLORS.cardBg },
+          x: colX[0], y: chipY, w: colW[0], h: chipH,
+          rectRadius: chipH / 2, fill: { color: PPTX_COLORS.cardBg },
           line: { color: PPTX_COLORS.border, width: 0.4 },
         })
-        // Person icon dot
+        const dotSize = 0.12 * scale
         slide.addShape(pptx.ShapeType.ellipse, {
-          x: colX[0] + 0.08, y: chipY + 0.05, w: 0.12, h: 0.12,
+          x: colX[0] + 0.08, y: chipY + (chipH - dotSize) / 2, w: dotSize, h: dotSize,
           fill: { color: stripHash(p.color) },
         })
         slide.addText(p.name, {
-          x: colX[0] + 0.25, y: chipY, w: colW[0] - 0.35, h: 0.22,
-          fontSize: 7, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle',
+          x: colX[0] + 0.25, y: chipY, w: colW[0] - 0.35, h: chipH,
+          fontSize: fsChip, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle',
         })
-        chipY += 0.26
+        chipY += chipH + chipGap
       })
       // Source systems
       inp.sourceSystems.forEach(s => {
         slide.addText(s.name, {
-          x: colX[0] + 0.1, y: chipY, w: colW[0] - 0.2, h: 0.18,
-          fontSize: 5.5, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
+          x: colX[0] + 0.1, y: chipY, w: colW[0] - 0.2, h: sysH,
+          fontSize: fsSys, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
         })
-        chipY += 0.18
+        chipY += sysH
       })
 
       // Arrow S→I
@@ -585,25 +641,26 @@ export function exportSIPOCPptx(
       })
       // Yellow accent bar
       slide.addShape(pptx.ShapeType.rect, {
-        x: colX[1], y: laneY + 0.06, w: 0.04, h: cardH - 0.12,
+        x: colX[1], y: laneY + 0.06 * scale, w: 0.04, h: cardH - 0.12 * scale,
         fill: { color: PPTX_COLORS.yellow },
       })
+      const nameH = 0.25 * scale
       slide.addText(inp.informationProduct.name, {
-        x: colX[1] + 0.12, y: laneY + 0.04, w: colW[1] - 0.2, h: 0.25,
-        fontSize: 7.5, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', valign: 'top', wrap: true,
+        x: colX[1] + 0.12, y: laneY + 0.04 * scale, w: colW[1] - 0.2, h: nameH,
+        fontSize: fsCardName, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', valign: 'top', wrap: true,
       })
       if (inp.informationProduct.category) {
         slide.addText(inp.informationProduct.category.toUpperCase(), {
-          x: colX[1] + 0.12, y: laneY + 0.28, w: colW[1] - 0.2, h: 0.14,
-          fontSize: 5, color: PPTX_COLORS.muted, fontFace: 'Arial',
+          x: colX[1] + 0.12, y: laneY + 0.28 * scale, w: colW[1] - 0.2, h: 0.14 * scale,
+          fontSize: fsCategory, color: PPTX_COLORS.muted, fontFace: 'Arial',
         })
       }
       // Dimensions
       if (dims.length > 0) {
         dims.forEach((dim, di) => {
           slide.addText(`• ${dim.name}`, {
-            x: colX[1] + 0.18, y: laneY + 0.42 + di * 0.13, w: colW[1] - 0.3, h: 0.13,
-            fontSize: 5.5, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
+            x: colX[1] + 0.18, y: laneY + 0.42 * scale + di * dimLineH, w: colW[1] - 0.3, h: dimLineH,
+            fontSize: fsDim, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
           })
         })
       }
@@ -614,15 +671,15 @@ export function exportSIPOCPptx(
         line: { color: PPTX_COLORS.border, width: 0.6, endArrowType: 'triangle' },
       })
 
-      laneY += Math.max(cardH, chipY - (laneY - 0.04)) + 0.12
+      laneY += Math.max(cardH, chipY - laneY) + laneGap
     })
 
     // ── Output lanes ────────────────────────────────────
-    let outY = 1.7
+    let outY = contentStartY
 
     cap.outputs.forEach(out => {
       const dims = (out.dimensions || [])
-      const cardH = 0.45 + (dims.length > 0 ? dims.length * 0.13 + 0.1 : 0)
+      const cardH = cardBase + (dims.length > 0 ? dims.length * dimLineH + dimExtra : 0)
 
       // Arrow P→O
       const arrowY = outY + cardH / 2 - 0.02
@@ -639,24 +696,24 @@ export function exportSIPOCPptx(
       })
       // Green accent bar
       slide.addShape(pptx.ShapeType.rect, {
-        x: colX[3], y: outY + 0.06, w: 0.04, h: cardH - 0.12,
+        x: colX[3], y: outY + 0.06 * scale, w: 0.04, h: cardH - 0.12 * scale,
         fill: { color: PPTX_COLORS.green },
       })
       slide.addText(out.informationProduct.name, {
-        x: colX[3] + 0.12, y: outY + 0.04, w: colW[3] - 0.2, h: 0.25,
-        fontSize: 7.5, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', valign: 'top', wrap: true,
+        x: colX[3] + 0.12, y: outY + 0.04 * scale, w: colW[3] - 0.2, h: 0.25 * scale,
+        fontSize: fsCardName, color: PPTX_COLORS.text, bold: true, fontFace: 'Arial', valign: 'top', wrap: true,
       })
       if (out.informationProduct.category) {
         slide.addText(out.informationProduct.category.toUpperCase(), {
-          x: colX[3] + 0.12, y: outY + 0.28, w: colW[3] - 0.2, h: 0.14,
-          fontSize: 5, color: PPTX_COLORS.muted, fontFace: 'Arial',
+          x: colX[3] + 0.12, y: outY + 0.28 * scale, w: colW[3] - 0.2, h: 0.14 * scale,
+          fontSize: fsCategory, color: PPTX_COLORS.muted, fontFace: 'Arial',
         })
       }
       if (dims.length > 0) {
         dims.forEach((dim, di) => {
           slide.addText(`• ${dim.name}`, {
-            x: colX[3] + 0.18, y: outY + 0.42 + di * 0.13, w: colW[3] - 0.3, h: 0.13,
-            fontSize: 5.5, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
+            x: colX[3] + 0.18, y: outY + 0.42 * scale + di * dimLineH, w: colW[3] - 0.3, h: dimLineH,
+            fontSize: fsDim, color: PPTX_COLORS.muted, fontFace: 'Arial', valign: 'middle',
           })
         })
       }
@@ -671,22 +728,23 @@ export function exportSIPOCPptx(
       let chipY = outY
       out.consumerPersonas.forEach(p => {
         slide.addShape(pptx.ShapeType.roundRect, {
-          x: colX[4], y: chipY, w: colW[4], h: 0.22,
-          rectRadius: 0.11, fill: { color: PPTX_COLORS.cardBg },
+          x: colX[4], y: chipY, w: colW[4], h: chipH,
+          rectRadius: chipH / 2, fill: { color: PPTX_COLORS.cardBg },
           line: { color: PPTX_COLORS.border, width: 0.4 },
         })
+        const dotSize = 0.12 * scale
         slide.addShape(pptx.ShapeType.ellipse, {
-          x: colX[4] + 0.08, y: chipY + 0.05, w: 0.12, h: 0.12,
+          x: colX[4] + 0.08, y: chipY + (chipH - dotSize) / 2, w: dotSize, h: dotSize,
           fill: { color: stripHash(p.color) },
         })
         slide.addText(p.name, {
-          x: colX[4] + 0.25, y: chipY, w: colW[4] - 0.35, h: 0.22,
-          fontSize: 7, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle',
+          x: colX[4] + 0.25, y: chipY, w: colW[4] - 0.35, h: chipH,
+          fontSize: fsChip, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle',
         })
-        chipY += 0.26
+        chipY += chipH + chipGap
       })
 
-      outY += Math.max(cardH, chipY - (outY - 0.04)) + 0.12
+      outY += Math.max(cardH, chipY - outY) + laneGap
     })
 
     addFooter(slide, cap.name)
@@ -695,359 +753,336 @@ export function exportSIPOCPptx(
   pptx.writeFile({ fileName: `${sanitizeFilename(title)}_SIPOC.pptx` })
 }
 
-// ─── SVG Export ─────────────────────────────────────────
+// ─── HTML Export ────────────────────────────────────────
 
-const SVG_COLORS = {
-  bg: '#151E2E',
-  cardBg: '#1F2C3F',
-  border: '#374A5E',
-  text: '#F8FAFC',
-  textSec: '#CBD5E1',
-  muted: '#64748B',
-  blue: '#2563EB',
-  orange: '#F97316',
-  yellow: '#EAB308',
-  green: '#10B981',
-  violet: '#8B5CF6',
-}
-
-function escSvg(s: string): string {
+function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function svgRoundedRect(x: number, y: number, w: number, h: number, r: number, fill: string, stroke?: string): string {
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}"${stroke ? ` stroke="${stroke}" stroke-width="1"` : ''}/>`
-}
-
-function svgText(x: number, y: number, text: string, size: number, fill: string, opts?: { bold?: boolean; anchor?: string; family?: string }): string {
-  const weight = opts?.bold ? ' font-weight="600"' : ''
-  const anchor = opts?.anchor ? ` text-anchor="${opts.anchor}"` : ''
-  const family = opts?.family ? ` font-family="${opts.family}"` : ''
-  return `<text x="${x}" y="${y}" font-size="${size}"${weight}${anchor}${family} fill="${fill}">${escSvg(text)}</text>`
-}
-
-function svgPersonaPill(x: number, y: number, name: string, color: string): { svg: string; h: number } {
-  const w = Math.max(name.length * 5.5 + 22, 60)
-  const svg = [
-    svgRoundedRect(x, y, w, 20, 10, SVG_COLORS.cardBg),
-    `<circle cx="${x + 10}" cy="${y + 10}" r="4" fill="${color}"/>`,
-    // Person icon inside circle
-    `<circle cx="${x + 10}" cy="${y + 8}" r="2" fill="none" stroke="${SVG_COLORS.bg}" stroke-width="0.8"/>`,
-    `<path d="M${x + 7} ${y + 14} a3.5 3.5 0 0 1 6 0" fill="none" stroke="${SVG_COLORS.bg}" stroke-width="0.8"/>`,
-    svgText(x + 18, y + 14, name, 8, SVG_COLORS.textSec),
-  ].join('\n')
-  return { svg, h: 24 }
-}
-
-function svgSystemChip(x: number, y: number, name: string, color: string): { svg: string; w: number; h: number } {
-  const w = Math.max(name.length * 5 + 16, 50)
-  const svg = [
-    svgRoundedRect(x, y, w, 16, 3, SVG_COLORS.cardBg, SVG_COLORS.border),
-    `<rect x="${x + 4}" y="${y + 5}" width="6" height="6" rx="1" fill="${color}"/>`,
-    svgText(x + 14, y + 12, name, 7, SVG_COLORS.textSec),
-  ].join('\n')
-  return { svg, w, h: 20 }
-}
-
-function svgIPCard(x: number, y: number, w: number, name: string, category: string | undefined, dims: string[], accent: string): { svg: string; h: number } {
-  const lines = wrapText(name, w - 16, 8)
-  const nameH = lines.length * 12
-  const catH = category ? 12 : 0
-  const dimH = dims.length > 0 ? dims.length * 11 + 6 : 0
-  const cardH = nameH + catH + dimH + 16
-
-  const parts: string[] = [
-    svgRoundedRect(x, y, w, cardH, 4, SVG_COLORS.cardBg, SVG_COLORS.border),
-    // Accent left border
-    `<rect x="${x}" y="${y + 3}" width="3" height="${cardH - 6}" rx="1.5" fill="${accent}"/>`,
-  ]
-
-  let cy = y + 14
-  lines.forEach(line => {
-    parts.push(svgText(x + 10, cy, line, 9, SVG_COLORS.text, { bold: true }))
-    cy += 12
-  })
-
-  if (category) {
-    parts.push(svgText(x + 10, cy + 2, category.toUpperCase(), 6, SVG_COLORS.muted, { family: 'monospace' }))
-    cy += 12
-  }
-
-  if (dims.length > 0) {
-    cy += 4
-    parts.push(`<line x1="${x + 10}" y1="${cy - 6}" x2="${x + w - 8}" y2="${cy - 6}" stroke="${SVG_COLORS.border}" stroke-width="0.5"/>`)
-    dims.forEach(dim => {
-      parts.push(svgText(x + 12, cy, `• ${dim}`, 7, SVG_COLORS.muted))
-      cy += 11
-    })
-  }
-
-  return { svg: parts.join('\n'), h: cardH }
-}
-
-function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
-  const charW = fontSize * 0.55
-  const maxChars = Math.floor(maxWidth / charW)
-  if (text.length <= maxChars) return [text]
-  const words = text.split(' ')
-  const lines: string[] = []
-  let current = ''
-  words.forEach(word => {
-    if ((current + ' ' + word).trim().length > maxChars && current) {
-      lines.push(current)
-      current = word
-    } else {
-      current = current ? current + ' ' + word : word
-    }
-  })
-  if (current) lines.push(current)
-  return lines
-}
-
-function svgFlowArrow(x1: number, y1: number, x2: number, y2: number, color: string): string {
-  const midX = (x1 + x2) / 2
-  return `<path d="M${x1} ${y1} C${midX} ${y1} ${midX} ${y2} ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4" marker-end="url(#arrow-${color.replace('#', '')})"/>`
-}
-
-function svgColumnHeader(x: number, y: number, letter: string, label: string, color: string): string {
-  return [
-    svgRoundedRect(x, y, 22, 22, 5, color),
-    svgText(x + 11, y + 16, letter, 12, '#FFFFFF', { bold: true, anchor: 'middle' }),
-    svgText(x + 30, y + 16, label, 8, SVG_COLORS.muted, { bold: true, family: 'monospace' }),
-  ].join('\n')
-}
-
-// ─── Lane height calculator ─────────────────────────────
-
-function calcSupplierH(inp: HydratedCapability['inputs'][number]): number {
-  const personaH = Math.max(inp.supplierPersonas.length, 0) * 24
-  const sysH = inp.sourceSystems.length > 0 ? 22 : 0
-  return Math.max(personaH + sysH, 20)
-}
-
-function calcIPCardH(name: string, category: string | undefined, dims: string[], colW: number): number {
-  const lines = wrapText(name, colW - 16, 8)
-  return lines.length * 12 + (category ? 12 : 0) + (dims.length > 0 ? dims.length * 11 + 6 : 0) + 16
-}
-
-function calcLaneH(leftH: number, rightH: number): number {
-  return Math.max(leftH, rightH) + 16
-}
-
-export function exportSIPOCSvg(
+export function exportSIPOCHtml(
   title: string,
   capabilities: HydratedCapability[]
 ): void {
-  const COL_W = 220
-  const PROC_W = 160
-  const ARROW_W = 24
-  const MARGIN = 40
-  const CAP_GAP = 40
-  const HEADER_H = 50
+  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
-  // Layout: [M] S [→] I [→] P [→] O [→] C [M]
-  const totalW = MARGIN + COL_W + ARROW_W + COL_W + ARROW_W + PROC_W + ARROW_W + COL_W + ARROW_W + COL_W + MARGIN
-  const colX = {
-    s: MARGIN,
-    a1: MARGIN + COL_W,
-    i: MARGIN + COL_W + ARROW_W,
-    a2: MARGIN + COL_W * 2 + ARROW_W,
-    p: MARGIN + COL_W * 2 + ARROW_W * 2,
-    a3: MARGIN + COL_W * 2 + ARROW_W * 2 + PROC_W,
-    o: MARGIN + COL_W * 2 + ARROW_W * 2 + PROC_W + ARROW_W,
-    a4: MARGIN + COL_W * 3 + ARROW_W * 2 + PROC_W,
-    c: MARGIN + COL_W * 3 + ARROW_W * 3 + PROC_W,
+  const capSections = capabilities.map((cap, ci) => {
+    const inputLanes = cap.inputs.map(inp => {
+      const dims = (inp.dimensions || []).map(d => d.name)
+      const supplierChips = inp.supplierPersonas.map(p =>
+        `<span class="persona-chip"><span class="persona-dot" style="background:${escHtml(p.color)}"></span>${escHtml(p.name)}</span>`
+      ).join('')
+      const sourceChips = inp.sourceSystems.map(s =>
+        `<span class="system-chip"><span class="sys-dot" style="background:${escHtml(s.color || '#64748B')}"></span>${escHtml(s.name)}</span>`
+      ).join('')
+      const feedingHtml = inp.feedingSystem
+        ? `<div class="feeding-row"><span class="feeding-label">FEEDS</span><span class="system-chip"><span class="sys-dot" style="background:${escHtml(inp.feedingSystem.color || '#64748B')}"></span>${escHtml(inp.feedingSystem.name)}</span></div>`
+        : ''
+      const dimHtml = dims.length > 0
+        ? `<div class="dim-divider"></div>${dims.map(d => `<div class="dim-item">&bull; ${escHtml(d)}</div>`).join('')}`
+        : ''
+      const catHtml = inp.informationProduct.category
+        ? `<div class="ip-category">${escHtml(inp.informationProduct.category.toUpperCase())}</div>`
+        : ''
+
+      return `<div class="lane">
+        <div class="lane-col supplier-col">
+          <div class="persona-stack">${supplierChips || '<span class="empty-note">No suppliers</span>'}</div>
+          <div class="source-systems">${sourceChips}</div>
+        </div>
+        <div class="lane-col arrow-col"><span class="arrow">&rarr;</span></div>
+        <div class="lane-col input-col">
+          <div class="ip-card input-accent">
+            <div class="ip-name">${escHtml(inp.informationProduct.name)}</div>
+            ${catHtml}
+            ${dimHtml}
+          </div>
+          ${feedingHtml}
+        </div>
+      </div>`
+    }).join('')
+
+    const outputLanes = cap.outputs.map(out => {
+      const dims = (out.dimensions || []).map(d => d.name)
+      const consumerChips = out.consumerPersonas.map(p =>
+        `<span class="persona-chip"><span class="persona-dot" style="background:${escHtml(p.color)}"></span>${escHtml(p.name)}</span>`
+      ).join('')
+      const destChips = out.destinationSystems ? out.destinationSystems.map(s =>
+        `<span class="system-chip"><span class="sys-dot" style="background:${escHtml(s.color || '#64748B')}"></span>${escHtml(s.name)}</span>`
+      ).join('') : ''
+      const destHtml = destChips
+        ? `<div class="dest-row"><span class="dest-label">AVAILABLE IN</span>${destChips}</div>`
+        : ''
+      const dimHtml = dims.length > 0
+        ? `<div class="dim-divider"></div>${dims.map(d => `<div class="dim-item">&bull; ${escHtml(d)}</div>`).join('')}`
+        : ''
+      const catHtml = out.informationProduct.category
+        ? `<div class="ip-category">${escHtml(out.informationProduct.category.toUpperCase())}</div>`
+        : ''
+
+      return `<div class="lane">
+        <div class="lane-col output-col">
+          <div class="ip-card output-accent">
+            <div class="ip-name">${escHtml(out.informationProduct.name)}</div>
+            ${catHtml}
+            ${dimHtml}
+          </div>
+          ${destHtml}
+        </div>
+        <div class="lane-col arrow-col"><span class="arrow">&rarr;</span></div>
+        <div class="lane-col consumer-col">
+          <div class="persona-stack">${consumerChips || '<span class="empty-note">No consumers</span>'}</div>
+        </div>
+      </div>`
+    }).join('')
+
+    const sysLabel = cap.system ? `<span class="cap-system">${escHtml(cap.system.name)}</span>` : ''
+
+    return `<section class="capability-section">
+      <div class="cap-header">
+        <div class="cap-header-left">
+          <span class="cap-number">${ci + 1}</span>
+          <span class="cap-name">${escHtml(cap.name)}</span>
+        </div>
+        <div class="cap-header-right">
+          <span class="cap-io">${cap.inputs.length} inputs &middot; ${cap.outputs.length} outputs</span>
+          ${sysLabel}
+        </div>
+      </div>
+      <div class="sipoc-columns">
+        <div class="col-header"><span class="col-badge badge-s">S</span><span class="col-label">SUPPLIERS</span></div>
+        <div class="col-header"><span class="col-badge badge-i">I</span><span class="col-label">INPUTS</span></div>
+        <div class="col-header"><span class="col-badge badge-p">P</span><span class="col-label">PROCESS</span></div>
+        <div class="col-header"><span class="col-badge badge-o">O</span><span class="col-label">OUTPUTS</span></div>
+        <div class="col-header"><span class="col-badge badge-c">C</span><span class="col-label">CUSTOMERS</span></div>
+      </div>
+      <div class="sipoc-flow">
+        <div class="flow-side flow-left">
+          ${inputLanes || '<div class="empty-note">No inputs defined</div>'}
+        </div>
+        <div class="flow-center">
+          <div class="process-block">
+            <div class="process-level">L${cap.level} ${cap.level === 3 ? 'FUNCTIONALITY' : cap.level === 2 ? 'CAPABILITY' : 'CORE AREA'}</div>
+            <div class="process-name">${escHtml(cap.name)}</div>
+          </div>
+        </div>
+        <div class="flow-side flow-right">
+          ${outputLanes || '<div class="empty-note">No outputs defined</div>'}
+        </div>
+      </div>
+    </section>`
+  }).join('')
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MACH12 / ${escHtml(title)} - SIPOC</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #151E2E;
+    color: #F8FAFC;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+    line-height: 1.5;
+    padding: 32px;
+  }
+  .page-header {
+    margin-bottom: 32px;
+    border-bottom: 1px solid #374A5E;
+    padding-bottom: 16px;
+  }
+  .page-title {
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .page-title .brand { color: #2563EB; font-family: monospace; }
+  .page-title .slash { color: #64748B; margin: 0 8px; }
+  .page-meta {
+    font-size: 11px;
+    color: #64748B;
+    font-family: monospace;
+    margin-top: 4px;
+  }
+  .capability-section {
+    background: #1A2538;
+    border: 1px solid #374A5E;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .cap-header {
+    background: #1F2C3F;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #374A5E;
+  }
+  .cap-header-left { display: flex; align-items: center; gap: 10px; }
+  .cap-number {
+    background: #2563EB;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: monospace;
+  }
+  .cap-name { font-size: 15px; font-weight: 600; color: #F8FAFC; }
+  .cap-header-right { display: flex; align-items: center; gap: 12px; }
+  .cap-io { font-size: 11px; color: #64748B; font-family: monospace; }
+  .cap-system {
+    font-size: 10px;
+    color: #2563EB;
+    background: rgba(37,99,235,0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .sipoc-columns {
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 20px 8px;
+    border-bottom: 1px solid #374A5E;
+  }
+  .col-header { display: flex; align-items: center; gap: 8px; }
+  .col-badge {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+  }
+  .badge-s { background: #F97316; }
+  .badge-i { background: #EAB308; }
+  .badge-p { background: #2563EB; }
+  .badge-o { background: #10B981; }
+  .badge-c { background: #8B5CF6; }
+  .col-label { font-size: 9px; font-weight: 700; color: #64748B; font-family: monospace; letter-spacing: 0.5px; }
+  .sipoc-flow {
+    display: flex;
+    padding: 16px 12px;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .flow-side { flex: 2; display: flex; flex-direction: column; gap: 10px; }
+  .flow-center { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding-top: 4px; }
+  .process-block {
+    background: linear-gradient(135deg, #1B3355, #1A3A6B);
+    border: 1.5px solid #2563EB;
+    border-radius: 8px;
+    padding: 16px 14px;
+    text-align: center;
+    width: 100%;
+    min-height: 80px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .process-level { font-size: 8px; font-weight: 700; color: #2563EB; font-family: monospace; letter-spacing: 1px; margin-bottom: 6px; }
+  .process-name { font-size: 13px; font-weight: 700; color: #F8FAFC; }
+  .lane {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 0;
+  }
+  .lane-col { display: flex; flex-direction: column; gap: 4px; }
+  .supplier-col, .consumer-col { flex: 1; min-width: 0; }
+  .input-col, .output-col { flex: 1.3; min-width: 0; }
+  .arrow-col {
+    flex: 0 0 28px;
+    display: flex; align-items: center; justify-content: center;
+    padding-top: 8px;
+  }
+  .arrow { color: #374A5E; font-size: 16px; opacity: 0.6; }
+  .persona-stack { display: flex; flex-direction: column; gap: 4px; }
+  .persona-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #1F2C3F;
+    border: 1px solid #374A5E;
+    border-radius: 12px;
+    padding: 3px 10px 3px 6px;
+    font-size: 11px;
+    color: #CBD5E1;
+  }
+  .persona-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block; flex-shrink: 0;
+  }
+  .source-systems { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .system-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #1F2C3F;
+    border: 1px solid #374A5E;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10px;
+    color: #CBD5E1;
+  }
+  .sys-dot {
+    width: 8px; height: 8px; border-radius: 2px;
+    display: inline-block; flex-shrink: 0;
+  }
+  .ip-card {
+    background: #1F2C3F;
+    border: 1px solid #374A5E;
+    border-radius: 6px;
+    padding: 10px 12px;
+    border-left: 3px solid transparent;
+  }
+  .input-accent { border-left-color: #EAB308; }
+  .output-accent { border-left-color: #10B981; }
+  .ip-name { font-size: 12px; font-weight: 600; color: #F8FAFC; }
+  .ip-category { font-size: 9px; color: #64748B; font-family: monospace; text-transform: uppercase; margin-top: 2px; }
+  .dim-divider { border-top: 1px solid #374A5E; margin: 6px 0; }
+  .dim-item { font-size: 10px; color: #64748B; line-height: 1.6; }
+  .feeding-row, .dest-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 4px;
+  }
+  .feeding-label, .dest-label {
+    font-size: 8px; font-weight: 700; color: #64748B;
+    font-family: monospace; letter-spacing: 0.5px;
+  }
+  .empty-note { font-size: 10px; color: #64748B; font-style: italic; }
+  .page-footer {
+    text-align: center;
+    font-size: 10px;
+    color: #374A5E;
+    margin-top: 32px;
+    padding-top: 12px;
+    border-top: 1px solid #374A5E;
+    font-family: monospace;
   }
 
-  // Two-pass: first calculate all heights, then render
-  type CapLayout = { headerY: number; colHeaderY: number; contentY: number; laneYs: number[]; totalH: number }
-  const layouts: CapLayout[] = []
+  @media print {
+    body { background: #fff; color: #1a1a1a; padding: 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .capability-section { break-inside: avoid; page-break-inside: avoid; border-color: #ddd; background: #f9f9fb; }
+    .cap-header { background: #eef1f6; }
+    .ip-card { background: #f5f6fa; }
+    .process-block { background: #e8edf6; border-color: #2563EB; }
+    .persona-chip, .system-chip { background: #eef1f6; }
+    .page-footer { color: #999; border-color: #ddd; }
+  }
+</style>
+</head>
+<body>
+  <div class="page-header">
+    <div class="page-title"><span class="brand">MACH12</span><span class="slash">/</span>${escHtml(title)}</div>
+    <div class="page-meta">${capabilities.length} Capabilit${capabilities.length === 1 ? 'y' : 'ies'} &middot; SIPOC Export &middot; ${escHtml(dateStr)}</div>
+  </div>
+  ${capSections}
+  <div class="page-footer">Generated by Mach12.ai</div>
+</body>
+</html>`
 
-  let globalY = MARGIN + 70
-
-  capabilities.forEach(cap => {
-    const headerY = globalY
-    const colHeaderY = headerY + HEADER_H + 8
-    const contentY = colHeaderY + 30
-    const maxLanes = Math.max(cap.inputs.length, cap.outputs.length, 1)
-
-    const laneYs: number[] = []
-    let laneY = contentY
-    for (let li = 0; li < maxLanes; li++) {
-      laneYs.push(laneY)
-      const inp = cap.inputs[li]
-      const out = cap.outputs[li]
-
-      let leftH = 20
-      if (inp) {
-        const supH = calcSupplierH(inp)
-        const cardH = calcIPCardH(inp.informationProduct.name, inp.informationProduct.category, (inp.dimensions || []).map(d => d.name), COL_W) + (inp.feedingSystem ? 22 : 0)
-        leftH = Math.max(supH, cardH)
-      }
-
-      let rightH = 20
-      if (out) {
-        const cardH = calcIPCardH(out.informationProduct.name, out.informationProduct.category, (out.dimensions || []).map(d => d.name), COL_W)
-        const consH = Math.max(out.consumerPersonas.length, 0) * 24
-        rightH = Math.max(cardH, consH || 20)
-      }
-
-      laneY += Math.max(leftH, rightH) + 16
-    }
-
-    const totalH = laneY - headerY + 16
-    layouts.push({ headerY, colHeaderY, contentY, laneYs, totalH })
-    globalY = laneY + CAP_GAP
-  })
-
-  const totalH = globalY + 20
-
-  // ── Render ──
-  const parts: string[] = []
-
-  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">`)
-  parts.push(`<defs><style>text { dominant-baseline: auto; }</style></defs>`)
-  parts.push(`<rect width="${totalW}" height="${totalH}" fill="${SVG_COLORS.bg}"/>`)
-
-  // Title
-  parts.push(svgText(MARGIN, MARGIN + 20, 'MACH12', 18, SVG_COLORS.blue, { bold: true, family: 'monospace' }))
-  parts.push(svgText(MARGIN + 90, MARGIN + 20, `/ ${title}`, 13, SVG_COLORS.text))
-  parts.push(svgText(MARGIN, MARGIN + 38, `${capabilities.length} Capabilities · SIPOC Export · ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 7, SVG_COLORS.muted, { family: 'monospace' }))
-
-  capabilities.forEach((cap, ci) => {
-    const L = layouts[ci]
-    const maxLanes = Math.max(cap.inputs.length, cap.outputs.length, 1)
-    const sectionW = totalW - MARGIN * 2 + 20
-
-    // Section background
-    parts.push(svgRoundedRect(MARGIN - 10, L.headerY, sectionW, L.totalH, 8, '#1A2538', SVG_COLORS.border))
-
-    // Header bar
-    parts.push(svgRoundedRect(MARGIN - 10, L.headerY, sectionW, HEADER_H, 8, SVG_COLORS.cardBg))
-    parts.push(`<rect x="${MARGIN - 10}" y="${L.headerY + HEADER_H - 8}" width="${sectionW}" height="8" fill="${SVG_COLORS.cardBg}"/>`)
-
-    parts.push(svgText(MARGIN + 6, L.headerY + 20, `${ci + 1}.`, 10, SVG_COLORS.blue, { bold: true, family: 'monospace' }))
-    parts.push(svgText(MARGIN + 26, L.headerY + 20, cap.name, 12, SVG_COLORS.text, { bold: true }))
-    if (cap.description) parts.push(svgText(MARGIN + 26, L.headerY + 36, cap.description.slice(0, 100), 7, SVG_COLORS.muted))
-
-    const ioText = `${cap.inputs.length} inputs · ${cap.outputs.length} outputs`
-    parts.push(svgText(totalW - MARGIN - 10, L.headerY + 20, ioText, 7, SVG_COLORS.muted, { anchor: 'end', family: 'monospace' }))
-    if (cap.system) parts.push(svgText(totalW - MARGIN - 10, L.headerY + 34, `System: ${cap.system.name}`, 7, SVG_COLORS.blue, { anchor: 'end' }))
-
-    // Column headers
-    parts.push(svgColumnHeader(colX.s, L.colHeaderY, 'S', 'SUPPLIERS', SVG_COLORS.orange))
-    parts.push(svgColumnHeader(colX.i, L.colHeaderY, 'I', 'INPUTS', SVG_COLORS.yellow))
-    parts.push(svgColumnHeader(colX.p, L.colHeaderY, 'P', 'PROCESS', SVG_COLORS.blue))
-    parts.push(svgColumnHeader(colX.o, L.colHeaderY, 'O', 'OUTPUTS', SVG_COLORS.green))
-    parts.push(svgColumnHeader(colX.c, L.colHeaderY, 'C', 'CUSTOMERS', SVG_COLORS.violet))
-
-    // Process block (spans all lanes)
-    const procH = (L.laneYs[maxLanes - 1] || L.contentY) - L.contentY + 60
-    parts.push(svgRoundedRect(colX.p, L.contentY, PROC_W, Math.max(procH, 60), 6, '#1B3355', SVG_COLORS.blue + '40'))
-    const procMidY = L.contentY + Math.max(procH, 60) / 2
-    const procLines = wrapText(cap.name, PROC_W - 16, 10)
-    let procTY = procMidY - (procLines.length * 13) / 2 - 6
-    parts.push(svgText(colX.p + PROC_W / 2, procTY, `L${cap.level} ${cap.level === 3 ? 'FUNCTIONALITY' : cap.level === 2 ? 'CAPABILITY' : 'CORE AREA'}`, 6, SVG_COLORS.blue, { anchor: 'middle', bold: true, family: 'monospace' }))
-    procTY += 14
-    procLines.forEach(line => {
-      parts.push(svgText(colX.p + PROC_W / 2, procTY, line, 10, SVG_COLORS.text, { bold: true, anchor: 'middle' }))
-      procTY += 13
-    })
-
-    // Render lanes
-    for (let li = 0; li < maxLanes; li++) {
-      const laneY = L.laneYs[li]
-      const inp = cap.inputs[li]
-      const out = cap.outputs[li]
-
-      // ── Left side: Supplier → Input ──
-      if (inp) {
-        // Suppliers
-        let chipY = laneY
-        if (inp.supplierPersonas.length > 0) {
-          inp.supplierPersonas.forEach(p => {
-            const pill = svgPersonaPill(colX.s, chipY, p.name, p.color)
-            parts.push(pill.svg)
-            chipY += pill.h
-          })
-        }
-        if (inp.sourceSystems.length > 0) {
-          let sysX = colX.s
-          inp.sourceSystems.forEach((sys, si) => {
-            if (si > 0) {
-              parts.push(svgText(sysX + 2, chipY + 10, '→', 7, SVG_COLORS.muted))
-              sysX += 12
-            }
-            const chip = svgSystemChip(sysX, chipY, sys.name, sys.color || '#64748B')
-            parts.push(chip.svg)
-            sysX += chip.w + 4
-          })
-        }
-        if (inp.supplierPersonas.length === 0 && inp.sourceSystems.length === 0) {
-          parts.push(svgText(colX.s + 4, laneY + 12, 'No suppliers', 7, SVG_COLORS.muted))
-        }
-
-        // Input card
-        const card = svgIPCard(colX.i, laneY, COL_W, inp.informationProduct.name, inp.informationProduct.category, (inp.dimensions || []).map(d => d.name), SVG_COLORS.yellow)
-        parts.push(card.svg)
-        if (inp.feedingSystem) {
-          const fy = laneY + card.h + 2
-          const feed = svgSystemChip(colX.i + 10, fy, inp.feedingSystem.name, inp.feedingSystem.color || '#64748B')
-          parts.push(feed.svg)
-          parts.push(svgText(colX.i + 14 + feed.w, fy + 10, 'FEEDS', 5, SVG_COLORS.muted, { family: 'monospace' }))
-        }
-
-        // Arrows: S → I → P (simple horizontal lines)
-        const arrowMidY = laneY + card.h / 2
-        parts.push(`<line x1="${colX.a1 + 2}" y1="${arrowMidY}" x2="${colX.i - 2}" y2="${arrowMidY}" stroke="${SVG_COLORS.orange}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>`)
-        parts.push(`<line x1="${colX.a2 + 2}" y1="${arrowMidY}" x2="${colX.p - 2}" y2="${arrowMidY}" stroke="${SVG_COLORS.yellow}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>`)
-      }
-
-      // ── Right side: Output → Customer ──
-      if (out) {
-        // Output card
-        const card = svgIPCard(colX.o, laneY, COL_W, out.informationProduct.name, out.informationProduct.category, (out.dimensions || []).map(d => d.name), SVG_COLORS.green)
-        parts.push(card.svg)
-
-        // Consumers
-        let chipY = laneY
-        if (out.consumerPersonas.length > 0) {
-          out.consumerPersonas.forEach(p => {
-            const pill = svgPersonaPill(colX.c, chipY, p.name, p.color)
-            parts.push(pill.svg)
-            chipY += pill.h
-          })
-        } else {
-          parts.push(svgText(colX.c + 4, laneY + 12, 'No consumers', 7, SVG_COLORS.muted))
-        }
-
-        // Arrows: P → O → C
-        const arrowMidY = laneY + card.h / 2
-        parts.push(`<line x1="${colX.a3 + 2}" y1="${arrowMidY}" x2="${colX.o - 2}" y2="${arrowMidY}" stroke="${SVG_COLORS.blue}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>`)
-        parts.push(`<line x1="${colX.a4 + 2}" y1="${arrowMidY}" x2="${colX.c - 2}" y2="${arrowMidY}" stroke="${SVG_COLORS.green}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.4"/>`)
-      }
-
-      // Empty placeholders
-      if (!inp && cap.inputs.length === 0 && li === 0) {
-        parts.push(svgText(colX.s + COL_W / 2, laneY + 14, 'No inputs', 8, SVG_COLORS.muted, { anchor: 'middle' }))
-      }
-      if (!out && cap.outputs.length === 0 && li === 0) {
-        parts.push(svgText(colX.o + COL_W / 2, laneY + 14, 'No outputs', 8, SVG_COLORS.muted, { anchor: 'middle' }))
-      }
-    }
-  })
-
-  // Footer
-  parts.push(svgText(MARGIN, totalH - 10, 'Generated by Mach12.ai', 7, SVG_COLORS.border, { family: 'monospace' }))
-  parts.push('</svg>')
-
-  // Download
-  const svgContent = parts.join('\n')
-  const blob = new Blob([svgContent], { type: 'image/svg+xml' })
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${sanitizeFilename(title)}_SIPOC.svg`
+  a.download = `${sanitizeFilename(title)}_SIPOC.html`
   a.click()
   URL.revokeObjectURL(url)
 }

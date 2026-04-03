@@ -114,6 +114,7 @@ export interface CapabilityOutput {
   capability_id: string
   information_product_id: string
   consumer_persona_ids: string[]
+  destination_system_ids: string[]   // downstream system flow (ordered)
   dimensions: Dimension[]
   sort_order: number
   created_at: string
@@ -131,6 +132,7 @@ export interface HydratedCapability extends Capability {
   outputs: (CapabilityOutput & {
     informationProduct: InformationProduct
     consumerPersonas: Persona[]
+    destinationSystems: LogicalSystem[]
   })[]
 }
 

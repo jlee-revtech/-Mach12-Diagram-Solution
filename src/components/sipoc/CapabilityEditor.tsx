@@ -381,6 +381,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const addOutput = useSIPOCStore(s => s.addOutput)
   const removeOutput = useSIPOCStore(s => s.removeOutput)
   const updateOutputConsumers = useSIPOCStore(s => s.updateOutputConsumers)
+  const updateOutputSystems = useSIPOCStore(s => s.updateOutputSystems)
   const addInformationProduct = useSIPOCStore(s => s.addInformationProduct)
 
   const capability = capabilities.find(c => c.id === capabilityId)
@@ -667,7 +668,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   <div className="w-1 h-3 rounded-full bg-[#10B981]/60 shrink-0" />
                   <span className="text-xs font-medium text-[var(--m12-text)] flex-1 truncate">{ip?.name || '(deleted)'}</span>
                   <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
-                    {output.consumer_persona_ids.length}c {(output.dimensions || []).length}d
+                    {output.consumer_persona_ids.length}c {(output.destination_system_ids || []).length}sys {(output.dimensions || []).length}d
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); removeOutput(output.id, capabilityId) }}
@@ -688,6 +689,74 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     onChange={ids => updateOutputConsumers(output.id, capabilityId, ids)}
                     colorFn={p => p.color}
                     emptyLabel="Create personas first"
+                  />
+                </div>
+                {/* Destination systems */}
+                <div>
+                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                    Destination Systems
+                    {(output.destination_system_ids || []).length > 1 && (
+                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(order = integration flow)</span>
+                    )}
+                  </div>
+                  {(output.destination_system_ids || []).length > 0 && (
+                    <div className="space-y-0 mb-2">
+                      {(output.destination_system_ids || []).map((sysId, idx) => {
+                        const sys = logicalSystems.find(s => s.id === sysId)
+                        if (!sys) return null
+                        const tmpl = SYSTEM_TEMPLATES.find(t => t.type === sys.system_type)
+                        const isFirst = idx === 0
+                        const isLast = idx === (output.destination_system_ids || []).length - 1
+                        return (
+                          <div key={sysId}>
+                            {idx > 0 && (
+                              <div className="flex items-center py-0.5 pl-3">
+                                <svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M4 0v12M1 9l3 3 3-3" stroke="var(--m12-text-faint)" strokeWidth="0.8" strokeLinecap="round" /></svg>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--m12-bg)] border border-[var(--m12-border)]/20 group/sys">
+                              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: sys.color || '#64748B' }} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[10px] font-medium text-[var(--m12-text)] truncate">{sys.name}</div>
+                                {tmpl && <div className="text-[7px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{tmpl.label}</div>}
+                              </div>
+                              <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] font-bold">
+                                {isFirst && (output.destination_system_ids || []).length > 1 ? 'PRIMARY' : `#${idx + 1}`}
+                              </span>
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover/sys:opacity-100 transition-opacity">
+                                {!isFirst && (
+                                  <button onClick={() => { const ids = [...(output.destination_system_ids || [])]; [ids[idx-1],ids[idx]]=[ids[idx],ids[idx-1]]; updateOutputSystems(output.id, capabilityId, ids) }} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5" title="Move up">
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5L1.5 4.5h5L4 1.5z" fill="currentColor" /></svg>
+                                  </button>
+                                )}
+                                {!isLast && (
+                                  <button onClick={() => { const ids = [...(output.destination_system_ids || [])]; [ids[idx],ids[idx+1]]=[ids[idx+1],ids[idx]]; updateOutputSystems(output.id, capabilityId, ids) }} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5" title="Move down">
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 6.5L1.5 3.5h5L4 6.5z" fill="currentColor" /></svg>
+                                  </button>
+                                )}
+                                <button onClick={() => updateOutputSystems(output.id, capabilityId, (output.destination_system_ids || []).filter(id => id !== sysId))} className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors p-0.5" title="Remove">
+                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <MultiSelect
+                    items={logicalSystems.filter(s => !(output.destination_system_ids || []).includes(s.id))}
+                    selectedIds={[]}
+                    onChange={newIds => {
+                      if (newIds.length > 0) updateOutputSystems(output.id, capabilityId, [...(output.destination_system_ids || []), ...newIds])
+                    }}
+                    colorFn={s => s.color || '#64748B'}
+                    groupFn={s => {
+                      const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
+                      return tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
+                    }}
+                    emptyLabel="No more systems to add"
+                    placeholder="+ Add destination system..."
                   />
                 </div>
                 {/* Data Objects */}

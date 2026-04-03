@@ -89,6 +89,8 @@ export async function POST(req: NextRequest) {
       return handleSIPOCExecutiveSummary(context)
     } else if (action === 'sipoc-flow-diagram') {
       return handleSIPOCFlowDiagram(prompt, context)
+    } else if (action === 'sipoc-bulk-load') {
+      return handleSIPOCBulkLoad(prompt, context, image)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -817,4 +819,83 @@ Return ONLY the raw <svg>...</svg> element. No markdown, no code fences, no expl
   return new Response(svg, {
     headers: { 'Content-Type': 'image/svg+xml' },
   })
+}
+
+// ─── Bulk Load L2/L3 capabilities under an L1 Core Area ──
+
+async function handleSIPOCBulkLoad(
+  prompt: string,
+  context: { coreAreaName: string; existingL2s?: string[]; existingL3s?: string[] },
+  image?: string
+) {
+  const content: any[] = []
+
+  if (image) {
+    const match = image.match(/^data:(image\/\w+);base64,(.+)$/)
+    if (match) {
+      content.push({
+        type: 'image',
+        source: { type: 'base64', media_type: match[1], data: match[2] },
+      })
+    }
+  }
+
+  const existingNote = context.existingL2s?.length
+    ? `\n\nExisting L2 Capabilities already in this Core Area (DO NOT duplicate these):\n${context.existingL2s.map(n => `- ${n}`).join('\n')}${context.existingL3s?.length ? `\n\nExisting L3 Functionalities:\n${context.existingL3s.map(n => `- ${n}`).join('\n')}` : ''}`
+    : ''
+
+  const textPrompt = `You are an expert enterprise capability modeler for Aerospace & Defense organizations.
+
+The user wants to populate an L1 Core Area called "${context.coreAreaName}" with L2 Capabilities and L3 Functionalities.
+
+${image ? 'An image has been provided — analyze it to extract capabilities and functionalities. The image may be a screenshot of an existing capability model, org chart, process map, or similar document.' : ''}
+
+${prompt ? `User instructions: ${prompt}` : 'Generate a comprehensive set of L2 Capabilities and L3 Functionalities for this core area.'}
+${existingNote}
+
+Return ONLY valid JSON matching this exact structure:
+{
+  "capabilities": [
+    {
+      "name": "L2 Capability Name",
+      "description": "Brief description of this capability",
+      "level": 2,
+      "children": [
+        {
+          "name": "L3 Functionality Name",
+          "description": "Brief description",
+          "level": 3
+        }
+      ]
+    }
+  ]
+}
+
+Guidelines:
+- L2 = Business Capability (e.g., "Budget Authorization", "Cost Estimation")
+- L3 = Specific Functionality/Process within that capability (e.g., "Labor Rate Development", "Material Cost Forecasting")
+- Generate 3-8 L2 capabilities, each with 2-6 L3 functionalities
+- Names should be concise, professional, and specific to A&D/GovCon where applicable
+- If an image is provided, extract capabilities and functionalities visible in it
+- Do NOT duplicate any existing capabilities listed above
+
+Return ONLY the JSON. No markdown, no explanation.`
+
+  content.push({ type: 'text', text: textPrompt })
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    messages: [{ role: 'user', content }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const json = JSON.parse(cleaned)
+    return NextResponse.json(json)
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse AI response', raw: text }, { status: 500 })
+  }
 }

@@ -7,9 +7,9 @@ import { useSIPOCStore } from '@/lib/sipoc/store'
 import SIPOCDrawer from '@/components/sipoc/SIPOCDrawer'
 import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
-import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
 import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
+import AIBulkLoadPanel from '@/components/sipoc/AIBulkLoadPanel'
 import VersionBadge from '@/components/VersionBadge'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,10 +26,10 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [titleInput, setTitleInput] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [showAI, setShowAI] = useState(false)
-  const [showAnalysis, setShowAnalysis] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
   const [showExecSummary, setShowExecSummary] = useState(false)
+  const [bulkLoadTarget, setBulkLoadTarget] = useState<{ id: string; name: string } | null>(null)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -135,18 +135,6 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           Executive Summary
         </button>
 
-        {/* AI analyze button */}
-        <button
-          onClick={() => setShowAnalysis(true)}
-          className="flex items-center gap-1.5 border border-[#06B6D4]/40 hover:bg-[#06B6D4]/10 text-[#06B6D4] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M6 3.5v3M6 8.5v.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-          Analyze
-        </button>
-
 
       </div>
 
@@ -159,13 +147,14 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
               onSelectCapability={(id) => {
                 useSIPOCStore.getState().setSelectedCapability(id)
               }}
+              onAILoad={(id, name) => setBulkLoadTarget({ id, name })}
             />
           </div>
         )}
 
         {/* SIPOC Drawer + Editor */}
         {organization && (
-          <SIPOCDrawer orgId={organization.id} editorOpen={editorOpen} onToggleEditor={() => setEditorOpen(e => !e)} onShowAI={() => setShowAI(true)} mapTitle={map.title}>
+          <SIPOCDrawer orgId={organization.id} editorOpen={editorOpen} onToggleEditor={() => setEditorOpen(e => !e)} onShowAI={(prompt?: string) => { if (prompt) setAiPromptOverride(prompt); setShowAI(true) }} mapTitle={map.title}>
             {editorOpen && selectedCapabilityId && (
               <CapabilityEditor orgId={organization.id} />
             )}
@@ -188,21 +177,12 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         <ExecutiveSummary onClose={() => setShowExecSummary(false)} />
       )}
 
-      {/* AI Analyze Panel */}
-      {showAnalysis && (
-        <AIAnalyzePanel
-          onClose={() => setShowAnalysis(false)}
-          onImplement={(capabilityName, prompt) => {
-            // Find the capability by name and select it
-            const caps = useSIPOCStore.getState().capabilities
-            const cap = caps.find(c => c.name === capabilityName)
-            if (cap) {
-              useSIPOCStore.getState().setSelectedCapability(cap.id)
-            }
-            setAiPromptOverride(prompt)
-            setShowAnalysis(false)
-            setShowAI(true)
-          }}
+      {/* AI Bulk Load Panel */}
+      {bulkLoadTarget && (
+        <AIBulkLoadPanel
+          coreAreaId={bulkLoadTarget.id}
+          coreAreaName={bulkLoadTarget.name}
+          onClose={() => setBulkLoadTarget(null)}
         />
       )}
     </div>

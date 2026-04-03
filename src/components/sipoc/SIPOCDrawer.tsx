@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { HydratedCapability, Persona, LogicalSystem, InformationProduct, Dimension } from '@/lib/sipoc/types'
-import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx, exportSIPOCSvg } from '@/lib/export/sipoc'
+import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx, exportSIPOCHtml } from '@/lib/export/sipoc'
+import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 
 // ─── SIPOC color tokens ──────────────────────────────────
 const SIPOC = {
@@ -42,12 +43,13 @@ function SystemChip({ system, small }: { system: LogicalSystem; small?: boolean 
   )
 }
 
-function IPCard({ name, category, dimensions, accent, onClick }: {
+function IPCard({ name, category, dimensions, accent, onClick, showDims = true }: {
   name: string
   category?: string
   dimensions: Dimension[]
   accent: string
   onClick?: () => void
+  showDims?: boolean
 }) {
   return (
     <div
@@ -63,7 +65,7 @@ function IPCard({ name, category, dimensions, accent, onClick }: {
           </span>
         )}
       </div>
-      {dimensions.length > 0 && (
+      {showDims && dimensions.length > 0 && (
         <div className="px-3 pb-2 flex flex-wrap gap-1">
           {dimensions.map(d => (
             <span key={d.id} className="px-1.5 py-0.5 text-[8px] rounded bg-[var(--m12-bg)] text-[var(--m12-text-muted)] border border-[var(--m12-border)]/10">
@@ -123,7 +125,7 @@ function HFlowArrow({ color }: { color: string }) {
 
 // ─── Input lane (Suppliers → Input card) ─────────────────
 
-function InputLane({ input, onRemove, onClickCard }: { input: HydratedCapability['inputs'][number]; onRemove: () => void; onClickCard: () => void }) {
+function InputLane({ input, onRemove, onClickCard, showDims }: { input: HydratedCapability['inputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean }) {
   const hasSuppliers = input.supplierPersonas.length > 0
   const hasSystems = input.sourceSystems.length > 0
   const hasLeft = hasSuppliers || hasSystems
@@ -174,6 +176,7 @@ function InputLane({ input, onRemove, onClickCard }: { input: HydratedCapability
           dimensions={input.dimensions || []}
           accent={SIPOC.I.color}
           onClick={onClickCard}
+          showDims={showDims}
         />
         {input.feedingSystem && (
           <div className="flex items-center gap-1 mt-1.5 pl-1">
@@ -191,8 +194,9 @@ function InputLane({ input, onRemove, onClickCard }: { input: HydratedCapability
 
 // ─── Output lane (Output card → Customers) ───────────────
 
-function OutputLane({ output, onRemove, onClickCard }: { output: HydratedCapability['outputs'][number]; onRemove: () => void; onClickCard: () => void }) {
+function OutputLane({ output, onRemove, onClickCard, showDims }: { output: HydratedCapability['outputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean }) {
   const hasConsumers = output.consumerPersonas.length > 0
+  const hasSystems = output.destinationSystems.length > 0
 
   return (
     <div className="flex items-stretch gap-0 group/lane">
@@ -213,7 +217,20 @@ function OutputLane({ output, onRemove, onClickCard }: { output: HydratedCapabil
           dimensions={output.dimensions || []}
           accent={SIPOC.O.color}
           onClick={onClickCard}
+          showDims={showDims}
         />
+        {/* Destination system lineage */}
+        {hasSystems && (
+          <div className="flex items-center gap-0.5 flex-wrap mt-1.5 pl-1">
+            <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase mr-0.5">available in</span>
+            {output.destinationSystems.map((sys, si) => (
+              <div key={sys.id} className="flex items-center gap-0.5">
+                {si > 0 && <MiniLineageArrow />}
+                <SystemChip system={sys} small />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Arrow: output → customers */}
@@ -237,7 +254,7 @@ function OutputLane({ output, onRemove, onClickCard }: { output: HydratedCapabil
 
 // ─── SIPOC Flow Content (lane-based layout) ──────────────
 
-function SIPOCFlowContent({ capability, onOpenEditor }: { capability: HydratedCapability; onOpenEditor: () => void }) {
+function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: HydratedCapability; onOpenEditor: () => void; showDims?: boolean }) {
   const removeInput = useSIPOCStore(s => s.removeInput)
   const removeOutput = useSIPOCStore(s => s.removeOutput)
   const setFocusedItem = useSIPOCStore(s => s.setFocusedItem)
@@ -268,7 +285,7 @@ function SIPOCFlowContent({ capability, onOpenEditor }: { capability: HydratedCa
           <div className="flex-1">
             {inputs.map((input, i) => (
               <div key={input.id} className={i > 0 ? 'border-t border-[var(--m12-border)]/8' : ''}>
-                <InputLane input={input} onRemove={() => removeInput(input.id, capability.id)} onClickCard={() => handleClickItem(input.id)} />
+                <InputLane input={input} onRemove={() => removeInput(input.id, capability.id)} onClickCard={() => handleClickItem(input.id)} showDims={showDims} />
               </div>
             ))}
           </div>
@@ -334,7 +351,7 @@ function SIPOCFlowContent({ capability, onOpenEditor }: { capability: HydratedCa
           <div className="flex-1">
             {outputs.map((output, i) => (
               <div key={output.id} className={i > 0 ? 'border-t border-[var(--m12-border)]/8' : ''}>
-                <OutputLane output={output} onRemove={() => removeOutput(output.id, capability.id)} onClickCard={() => handleClickItem(output.id)} />
+                <OutputLane output={output} onRemove={() => removeOutput(output.id, capability.id)} onClickCard={() => handleClickItem(output.id)} showDims={showDims} />
               </div>
             ))}
           </div>
@@ -391,7 +408,7 @@ function ExportMenu({ hydrated, mapTitle, orgId }: { hydrated: HydratedCapabilit
             { label: 'PDF', fn: () => exportSIPOCPdf(capName, exportCaps) },
             { label: 'Excel', fn: () => { const s = useSIPOCStore.getState(); exportSIPOCExcel(capName, exportCaps, s.personas, s.informationProducts, s.logicalSystems) } },
             { label: 'PowerPoint', fn: () => exportSIPOCPptx(capName, exportCaps) },
-            { label: 'SVG', fn: () => exportSIPOCSvg(capName, exportCaps) },
+            { label: 'HTML', fn: () => exportSIPOCHtml(capName, exportCaps) },
           ].map(({ label, fn }) => (
             <button
               key={label}
@@ -413,7 +430,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
   orgId: string
   editorOpen: boolean
   onToggleEditor: () => void
-  onShowAI: () => void
+  onShowAI: (prompt?: string) => void
   mapTitle: string
   children?: React.ReactNode
 }) {
@@ -424,6 +441,8 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
 
   const fullscreen = useSIPOCStore(s => s.drawerFullscreen)
 
+  const [showDims, setShowDims] = useState(true)
+  const [showAnalysis, setShowAnalysis] = useState(false)
   const [resizing, setResizing] = useState(false)
   const [contentVisible, setContentVisible] = useState(false)
   const resizeRef = useRef<{ startY: number; startH: number } | null>(null)
@@ -599,12 +618,40 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
           </button>
         </div>
 
+        {/* Dims toggle */}
+        <button
+          onClick={() => setShowDims(d => !d)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
+            showDims
+              ? 'bg-[var(--m12-bg)] text-[var(--m12-text)]'
+              : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)]'
+          }`}
+        >
+          Dims
+        </button>
+
         {/* Export dropdown */}
         <ExportMenu hydrated={hydrated} mapTitle={mapTitle} orgId={orgId} />
 
+        {/* Analyze */}
+        <button
+          onClick={() => setShowAnalysis(a => !a)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
+            showAnalysis
+              ? 'bg-[#06B6D4]/15 text-[#06B6D4]'
+              : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)]'
+          }`}
+        >
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M6 3.5v3M6 8.5v.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          Analyze
+        </button>
+
         {/* AI Generate */}
         <button
-          onClick={onShowAI}
+          onClick={() => onShowAI()}
           className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider bg-gradient-to-r from-[#8B5CF6] to-[#2563EB] text-white hover:from-[#7C3AED] hover:to-[#3B82F6] transition-all"
         >
           <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
@@ -670,14 +717,38 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
       >
         {/* SIPOC flow (takes remaining space) */}
         <div className="flex-1 min-w-0 overflow-hidden">
-          {hydrated ? (
-            <SIPOCFlowContent capability={hydrated} onOpenEditor={() => { if (!editorOpen) onToggleEditor() }} />
+          {showAnalysis ? (
+            <AIAnalyzePanel
+              onClose={() => setShowAnalysis(false)}
+              onImplement={(capabilityName, prompt) => {
+                const caps = useSIPOCStore.getState().capabilities
+                const cap = caps.find(c => c.name === capabilityName)
+                if (cap) {
+                  useSIPOCStore.getState().setSelectedCapability(cap.id)
+                }
+                setShowAnalysis(false)
+                onShowAI(prompt)
+              }}
+            />
+          ) : hydrated ? (
+            <SIPOCFlowContent capability={hydrated} onOpenEditor={() => { if (!editorOpen) onToggleEditor() }} showDims={showDims} />
           ) : (
             <div className="flex items-center justify-center h-full text-[var(--m12-text-faint)] text-xs">
               Select a capability on the map to view its SIPOC
             </div>
           )}
         </div>
+
+        {/* Editor toggle tab */}
+        <button
+          onClick={onToggleEditor}
+          className="shrink-0 w-5 flex items-center justify-center border-l border-[var(--m12-border)]/20 hover:bg-[var(--m12-bg)] transition-colors cursor-pointer group"
+          title={editorOpen ? 'Hide editor' : 'Show editor'}
+        >
+          <svg width="8" height="12" viewBox="0 0 8 12" fill="none" className={`text-[var(--m12-text-muted)] group-hover:text-[var(--m12-text)] transition-all ${editorOpen ? 'rotate-180' : ''}`}>
+            <path d="M2 1l5 5-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
 
         {/* Editor panel (slides in from right) */}
         <div

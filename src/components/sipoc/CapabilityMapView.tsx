@@ -131,7 +131,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
 }
 
 // ─── L1 Core Area column (draggable + drop target) ──────
-function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onDrop, onReorderL1 }: {
+function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1 }: {
   node: CapabilityTreeNode
   color: string
   index: number
@@ -139,6 +139,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
   onSelect: (id: string) => void
   onAddL2: (parentId: string) => void
   onAddL3: (parentId: string) => void
+  onAILoad: (coreAreaId: string, coreAreaName: string) => void
   onDrop: (dragId: string, targetParentId: string) => void
   onReorderL1: (dragId: string, targetIndex: number) => void
 }) {
@@ -235,6 +236,16 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
                     + Add L3 Functionality
                   </button>
                 )}
+                <div className="border-t border-[var(--m12-border)]/20" />
+                <button
+                  onClick={() => { setShowAddMenu(false); onAILoad(node.id, node.name) }}
+                  className="w-full text-left px-3 py-2 text-[10px] flex items-center gap-1.5 text-[#8B5CF6] hover:bg-[#8B5CF6]/10 transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="currentColor" />
+                  </svg>
+                  AI Bulk Load
+                </button>
               </div>
             </>
           )}
@@ -268,8 +279,9 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
 }
 
 // ─── Main Capability Map View ───────────────────────────
-export default function CapabilityMapView({ onSelectCapability }: {
+export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
   onSelectCapability: (id: string) => void
+  onAILoad?: (coreAreaId: string, coreAreaName: string) => void
 }) {
   const capabilities = useSIPOCStore(s => s.capabilities)
   const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
@@ -474,6 +486,7 @@ export default function CapabilityMapView({ onSelectCapability }: {
               onSelect={handleSelect}
               onAddL2={handleAddL2}
               onAddL3={handleAddL3}
+              onAILoad={onAILoad || (() => {})}
               onDrop={handleDrop}
               onReorderL1={handleReorderL1}
             />

@@ -130,8 +130,8 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
   }, [map])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-2xl shadow-2xl w-[680px] max-h-[85vh] flex flex-col overflow-hidden">
+    <div className="flex flex-col h-full">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-[var(--m12-border)]/30 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">

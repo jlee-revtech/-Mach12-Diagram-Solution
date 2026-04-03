@@ -67,6 +67,7 @@ interface SIPOCState {
   addOutput: (capabilityId: string, informationProductId: string) => Promise<void>
   removeOutput: (outputId: string, capabilityId: string) => Promise<void>
   updateOutputConsumers: (outputId: string, capabilityId: string, personaIds: string[]) => Promise<void>
+  updateOutputSystems: (outputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
 
   // ─── Dimension CRUD (on inputs/outputs) ─────────────────
   addDimension: (side: 'input' | 'output', itemId: string, capabilityId: string, name: string) => Promise<void>
@@ -321,6 +322,18 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     })
   },
 
+  updateOutputSystems: async (outputId, capabilityId, systemIds) => {
+    await api.updateCapabilityOutput(outputId, { destination_system_ids: systemIds })
+    set({
+      outputs: {
+        ...get().outputs,
+        [capabilityId]: (get().outputs[capabilityId] || []).map(o =>
+          o.id === outputId ? { ...o, destination_system_ids: systemIds } : o
+        ),
+      },
+    })
+  },
+
   // ─── Dimension CRUD helpers ─────────────────────────────
 
   addDimension: async (side, itemId, capabilityId, name) => {
@@ -459,6 +472,9 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         consumerPersonas: output.consumer_persona_ids
           .map(id => personaMap.get(id))
           .filter((p): p is Persona => !!p),
+        destinationSystems: (output.destination_system_ids || [])
+          .map(id => sysMap.get(id))
+          .filter((s): s is LogicalSystem => !!s),
       })),
     }))
   },
