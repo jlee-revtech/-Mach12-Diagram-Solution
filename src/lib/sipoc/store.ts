@@ -44,7 +44,7 @@ interface SIPOCState {
 
   // ─── Capability CRUD ──────────────────────────────────
   addCapability: (name: string) => Promise<void>
-  updateCapability: (id: string, updates: Partial<Pick<Capability, 'name' | 'description'>>) => Promise<void>
+  updateCapability: (id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id'>>) => Promise<void>
   removeCapability: (id: string) => Promise<void>
   reorderCapability: (id: string, newSortOrder: number) => Promise<void>
   setSelectedCapability: (id: string | null) => void
@@ -401,6 +401,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
 
     return capabilities.map(cap => ({
       ...cap,
+      system: cap.system_id ? sysMap.get(cap.system_id) || null : null,
       inputs: (inputs[cap.id] || []).map(input => ({
         ...input,
         informationProduct: ipMap.get(input.information_product_id) || {

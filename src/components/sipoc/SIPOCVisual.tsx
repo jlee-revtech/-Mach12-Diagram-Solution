@@ -303,7 +303,13 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
             {capability.description && (
               <div className="text-[10px] text-[var(--m12-text-muted)] mt-1.5 line-clamp-3 leading-relaxed">{capability.description}</div>
             )}
-            <div className="mt-2 inline-flex items-center gap-1 text-[7px] font-[family-name:var(--font-space-mono)] text-[#2563EB]/60 uppercase tracking-widest font-bold">
+            {capability.system && (
+              <div className="mt-2 flex items-center justify-center gap-1.5">
+                <div className="w-2 h-2 rounded shrink-0" style={{ backgroundColor: capability.system.color || '#64748B' }} />
+                <span className="text-[8px] font-medium text-[var(--m12-text-secondary)]">{capability.system.name}</span>
+              </div>
+            )}
+            <div className={`${capability.system ? 'mt-1' : 'mt-2'} inline-flex items-center gap-1 text-[7px] font-[family-name:var(--font-space-mono)] text-[#2563EB]/60 uppercase tracking-widest font-bold`}>
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                 <circle cx="4" cy="4" r="3" stroke="currentColor" strokeWidth="0.8" />
                 <circle cx="4" cy="4" r="1" fill="currentColor" />

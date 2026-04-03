@@ -54,6 +54,7 @@ export interface Capability {
   capability_map_id: string
   name: string
   description?: string
+  system_id?: string | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -92,6 +93,7 @@ export interface CapabilityOutput {
 
 // ─── Hydrated capability (all data resolved) ───────────
 export interface HydratedCapability extends Capability {
+  system: LogicalSystem | null
   inputs: (CapabilityInput & {
     informationProduct: InformationProduct
     supplierPersonas: Persona[]

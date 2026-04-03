@@ -134,7 +134,7 @@ export async function createCapability(mapId: string, name: string, sortOrder: n
   return Array.isArray(arr) ? arr[0] : arr
 }
 
-export async function updateCapability(id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'sort_order'>>): Promise<void> {
+export async function updateCapability(id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'sort_order'>>): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/capabilities?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },

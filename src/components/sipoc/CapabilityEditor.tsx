@@ -286,6 +286,37 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
         />
       </div>
 
+      {/* System (where this capability is performed) */}
+      <div>
+        <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+          Performed In
+          <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(system)</span>
+        </div>
+        {(() => {
+          const capSys = capability.system_id ? logicalSystems.find(s => s.id === capability.system_id) : null
+          const capTmpl = capSys ? SYSTEM_TEMPLATES.find(t => t.type === capSys.system_type) : null
+          return (
+            <div className="relative">
+              <select
+                value={capability.system_id || ''}
+                onChange={e => updateCapability(capabilityId, { system_id: e.target.value || null })}
+                className="w-full bg-[var(--m12-bg-input)] border border-[#2563EB]/30 rounded-lg px-2.5 py-2 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60 appearance-none pr-7"
+                style={capSys ? { borderLeftWidth: 3, borderLeftColor: capSys.color || capTmpl?.color || '#64748B' } : {}}
+              >
+                <option value="">Not specified</option>
+                {logicalSystems.map(s => {
+                  const t = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
+                  return <option key={s.id} value={s.id}>{s.name}{t ? ` (${t.label})` : ''}</option>
+                })}
+              </select>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--m12-text-muted)] pointer-events-none">
+                <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          )
+        })()}
+      </div>
+
       {/* INPUTS section */}
       <div>
         <SectionLabel label="Inputs" count={inputs.length} />
@@ -404,9 +435,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                           style={feedSys ? { borderLeftWidth: 3, borderLeftColor: feedSys.color || feedTmpl?.color || '#64748B' } : {}}
                         >
                           <option value="">None</option>
-                          {logicalSystems
-                            .filter(s => !input.source_system_ids.includes(s.id))
-                            .map(s => {
+                          {logicalSystems.map(s => {
                               const t = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
                               return <option key={s.id} value={s.id}>{s.name}{t ? ` (${t.label})` : ''}</option>
                             })
