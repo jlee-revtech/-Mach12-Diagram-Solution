@@ -22,6 +22,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const mapTitle = map?.title ?? ''
   const loading = useSIPOCStore(s => s.loading)
   const selectedCapabilityId = useSIPOCStore(s => s.selectedCapabilityId)
+  const drawerFullscreen = useSIPOCStore(s => s.drawerFullscreen)
 
   const [titleInput, setTitleInput] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
@@ -230,14 +231,16 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
 
       {/* Main content: MAP + SIPOC drawer */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* MAP area */}
-        <div className="flex-1 overflow-auto p-6 min-h-0">
-          <CapabilityMapView
-            onSelectCapability={(id) => {
-              useSIPOCStore.getState().setSelectedCapability(id)
-            }}
-          />
-        </div>
+        {/* MAP area (hidden in fullscreen) */}
+        {!drawerFullscreen && (
+          <div className="flex-1 overflow-auto p-6 min-h-0">
+            <CapabilityMapView
+              onSelectCapability={(id) => {
+                useSIPOCStore.getState().setSelectedCapability(id)
+              }}
+            />
+          </div>
+        )}
 
         {/* SIPOC Drawer + Editor */}
         {organization && (

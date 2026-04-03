@@ -34,6 +34,86 @@ function QuickAdd({ placeholder, onAdd }: { placeholder: string; onAdd: (value: 
   )
 }
 
+// ─── Searchable IP dropdown ─────────────────────────────
+function SearchableIPDropdown({ items, onSelect, accent, placeholder }: {
+  items: InformationProduct[]
+  onSelect: (id: string) => void
+  accent: string
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const filtered = items.filter(ip =>
+    ip.name.toLowerCase().includes(filter.toLowerCase()) ||
+    (ip.category || '').toLowerCase().includes(filter.toLowerCase())
+  )
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  if (items.length === 0) return null
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        onClick={() => { setOpen(o => !o); setFilter('') }}
+        className={`w-full text-left text-[10px] px-2.5 py-1.5 rounded-lg border border-dashed transition-colors ${
+          open
+            ? `border-[${accent}]/60 text-[${accent}]`
+            : `border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[${accent}]/40 hover:text-[${accent}]`
+        }`}
+        style={open ? { borderColor: `${accent}99`, color: accent } : undefined}
+      >
+        + Add existing info product
+      </button>
+      {open && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden">
+          <div className="p-1.5 border-b border-[var(--m12-border)]/20">
+            <input
+              ref={inputRef}
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              placeholder={placeholder}
+              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-md px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[color:var(--accent)]"
+              style={{ '--accent': accent } as React.CSSProperties}
+            />
+          </div>
+          <div className="max-h-[180px] overflow-y-auto">
+            {filtered.length > 0 ? filtered.map(ip => (
+              <button
+                key={ip.id}
+                onClick={() => { onSelect(ip.id); setOpen(false); setFilter('') }}
+                className="w-full text-left px-2.5 py-1.5 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors flex items-center gap-2"
+              >
+                <div className="w-1 h-3 rounded-full shrink-0" style={{ backgroundColor: accent }} />
+                <span className="flex-1 truncate">{ip.name}</span>
+                {ip.category && (
+                  <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase shrink-0">{ip.category}</span>
+                )}
+              </button>
+            )) : (
+              <div className="px-2.5 py-3 text-[10px] text-[var(--m12-text-faint)] text-center italic">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Multi-select tag picker ────────────────────────────
 function MultiSelect<T extends { id: string; name: string }>({
   items,
@@ -524,22 +604,12 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
           })}
 
           {/* Add existing IP as input */}
-          {availableForInput.length > 0 && (
-            <div>
-              <div className="text-[9px] text-[var(--m12-text-muted)] mb-1 font-[family-name:var(--font-space-mono)]">ADD EXISTING</div>
-              <div className="flex flex-wrap gap-1">
-                {availableForInput.slice(0, 8).map(ip => (
-                  <button
-                    key={ip.id}
-                    onClick={() => handleAddInputIP(ip.id)}
-                    className="text-[10px] px-2 py-0.5 rounded border border-dashed border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[#EAB308]/60 hover:text-[#EAB308] transition-colors"
-                  >
-                    + {ip.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <SearchableIPDropdown
+            items={availableForInput}
+            onSelect={handleAddInputIP}
+            accent="#EAB308"
+            placeholder="Search info products..."
+          />
 
           {/* Quick-create new IP as input */}
           <QuickAdd placeholder="New input info product..." onAdd={handleQuickCreateAndAddInput} />
@@ -600,22 +670,12 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
           })}
 
           {/* Add existing IP as output */}
-          {availableForOutput.length > 0 && (
-            <div>
-              <div className="text-[9px] text-[var(--m12-text-muted)] mb-1 font-[family-name:var(--font-space-mono)]">ADD EXISTING</div>
-              <div className="flex flex-wrap gap-1">
-                {availableForOutput.slice(0, 8).map(ip => (
-                  <button
-                    key={ip.id}
-                    onClick={() => handleAddOutputIP(ip.id)}
-                    className="text-[10px] px-2 py-0.5 rounded border border-dashed border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[#10B981]/60 hover:text-[#10B981] transition-colors"
-                  >
-                    + {ip.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <SearchableIPDropdown
+            items={availableForOutput}
+            onSelect={handleAddOutputIP}
+            accent="#10B981"
+            placeholder="Search info products..."
+          />
 
           {/* Quick-create new IP as output */}
           <QuickAdd placeholder="New output info product..." onAdd={handleQuickCreateAndAddOutput} />

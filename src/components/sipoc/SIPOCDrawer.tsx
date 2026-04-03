@@ -17,10 +17,17 @@ const SIPOC = {
 
 function PersonaChip({ persona }: { persona: Persona }) {
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/20 text-[10px]">
-      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: persona.color }} />
-      <span className="text-[var(--m12-text)] font-medium truncate">{persona.name}</span>
-      {persona.role && <span className="text-[var(--m12-text-faint)] truncate">· {persona.role}</span>}
+    <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/20 text-[10px]">
+      <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center" style={{ backgroundColor: `${persona.color}20` }}>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <circle cx="6" cy="4" r="2.2" stroke={persona.color} strokeWidth="1.2" />
+          <path d="M2 11c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke={persona.color} strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      </div>
+      <div className="min-w-0">
+        <div className="text-[var(--m12-text)] font-medium truncate leading-tight">{persona.name}</div>
+        {persona.role && <div className="text-[8px] text-[var(--m12-text-faint)] truncate leading-tight">{persona.role}</div>}
+      </div>
     </div>
   )
 }
@@ -105,12 +112,6 @@ function SIPOCFlowContent({ capability }: { capability: HydratedCapability }) {
 
   return (
     <div className="flex-1 overflow-auto relative">
-      {/* Flow backbone line */}
-      <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px z-0 pointer-events-none"
-        style={{
-          background: `linear-gradient(to right, ${SIPOC.S.color}30, ${SIPOC.I.color}40, ${SIPOC.P.color}50, ${SIPOC.O.color}40, ${SIPOC.C.color}30)`,
-        }}
-      />
 
       <div className="relative z-10 grid h-full" style={{ gridTemplateColumns: '1fr 1.3fr minmax(180px, 220px) 1.3fr 1fr', minHeight: 200 }}>
         {/* ─── Suppliers ─── */}
@@ -261,9 +262,10 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, childre
   const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
   const capabilities = useSIPOCStore(s => s.capabilities)
 
+  const fullscreen = useSIPOCStore(s => s.drawerFullscreen)
+
   const [resizing, setResizing] = useState(false)
   const [contentVisible, setContentVisible] = useState(false)
-  const [fullscreen, setFullscreen] = useState(false)
   const resizeRef = useRef<{ startY: number; startH: number } | null>(null)
 
   // Hydrate the selected capability
@@ -454,7 +456,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, childre
 
         {/* Fullscreen toggle */}
         <button
-          onClick={() => setFullscreen(f => !f)}
+          onClick={() => useSIPOCStore.setState({ drawerFullscreen: !fullscreen })}
           className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
             fullscreen
               ? 'text-[#2563EB] bg-[#2563EB]/10'
