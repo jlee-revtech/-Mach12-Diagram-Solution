@@ -679,6 +679,147 @@ function EditableRow({
   )
 }
 
+// ─── Collapsible Info Products List ─────────────────────
+function IPEntityList({
+  informationProducts,
+  editingId,
+  setEditingId,
+  updateInformationProduct,
+  removeInformationProduct,
+  onAdd,
+}: {
+  informationProducts: InformationProduct[]
+  editingId: string | null
+  setEditingId: (id: string | null) => void
+  updateInformationProduct: (id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category'>>) => Promise<void>
+  removeInformationProduct: (id: string) => Promise<void>
+  onAdd: (name: string) => void
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const inputs = useSIPOCStore(s => s.inputs)
+  const outputs = useSIPOCStore(s => s.outputs)
+  const capabilities = useSIPOCStore(s => s.capabilities)
+
+  return (
+    <div className="space-y-1">
+      {informationProducts.map(ip => {
+        const isExpanded = expandedId === ip.id
+        const isEditing = editingId === ip.id
+
+        // Find which capabilities use this IP
+        const usedIn: { capName: string; side: 'input' | 'output'; dimCount: number }[] = []
+        capabilities.forEach(cap => {
+          (inputs[cap.id] || []).forEach(inp => {
+            if (inp.information_product_id === ip.id) {
+              usedIn.push({ capName: cap.name, side: 'input', dimCount: (inp.dimensions || []).length })
+            }
+          })
+          ;(outputs[cap.id] || []).forEach(out => {
+            if (out.information_product_id === ip.id) {
+              usedIn.push({ capName: cap.name, side: 'output', dimCount: (out.dimensions || []).length })
+            }
+          })
+        })
+
+        if (isEditing) {
+          return (
+            <EditableRow
+              key={ip.id}
+              id={ip.id}
+              name={ip.name}
+              editingId={editingId}
+              setEditingId={setEditingId}
+              categoryValue={ip.category || ''}
+              onSave={name => updateInformationProduct(ip.id, { name })}
+              onSaveCategory={category => updateInformationProduct(ip.id, { category: category || undefined })}
+              onDelete={() => removeInformationProduct(ip.id)}
+            />
+          )
+        }
+
+        return (
+          <div key={ip.id} className={`border rounded-lg transition-all ${isExpanded ? 'border-[var(--m12-border)]/50 bg-[var(--m12-bg)]/50' : 'border-transparent'}`}>
+            {/* Collapsed row */}
+            <div
+              className="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-[var(--m12-bg)]/50 rounded-lg transition-colors group"
+              onClick={() => setExpandedId(isExpanded ? null : ip.id)}
+            >
+              <button className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors shrink-0">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                  <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[var(--m12-text-muted)] shrink-0">
+                <rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1" />
+                <path d="M3 4.5h4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
+              </svg>
+              <span className="text-xs text-[var(--m12-text)] flex-1 truncate">{ip.name}</span>
+              {ip.category && (
+                <span className="text-[8px] text-[var(--m12-text-muted)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] uppercase">
+                  {ip.category}
+                </span>
+              )}
+              {usedIn.length > 0 && (
+                <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                  {usedIn.length}x
+                </span>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); removeInformationProduct(ip.id) }}
+                className="opacity-0 group-hover:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all shrink-0"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Expanded detail */}
+            {isExpanded && (
+              <div className="px-3 pb-2.5 pt-1 space-y-2 border-t border-[var(--m12-border)]/20 mx-1">
+                {/* Edit button */}
+                <button
+                  onClick={() => setEditingId(ip.id)}
+                  className="text-[8px] font-[family-name:var(--font-space-mono)] text-[#2563EB] hover:text-[#3B82F6] uppercase tracking-wider font-bold transition-colors"
+                >
+                  Edit Name / Category
+                </button>
+
+                {/* Usage */}
+                {usedIn.length > 0 ? (
+                  <div>
+                    <div className="text-[8px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)] font-bold">Used In</div>
+                    <div className="space-y-0.5">
+                      {usedIn.map((u, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-[9px]">
+                          <span className={`text-[7px] font-[family-name:var(--font-space-mono)] font-bold uppercase px-1 py-0.5 rounded ${
+                            u.side === 'input'
+                              ? 'bg-[#EAB308]/10 text-[#EAB308]'
+                              : 'bg-[#10B981]/10 text-[#10B981]'
+                          }`}>
+                            {u.side === 'input' ? 'IN' : 'OUT'}
+                          </span>
+                          <span className="text-[var(--m12-text-secondary)] truncate">{u.capName}</span>
+                          {u.dimCount > 0 && (
+                            <span className="text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] text-[7px]">{u.dimCount} dims</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[9px] text-[var(--m12-text-faint)] italic">Not used in any capability yet</div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+      <QuickAdd placeholder="New info product name..." onAdd={onAdd} />
+    </div>
+  )
+}
+
 // ─── Entity Pool Manager ────────────────────────────────
 function EntityPool({ orgId }: { orgId: string }) {
   const personas = useSIPOCStore(s => s.personas)
@@ -768,22 +909,14 @@ function EntityPool({ orgId }: { orgId: string }) {
 
       {/* Information Products list */}
       {activeTab === 'products' && (
-        <div className="space-y-1.5">
-          {informationProducts.map(ip => (
-            <EditableRow
-              key={ip.id}
-              id={ip.id}
-              name={ip.name}
-              editingId={editingId}
-              setEditingId={setEditingId}
-              categoryValue={ip.category || ''}
-              onSave={name => updateInformationProduct(ip.id, { name })}
-              onSaveCategory={category => updateInformationProduct(ip.id, { category: category || undefined })}
-              onDelete={() => removeInformationProduct(ip.id)}
-            />
-          ))}
-          <QuickAdd placeholder="New info product name..." onAdd={handleAddIP} />
-        </div>
+        <IPEntityList
+          informationProducts={informationProducts}
+          editingId={editingId}
+          setEditingId={setEditingId}
+          updateInformationProduct={updateInformationProduct}
+          removeInformationProduct={removeInformationProduct}
+          onAdd={handleAddIP}
+        />
       )}
 
       {/* Logical Systems list */}
