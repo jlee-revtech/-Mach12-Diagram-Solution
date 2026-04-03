@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { Persona, InformationProduct, LogicalSystem, Dimension } from '@/lib/sipoc/types'
 import { PERSONA_COLORS, IP_CATEGORIES } from '@/lib/sipoc/types'
@@ -222,6 +222,35 @@ function DimensionsEditor({
 
 // ─── Capability Detail Editor ───────────────────────────
 function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId: string }) {
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const focusedItemId = useSIPOCStore(s => s.focusedItemId)
+  const setFocusedItem = useSIPOCStore(s => s.setFocusedItem)
+
+  const toggleItem = (id: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  // When focusedItemId changes, expand and scroll to that item
+  useEffect(() => {
+    if (!focusedItemId) return
+    setExpandedItems(prev => {
+      const next = new Set(prev)
+      next.add(focusedItemId)
+      return next
+    })
+    // Scroll into view after a tick to let the DOM expand
+    requestAnimationFrame(() => {
+      itemRefs.current[focusedItemId]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    // Clear focus after handling
+    setFocusedItem(null)
+  }, [focusedItemId, setFocusedItem])
+
   const capabilities = useSIPOCStore(s => s.capabilities)
   const inputs = useSIPOCStore(s => s.inputs[capabilityId] || [])
   const outputs = useSIPOCStore(s => s.outputs[capabilityId] || [])
@@ -304,10 +333,22 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 style={capSys ? { borderLeftWidth: 3, borderLeftColor: capSys.color || capTmpl?.color || '#64748B' } : {}}
               >
                 <option value="">Not specified</option>
-                {logicalSystems.map(s => {
-                  const t = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
-                  return <option key={s.id} value={s.id}>{s.name}{t ? ` (${t.label})` : ''}</option>
-                })}
+                {(() => {
+                  const groups = new Map<string, typeof logicalSystems>()
+                  logicalSystems.forEach(s => {
+                    const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
+                    const label = tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
+                    if (!groups.has(label)) groups.set(label, [])
+                    groups.get(label)!.push(s)
+                  })
+                  return [...groups.entries()].map(([group, systems]) => (
+                    <optgroup key={group} label={group}>
+                      {systems.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </optgroup>
+                  ))
+                })()}
               </select>
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--m12-text-muted)] pointer-events-none">
                 <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
@@ -324,18 +365,29 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
           {inputs.map(input => {
             const ip = informationProducts.find(p => p.id === input.information_product_id)
             return (
-              <div key={input.id} className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg p-2.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[var(--m12-text)]">{ip?.name || '(deleted)'}</span>
+              <div key={input.id} ref={el => { itemRefs.current[input.id] = el }} className={`bg-[var(--m12-bg)] border rounded-lg overflow-hidden transition-colors ${expandedItems.has(input.id) ? 'border-[#EAB308]/30' : 'border-[var(--m12-border)]/30'}`}>
+                <div
+                  className="flex items-center gap-2 px-2.5 py-2 cursor-pointer hover:bg-[var(--m12-bg-card)]/30 transition-colors"
+                  onClick={() => toggleItem(input.id)}
+                >
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(input.id) ? 'rotate-90' : ''}`}>
+                    <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <div className="w-1 h-3 rounded-full bg-[#EAB308]/60 shrink-0" />
+                  <span className="text-xs font-medium text-[var(--m12-text)] flex-1 truncate">{ip?.name || '(deleted)'}</span>
+                  <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                    {input.supplier_persona_ids.length}s {input.source_system_ids.length}sys {(input.dimensions || []).length}d
+                  </span>
                   <button
-                    onClick={() => removeInput(input.id, capabilityId)}
-                    className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); removeInput(input.id, capabilityId) }}
+                    className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
                     </svg>
                   </button>
                 </div>
+                {expandedItems.has(input.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-[var(--m12-border)]/20 pt-2">
                 {/* Supplier personas */}
                 <div>
                   <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Suppliers</div>
@@ -435,11 +487,22 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                           style={feedSys ? { borderLeftWidth: 3, borderLeftColor: feedSys.color || feedTmpl?.color || '#64748B' } : {}}
                         >
                           <option value="">None</option>
-                          {logicalSystems.map(s => {
-                              const t = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
-                              return <option key={s.id} value={s.id}>{s.name}{t ? ` (${t.label})` : ''}</option>
+                          {(() => {
+                            const groups = new Map<string, typeof logicalSystems>()
+                            logicalSystems.forEach(s => {
+                              const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
+                              const label = tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
+                              if (!groups.has(label)) groups.set(label, [])
+                              groups.get(label)!.push(s)
                             })
-                          }
+                            return [...groups.entries()].map(([group, systems]) => (
+                              <optgroup key={group} label={group}>
+                                {systems.map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                              </optgroup>
+                            ))
+                          })()}
                         </select>
                         <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--m12-text-muted)] pointer-events-none">
                           <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
@@ -455,6 +518,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   itemId={input.id}
                   capabilityId={capabilityId}
                 />
+                </div>}
               </div>
             )
           })}
@@ -489,18 +553,29 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
           {outputs.map(output => {
             const ip = informationProducts.find(p => p.id === output.information_product_id)
             return (
-              <div key={output.id} className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg p-2.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[var(--m12-text)]">{ip?.name || '(deleted)'}</span>
+              <div key={output.id} ref={el => { itemRefs.current[output.id] = el }} className={`bg-[var(--m12-bg)] border rounded-lg overflow-hidden transition-colors ${expandedItems.has(output.id) ? 'border-[#10B981]/30' : 'border-[var(--m12-border)]/30'}`}>
+                <div
+                  className="flex items-center gap-2 px-2.5 py-2 cursor-pointer hover:bg-[var(--m12-bg-card)]/30 transition-colors"
+                  onClick={() => toggleItem(output.id)}
+                >
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(output.id) ? 'rotate-90' : ''}`}>
+                    <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <div className="w-1 h-3 rounded-full bg-[#10B981]/60 shrink-0" />
+                  <span className="text-xs font-medium text-[var(--m12-text)] flex-1 truncate">{ip?.name || '(deleted)'}</span>
+                  <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                    {output.consumer_persona_ids.length}c {(output.dimensions || []).length}d
+                  </span>
                   <button
-                    onClick={() => removeOutput(output.id, capabilityId)}
-                    className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); removeOutput(output.id, capabilityId) }}
+                    className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
                     </svg>
                   </button>
                 </div>
+                {expandedItems.has(output.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-[var(--m12-border)]/20 pt-2">
                 {/* Consumer personas */}
                 <div>
                   <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Consumers</div>
@@ -519,6 +594,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   itemId={output.id}
                   capabilityId={capabilityId}
                 />
+                </div>}
               </div>
             )
           })}

@@ -31,6 +31,8 @@ interface SIPOCState {
 
   // UI state
   selectedCapabilityId: string | null
+  focusedItemId: string | null
+  setFocusedItem: (id: string | null) => void
   editingEntityType: 'persona' | 'informationProduct' | 'logicalSystem' | null
   editingEntityId: string | null
 
@@ -96,6 +98,8 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   inputs: {},
   outputs: {},
   selectedCapabilityId: null,
+  focusedItemId: null,
+  setFocusedItem: (id) => set({ focusedItemId: id }),
   editingEntityType: null,
   editingEntityId: null,
 

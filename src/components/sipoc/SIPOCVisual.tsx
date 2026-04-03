@@ -53,18 +53,22 @@ function IPCard({
   dimensions,
   showDimensions,
   accentColor,
+  itemId,
 }: {
   name: string
   category?: string
   dimensions?: Dimension[]
   showDimensions: boolean
   accentColor: string
+  itemId?: string
 }) {
+  const setFocusedItem = useSIPOCStore(s => s.setFocusedItem)
   const hasDims = dimensions && dimensions.length > 0
   return (
     <div
-      className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2.5 shadow-sm transition-all hover:shadow-md"
+      className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2.5 shadow-sm transition-all hover:shadow-md cursor-pointer hover:ring-1 hover:ring-[var(--m12-border)]/30"
       style={{ borderLeftWidth: 3, borderLeftColor: accentColor }}
+      onClick={itemId ? (e) => { e.stopPropagation(); setFocusedItem(itemId) } : undefined}
     >
       <div className="flex items-center gap-1.5">
         <div className="text-[11px] font-semibold text-[var(--m12-text)] flex-1 leading-tight">{name}</div>
@@ -108,17 +112,9 @@ function MiniArrow() {
   )
 }
 
-// ─── Feeding system chip (emphasized) ───────────────────
+// ─── Feeding system chip (same style as source systems) ─
 function FeedingSystemChip({ name, color }: { name: string; color?: string }) {
-  return (
-    <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-2.5 py-1.5 shadow-md max-w-full ring-1 ring-[var(--m12-border)]/15">
-      <div className="w-2.5 h-2.5 rounded shrink-0" style={{ backgroundColor: color || '#64748B' }} />
-      <div className="min-w-0">
-        <span className="text-[10px] font-semibold text-[var(--m12-text)] truncate block">{name}</span>
-        <span className="text-[6px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-widest">Feeding System</span>
-      </div>
-    </div>
-  )
+  return <SystemChip name={name} color={color} />
 }
 
 // ─── Single input lane (Suppliers → Input) ──────────────
@@ -169,14 +165,16 @@ function InputLane({ input, showDimensions }: {
           dimensions={input.dimensions}
           showDimensions={showDimensions}
           accentColor="#EAB308"
+          itemId={input.id}
         />
       </div>
 
-      {/* Feeding system (last in chain — sits between IP and Process) */}
+      {/* Feeding system (sits between IP and Process) */}
       {feedingSystem && (
         <>
           <HArrow />
           <FeedingSystemChip name={feedingSystem.name} color={feedingSystem.color} />
+          <HArrow />
         </>
       )}
     </div>
@@ -200,6 +198,7 @@ function OutputLane({ output, showDimensions }: {
           dimensions={output.dimensions}
           showDimensions={showDimensions}
           accentColor="#10B981"
+          itemId={output.id}
         />
       </div>
 
