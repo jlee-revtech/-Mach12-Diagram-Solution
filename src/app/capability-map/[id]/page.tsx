@@ -4,7 +4,6 @@ import { use, useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import SIPOCVisual from '@/components/sipoc/SIPOCVisual'
 import CapabilityEditor from '@/components/sipoc/CapabilityEditor'
 import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
@@ -21,7 +20,6 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const map = useSIPOCStore(s => s.map)
   const mapTitle = map?.title ?? ''
   const loading = useSIPOCStore(s => s.loading)
-  const addCapability = useSIPOCStore(s => s.addCapability)
   const selectedCapabilityId = useSIPOCStore(s => s.selectedCapabilityId)
 
   const [titleInput, setTitleInput] = useState('')
@@ -32,7 +30,6 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
   const [showExecSummary, setShowExecSummary] = useState(false)
-  const [viewMode, setViewMode] = useState<'sipoc' | 'map'>('sipoc')
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -120,29 +117,10 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           </button>
         )}
 
-        {/* View toggle */}
-        <div className="flex bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg p-0.5">
-          <button
-            onClick={() => setViewMode('sipoc')}
-            className={`px-2.5 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
-              viewMode === 'sipoc'
-                ? 'bg-[#8B5CF6]/15 text-[#8B5CF6]'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
-          >
-            SIPOC
-          </button>
-          <button
-            onClick={() => setViewMode('map')}
-            className={`px-2.5 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
-              viewMode === 'map'
-                ? 'bg-[#2563EB]/15 text-[#2563EB]'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
-          >
-            Map
-          </button>
-        </div>
+        {/* View label */}
+        <span className="text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-1 rounded-md">
+          Capability Map
+        </span>
 
         <div className="flex-1" />
 
@@ -247,37 +225,18 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           </button>
         )}
 
-        {/* Add capability button (SIPOC view only) */}
-        {viewMode === 'sipoc' && (
-          <button
-            onClick={() => {
-              const name = prompt('Capability name:')
-              if (name?.trim()) addCapability(name.trim())
-            }}
-            className="flex items-center gap-1.5 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            Add Capability
-          </button>
-        )}
       </div>
 
       {/* Main content: visual + editor */}
       <div className="flex flex-1 overflow-hidden">
         {/* Visual area */}
         <div className="flex-1 overflow-auto p-6">
-          {viewMode === 'sipoc' ? (
-            <SIPOCVisual />
-          ) : (
-            <CapabilityMapView
-              onSelectCapability={(id) => {
-                useSIPOCStore.getState().setSelectedCapability(id)
-                setViewMode('sipoc')
-              }}
-            />
-          )}
+          <CapabilityMapView
+            onSelectCapability={(id) => {
+              useSIPOCStore.getState().setSelectedCapability(id)
+              setSidebarOpen(true)
+            }}
+          />
         </div>
 
         {/* Sidebar toggle */}

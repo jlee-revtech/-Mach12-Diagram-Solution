@@ -88,12 +88,17 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
       className={`space-y-0.5 transition-all ${dragOver ? 'ring-2 ring-[#2563EB]/40 rounded-lg' : ''}`}
     >
       <div
-        className="px-2.5 py-2 rounded-lg border border-[var(--m12-border)]/20 bg-[var(--m12-bg-card)] cursor-grab active:cursor-grabbing"
+        className={`px-2.5 py-2 rounded-lg border bg-[var(--m12-bg-card)] cursor-grab active:cursor-grabbing ${
+          selectedId === node.id ? 'border-[#2563EB]/50 ring-1 ring-[#2563EB]/20' : 'border-[var(--m12-border)]/20'
+        }`}
         style={{ borderTopWidth: 2, borderTopColor: parentColor }}
       >
         <div className="flex items-center gap-1.5">
           <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>
-          <div className="text-[11px] font-bold text-[var(--m12-text)] flex-1">{node.name}</div>
+          <div
+            className="text-[11px] font-bold text-[var(--m12-text)] flex-1 cursor-pointer hover:text-[#2563EB] transition-colors"
+            onClick={(e) => { e.stopPropagation(); onSelect(node.id) }}
+          >{node.name}</div>
           <button
             onClick={(e) => { e.stopPropagation(); onAddL3(node.id) }}
             className="w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors opacity-0 group-hover/l2:opacity-100"
