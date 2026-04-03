@@ -77,11 +77,24 @@ export interface CapabilityTemplateRow {
   created_by: string | null
   template_data: {
     capability: { name: string; description?: string; level: number; color?: string }
-    children: {
-      name: string
-      description?: string
-      level: number
-      children: { name: string; description?: string; level: number }[]
+    system?: string  // system name
+    inputs: {
+      informationProduct: { name: string; category?: string }
+      supplierPersonas: { name: string; role?: string; color: string }[]
+      sourceSystems: { name: string; color?: string }[]
+      feedingSystem?: { name: string; color?: string }
+      dimensions: { name: string; description?: string }[]
+    }[]
+    outputs: {
+      informationProduct: { name: string; category?: string }
+      consumerPersonas: { name: string; role?: string; color: string }[]
+      destinationSystems: { name: string; color?: string }[]
+      dimensions: { name: string; description?: string }[]
+    }[]
+    // Keep hierarchy for children if this is an L1/L2 being saved
+    children?: {
+      name: string; description?: string; level: number
+      children?: { name: string; description?: string; level: number }[]
     }[]
   }
   created_at: string

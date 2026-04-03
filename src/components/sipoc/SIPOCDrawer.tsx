@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { HydratedCapability, Persona, LogicalSystem, InformationProduct, Dimension } from '@/lib/sipoc/types'
+import type { HydratedCapability, CapabilityTemplateRow, Persona, LogicalSystem, InformationProduct, Dimension } from '@/lib/sipoc/types'
 import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx, exportSIPOCHtml } from '@/lib/export/sipoc'
+import { createCapabilityTemplate } from '@/lib/supabase/capability-maps'
+import { useAuth } from '@/lib/supabase/auth-context'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
+import SIPOCTemplatesPanel from '@/components/sipoc/SIPOCTemplatesPanel'
 
 // ─── SIPOC color tokens ──────────────────────────────────
 const SIPOC = {
@@ -365,11 +368,35 @@ function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: 
   )
 }
 
+// ─── Serialize hydrated capability to portable template ──
+
+function hydratedToTemplate(cap: HydratedCapability): CapabilityTemplateRow['template_data'] {
+  return {
+    capability: { name: cap.name, description: cap.description, level: cap.level, color: cap.color || undefined },
+    system: cap.system?.name,
+    inputs: cap.inputs.map(inp => ({
+      informationProduct: { name: inp.informationProduct.name, category: inp.informationProduct.category },
+      supplierPersonas: inp.supplierPersonas.map(p => ({ name: p.name, role: p.role, color: p.color })),
+      sourceSystems: inp.sourceSystems.map(s => ({ name: s.name, color: s.color })),
+      feedingSystem: inp.feedingSystem ? { name: inp.feedingSystem.name, color: inp.feedingSystem.color } : undefined,
+      dimensions: (inp.dimensions || []).map(d => ({ name: d.name, description: d.description })),
+    })),
+    outputs: cap.outputs.map(out => ({
+      informationProduct: { name: out.informationProduct.name, category: out.informationProduct.category },
+      consumerPersonas: out.consumerPersonas.map(p => ({ name: p.name, role: p.role, color: p.color })),
+      destinationSystems: out.destinationSystems.map(s => ({ name: s.name, color: s.color })),
+      dimensions: (out.dimensions || []).map(d => ({ name: d.name, description: d.description })),
+    })),
+  }
+}
+
 // ─── Export menu (for individual SIPOC) ──────────────────
 
 function ExportMenu({ hydrated, mapTitle, orgId }: { hydrated: HydratedCapability | null; mapTitle: string; orgId: string }) {
   const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const { user } = useAuth()
 
   useEffect(() => {
     if (!open) return
@@ -418,6 +445,29 @@ function ExportMenu({ hydrated, mapTitle, orgId }: { hydrated: HydratedCapabilit
               Export as {label}
             </button>
           ))}
+          <div className="border-t border-[var(--m12-border)]/20" />
+          <button
+            disabled={saving}
+            onClick={async () => {
+              if (!hydrated || !user) return
+              const name = prompt('Template name:', hydrated.name)
+              if (!name) return
+              setSaving(true)
+              try {
+                const templateData = hydratedToTemplate(hydrated)
+                await createCapabilityTemplate(orgId, user.id, name, hydrated.description || null, templateData)
+                setOpen(false)
+              } catch (err) {
+                console.error('Failed to save template:', err)
+                alert('Failed to save template')
+              } finally {
+                setSaving(false)
+              }
+            }}
+            className="w-full text-left px-2.5 py-1.5 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save as Template'}
+          </button>
         </div>
       )}
     </div>
@@ -443,6 +493,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
 
   const [showDims, setShowDims] = useState(true)
   const [showAnalysis, setShowAnalysis] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
   const [resizing, setResizing] = useState(false)
   const [contentVisible, setContentVisible] = useState(false)
   const resizeRef = useRef<{ startY: number; startH: number } | null>(null)
@@ -633,9 +684,27 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
         {/* Export dropdown */}
         <ExportMenu hydrated={hydrated} mapTitle={mapTitle} orgId={orgId} />
 
+        {/* Templates */}
+        <button
+          onClick={() => { setShowTemplates(t => !t); if (!showTemplates) setShowAnalysis(false) }}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
+            showTemplates
+              ? 'bg-[#F97316]/15 text-[#F97316]'
+              : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)]'
+          }`}
+        >
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+            <rect x="1" y="1" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+            <rect x="7" y="1" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+            <rect x="1" y="7" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+            <rect x="7" y="7" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+          </svg>
+          Templates
+        </button>
+
         {/* Analyze */}
         <button
-          onClick={() => setShowAnalysis(a => !a)}
+          onClick={() => { setShowAnalysis(a => !a); if (!showAnalysis) setShowTemplates(false) }}
           className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
             showAnalysis
               ? 'bg-[#06B6D4]/15 text-[#06B6D4]'
@@ -717,7 +786,12 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
       >
         {/* SIPOC flow (takes remaining space) */}
         <div className="flex-1 min-w-0 overflow-hidden">
-          {showAnalysis ? (
+          {showTemplates ? (
+            <SIPOCTemplatesPanel
+              orgId={orgId}
+              onClose={() => setShowTemplates(false)}
+            />
+          ) : showAnalysis ? (
             <AIAnalyzePanel
               onClose={() => setShowAnalysis(false)}
               onImplement={(capabilityName, prompt) => {

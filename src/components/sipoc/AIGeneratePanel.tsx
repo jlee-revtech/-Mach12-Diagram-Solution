@@ -411,8 +411,8 @@ export default function AIGeneratePanel({
               onChange={e => setPrompt(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleGenerate() }}
               placeholder="e.g., External Market Inputs - gathering cost, labor, and rate data for proposals and estimates..."
-              rows={2}
-              className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 resize-none"
+              rows={8}
+              className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 resize-y min-h-[160px]"
             />
             <button
               onClick={handleGenerate}

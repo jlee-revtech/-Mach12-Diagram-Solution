@@ -131,7 +131,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
 }
 
 // ─── L1 Core Area column (draggable + drop target) ──────
-function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1 }: {
+function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onRemove }: {
   node: CapabilityTreeNode
   color: string
   index: number
@@ -142,6 +142,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
   onAILoad: (coreAreaId: string, coreAreaName: string) => void
   onDrop: (dragId: string, targetParentId: string) => void
   onReorderL1: (dragId: string, targetIndex: number) => void
+  onRemove: (id: string, name: string, childCount: number) => void
 }) {
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -246,6 +247,16 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
                   </svg>
                   AI Bulk Load
                 </button>
+                <div className="border-t border-[var(--m12-border)]/20" />
+                <button
+                  onClick={() => { setShowAddMenu(false); onRemove(node.id, node.name, node.children.length) }}
+                  className="w-full text-left px-3 py-2 text-[10px] flex items-center gap-1.5 text-red-400 hover:bg-red-400/10 transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Remove Core Area
+                </button>
               </div>
             </>
           )}
@@ -287,6 +298,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
   const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
   const addCapability = useSIPOCStore(s => s.addCapability)
   const updateCapability = useSIPOCStore(s => s.updateCapability)
+  const removeCapability = useSIPOCStore(s => s.removeCapability)
   const [addingL1, setAddingL1] = useState(false)
   const [newL1Name, setNewL1Name] = useState('')
 
@@ -358,6 +370,27 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
       }
     }
   }, [l1Roots, updateCapability])
+
+  // ─── Remove L1 Core Area ──────────────────────────────
+  const handleRemoveL1 = useCallback(async (id: string, name: string, childCount: number) => {
+    const msg = childCount > 0
+      ? `Remove "${name}" and all ${childCount} child capabilit${childCount === 1 ? 'y' : 'ies'} inside it? This cannot be undone.`
+      : `Remove "${name}"? This cannot be undone.`
+    if (!confirm(msg)) return
+    // Remove all descendants first (children of children), then the L1
+    const toRemove: string[] = []
+    const collect = (parentId: string) => {
+      capabilities.filter(c => c.parent_id === parentId).forEach(c => {
+        collect(c.id)
+        toRemove.push(c.id)
+      })
+    }
+    collect(id)
+    for (const cid of toRemove) {
+      await removeCapability(cid)
+    }
+    await removeCapability(id)
+  }, [capabilities, removeCapability])
 
   // ─── Drag & Drop handler ──────────────────────────────
   const handleDrop = useCallback(async (dragId: string, targetParentId: string) => {
@@ -489,6 +522,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
               onAILoad={onAILoad || (() => {})}
               onDrop={handleDrop}
               onReorderL1={handleReorderL1}
+              onRemove={handleRemoveL1}
             />
           ))}
         </div>
