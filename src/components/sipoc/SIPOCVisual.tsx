@@ -300,13 +300,8 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
           <div className="bg-gradient-to-b from-[#2563EB]/15 to-[#2563EB]/8 border-2 border-[#2563EB]/30 rounded-xl px-5 py-4 text-center w-full shadow-inner">
             <div className="text-[13px] font-bold text-[var(--m12-text)] leading-tight">{capability.name}</div>
             {(capability.features || []).length > 0 && (
-              <div className="mt-1.5 space-y-0.5">
-                {capability.features!.map((feat, i) => (
-                  <div key={i} className="text-[9px] text-[var(--m12-text-muted)] leading-relaxed flex items-start gap-1">
-                    <span className="opacity-50 mt-px">•</span>
-                    <span className="line-clamp-1">{feat}</span>
-                  </div>
-                ))}
+              <div className="mt-2 text-[8px] font-[family-name:var(--font-space-mono)] text-[#2563EB]/60 font-bold uppercase tracking-wider">
+                {capability.features!.length} feature{capability.features!.length !== 1 ? 's' : ''}
               </div>
             )}
             {capability.system && (

@@ -255,6 +255,70 @@ function OutputLane({ output, onRemove, onClickCard, showDims }: { output: Hydra
   )
 }
 
+// ─── Process column with collapsible features ──────────
+
+function ProcessColumn({ capability, inputs, outputs }: { capability: HydratedCapability; inputs: HydratedCapability['inputs']; outputs: HydratedCapability['outputs'] }) {
+  const [featuresExpanded, setFeaturesExpanded] = useState(false)
+  const features = capability.features || []
+  const hasFeatures = features.length > 0
+
+  return (
+    <div className="w-[220px] shrink-0 flex flex-col border-l border-r border-[var(--m12-border)]/10 overflow-y-auto" style={{ background: SIPOC.P.bg }}>
+      <div className="p-3 pb-1 shrink-0 border-b border-[var(--m12-border)]/10">
+        <ColumnHeader sipoc={SIPOC.P} />
+      </div>
+      <div className="flex-1 flex flex-col items-center p-4 gap-3">
+        {/* Process box — compact */}
+        <div className="w-full rounded-xl border border-[#2563EB]/30 bg-gradient-to-b from-[#2563EB]/10 to-[#2563EB]/5 p-4 text-center shadow-lg"
+          style={{ boxShadow: '0 0 40px rgba(37,99,235,0.08)' }}
+        >
+          <div className="text-[8px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-[0.2em] text-[#2563EB]/60 mb-1.5">
+            L{capability.level} {capability.level === 1 ? 'Core Area' : capability.level === 2 ? 'Capability' : 'Functionality'}
+          </div>
+          <div className="text-sm font-bold text-[var(--m12-text)] leading-snug">{capability.name}</div>
+          {capability.system && (
+            <div className="flex justify-center mt-3">
+              <SystemChip system={capability.system} />
+            </div>
+          )}
+        </div>
+
+        {/* Features — collapsible card */}
+        {hasFeatures && (
+          <div className="w-full">
+            <button
+              onClick={() => setFeaturesExpanded(e => !e)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-[#2563EB]/5 border border-[#2563EB]/15 hover:border-[#2563EB]/30 transition-colors group"
+            >
+              <span className="text-[8px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider text-[#2563EB]/70">
+                {features.length} Feature{features.length !== 1 ? 's' : ''}
+              </span>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`text-[#2563EB]/50 transition-transform ${featuresExpanded ? 'rotate-180' : ''}`}>
+                <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {featuresExpanded && (
+              <div className="mt-1.5 px-1 space-y-1 max-h-[300px] overflow-y-auto">
+                {features.map((feat, i) => (
+                  <div key={i} className="flex items-start gap-1.5 text-[9px] text-[var(--m12-text-secondary)] leading-snug">
+                    <span className="text-[#2563EB]/40 mt-px shrink-0">•</span>
+                    <span>{feat}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Stats */}
+        <div className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">
+          {inputs.length} input{inputs.length !== 1 ? 's' : ''} · {outputs.length} output{outputs.length !== 1 ? 's' : ''}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── SIPOC Flow Content (lane-based layout) ──────────────
 
 function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: HydratedCapability; onOpenEditor: () => void; showDims?: boolean }) {
@@ -305,39 +369,7 @@ function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: 
       </div>
 
       {/* ─── Center: Process ─── */}
-      <div className="w-[220px] shrink-0 flex flex-col border-l border-r border-[var(--m12-border)]/10 overflow-y-auto" style={{ background: SIPOC.P.bg }}>
-        <div className="p-3 pb-1 shrink-0 border-b border-[var(--m12-border)]/10">
-          <ColumnHeader sipoc={SIPOC.P} />
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center p-4">
-          <div className="w-full rounded-xl border border-[#2563EB]/30 bg-gradient-to-b from-[#2563EB]/10 to-[#2563EB]/5 p-4 text-center shadow-lg"
-            style={{ boxShadow: '0 0 40px rgba(37,99,235,0.08)' }}
-          >
-            <div className="text-[8px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-[0.2em] text-[#2563EB]/60 mb-1.5">
-              L{capability.level} {capability.level === 1 ? 'Core Area' : capability.level === 2 ? 'Capability' : 'Functionality'}
-            </div>
-            <div className="text-sm font-bold text-[var(--m12-text)] leading-snug">{capability.name}</div>
-            {(capability.features || []).length > 0 && (
-              <div className="mt-2 space-y-0.5">
-                {capability.features!.map((feat, i) => (
-                  <div key={i} className="text-[9px] text-[var(--m12-text-secondary)] leading-snug flex items-start gap-1">
-                    <span className="text-[var(--m12-text-faint)] mt-px">•</span>
-                    <span>{feat}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {capability.system && (
-              <div className="flex justify-center mt-3">
-                <SystemChip system={capability.system} />
-              </div>
-            )}
-          </div>
-          <div className="mt-3 text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">
-            {inputs.length} input{inputs.length !== 1 ? 's' : ''} · {outputs.length} output{outputs.length !== 1 ? 's' : ''}
-          </div>
-        </div>
-      </div>
+      <ProcessColumn capability={capability} inputs={inputs} outputs={outputs} />
 
       {/* ─── Arrow: process → outputs ─── */}
       <div className="flex items-center shrink-0">
