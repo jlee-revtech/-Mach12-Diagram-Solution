@@ -99,23 +99,46 @@ function HArrow({ muted }: { muted?: boolean }) {
   )
 }
 
+// ─── Mini flow arrow between systems ────────────────────
+function MiniArrow() {
+  return (
+    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="shrink-0 opacity-40">
+      <path d="M0 4h9M7 1.5L10 4 7 6.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--m12-text-muted)]" />
+    </svg>
+  )
+}
+
 // ─── Single input lane (Suppliers → Input) ──────────────
 function InputLane({ input, showDimensions }: {
   input: HydratedCapability['inputs'][0]
   showDimensions: boolean
 }) {
   const hasSuppliers = input.supplierPersonas.length > 0 || input.sourceSystems.length > 0
+  const hasSystems = input.sourceSystems.length > 0
 
   return (
     <div className="flex items-center gap-2">
       {/* Suppliers for this input */}
-      <div className="flex-1 flex flex-wrap gap-1 justify-end min-w-0">
-        {input.supplierPersonas.map(p => (
-          <PersonaChip key={p.id} name={p.name} color={p.color} />
-        ))}
-        {input.sourceSystems.map(s => (
-          <SystemChip key={s.id} name={s.name} color={s.color} />
-        ))}
+      <div className="flex-1 flex flex-col gap-1.5 items-end min-w-0">
+        {/* Persona chips */}
+        {input.supplierPersonas.length > 0 && (
+          <div className="flex flex-wrap gap-1 justify-end">
+            {input.supplierPersonas.map(p => (
+              <PersonaChip key={p.id} name={p.name} color={p.color} />
+            ))}
+          </div>
+        )}
+        {/* System flow (ordered with arrows) */}
+        {hasSystems && (
+          <div className="flex items-center gap-0.5 flex-wrap justify-end">
+            {input.sourceSystems.map((s, i) => (
+              <div key={s.id} className="flex items-center gap-0.5">
+                {i > 0 && <MiniArrow />}
+                <SystemChip name={s.name} color={s.color} />
+              </div>
+            ))}
+          </div>
+        )}
         {!hasSuppliers && (
           <div className="text-[9px] text-[var(--m12-text-faint)] italic">—</div>
         )}

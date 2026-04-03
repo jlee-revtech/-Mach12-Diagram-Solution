@@ -315,20 +315,113 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     emptyLabel="Create personas first"
                   />
                 </div>
-                {/* Source systems */}
+                {/* Source systems (ordered flow) */}
                 <div>
-                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Source Systems</div>
+                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                    Source System Flow
+                    {input.source_system_ids.length > 1 && (
+                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(order = data flow sequence)</span>
+                    )}
+                  </div>
+                  {/* Ordered flow display */}
+                  {input.source_system_ids.length > 0 && (
+                    <div className="space-y-0 mb-2">
+                      {input.source_system_ids.map((sysId, idx) => {
+                        const sys = logicalSystems.find(s => s.id === sysId)
+                        if (!sys) return null
+                        const tmpl = SYSTEM_TEMPLATES.find(t => t.type === sys.system_type)
+                        const isFirst = idx === 0
+                        const isLast = idx === input.source_system_ids.length - 1
+                        return (
+                          <div key={sysId}>
+                            {/* Arrow between items */}
+                            {idx > 0 && (
+                              <div className="flex items-center justify-center py-0.5">
+                                <svg width="10" height="12" viewBox="0 0 10 12" fill="none" className="text-[var(--m12-border)]">
+                                  <path d="M5 0v9M2.5 7L5 10l2.5-3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg px-2 py-1.5 group/sys">
+                              {/* System color + type badge */}
+                              <div className="w-2 h-2 rounded shrink-0" style={{ backgroundColor: sys.color || tmpl?.color || '#64748B' }} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[10px] font-medium text-[var(--m12-text)] truncate">{sys.name}</div>
+                                {tmpl && (
+                                  <div className="text-[7px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{tmpl.label}</div>
+                                )}
+                              </div>
+                              {/* Step indicator */}
+                              <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] font-bold">
+                                {isFirst && input.source_system_ids.length > 1 ? 'ORIGIN' : isLast && input.source_system_ids.length > 1 ? 'FINAL' : `#${idx + 1}`}
+                              </span>
+                              {/* Reorder + remove controls */}
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover/sys:opacity-100 transition-opacity">
+                                {!isFirst && (
+                                  <button
+                                    onClick={() => {
+                                      const ids = [...input.source_system_ids]
+                                      ;[ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]]
+                                      updateInputSystems(input.id, capabilityId, ids)
+                                    }}
+                                    className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5"
+                                    title="Move up"
+                                  >
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                                      <path d="M4 1.5L1.5 4.5h5L4 1.5z" fill="currentColor" />
+                                    </svg>
+                                  </button>
+                                )}
+                                {!isLast && (
+                                  <button
+                                    onClick={() => {
+                                      const ids = [...input.source_system_ids]
+                                      ;[ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]]
+                                      updateInputSystems(input.id, capabilityId, ids)
+                                    }}
+                                    className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5"
+                                    title="Move down"
+                                  >
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                                      <path d="M4 6.5L1.5 3.5h5L4 6.5z" fill="currentColor" />
+                                    </svg>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    const ids = input.source_system_ids.filter(id => id !== sysId)
+                                    updateInputSystems(input.id, capabilityId, ids)
+                                  }}
+                                  className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors p-0.5"
+                                  title="Remove"
+                                >
+                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                                    <path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {/* Add system selector */}
                   <MultiSelect
-                    items={logicalSystems}
-                    selectedIds={input.source_system_ids}
-                    onChange={ids => updateInputSystems(input.id, capabilityId, ids)}
+                    items={logicalSystems.filter(s => !input.source_system_ids.includes(s.id))}
+                    selectedIds={[]}
+                    onChange={newIds => {
+                      if (newIds.length > 0) {
+                        updateInputSystems(input.id, capabilityId, [...input.source_system_ids, ...newIds])
+                      }
+                    }}
                     colorFn={s => s.color || '#64748B'}
                     groupFn={s => {
                       const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
                       return tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
                     }}
-                    emptyLabel="Create logical systems first"
-                    placeholder="Select source systems..."
+                    emptyLabel="No more systems to add"
+                    placeholder="+ Add system to flow..."
                   />
                 </div>
                 {/* Data Objects */}
