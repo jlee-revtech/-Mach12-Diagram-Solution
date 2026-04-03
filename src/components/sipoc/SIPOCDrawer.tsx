@@ -41,14 +41,19 @@ function SystemChip({ system, small }: { system: LogicalSystem; small?: boolean 
   )
 }
 
-function IPCard({ name, category, dimensions, accent }: {
+function IPCard({ name, category, dimensions, accent, onClick }: {
   name: string
   category?: string
   dimensions: Dimension[]
   accent: string
+  onClick?: () => void
 }) {
   return (
-    <div className="rounded-lg border border-[var(--m12-border)]/20 bg-[var(--m12-bg-card)] overflow-hidden shadow-sm hover:shadow-md transition-shadow" style={{ borderLeftWidth: 3, borderLeftColor: accent }}>
+    <div
+      className={`rounded-lg border border-[var(--m12-border)]/20 bg-[var(--m12-bg-card)] overflow-hidden shadow-sm hover:shadow-md transition-shadow ${onClick ? 'cursor-pointer hover:border-[var(--m12-border)]/40' : ''}`}
+      style={{ borderLeftWidth: 3, borderLeftColor: accent }}
+      onClick={onClick}
+    >
       <div className="px-3 py-2">
         <div className="text-[11px] font-semibold text-[var(--m12-text)] leading-tight">{name}</div>
         {category && (
@@ -117,7 +122,7 @@ function HFlowArrow({ color }: { color: string }) {
 
 // ─── Input lane (Suppliers → Input card) ─────────────────
 
-function InputLane({ input, onRemove }: { input: HydratedCapability['inputs'][number]; onRemove: () => void }) {
+function InputLane({ input, onRemove, onClickCard }: { input: HydratedCapability['inputs'][number]; onRemove: () => void; onClickCard: () => void }) {
   const hasSuppliers = input.supplierPersonas.length > 0
   const hasSystems = input.sourceSystems.length > 0
   const hasLeft = hasSuppliers || hasSystems
@@ -167,6 +172,7 @@ function InputLane({ input, onRemove }: { input: HydratedCapability['inputs'][nu
           category={input.informationProduct.category}
           dimensions={input.dimensions || []}
           accent={SIPOC.I.color}
+          onClick={onClickCard}
         />
         {input.feedingSystem && (
           <div className="flex items-center gap-1 mt-1.5 pl-1">
@@ -184,7 +190,7 @@ function InputLane({ input, onRemove }: { input: HydratedCapability['inputs'][nu
 
 // ─── Output lane (Output card → Customers) ───────────────
 
-function OutputLane({ output, onRemove }: { output: HydratedCapability['outputs'][number]; onRemove: () => void }) {
+function OutputLane({ output, onRemove, onClickCard }: { output: HydratedCapability['outputs'][number]; onRemove: () => void; onClickCard: () => void }) {
   const hasConsumers = output.consumerPersonas.length > 0
 
   return (
@@ -205,6 +211,7 @@ function OutputLane({ output, onRemove }: { output: HydratedCapability['outputs'
           category={output.informationProduct.category}
           dimensions={output.dimensions || []}
           accent={SIPOC.O.color}
+          onClick={onClickCard}
         />
       </div>
 
@@ -229,9 +236,15 @@ function OutputLane({ output, onRemove }: { output: HydratedCapability['outputs'
 
 // ─── SIPOC Flow Content (lane-based layout) ──────────────
 
-function SIPOCFlowContent({ capability }: { capability: HydratedCapability }) {
+function SIPOCFlowContent({ capability, onOpenEditor }: { capability: HydratedCapability; onOpenEditor: () => void }) {
   const removeInput = useSIPOCStore(s => s.removeInput)
   const removeOutput = useSIPOCStore(s => s.removeOutput)
+  const setFocusedItem = useSIPOCStore(s => s.setFocusedItem)
+
+  const handleClickItem = useCallback((itemId: string) => {
+    setFocusedItem(itemId)
+    onOpenEditor()
+  }, [setFocusedItem, onOpenEditor])
   const inputs = capability.inputs || []
   const outputs = capability.outputs || []
 
@@ -254,7 +267,7 @@ function SIPOCFlowContent({ capability }: { capability: HydratedCapability }) {
           <div className="flex-1">
             {inputs.map((input, i) => (
               <div key={input.id} className={i > 0 ? 'border-t border-[var(--m12-border)]/8' : ''}>
-                <InputLane input={input} onRemove={() => removeInput(input.id, capability.id)} />
+                <InputLane input={input} onRemove={() => removeInput(input.id, capability.id)} onClickCard={() => handleClickItem(input.id)} />
               </div>
             ))}
           </div>
@@ -320,7 +333,7 @@ function SIPOCFlowContent({ capability }: { capability: HydratedCapability }) {
           <div className="flex-1">
             {outputs.map((output, i) => (
               <div key={output.id} className={i > 0 ? 'border-t border-[var(--m12-border)]/8' : ''}>
-                <OutputLane output={output} onRemove={() => removeOutput(output.id, capability.id)} />
+                <OutputLane output={output} onRemove={() => removeOutput(output.id, capability.id)} onClickCard={() => handleClickItem(output.id)} />
               </div>
             ))}
           </div>
@@ -582,7 +595,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, childre
         {/* SIPOC flow (takes remaining space) */}
         <div className="flex-1 min-w-0 overflow-hidden">
           {hydrated ? (
-            <SIPOCFlowContent capability={hydrated} />
+            <SIPOCFlowContent capability={hydrated} onOpenEditor={() => { if (!editorOpen) onToggleEditor() }} />
           ) : (
             <div className="flex items-center justify-center h-full text-[var(--m12-text-faint)] text-xs">
               Select a capability on the map to view its SIPOC
