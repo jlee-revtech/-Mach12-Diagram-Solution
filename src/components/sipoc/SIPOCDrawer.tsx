@@ -103,84 +103,179 @@ function ColumnHeader({ sipoc }: { sipoc: typeof SIPOC[keyof typeof SIPOC] }) {
   )
 }
 
-// ─── SIPOC Flow Content (5-column layout) ────────────────
+// ─── Horizontal flow arrow between columns ──────────────
 
-function SIPOCFlowContent({ capability }: { capability: HydratedCapability }) {
-  const inputs = capability.inputs || []
-  const outputs = capability.outputs || []
-  const laneCount = Math.max(inputs.length, outputs.length, 1)
+function HFlowArrow({ color }: { color: string }) {
+  return (
+    <div className="flex items-center justify-center shrink-0 w-6">
+      <svg width="16" height="10" viewBox="0 0 16 10" fill="none" className="opacity-30">
+        <path d="M0 5h12M10 2l3 3-3 3" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  )
+}
+
+// ─── Input lane (Suppliers → Input card) ─────────────────
+
+function InputLane({ input, onRemove }: { input: HydratedCapability['inputs'][number]; onRemove: () => void }) {
+  const hasSuppliers = input.supplierPersonas.length > 0
+  const hasSystems = input.sourceSystems.length > 0
+  const hasLeft = hasSuppliers || hasSystems
 
   return (
-    <div className="flex-1 overflow-auto relative">
-
-      <div className="relative z-10 grid h-full" style={{ gridTemplateColumns: '1fr 1.3fr minmax(180px, 220px) 1.3fr 1fr', minHeight: 200 }}>
-        {/* ─── Suppliers ─── */}
-        <div className="p-4 overflow-y-auto" style={{ background: SIPOC.S.bg }}>
-          <ColumnHeader sipoc={SIPOC.S} />
-          <div className="space-y-4">
-            {inputs.length > 0 ? inputs.map((input, i) => (
-              <div key={input.id} className="space-y-1.5">
-                <div className="text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-faint)] px-1">
-                  for: {input.informationProduct.name}
-                </div>
-                {input.supplierPersonas.length > 0 ? (
-                  <div className="space-y-1">
-                    {input.supplierPersonas.map(p => (
-                      <PersonaChip key={p.id} persona={p} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-[9px] italic text-[var(--m12-text-faint)] px-1">No suppliers</div>
-                )}
-                {/* Source system lineage */}
-                {input.sourceSystems.length > 0 && (
-                  <div className="flex items-center gap-0.5 flex-wrap mt-1 pl-1">
-                    {input.sourceSystems.map((sys, si) => (
-                      <div key={sys.id} className="flex items-center gap-0.5">
-                        {si > 0 && <MiniLineageArrow />}
-                        <SystemChip system={sys} small />
-                      </div>
-                    ))}
-                  </div>
-                )}
+    <div className="flex items-stretch gap-0 group/lane">
+      {/* Supplier side */}
+      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center" style={{ background: SIPOC.S.bg }}>
+        {hasSuppliers && (
+          <div className="space-y-1 mb-1.5">
+            {input.supplierPersonas.map(p => (
+              <PersonaChip key={p.id} persona={p} />
+            ))}
+          </div>
+        )}
+        {hasSystems && (
+          <div className="flex items-center gap-0.5 flex-wrap">
+            {input.sourceSystems.map((sys, si) => (
+              <div key={sys.id} className="flex items-center gap-0.5">
+                {si > 0 && <MiniLineageArrow />}
+                <SystemChip system={sys} small />
               </div>
-            )) : (
-              <div className="text-[10px] italic text-[var(--m12-text-faint)] text-center py-6">No inputs defined</div>
-            )}
+            ))}
+          </div>
+        )}
+        {!hasLeft && (
+          <div className="text-[9px] italic text-[var(--m12-text-faint)]">No suppliers</div>
+        )}
+      </div>
+
+      {/* Arrow: suppliers → input */}
+      <HFlowArrow color={SIPOC.S.color} />
+
+      {/* Input card side */}
+      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.I.bg }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); if (confirm(`Remove input "${input.informationProduct.name}"?`)) onRemove() }}
+          className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/lane:opacity-100 z-10"
+          title="Remove input"
+        >
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        </button>
+        <IPCard
+          name={input.informationProduct.name}
+          category={input.informationProduct.category}
+          dimensions={input.dimensions || []}
+          accent={SIPOC.I.color}
+        />
+        {input.feedingSystem && (
+          <div className="flex items-center gap-1 mt-1.5 pl-1">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="opacity-40 shrink-0">
+              <path d="M1 4h5M4 2l2 2-2 2" stroke={SIPOC.I.color} strokeWidth="1" strokeLinecap="round" />
+            </svg>
+            <SystemChip system={input.feedingSystem} small />
+            <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase">feeds</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Output lane (Output card → Customers) ───────────────
+
+function OutputLane({ output, onRemove }: { output: HydratedCapability['outputs'][number]; onRemove: () => void }) {
+  const hasConsumers = output.consumerPersonas.length > 0
+
+  return (
+    <div className="flex items-stretch gap-0 group/lane">
+      {/* Output card side */}
+      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.O.bg }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); if (confirm(`Remove output "${output.informationProduct.name}"?`)) onRemove() }}
+          className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/lane:opacity-100 z-10"
+          title="Remove output"
+        >
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        </button>
+        <IPCard
+          name={output.informationProduct.name}
+          category={output.informationProduct.category}
+          dimensions={output.dimensions || []}
+          accent={SIPOC.O.color}
+        />
+      </div>
+
+      {/* Arrow: output → customers */}
+      <HFlowArrow color={SIPOC.O.color} />
+
+      {/* Customer side */}
+      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center" style={{ background: SIPOC.C.bg }}>
+        {hasConsumers ? (
+          <div className="space-y-1">
+            {output.consumerPersonas.map(p => (
+              <PersonaChip key={p.id} persona={p} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-[9px] italic text-[var(--m12-text-faint)]">No consumers</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── SIPOC Flow Content (lane-based layout) ──────────────
+
+function SIPOCFlowContent({ capability }: { capability: HydratedCapability }) {
+  const removeInput = useSIPOCStore(s => s.removeInput)
+  const removeOutput = useSIPOCStore(s => s.removeOutput)
+  const inputs = capability.inputs || []
+  const outputs = capability.outputs || []
+
+  return (
+    <div className="flex h-full overflow-auto">
+      {/* ─── Left: Suppliers → Inputs (stacked lanes) ─── */}
+      <div className="flex-[2] min-w-0 flex flex-col overflow-y-auto">
+        {/* Column headers */}
+        <div className="flex shrink-0 border-b border-[var(--m12-border)]/10">
+          <div className="flex-1 p-3 pb-1" style={{ background: SIPOC.S.bg }}>
+            <ColumnHeader sipoc={SIPOC.S} />
+          </div>
+          <div className="w-6" />
+          <div className="flex-1 p-3 pb-1" style={{ background: SIPOC.I.bg }}>
+            <ColumnHeader sipoc={SIPOC.I} />
           </div>
         </div>
-
-        {/* ─── Inputs ─── */}
-        <div className="p-4 overflow-y-auto border-l border-[var(--m12-border)]/10" style={{ background: SIPOC.I.bg }}>
-          <ColumnHeader sipoc={SIPOC.I} />
-          <div className="space-y-3">
-            {inputs.length > 0 ? inputs.map(input => (
-              <div key={input.id} className="space-y-1.5">
-                <IPCard
-                  name={input.informationProduct.name}
-                  category={input.informationProduct.category}
-                  dimensions={input.dimensions || []}
-                  accent={SIPOC.I.color}
-                />
-                {input.feedingSystem && (
-                  <div className="flex items-center gap-1 pl-2">
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="opacity-40 shrink-0">
-                      <path d="M1 4h5M4 2l2 2-2 2" stroke={SIPOC.I.color} strokeWidth="1" strokeLinecap="round" />
-                    </svg>
-                    <SystemChip system={input.feedingSystem} small />
-                    <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase">feeds</span>
-                  </div>
-                )}
+        {/* Input lanes */}
+        {inputs.length > 0 ? (
+          <div className="flex-1">
+            {inputs.map((input, i) => (
+              <div key={input.id} className={i > 0 ? 'border-t border-[var(--m12-border)]/8' : ''}>
+                <InputLane input={input} onRemove={() => removeInput(input.id, capability.id)} />
               </div>
-            )) : (
-              <div className="text-[10px] italic text-[var(--m12-text-faint)] text-center py-6">No inputs</div>
-            )}
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-[10px] italic text-[var(--m12-text-faint)] py-8">
+            No inputs defined
+          </div>
+        )}
+      </div>
 
-        {/* ─── Process ─── */}
-        <div className="p-4 flex flex-col items-center justify-center border-l border-r border-[var(--m12-border)]/10" style={{ background: SIPOC.P.bg }}>
+      {/* ─── Arrow: inputs → process ─── */}
+      <div className="flex items-center shrink-0">
+        <HFlowArrow color={SIPOC.I.color} />
+      </div>
+
+      {/* ─── Center: Process ─── */}
+      <div className="w-[220px] shrink-0 flex flex-col border-l border-r border-[var(--m12-border)]/10 overflow-y-auto" style={{ background: SIPOC.P.bg }}>
+        <div className="p-3 pb-1 shrink-0 border-b border-[var(--m12-border)]/10">
           <ColumnHeader sipoc={SIPOC.P} />
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
           <div className="w-full rounded-xl border border-[#2563EB]/30 bg-gradient-to-b from-[#2563EB]/10 to-[#2563EB]/5 p-4 text-center shadow-lg"
             style={{ boxShadow: '0 0 40px rgba(37,99,235,0.08)' }}
           >
@@ -201,49 +296,39 @@ function SIPOCFlowContent({ capability }: { capability: HydratedCapability }) {
             {inputs.length} input{inputs.length !== 1 ? 's' : ''} · {outputs.length} output{outputs.length !== 1 ? 's' : ''}
           </div>
         </div>
+      </div>
 
-        {/* ─── Outputs ─── */}
-        <div className="p-4 overflow-y-auto border-r border-[var(--m12-border)]/10" style={{ background: SIPOC.O.bg }}>
-          <ColumnHeader sipoc={SIPOC.O} />
-          <div className="space-y-3">
-            {outputs.length > 0 ? outputs.map(output => (
-              <IPCard
-                key={output.id}
-                name={output.informationProduct.name}
-                category={output.informationProduct.category}
-                dimensions={output.dimensions || []}
-                accent={SIPOC.O.color}
-              />
-            )) : (
-              <div className="text-[10px] italic text-[var(--m12-text-faint)] text-center py-6">No outputs</div>
-            )}
+      {/* ─── Arrow: process → outputs ─── */}
+      <div className="flex items-center shrink-0">
+        <HFlowArrow color={SIPOC.P.color} />
+      </div>
+
+      {/* ─── Right: Outputs → Customers (stacked lanes) ─── */}
+      <div className="flex-[2] min-w-0 flex flex-col overflow-y-auto">
+        {/* Column headers */}
+        <div className="flex shrink-0 border-b border-[var(--m12-border)]/10">
+          <div className="flex-1 p-3 pb-1" style={{ background: SIPOC.O.bg }}>
+            <ColumnHeader sipoc={SIPOC.O} />
+          </div>
+          <div className="w-6" />
+          <div className="flex-1 p-3 pb-1" style={{ background: SIPOC.C.bg }}>
+            <ColumnHeader sipoc={SIPOC.C} />
           </div>
         </div>
-
-        {/* ─── Customers ─── */}
-        <div className="p-4 overflow-y-auto" style={{ background: SIPOC.C.bg }}>
-          <ColumnHeader sipoc={SIPOC.C} />
-          <div className="space-y-4">
-            {outputs.length > 0 ? outputs.map(output => (
-              <div key={output.id} className="space-y-1.5">
-                <div className="text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-faint)] px-1">
-                  from: {output.informationProduct.name}
-                </div>
-                {output.consumerPersonas.length > 0 ? (
-                  <div className="space-y-1">
-                    {output.consumerPersonas.map(p => (
-                      <PersonaChip key={p.id} persona={p} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-[9px] italic text-[var(--m12-text-faint)] px-1">No consumers</div>
-                )}
+        {/* Output lanes */}
+        {outputs.length > 0 ? (
+          <div className="flex-1">
+            {outputs.map((output, i) => (
+              <div key={output.id} className={i > 0 ? 'border-t border-[var(--m12-border)]/8' : ''}>
+                <OutputLane output={output} onRemove={() => removeOutput(output.id, capability.id)} />
               </div>
-            )) : (
-              <div className="text-[10px] italic text-[var(--m12-text-faint)] text-center py-6">No outputs defined</div>
-            )}
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-[10px] italic text-[var(--m12-text-faint)] py-8">
+            No outputs defined
+          </div>
+        )}
       </div>
     </div>
   )
