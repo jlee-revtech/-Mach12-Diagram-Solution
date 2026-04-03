@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { APP_VERSION } from '@/lib/version'
 
 export default function SetupPage() {
   const [mode, setMode] = useState<'create' | 'join'>('create')
@@ -53,6 +54,7 @@ export default function SetupPage() {
             MACH12
           </span>
           <span className="text-[var(--m12-text-muted)] text-xl">.AI</span>
+          <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] ml-2 self-end mb-1">v{APP_VERSION}</span>
           <h2 className="text-lg font-semibold text-[var(--m12-text)] mt-4">Set Up Your Organization</h2>
           <p className="text-sm text-[var(--m12-text-muted)] mt-1">
             Create a new organization or join an existing one by name or invite code.

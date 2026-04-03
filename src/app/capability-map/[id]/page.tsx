@@ -11,6 +11,7 @@ import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
 import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx } from '@/lib/export/sipoc'
+import { APP_VERSION } from '@/lib/version'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -94,6 +95,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         <span className="text-gradient text-sm font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
           MACH12
         </span>
+        <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">v{APP_VERSION}</span>
         <span className="text-[var(--m12-text-muted)] text-xs">/</span>
 
         {/* Title (inline editable) */}

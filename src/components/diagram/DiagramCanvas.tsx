@@ -26,6 +26,7 @@ import AICommandPalette from './AICommandPalette'
 import OnboardingGuide from './OnboardingGuide'
 import ShareDialog from './ShareDialog'
 import { PresenceBadge, RemoteCursors } from './CollabPresence'
+import { APP_VERSION } from '@/lib/version'
 
 const nodeTypes = { system: SystemNodeComponent, systemGroup: GroupNodeComponent }
 const edgeTypes = { dataFlow: DataFlowEdgeComponent }
@@ -317,6 +318,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
               MACH12
             </span>
             <span className="text-[var(--m12-text-muted)] text-xs">.AI</span>
+            <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] ml-1">v{APP_VERSION}</span>
           </div>
           {/* Diagram title */}
           <div className="bg-[var(--m12-bg-card)]/90 backdrop-blur-sm border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5">
