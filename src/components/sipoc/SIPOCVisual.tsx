@@ -108,17 +108,32 @@ function MiniArrow() {
   )
 }
 
+// ─── Feeding system chip (emphasized) ───────────────────
+function FeedingSystemChip({ name, color }: { name: string; color?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-2.5 py-1.5 shadow-md max-w-full ring-1 ring-[var(--m12-border)]/15">
+      <div className="w-2.5 h-2.5 rounded shrink-0" style={{ backgroundColor: color || '#64748B' }} />
+      <div className="min-w-0">
+        <span className="text-[10px] font-semibold text-[var(--m12-text)] truncate block">{name}</span>
+        <span className="text-[6px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] uppercase tracking-widest">Feeding System</span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Single input lane (Suppliers → Input) ──────────────
 function InputLane({ input, showDimensions }: {
   input: HydratedCapability['inputs'][0]
   showDimensions: boolean
 }) {
   const hasSuppliers = input.supplierPersonas.length > 0 || input.sourceSystems.length > 0
-  const hasSystems = input.sourceSystems.length > 0
+  const systems = input.sourceSystems
+  const originSystems = systems.length > 1 ? systems.slice(0, -1) : []
+  const feedingSystem = systems.length > 0 ? systems[systems.length - 1] : null
 
   return (
     <div className="flex items-center gap-2">
-      {/* Suppliers for this input */}
+      {/* Left: Personas + origin systems */}
       <div className="flex-1 flex flex-col gap-1.5 items-end min-w-0">
         {/* Persona chips */}
         {input.supplierPersonas.length > 0 && (
@@ -128,10 +143,10 @@ function InputLane({ input, showDimensions }: {
             ))}
           </div>
         )}
-        {/* System flow (ordered with arrows) */}
-        {hasSystems && (
+        {/* Origin systems flow (all except last) */}
+        {originSystems.length > 0 && (
           <div className="flex items-center gap-0.5 flex-wrap justify-end">
-            {input.sourceSystems.map((s, i) => (
+            {originSystems.map((s, i) => (
               <div key={s.id} className="flex items-center gap-0.5">
                 {i > 0 && <MiniArrow />}
                 <SystemChip name={s.name} color={s.color} />
@@ -144,7 +159,16 @@ function InputLane({ input, showDimensions }: {
         )}
       </div>
 
+      {/* Arrow from left section toward IP/feeding system */}
       <HArrow muted={!hasSuppliers} />
+
+      {/* Feeding system (the last system in the chain - directly feeds the input) */}
+      {feedingSystem && (
+        <>
+          <FeedingSystemChip name={feedingSystem.name} color={feedingSystem.color} />
+          <HArrow />
+        </>
+      )}
 
       {/* Input IP card */}
       <div className="w-[180px] shrink-0">

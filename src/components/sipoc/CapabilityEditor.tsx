@@ -352,8 +352,8 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                                 )}
                               </div>
                               {/* Step indicator */}
-                              <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] font-bold">
-                                {isFirst && input.source_system_ids.length > 1 ? 'ORIGIN' : isLast && input.source_system_ids.length > 1 ? 'FINAL' : `#${idx + 1}`}
+                              <span className={`text-[7px] font-[family-name:var(--font-space-mono)] font-bold ${isLast && input.source_system_ids.length > 1 ? 'text-[#EAB308]' : 'text-[var(--m12-text-faint)]'}`}>
+                                {isFirst && input.source_system_ids.length > 1 ? 'ORIGIN' : isLast && input.source_system_ids.length > 1 ? 'FEEDS' : `#${idx + 1}`}
                               </span>
                               {/* Reorder + remove controls */}
                               <div className="flex items-center gap-0.5 opacity-0 group-hover/sys:opacity-100 transition-opacity">
