@@ -47,7 +47,7 @@ interface SIPOCState {
 
   // ─── Capability CRUD ──────────────────────────────────
   addCapability: (name: string, parentId?: string | null, level?: number, color?: string | null) => Promise<string | undefined>
-  updateCapability: (id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'color' | 'parent_id' | 'level'>>) => Promise<void>
+  updateCapability: (id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'color' | 'parent_id' | 'level' | 'sort_order'>>) => Promise<void>
   removeCapability: (id: string) => Promise<void>
   reorderCapability: (id: string, newSortOrder: number) => Promise<void>
   setSelectedCapability: (id: string | null) => void

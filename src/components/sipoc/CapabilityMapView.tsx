@@ -1,57 +1,112 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { CapabilityTreeNode } from '@/lib/sipoc/types'
 
-// ─── L1 color palette ───────────────────────────────────
 const L1_COLORS = [
   '#2563EB', '#10B981', '#F97316', '#8B5CF6',
   '#06B6D4', '#EF4444', '#EAB308', '#EC4899',
   '#14B8A6', '#6366F1', '#84CC16', '#F43F5E',
 ]
 
-// ─── L3 Functionality chip ──────────────────────────────
-function L3Chip({ node, isSelected, onSelect }: {
+// ─── Drag state (module-level to avoid prop drilling) ───
+let draggedId: string | null = null
+let draggedLevel: number | null = null
+
+// ─── L3 Functionality chip (draggable) ──────────────────
+function L3Chip({ node, isSelected, onSelect, onDrop }: {
   node: CapabilityTreeNode
   isSelected: boolean
   onSelect: () => void
+  onDrop: (dragId: string, targetParentId: string) => void
 }) {
+  const [dragOver, setDragOver] = useState(false)
+
   return (
-    <button
+    <div
+      draggable
+      onDragStart={(e) => {
+        draggedId = node.id
+        draggedLevel = node.level
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', node.id)
+      }}
+      onDragEnd={() => { draggedId = null; draggedLevel = null }}
       onClick={onSelect}
-      className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded ${
+      className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded cursor-grab active:cursor-grabbing ${
         isSelected
           ? 'bg-[#2563EB]/15 text-[var(--m12-text)] font-medium'
           : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg-card-hover)]'
-      }`}
+      } ${dragOver ? 'ring-1 ring-[#2563EB]/50' : ''}`}
     >
+      <span className="text-[var(--m12-text-faint)] mr-1">⠿</span>
       {node.name}
-    </button>
+    </div>
   )
 }
 
-// ─── L2 Capability block ────────────────────────────────
-function L2Block({ node, parentColor, selectedId, onSelect }: {
+// ─── L2 Capability block (draggable + drop target for L3) ─
+function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
   node: CapabilityTreeNode
   parentColor: string
   selectedId: string | null
   onSelect: (id: string) => void
+  onDrop: (dragId: string, targetParentId: string) => void
+  onAddL3: (parentId: string) => void
 }) {
-  const hasChildren = node.children.length > 0
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    // Accept L3 drops onto L2
+    if (draggedLevel === 3 && draggedId !== node.id) {
+      e.dataTransfer.dropEffect = 'move'
+      setDragOver(true)
+    }
+  }
 
   return (
-    <div className="space-y-0.5">
+    <div
+      draggable
+      onDragStart={(e) => {
+        draggedId = node.id
+        draggedLevel = node.level
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', node.id)
+      }}
+      onDragEnd={() => { draggedId = null; draggedLevel = null }}
+      onDragOver={handleDragOver}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDragOver(false)
+        const id = e.dataTransfer.getData('text/plain')
+        if (id && id !== node.id) onDrop(id, node.id)
+      }}
+      className={`space-y-0.5 transition-all ${dragOver ? 'ring-2 ring-[#2563EB]/40 rounded-lg' : ''}`}
+    >
       <div
-        className="px-2.5 py-2 rounded-lg border border-[var(--m12-border)]/20 bg-[var(--m12-bg-card)]"
+        className="px-2.5 py-2 rounded-lg border border-[var(--m12-border)]/20 bg-[var(--m12-bg-card)] cursor-grab active:cursor-grabbing"
         style={{ borderTopWidth: 2, borderTopColor: parentColor }}
       >
-        <div className="text-[11px] font-bold text-[var(--m12-text)] mb-0.5">{node.name}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>
+          <div className="text-[11px] font-bold text-[var(--m12-text)] flex-1">{node.name}</div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onAddL3(node.id) }}
+            className="w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors opacity-0 group-hover/l2:opacity-100"
+            title="Add L3"
+          >
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5v5M1.5 4h5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
+          </button>
+        </div>
         {node.description && (
-          <div className="text-[8px] text-[var(--m12-text-muted)] leading-tight">{node.description}</div>
+          <div className="text-[8px] text-[var(--m12-text-muted)] leading-tight mt-0.5">{node.description}</div>
         )}
       </div>
-      {hasChildren && (
+      {node.children.length > 0 && (
         <div className="pl-0.5 space-y-0">
           {node.children
             .sort((a, b) => a.sort_order - b.sort_order)
@@ -61,6 +116,7 @@ function L2Block({ node, parentColor, selectedId, onSelect }: {
                 node={child}
                 isSelected={selectedId === child.id}
                 onSelect={() => onSelect(child.id)}
+                onDrop={onDrop}
               />
             ))}
         </div>
@@ -69,8 +125,8 @@ function L2Block({ node, parentColor, selectedId, onSelect }: {
   )
 }
 
-// ─── L1 Core Area column ────────────────────────────────
-function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3 }: {
+// ─── L1 Core Area column (drop target for L2 and L3) ────
+function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onDrop }: {
   node: CapabilityTreeNode
   color: string
   index: number
@@ -78,11 +134,32 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3 }
   onSelect: (id: string) => void
   onAddL2: (parentId: string) => void
   onAddL3: (parentId: string) => void
+  onDrop: (dragId: string, targetParentId: string) => void
 }) {
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    // Accept L2 drops onto L1, or L3 drops (to move to first L2)
+    if (draggedId && draggedId !== node.id) {
+      e.dataTransfer.dropEffect = 'move'
+      setDragOver(true)
+    }
+  }
 
   return (
-    <div className="flex flex-col min-w-[200px] max-w-[260px]">
+    <div
+      className={`flex flex-col min-w-[200px] max-w-[260px] transition-all ${dragOver ? 'ring-2 ring-[#2563EB]/40 rounded-xl' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setDragOver(false)
+        const id = e.dataTransfer.getData('text/plain')
+        if (id && id !== node.id) onDrop(id, node.id)
+      }}
+    >
       {/* L1 Header */}
       <div
         className="rounded-t-xl px-4 py-3 flex items-center justify-between"
@@ -115,11 +192,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3 }
                 </button>
                 {node.children.length > 0 && (
                   <button
-                    onClick={() => {
-                      setShowAddMenu(false)
-                      // Add L3 to the first L2 child
-                      onAddL3(node.children[0].id)
-                    }}
+                    onClick={() => { setShowAddMenu(false); onAddL3(node.children[0].id) }}
                     className="w-full text-left px-3 py-2 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors"
                   >
                     + Add L3 Functionality
@@ -132,7 +205,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3 }
       </div>
 
       {/* L2/L3 content */}
-      <div className="flex-1 rounded-b-xl border border-t-0 border-[var(--m12-border)]/20 bg-[var(--m12-bg)]/50 p-2 space-y-3 overflow-y-auto">
+      <div className="flex-1 rounded-b-xl border border-t-0 border-[var(--m12-border)]/20 bg-[var(--m12-bg)]/50 p-2 space-y-3 overflow-y-auto group/l2">
         {node.children.length > 0 ? (
           node.children
             .sort((a, b) => a.sort_order - b.sort_order)
@@ -143,11 +216,13 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3 }
                 parentColor={color}
                 selectedId={selectedId}
                 onSelect={onSelect}
+                onDrop={onDrop}
+                onAddL3={onAddL3}
               />
             ))
         ) : (
           <div className="text-[10px] text-[var(--m12-text-faint)] italic text-center py-4">
-            No capabilities yet
+            Drop capabilities here
           </div>
         )}
       </div>
@@ -162,6 +237,7 @@ export default function CapabilityMapView({ onSelectCapability }: {
   const capabilities = useSIPOCStore(s => s.capabilities)
   const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
   const addCapability = useSIPOCStore(s => s.addCapability)
+  const updateCapability = useSIPOCStore(s => s.updateCapability)
   const [addingL1, setAddingL1] = useState(false)
   const [newL1Name, setNewL1Name] = useState('')
 
@@ -197,6 +273,46 @@ export default function CapabilityMapView({ onSelectCapability }: {
     }
   }, [capabilities, onSelectCapability])
 
+  // ─── Drag & Drop handler ──────────────────────────────
+  const handleDrop = useCallback(async (dragId: string, targetParentId: string) => {
+    const dragged = capabilities.find(c => c.id === dragId)
+    const target = capabilities.find(c => c.id === targetParentId)
+    if (!dragged || !target) return
+
+    // Prevent dropping onto self or own descendant
+    const isDescendant = (parentId: string, childId: string): boolean => {
+      const children = capabilities.filter(c => c.parent_id === parentId)
+      return children.some(c => c.id === childId || isDescendant(c.id, childId))
+    }
+    if (isDescendant(dragId, targetParentId)) return
+
+    // Determine new level based on target
+    let newParentId = targetParentId
+    let newLevel = dragged.level
+
+    if (target.level === 1) {
+      // Dropping onto L1: item becomes L2 under this L1
+      newLevel = 2
+    } else if (target.level === 2) {
+      // Dropping onto L2: item becomes L3 under this L2
+      newLevel = 3
+    } else if (target.level === 3) {
+      // Dropping onto L3: item becomes sibling (same parent)
+      newParentId = target.parent_id || targetParentId
+      newLevel = 3
+    }
+
+    // Calculate sort order (append to end of new parent's children)
+    const siblings = capabilities.filter(c => c.parent_id === newParentId && c.id !== dragId)
+    const newSortOrder = siblings.length
+
+    await updateCapability(dragId, {
+      parent_id: newParentId,
+      level: newLevel,
+      sort_order: newSortOrder,
+    })
+  }, [capabilities, updateCapability])
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -206,7 +322,7 @@ export default function CapabilityMapView({ onSelectCapability }: {
             Capability Map
           </div>
           <div className="text-[10px] text-[var(--m12-text-faint)] mt-0.5">
-            L1 Core Area → L2 Capability → L3 Functionality (SIPOC)
+            L1 Core Area → L2 Capability → L3 Functionality (SIPOC) &nbsp;·&nbsp; Drag to reorganize
           </div>
         </div>
         {addingL1 ? (
@@ -248,6 +364,7 @@ export default function CapabilityMapView({ onSelectCapability }: {
               onSelect={handleSelect}
               onAddL2={handleAddL2}
               onAddL3={handleAddL3}
+              onDrop={handleDrop}
             />
           ))}
         </div>
@@ -269,6 +386,7 @@ export default function CapabilityMapView({ onSelectCapability }: {
         <span className="flex items-center gap-1">
           <div className="w-3 h-2 rounded-sm bg-[#2563EB]/10" /> L3 Functionality (SIPOC)
         </span>
+        <span className="text-[var(--m12-text-faint)]/60">· Drag items to reorganize</span>
       </div>
     </div>
   )
