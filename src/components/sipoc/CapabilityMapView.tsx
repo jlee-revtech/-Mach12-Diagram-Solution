@@ -125,8 +125,8 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
   )
 }
 
-// ─── L1 Core Area column (drop target for L2 and L3) ────
-function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onDrop }: {
+// ─── L1 Core Area column (draggable + drop target) ──────
+function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onDrop, onReorderL1 }: {
   node: CapabilityTreeNode
   color: string
   index: number
@@ -135,34 +135,66 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
   onAddL2: (parentId: string) => void
   onAddL3: (parentId: string) => void
   onDrop: (dragId: string, targetParentId: string) => void
+  onReorderL1: (dragId: string, targetIndex: number) => void
 }) {
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [dragOverLeft, setDragOverLeft] = useState(false)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
-    // Accept L2 drops onto L1, or L3 drops (to move to first L2)
     if (draggedId && draggedId !== node.id) {
       e.dataTransfer.dropEffect = 'move'
-      setDragOver(true)
+      // If dragging an L1, show reorder indicator; otherwise show child drop
+      if (draggedLevel === 1) {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+        const midX = rect.left + rect.width / 2
+        setDragOverLeft(e.clientX < midX)
+        setDragOver(true)
+      } else {
+        setDragOver(true)
+      }
     }
   }
 
   return (
     <div
-      className={`flex flex-col min-w-[200px] max-w-[260px] transition-all ${dragOver ? 'ring-2 ring-[#2563EB]/40 rounded-xl' : ''}`}
+      className={`flex flex-col min-w-[200px] max-w-[260px] transition-all ${
+        dragOver && draggedLevel === 1
+          ? dragOverLeft
+            ? 'border-l-4 border-[#2563EB] rounded-xl'
+            : 'border-r-4 border-[#2563EB] rounded-xl'
+          : dragOver
+            ? 'ring-2 ring-[#2563EB]/40 rounded-xl'
+            : ''
+      }`}
       onDragOver={handleDragOver}
-      onDragLeave={() => setDragOver(false)}
+      onDragLeave={() => { setDragOver(false); setDragOverLeft(false) }}
       onDrop={(e) => {
         e.preventDefault()
         setDragOver(false)
+        setDragOverLeft(false)
         const id = e.dataTransfer.getData('text/plain')
-        if (id && id !== node.id) onDrop(id, node.id)
+        if (!id || id === node.id) return
+        if (draggedLevel === 1) {
+          // Reorder: place before or after this column
+          onReorderL1(id, dragOverLeft ? index : index + 1)
+        } else {
+          onDrop(id, node.id)
+        }
       }}
     >
-      {/* L1 Header */}
+      {/* L1 Header (draggable for reorder) */}
       <div
-        className="rounded-t-xl px-4 py-3 flex items-center justify-between"
+        draggable
+        onDragStart={(e) => {
+          draggedId = node.id
+          draggedLevel = 1
+          e.dataTransfer.effectAllowed = 'move'
+          e.dataTransfer.setData('text/plain', node.id)
+        }}
+        onDragEnd={() => { draggedId = null; draggedLevel = null }}
+        className="rounded-t-xl px-4 py-3 flex items-center justify-between cursor-grab active:cursor-grabbing"
         style={{ backgroundColor: color }}
       >
         <div>
@@ -248,17 +280,18 @@ export default function CapabilityMapView({ onSelectCapability }: {
   // L1 nodes for columns
   const l1Roots = useMemo(() => tree.filter(n => n.level === 1), [tree])
 
-  // All capability IDs that are part of a hierarchy (have a parent, or ARE a parent with L1 level)
+  // Determine which capabilities are properly assigned in the hierarchy
   const assignedIds = useMemo(() => {
     const ids = new Set<string>()
-    // All L1s are "assigned"
+    const allIds = new Set(capabilities.map(c => c.id))
+    // L1s are assigned
     capabilities.filter(c => c.level === 1).forEach(c => ids.add(c.id))
-    // Anything with a parent_id is assigned
-    capabilities.filter(c => c.parent_id).forEach(c => ids.add(c.id))
+    // Anything with a valid parent_id (parent exists) is assigned
+    capabilities.filter(c => c.parent_id && allIds.has(c.parent_id)).forEach(c => ids.add(c.id))
     return ids
   }, [capabilities])
 
-  // Orphans: capabilities not assigned to any hierarchy
+  // Orphans: not assigned, or parent_id points to deleted capability
   const orphans = useMemo(() => {
     return capabilities.filter(c => !assignedIds.has(c.id))
   }, [capabilities, assignedIds])
@@ -285,11 +318,29 @@ export default function CapabilityMapView({ onSelectCapability }: {
   }, [addCapability])
 
   const handleSelect = useCallback((id: string) => {
-    const cap = capabilities.find(c => c.id === id)
-    if (cap && cap.level === 3) {
-      onSelectCapability(id)
+    onSelectCapability(id)
+  }, [onSelectCapability])
+
+  // Reorder L1 columns
+  const handleReorderL1 = useCallback(async (dragId: string, targetIndex: number) => {
+    // Recalculate sort_order for all L1s
+    const currentL1s = l1Roots.map(n => n.id)
+    const fromIdx = currentL1s.indexOf(dragId)
+    if (fromIdx < 0) return
+
+    // Remove from current position and insert at target
+    const reordered = [...currentL1s]
+    reordered.splice(fromIdx, 1)
+    const insertAt = targetIndex > fromIdx ? targetIndex - 1 : targetIndex
+    reordered.splice(insertAt, 0, dragId)
+
+    // Update sort_order for each
+    for (let i = 0; i < reordered.length; i++) {
+      if (reordered[i] !== currentL1s[i]) {
+        await updateCapability(reordered[i], { sort_order: i })
+      }
     }
-  }, [capabilities, onSelectCapability])
+  }, [l1Roots, updateCapability])
 
   // ─── Drag & Drop handler ──────────────────────────────
   const handleDrop = useCallback(async (dragId: string, targetParentId: string) => {
@@ -419,6 +470,7 @@ export default function CapabilityMapView({ onSelectCapability }: {
               onAddL2={handleAddL2}
               onAddL3={handleAddL3}
               onDrop={handleDrop}
+              onReorderL1={handleReorderL1}
             />
           ))}
         </div>

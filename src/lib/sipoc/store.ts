@@ -207,9 +207,17 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
 
   getCapabilityTree: () => {
     const { capabilities } = get()
+    const idSet = new Set(capabilities.map(c => c.id))
+
+    // Fix broken parent references: if parent_id points to a non-existent capability, treat as root
+    const getEffectiveParent = (c: Capability): string | null => {
+      if (!c.parent_id) return null
+      return idSet.has(c.parent_id) ? c.parent_id : null
+    }
+
     const buildTree = (parentId: string | null): CapabilityTreeNode[] => {
       return capabilities
-        .filter(c => (c.parent_id || null) === parentId)
+        .filter(c => getEffectiveParent(c) === parentId)
         .sort((a, b) => a.sort_order - b.sort_order)
         .map(c => ({ ...c, children: buildTree(c.id) }))
     }
