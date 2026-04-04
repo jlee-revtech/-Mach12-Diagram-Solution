@@ -522,7 +522,7 @@ export default function SIPOCVisual() {
   }
 
   return (
-    <div className="space-y-5 min-w-[1100px]">
+    <div className="space-y-5 min-w-0 w-full">
       {/* SIPOC header */}
       <div className="flex items-center justify-center gap-6">
         <ColumnHeader label="Suppliers" color="#F97316" letter="S" />

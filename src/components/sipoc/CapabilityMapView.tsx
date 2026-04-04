@@ -168,7 +168,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
 
   return (
     <div
-      className={`flex flex-col w-[240px] min-w-[240px] transition-all ${
+      className={`flex flex-col flex-1 min-w-[140px] transition-all ${
         dragOver && draggedLevel === 1
           ? dragOverLeft
             ? 'border-l-4 border-[#2563EB] rounded-xl'
@@ -510,7 +510,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
 
       {/* Columns */}
       {l1Roots.length > 0 ? (
-        <div className="flex gap-3 pb-4" style={{ minHeight: 300 }}>
+        <div className="flex gap-3 pb-4 w-full" style={{ minHeight: 300 }}>
           {l1Roots.map((l1, i) => (
             <L1Column
               key={l1.id}
