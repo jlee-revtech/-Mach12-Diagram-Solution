@@ -389,12 +389,13 @@ ${JSON.stringify(context!.currentOutputs, null, 2)}` : ''
 5. For enhancements, set "existingProduct" to the exact name of the existing information product being enhanced
 6. Do NOT re-suggest items that are already fully configured`
     : `Generate a comprehensive SIPOC breakdown from scratch.
-- Generate 4-8 inputs and 3-6 outputs for a typical L3 capability
+- Be thorough: generate ALL relevant inputs and outputs for this capability — typically 10-25+ inputs and 8-20+ outputs depending on complexity
+- Do not artificially limit the count; include every data element, document, system feed, or information product that would realistically flow through this process
 - Mark all items with "status": "new"`
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: SIPOC_SYSTEM_PROMPT,
     messages: [
       {
@@ -874,7 +875,7 @@ Return ONLY valid JSON matching this exact structure:
 Guidelines:
 - L2 = Business Capability (e.g., "Budget Authorization", "Cost Estimation")
 - L3 = Specific Functionality/Process within that capability (e.g., "Labor Rate Development", "Material Cost Forecasting")
-- Generate 3-8 L2 capabilities, each with 2-6 L3 functionalities
+- Be thorough: generate ALL relevant L2 capabilities and their L3 functionalities — do not artificially limit the count
 - Names should be concise, professional, and specific to A&D/GovCon where applicable
 - If an image is provided, extract capabilities and functionalities visible in it
 - Do NOT duplicate any existing capabilities listed above
