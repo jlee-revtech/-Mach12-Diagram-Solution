@@ -537,12 +537,22 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
   const [contentVisible, setContentVisible] = useState(false)
   const resizeRef = useRef<{ startY: number; startH: number } | null>(null)
 
-  // Hydrate the selected capability
+  // Hydrate the selected capability — auto-rollup for L1/L2 with children
+  const hasChildren = useMemo(
+    () => !!selectedId && capabilities.some(c => c.parent_id === selectedId),
+    [selectedId, capabilities]
+  )
   const hydrated = useMemo(() => {
     if (!selectedId) return null
-    const all = useSIPOCStore.getState().getHydratedCapabilities()
+    const store = useSIPOCStore.getState()
+    if (hasChildren) {
+      const rolled = store.getRollup(selectedId)
+      if (rolled) return rolled
+    }
+    const all = store.getHydratedCapabilities()
     return all.find(c => c.id === selectedId) || null
-  }, [selectedId, capabilities, useSIPOCStore(s => s.inputs), useSIPOCStore(s => s.outputs)])
+  }, [selectedId, hasChildren, capabilities, useSIPOCStore(s => s.inputs), useSIPOCStore(s => s.outputs), useSIPOCStore(s => s.tags)])
+  const isRollupView = hasChildren && !!hydrated
 
   // Build breadcrumb
   const breadcrumb = useMemo(() => {
@@ -844,7 +854,19 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
               }}
             />
           ) : hydrated ? (
-            <SIPOCFlowContent capability={hydrated} onOpenEditor={() => { if (!editorOpen) onToggleEditor() }} showDims={showDims} />
+            <div className="flex flex-col h-full">
+              {isRollupView && (
+                <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 bg-[#8B5CF6]/10 border-b border-[#8B5CF6]/25 text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#C4B5FD]">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Rollup view · aggregated from {(hydrated.features || []).length} sub-capabilit{(hydrated.features || []).length === 1 ? 'y' : 'ies'} (read-only)
+                </div>
+              )}
+              <div className="flex-1 overflow-hidden">
+                <SIPOCFlowContent capability={hydrated} onOpenEditor={() => { if (!editorOpen) onToggleEditor() }} showDims={showDims} />
+              </div>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full text-[var(--m12-text-faint)] text-xs">
               Select a capability on the map to view its SIPOC

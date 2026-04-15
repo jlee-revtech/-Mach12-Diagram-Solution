@@ -529,23 +529,42 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
     allOutputIPs.set(o.informationProduct.id, o.informationProduct.name)
   })
 
-  const Row = ({ label, items, colorFor }: { label: string; items: { id: string; name: string }[]; colorFor?: (id: string) => string | undefined }) => (
-    <div>
-      <div className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1">{label} <span className="text-[var(--m12-text-faint)]">({items.length})</span></div>
-      {items.length > 0 ? (
-        <div className="flex flex-wrap gap-1">
-          {items.map(i => (
-            <span key={i.id} className="inline-flex items-center gap-1 text-[10px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1.5 py-0.5 text-[var(--m12-text-secondary)]">
-              {colorFor?.(i.id) && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorFor(i.id) }} />}
-              {i.name}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div className="text-[10px] text-[var(--m12-text-faint)] italic">None</div>
-      )}
-    </div>
-  )
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set())
+  const toggle = (key: string) => setOpenSections(prev => {
+    const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n
+  })
+
+  const Row = ({ sectionKey, label, items, colorFor }: { sectionKey: string; label: string; items: { id: string; name: string }[]; colorFor?: (id: string) => string | undefined }) => {
+    const isOpen = openSections.has(sectionKey)
+    return (
+      <div>
+        <button
+          onClick={() => toggle(sectionKey)}
+          className="w-full flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--m12-text-secondary)] transition-colors"
+        >
+          <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
+            <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>{label}</span>
+          <span className="text-[var(--m12-text-faint)]">({items.length})</span>
+        </button>
+        {isOpen && (
+          items.length > 0 ? (
+            <div className="flex flex-wrap gap-1 pl-3">
+              {items.map(i => (
+                <span key={i.id} className="inline-flex items-center gap-1 text-[10px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1.5 py-0.5 text-[var(--m12-text-secondary)]">
+                  {colorFor?.(i.id) && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorFor(i.id) }} />}
+                  {i.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[10px] text-[var(--m12-text-faint)] italic pl-3">None</div>
+          )
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-lg border border-[#2563EB]/30 bg-[#2563EB]/[0.04] p-3 space-y-3">
@@ -571,26 +590,54 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
       {genError && (
         <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1">{genError}</div>
       )}
-      <Row label="Suppliers" items={[...allSuppliers.values()]} colorFor={id => allSuppliers.get(id)?.color} />
-      <Row label="Inputs" items={[...allInputIPs.entries()].map(([id, name]) => ({ id, name }))} />
-      <Row label="Outputs" items={[...allOutputIPs.entries()].map(([id, name]) => ({ id, name }))} />
-      <Row label="Customers" items={[...allCustomers.values()]} colorFor={id => allCustomers.get(id)?.color} />
-      {allTags.size > 0 && (
-        <div>
-          <div className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1">Tags <span className="text-[var(--m12-text-faint)]">({allTags.size})</span></div>
-          <div className="flex flex-wrap gap-1">
-            {[...allTags.values()].map(t => (
-              <span key={t.id} className="inline-flex items-center rounded text-[9px] px-1.5 py-0 text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
-            ))}
+      <Row sectionKey="suppliers" label="Suppliers" items={[...allSuppliers.values()]} colorFor={id => allSuppliers.get(id)?.color} />
+      <Row sectionKey="inputs" label="Inputs" items={[...allInputIPs.entries()].map(([id, name]) => ({ id, name }))} />
+      <Row sectionKey="outputs" label="Outputs" items={[...allOutputIPs.entries()].map(([id, name]) => ({ id, name }))} />
+      <Row sectionKey="customers" label="Customers" items={[...allCustomers.values()]} colorFor={id => allCustomers.get(id)?.color} />
+      {allTags.size > 0 && (() => {
+        const isOpen = openSections.has('tags')
+        return (
+          <div>
+            <button
+              onClick={() => toggle('tags')}
+              className="w-full flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--m12-text-secondary)] transition-colors"
+            >
+              <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
+                <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Tags</span>
+              <span className="text-[var(--m12-text-faint)]">({allTags.size})</span>
+            </button>
+            {isOpen && (
+              <div className="flex flex-wrap gap-1 pl-3">
+                {[...allTags.values()].map(t => (
+                  <span key={t.id} className="inline-flex items-center rounded text-[9px] px-1.5 py-0 text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
-      {(rollup.features || []).length > 0 && (
-        <div>
-          <div className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1">Features (auto)</div>
-          <div className="text-[10px] text-[var(--m12-text-secondary)]">{(rollup.features || []).join(' · ')}</div>
-        </div>
-      )}
+        )
+      })()}
+      {(rollup.features || []).length > 0 && (() => {
+        const isOpen = openSections.has('features')
+        return (
+          <div>
+            <button
+              onClick={() => toggle('features')}
+              className="w-full flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--m12-text-secondary)] transition-colors"
+            >
+              <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
+                <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Features (auto)</span>
+              <span className="text-[var(--m12-text-faint)]">({(rollup.features || []).length})</span>
+            </button>
+            {isOpen && (
+              <div className="text-[10px] text-[var(--m12-text-secondary)] pl-3">{(rollup.features || []).join(' · ')}</div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
