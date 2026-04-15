@@ -165,6 +165,20 @@ export interface HydratedCapability extends Capability {
   })[]
 }
 
+// ─── Tag color presets ─────────────────────────────────
+export const TAG_COLORS = [
+  '#64748B', // slate (default)
+  '#2563EB', // blue
+  '#10B981', // emerald
+  '#F97316', // orange
+  '#EF4444', // red
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#EAB308', // yellow
+  '#06B6D4', // cyan
+  '#14B8A6', // teal
+] as const
+
 // ─── Persona color presets ─────────────────────────────
 export const PERSONA_COLORS = [
   '#6366F1', // indigo

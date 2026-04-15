@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { Persona, InformationProduct, LogicalSystem, Dimension, Tag } from '@/lib/sipoc/types'
-import { PERSONA_COLORS, IP_CATEGORIES } from '@/lib/sipoc/types'
+import { PERSONA_COLORS, IP_CATEGORIES, TAG_COLORS } from '@/lib/sipoc/types'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 
 // ─── Inline quick-create input ──────────────────────────
@@ -466,6 +466,135 @@ function DimensionsEditor({
   )
 }
 
+// ─── Rollup summary (read-only, shown for L1/L2 with children) ──
+function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/types').HydratedCapability; capabilityId: string }) {
+  const updateCapability = useSIPOCStore(s => s.updateCapability)
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+
+  const handleGenerateNarrative = async () => {
+    setGenerating(true)
+    setGenError(null)
+    try {
+      const payload = {
+        name: rollup.name,
+        level: rollup.level,
+        features: rollup.features || [],
+        suppliers: [...new Set(rollup.inputs.flatMap(i => i.supplierPersonas.map(p => p.name)))],
+        customers: [...new Set(rollup.outputs.flatMap(o => o.consumerPersonas.map(p => p.name)))],
+        inputs: rollup.inputs.map(i => ({
+          name: i.informationProduct.name,
+          dimensions: i.dimensions.map(d => d.name),
+          tags: i.tags.map(t => t.name),
+        })),
+        outputs: rollup.outputs.map(o => ({
+          name: o.informationProduct.name,
+          dimensions: o.dimensions.map(d => d.name),
+        })),
+        feedingSystems: [...new Set(rollup.inputs.map(i => i.feedingSystem?.name).filter(Boolean))],
+        sourceSystems: [...new Set(rollup.inputs.flatMap(i => i.sourceSystems.map(s => s.name)))],
+        destinationSystems: [...new Set(rollup.outputs.flatMap(o => o.destinationSystems.map(s => s.name)))],
+      }
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sipoc-l2-narrative', context: payload }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.narrative) {
+        setGenError(data.error || 'Generation failed')
+        return
+      }
+      await updateCapability(capabilityId, { description: data.narrative })
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Generation failed')
+    } finally {
+      setGenerating(false)
+    }
+  }
+  const childCount = (rollup.features || []).length
+  const allSuppliers = new Map<string, Persona>()
+  const allCustomers = new Map<string, Persona>()
+  const allInputIPs = new Map<string, string>()
+  const allOutputIPs = new Map<string, string>()
+  const allTags = new Map<string, Tag>()
+  rollup.inputs.forEach(i => {
+    i.supplierPersonas.forEach(p => allSuppliers.set(p.id, p))
+    allInputIPs.set(i.informationProduct.id, i.informationProduct.name)
+    i.tags.forEach(t => allTags.set(t.id, t))
+    i.dimensions.forEach(d => d.tags.forEach(t => allTags.set(t.id, t)))
+  })
+  rollup.outputs.forEach(o => {
+    o.consumerPersonas.forEach(p => allCustomers.set(p.id, p))
+    allOutputIPs.set(o.informationProduct.id, o.informationProduct.name)
+  })
+
+  const Row = ({ label, items, colorFor }: { label: string; items: { id: string; name: string }[]; colorFor?: (id: string) => string | undefined }) => (
+    <div>
+      <div className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1">{label} <span className="text-[var(--m12-text-faint)]">({items.length})</span></div>
+      {items.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {items.map(i => (
+            <span key={i.id} className="inline-flex items-center gap-1 text-[10px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1.5 py-0.5 text-[var(--m12-text-secondary)]">
+              {colorFor?.(i.id) && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorFor(i.id) }} />}
+              {i.name}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[10px] text-[var(--m12-text-faint)] italic">None</div>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="rounded-lg border border-[#2563EB]/30 bg-[#2563EB]/[0.04] p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <svg width="11" height="11" viewBox="0 0 10 10" fill="none" className="text-[#93C5FD]">
+          <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="text-[10px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#93C5FD] font-bold flex-1">
+          Rollup · summarized from {childCount} sub-capabilit{childCount === 1 ? 'y' : 'ies'} (read-only)
+        </span>
+        <button
+          onClick={handleGenerateNarrative}
+          disabled={generating}
+          className="shrink-0 text-[9px] px-2 py-1 rounded-md font-[family-name:var(--font-space-mono)] uppercase tracking-wider border bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#C4B5FD] hover:bg-[#8B5CF6]/25 disabled:opacity-50 disabled:cursor-wait transition-colors flex items-center gap-1"
+          title="Generate an AI description from this rollup and save it to the capability"
+        >
+          <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+            <path d="M5 1l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" fill="currentColor" />
+          </svg>
+          {generating ? 'Generating…' : 'AI Description'}
+        </button>
+      </div>
+      {genError && (
+        <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1">{genError}</div>
+      )}
+      <Row label="Suppliers" items={[...allSuppliers.values()]} colorFor={id => allSuppliers.get(id)?.color} />
+      <Row label="Inputs" items={[...allInputIPs.entries()].map(([id, name]) => ({ id, name }))} />
+      <Row label="Outputs" items={[...allOutputIPs.entries()].map(([id, name]) => ({ id, name }))} />
+      <Row label="Customers" items={[...allCustomers.values()]} colorFor={id => allCustomers.get(id)?.color} />
+      {allTags.size > 0 && (
+        <div>
+          <div className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1">Tags <span className="text-[var(--m12-text-faint)]">({allTags.size})</span></div>
+          <div className="flex flex-wrap gap-1">
+            {[...allTags.values()].map(t => (
+              <span key={t.id} className="inline-flex items-center rounded text-[9px] px-1.5 py-0 text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {(rollup.features || []).length > 0 && (
+        <div>
+          <div className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1">Features (auto)</div>
+          <div className="text-[10px] text-[var(--m12-text-secondary)]">{(rollup.features || []).join(' · ')}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Capability Detail Editor ───────────────────────────
 function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId: string }) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
@@ -519,7 +648,10 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const addInformationProduct = useSIPOCStore(s => s.addInformationProduct)
 
   const capability = capabilities.find(c => c.id === capabilityId)
+  const getRollup = useSIPOCStore(s => s.getRollup)
+  const hasChildren = capabilities.some(c => c.parent_id === capabilityId)
   if (!capability) return null
+  const rollup = hasChildren ? getRollup(capabilityId) : null
 
   // Get IPs not already used as inputs/outputs for this capability
   const usedInputIpIds = new Set(inputs.map(i => i.information_product_id))
@@ -547,6 +679,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
 
   return (
     <div className="space-y-5">
+      {rollup && <RollupSummary rollup={rollup} capabilityId={capabilityId} />}
       {/* Capability name & description */}
       <div className="space-y-2">
         <input
@@ -1278,8 +1411,12 @@ function EntityPool({ orgId }: { orgId: string }) {
   const addLogicalSystem = useSIPOCStore(s => s.addLogicalSystem)
   const removeLogicalSystem = useSIPOCStore(s => s.removeLogicalSystem)
   const updateLogicalSystem = useSIPOCStore(s => s.updateLogicalSystem)
+  const tags = useSIPOCStore(s => s.tags)
+  const addTag = useSIPOCStore(s => s.addTag)
+  const updateTagFn = useSIPOCStore(s => s.updateTag)
+  const removeTag = useSIPOCStore(s => s.removeTag)
 
-  const [activeTab, setActiveTab] = useState<'personas' | 'products' | 'systems'>('personas')
+  const [activeTab, setActiveTab] = useState<'personas' | 'products' | 'systems' | 'tags'>('personas')
   const [newSystemType, setNewSystemType] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -1291,6 +1428,11 @@ function EntityPool({ orgId }: { orgId: string }) {
   const handleAddIP = useCallback(async (name: string) => {
     await addInformationProduct(orgId, { name })
   }, [orgId, addInformationProduct])
+
+  const handleAddTag = useCallback(async (name: string) => {
+    const colorIdx = tags.length % TAG_COLORS.length
+    await addTag(orgId, { name, color: TAG_COLORS[colorIdx] })
+  }, [orgId, tags.length, addTag])
 
   const handleAddSystem = useCallback(async (name: string) => {
     const template = SYSTEM_TEMPLATES.find(t => t.type === newSystemType)
@@ -1305,6 +1447,7 @@ function EntityPool({ orgId }: { orgId: string }) {
     { key: 'personas' as const, label: 'Personas', count: personas.length },
     { key: 'products' as const, label: 'Info Products', count: informationProducts.length },
     { key: 'systems' as const, label: 'Systems', count: logicalSystems.length },
+    { key: 'tags' as const, label: 'Tags', count: tags.length },
   ]
 
   return (
@@ -1415,6 +1558,31 @@ function EntityPool({ orgId }: { orgId: string }) {
             </select>
             <QuickAdd placeholder="New system name..." onAdd={handleAddSystem} />
           </div>
+        </div>
+      )}
+
+      {/* Tags list */}
+      {activeTab === 'tags' && (
+        <div className="space-y-1.5">
+          {tags.map(t => (
+            <EditableRow
+              key={t.id}
+              id={t.id}
+              name={t.name}
+              editingId={editingId}
+              setEditingId={setEditingId}
+              color={t.color}
+              colorDot="round"
+              secondaryLabel="Description..."
+              secondaryField={t.description || ''}
+              onSave={name => updateTagFn(t.id, { name })}
+              onSaveSecondary={description => updateTagFn(t.id, { description: description || undefined })}
+              onDelete={() => removeTag(t.id)}
+              colorOptions={TAG_COLORS}
+              onSaveColor={color => updateTagFn(t.id, { color })}
+            />
+          ))}
+          <QuickAdd placeholder="New tag name..." onAdd={handleAddTag} />
         </div>
       )}
     </div>

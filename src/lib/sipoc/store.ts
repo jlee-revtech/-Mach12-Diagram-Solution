@@ -100,6 +100,9 @@ interface SIPOCState {
 
   // ─── Derived: hydrated capabilities ───────────────────
   getHydratedCapabilities: () => HydratedCapability[]
+
+  // ─── Derived: L1/L2 rollup from descendant L3 SIPOCs ───
+  getRollup: (capabilityId: string) => HydratedCapability | null
 }
 
 export const useSIPOCStore = create<SIPOCState>((set, get) => ({
@@ -547,5 +550,137 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
           .filter((s): s is LogicalSystem => !!s),
       })),
     }))
+  },
+
+  // ─── Rollup: aggregate all descendant-L3 SIPOC detail ───
+  getRollup: (capabilityId) => {
+    const hydrated = get().getHydratedCapabilities()
+    const byId = new Map(hydrated.map(h => [h.id, h]))
+    const rawCaps = get().capabilities
+    const root = byId.get(capabilityId)
+    if (!root) return null
+
+    // Collect all descendant leaves (capabilities with no children)
+    const descendants: HydratedCapability[] = []
+    const collect = (id: string) => {
+      const children = rawCaps.filter(c => c.parent_id === id)
+      if (children.length === 0) {
+        const h = byId.get(id)
+        if (h && h.id !== capabilityId) descendants.push(h)
+        return
+      }
+      children.forEach(c => collect(c.id))
+    }
+    collect(capabilityId)
+
+    if (descendants.length === 0) return null
+
+    type HInput = HydratedCapability['inputs'][0]
+    type HOutput = HydratedCapability['outputs'][0]
+
+    // Merge dimensions by case-insensitive name; union tags
+    const mergeDimensions = (accDims: (import('./types').Dimension & { tags: Tag[] })[], newDims: (import('./types').Dimension & { tags: Tag[] })[]) => {
+      const byName = new Map(accDims.map(d => [d.name.toLowerCase(), d]))
+      for (const nd of newDims) {
+        const key = nd.name.toLowerCase()
+        const existing = byName.get(key)
+        if (existing) {
+          const tagIds = new Set(existing.tags.map(t => t.id))
+          nd.tags.forEach(t => { if (!tagIds.has(t.id)) { existing.tags.push(t); tagIds.add(t.id) } })
+        } else {
+          const copy = { ...nd, tags: [...nd.tags] }
+          byName.set(key, copy)
+          accDims.push(copy)
+        }
+      }
+      return accDims
+    }
+
+    // Aggregate inputs by IP id
+    const inputAgg = new Map<string, HInput>()
+    for (const d of descendants) {
+      for (const inp of d.inputs) {
+        const key = inp.information_product_id
+        const existing = inputAgg.get(key)
+        if (!existing) {
+          inputAgg.set(key, {
+            ...inp,
+            id: `rollup-input-${capabilityId}-${key}`,
+            supplier_persona_ids: [...inp.supplier_persona_ids],
+            source_system_ids: [...inp.source_system_ids],
+            tag_ids: [...(inp.tag_ids || [])],
+            supplierPersonas: [...inp.supplierPersonas],
+            sourceSystems: [...inp.sourceSystems],
+            tags: [...inp.tags],
+            dimensions: inp.dimensions.map(x => ({ ...x, tags: [...x.tags] })),
+          })
+        } else {
+          const addIds = (target: string[], src: string[]) => { src.forEach(id => { if (!target.includes(id)) target.push(id) }) }
+          addIds(existing.supplier_persona_ids, inp.supplier_persona_ids)
+          addIds(existing.source_system_ids, inp.source_system_ids)
+          addIds(existing.tag_ids || (existing.tag_ids = []), inp.tag_ids || [])
+          const pIds = new Set(existing.supplierPersonas.map(p => p.id))
+          inp.supplierPersonas.forEach(p => { if (!pIds.has(p.id)) existing.supplierPersonas.push(p) })
+          const sIds = new Set(existing.sourceSystems.map(s => s.id))
+          inp.sourceSystems.forEach(s => { if (!sIds.has(s.id)) existing.sourceSystems.push(s) })
+          const tIds = new Set(existing.tags.map(t => t.id))
+          inp.tags.forEach(t => { if (!tIds.has(t.id)) existing.tags.push(t) })
+          if (existing.feeding_system_id && inp.feeding_system_id && existing.feeding_system_id !== inp.feeding_system_id) {
+            existing.feeding_system_id = null
+            existing.feedingSystem = null
+          } else if (!existing.feeding_system_id && inp.feeding_system_id) {
+            existing.feeding_system_id = inp.feeding_system_id
+            existing.feedingSystem = inp.feedingSystem
+          }
+          mergeDimensions(existing.dimensions, inp.dimensions)
+        }
+      }
+    }
+
+    // Aggregate outputs by IP id
+    const outputAgg = new Map<string, HOutput>()
+    for (const d of descendants) {
+      for (const out of d.outputs) {
+        const key = out.information_product_id
+        const existing = outputAgg.get(key)
+        if (!existing) {
+          outputAgg.set(key, {
+            ...out,
+            id: `rollup-output-${capabilityId}-${key}`,
+            consumer_persona_ids: [...out.consumer_persona_ids],
+            destination_system_ids: [...(out.destination_system_ids || [])],
+            consumerPersonas: [...out.consumerPersonas],
+            destinationSystems: [...out.destinationSystems],
+            dimensions: out.dimensions.map(x => ({ ...x })),
+          })
+        } else {
+          const addIds = (target: string[], src: string[]) => { src.forEach(id => { if (!target.includes(id)) target.push(id) }) }
+          addIds(existing.consumer_persona_ids, out.consumer_persona_ids)
+          addIds(existing.destination_system_ids || (existing.destination_system_ids = []), out.destination_system_ids || [])
+          const cIds = new Set(existing.consumerPersonas.map(p => p.id))
+          out.consumerPersonas.forEach(p => { if (!cIds.has(p.id)) existing.consumerPersonas.push(p) })
+          const dIds = new Set(existing.destinationSystems.map(s => s.id))
+          out.destinationSystems.forEach(s => { if (!dIds.has(s.id)) existing.destinationSystems.push(s) })
+          const mergedDims = mergeDimensions(
+            existing.dimensions.map(x => ({ ...x, tags: [] as Tag[] })),
+            out.dimensions.map(x => ({ ...x, tags: [] as Tag[] }))
+          )
+          existing.dimensions = mergedDims
+        }
+      }
+    }
+
+    // Feature list = immediate-child names, sorted
+    const immediateChildren = rawCaps
+      .filter(c => c.parent_id === capabilityId)
+      .sort((a, b) => a.sort_order - b.sort_order)
+    const features = immediateChildren.map(c => c.name)
+
+    return {
+      ...root,
+      features,
+      inputs: [...inputAgg.values()],
+      outputs: [...outputAgg.values()],
+    }
   },
 }))

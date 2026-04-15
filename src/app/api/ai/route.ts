@@ -91,6 +91,8 @@ export async function POST(req: NextRequest) {
       return handleSIPOCFlowDiagram(prompt, context)
     } else if (action === 'sipoc-bulk-load') {
       return handleSIPOCBulkLoad(prompt, context, image)
+    } else if (action === 'sipoc-l2-narrative') {
+      return handleSIPOCL2Narrative(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -899,4 +901,39 @@ Return ONLY the JSON. No markdown, no explanation.`
   } catch {
     return NextResponse.json({ error: 'Failed to parse AI response', raw: text }, { status: 500 })
   }
+}
+
+async function handleSIPOCL2Narrative(context: {
+  name: string
+  level?: number
+  features?: string[]
+  suppliers?: string[]
+  inputs?: { name: string; dimensions?: string[]; tags?: string[] }[]
+  outputs?: { name: string; dimensions?: string[]; tags?: string[] }[]
+  customers?: string[]
+  feedingSystems?: string[]
+  sourceSystems?: string[]
+  destinationSystems?: string[]
+}) {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 600,
+    system: 'You are an expert business and data architect. Generate concise, executive-ready capability descriptions for enterprise SIPOC models.',
+    messages: [{
+      role: 'user',
+      content: `Write a 2–4 sentence description for the capability "${context.name}" (Level ${context.level ?? 2}) based on its rolled-up SIPOC detail below. The description should explain WHAT the capability does, WHO it serves, and the key data it consumes and produces. Avoid bullet points. Do not wrap in quotes. Return plain prose only — no preamble, no JSON.
+
+Sub-capabilities (features): ${(context.features || []).join(', ') || '(none)'}
+Suppliers: ${(context.suppliers || []).join(', ') || '(none)'}
+Inputs: ${(context.inputs || []).map(i => `${i.name}${i.dimensions?.length ? ` [${i.dimensions.join(', ')}]` : ''}${i.tags?.length ? ` #${i.tags.join(' #')}` : ''}`).join('; ') || '(none)'}
+Feeding systems: ${(context.feedingSystems || []).join(', ') || '(none)'}
+Source systems: ${(context.sourceSystems || []).join(', ') || '(none)'}
+Outputs: ${(context.outputs || []).map(o => `${o.name}${o.dimensions?.length ? ` [${o.dimensions.join(', ')}]` : ''}`).join('; ') || '(none)'}
+Destination systems: ${(context.destinationSystems || []).join(', ') || '(none)'}
+Customers: ${(context.customers || []).join(', ') || '(none)'}`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+  return NextResponse.json({ narrative: text })
 }

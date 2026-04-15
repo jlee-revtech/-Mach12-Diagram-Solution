@@ -411,7 +411,7 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
 // ─── Recursive tree section for hierarchy ───────────────
 const L1_PALETTE = ['#2563EB', '#10B981', '#F97316', '#8B5CF6', '#06B6D4', '#EF4444', '#EAB308', '#EC4899']
 
-function TreeSection({ node, depth, collapsedGroups, toggleGroup, renderLeaf, getHydrated, isLeaf }: {
+function TreeSection({ node, depth, collapsedGroups, toggleGroup, renderLeaf, getHydrated, isLeaf, rollupIds, toggleRollup, renderRollup }: {
   node: import('@/lib/sipoc/types').CapabilityTreeNode
   depth: number
   collapsedGroups: Set<string>
@@ -419,6 +419,9 @@ function TreeSection({ node, depth, collapsedGroups, toggleGroup, renderLeaf, ge
   renderLeaf: (id: string) => React.ReactNode
   getHydrated: (id: string) => HydratedCapability | undefined
   isLeaf: (id: string) => boolean
+  rollupIds: Set<string>
+  toggleRollup: (id: string) => void
+  renderRollup: (id: string, name: string) => React.ReactNode
 }) {
   const collapsed = collapsedGroups.has(node.id)
   const nodeIsLeaf = node.children.length === 0
@@ -433,12 +436,15 @@ function TreeSection({ node, depth, collapsedGroups, toggleGroup, renderLeaf, ge
   const isL1 = depth === 0 || node.level === 1
   const childCount = node.children.reduce((sum, c) => sum + (c.children.length > 0 ? c.children.length : 1), 0)
 
+  const showRollup = rollupIds.has(node.id)
+
   return (
     <div className="space-y-2">
       {/* Group header */}
+      <div className="flex items-center gap-2.5 group w-full">
       <button
         onClick={() => toggleGroup(node.id)}
-        className="flex items-center gap-2.5 group w-full text-left"
+        className="flex items-center gap-2.5 flex-1 text-left"
       >
         <svg
           width={isL1 ? 10 : 8} height={isL1 ? 10 : 8}
@@ -463,6 +469,25 @@ function TreeSection({ node, depth, collapsedGroups, toggleGroup, renderLeaf, ge
           </span>
         )}
       </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleRollup(node.id) }}
+        className={`shrink-0 text-[9px] px-2 py-0.5 rounded-md font-[family-name:var(--font-space-mono)] uppercase tracking-wider border transition-colors ${
+          showRollup
+            ? 'bg-[#2563EB]/15 border-[#2563EB]/40 text-[#93C5FD]'
+            : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[var(--m12-border)] hover:text-[var(--m12-text-secondary)]'
+        }`}
+        title="Show rollup summarizing all descendant SIPOCs"
+      >
+        {showRollup ? 'Hide rollup' : 'Rollup'}
+      </button>
+      </div>
+
+      {/* Rollup block */}
+      {showRollup && (
+        <div className="pl-4">
+          {renderRollup(node.id, node.name)}
+        </div>
+      )}
 
       {/* Children */}
       {!collapsed && (
@@ -480,6 +505,9 @@ function TreeSection({ node, depth, collapsedGroups, toggleGroup, renderLeaf, ge
               renderLeaf={renderLeaf}
               getHydrated={getHydrated}
               isLeaf={isLeaf}
+              rollupIds={rollupIds}
+              toggleRollup={toggleRollup}
+              renderRollup={renderRollup}
             />
           ))}
         </div>
@@ -610,7 +638,13 @@ export default function SIPOCVisual() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [filterMode, setFilterMode] = useState<'any' | 'all'>('any')
+  const [rollupIds, setRollupIds] = useState<Set<string>>(new Set())
   const allTags = useSIPOCStore(s => s.tags)
+  const getRollup = useSIPOCStore(s => s.getRollup)
+
+  const toggleRollup = (id: string) => setRollupIds(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n
+  })
   const initializedRef = useRef(false)
 
   const toggleCollapse = (id: string) => {
@@ -696,6 +730,44 @@ export default function SIPOCVisual() {
     )
   }
 
+  const renderRollup = (nodeId: string, _nodeName: string) => {
+    const rolled = getRollup(nodeId)
+    if (!rolled) {
+      return (
+        <div className="rounded-lg border border-dashed border-[var(--m12-border)]/40 px-4 py-3 text-[10px] italic text-[var(--m12-text-muted)]">
+          No descendant SIPOC detail to summarize yet.
+        </div>
+      )
+    }
+    const childCount = (rolled.features || []).length
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2 text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#93C5FD]">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Rollup — summarized from {childCount} sub-capabilit{childCount === 1 ? 'y' : 'ies'} (read-only)
+        </div>
+        <CapabilityBlock
+          capability={rolled}
+          isSelected={false}
+          onSelect={() => {}}
+          showDimensions={showDimensions}
+          collapsed={false}
+          onToggleCollapse={() => {}}
+          filterTagIds={filterTagIds}
+          filterMode={filterMode}
+        />
+        {(rolled.features || []).length > 0 && (
+          <div className="text-[9px] text-[var(--m12-text-muted)] pl-1">
+            <span className="font-[family-name:var(--font-space-mono)] uppercase tracking-wider mr-1">Features:</span>
+            {(rolled.features || []).join(' · ')}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5 min-w-0 w-full">
       {/* SIPOC header */}
@@ -770,6 +842,9 @@ export default function SIPOCVisual() {
               renderLeaf={renderLeaf}
               getHydrated={getHydrated}
               isLeaf={isLeaf}
+              rollupIds={rollupIds}
+              toggleRollup={toggleRollup}
+              renderRollup={renderRollup}
             />
           ))}
 
