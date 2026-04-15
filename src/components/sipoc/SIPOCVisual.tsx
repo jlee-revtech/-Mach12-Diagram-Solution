@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { HydratedCapability, Dimension } from '@/lib/sipoc/types'
+import type { HydratedCapability, Dimension, Tag } from '@/lib/sipoc/types'
 
 // ─── Column Header ──────────────────────────────────────
 function ColumnHeader({ label, color, letter }: { label: string; color: string; letter: string }) {
@@ -46,6 +46,14 @@ function SystemChip({ name, color }: { name: string; color?: string }) {
   )
 }
 
+// Tag-match helper: empty filter = match all
+function matchesTags(ownIds: string[], selected: string[], mode: 'any' | 'all'): boolean {
+  if (selected.length === 0) return true
+  if (ownIds.length === 0) return false
+  if (mode === 'all') return selected.every(id => ownIds.includes(id))
+  return selected.some(id => ownIds.includes(id))
+}
+
 // ─── Info Product Card (the data object, with dimensions) ─
 function IPCard({
   name,
@@ -54,13 +62,19 @@ function IPCard({
   showDimensions,
   accentColor,
   itemId,
+  tags,
+  filterTagIds,
+  filterMode,
 }: {
   name: string
   category?: string
-  dimensions?: Dimension[]
+  dimensions?: (Dimension & { tags?: Tag[] })[]
   showDimensions: boolean
   accentColor: string
   itemId?: string
+  tags?: Tag[]
+  filterTagIds?: string[]
+  filterMode?: 'any' | 'all'
 }) {
   const setFocusedItem = useSIPOCStore(s => s.setFocusedItem)
   const hasDims = dimensions && dimensions.length > 0
@@ -83,11 +97,47 @@ function IPCard({
           {category}
         </div>
       )}
-      {showDimensions && hasDims && (
-        <div className="mt-2 pt-1.5 border-t border-[var(--m12-border)]/15 space-y-0 border-l-2 border-[var(--m12-border)]/15 ml-0.5 pl-2">
-          {dimensions.map(dim => (
-            <div key={dim.id} className="text-[8px] text-[var(--m12-text-muted)] py-px">{dim.name}</div>
+      {tags && tags.length > 0 && (
+        <div className="flex flex-wrap gap-0.5 mt-1">
+          {tags.map(t => (
+            <span
+              key={t.id}
+              className="inline-flex items-center rounded text-[8px] px-1 py-0 text-white leading-tight"
+              style={{ backgroundColor: t.color }}
+              title={t.description || t.name}
+            >
+              {t.name}
+            </span>
           ))}
+        </div>
+      )}
+      {showDimensions && hasDims && (
+        <div className="mt-2 pt-1.5 border-t border-[var(--m12-border)]/15 space-y-0.5 border-l-2 border-[var(--m12-border)]/15 ml-0.5 pl-2">
+          {dimensions.map(dim => {
+            const dimTagIds = (dim.tags || []).map(t => t.id)
+            const dimMatches = matchesTags(dimTagIds, filterTagIds || [], filterMode || 'any')
+            return (
+              <div key={dim.id} className={`py-px transition-opacity ${dimMatches ? '' : 'opacity-30'}`}>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[8px] text-[var(--m12-text-muted)] shrink-0">{dim.name}</span>
+                  {dim.tags && dim.tags.length > 0 && (
+                    <span className="flex flex-wrap gap-0.5">
+                      {dim.tags.map(t => (
+                        <span
+                          key={t.id}
+                          className="inline-flex items-center rounded text-[7px] px-1 py-0 text-white leading-tight"
+                          style={{ backgroundColor: t.color }}
+                          title={t.description || t.name}
+                        >
+                          {t.name}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -118,16 +168,25 @@ function FeedingSystemChip({ name, color }: { name: string; color?: string }) {
 }
 
 // ─── Single input lane (Suppliers → Input) ──────────────
-function InputLane({ input, showDimensions }: {
+function InputLane({ input, showDimensions, filterTagIds, filterMode }: {
   input: HydratedCapability['inputs'][0]
   showDimensions: boolean
+  filterTagIds?: string[]
+  filterMode?: 'any' | 'all'
 }) {
   const hasSuppliers = input.supplierPersonas.length > 0 || input.sourceSystems.length > 0 || !!input.feedingSystem
   const sourceSystems = input.sourceSystems
   const feedingSystem = input.feedingSystem
 
+  const mode = filterMode || 'any'
+  const selected = filterTagIds || []
+  const ipTagIds = (input.tags || []).map(t => t.id)
+  const ipMatch = matchesTags(ipTagIds, selected, mode)
+  const anyDimMatch = (input.dimensions || []).some(d => matchesTags((d.tags || []).map(t => t.id), selected, mode))
+  const laneMatch = selected.length === 0 || ipMatch || anyDimMatch
+
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-2 transition-opacity ${laneMatch ? '' : 'opacity-30'}`}>
       {/* Left: Personas + origin systems */}
       <div className="flex-1 flex flex-col gap-1.5 items-end min-w-0">
         {/* Persona chips */}
@@ -163,6 +222,9 @@ function InputLane({ input, showDimensions }: {
           name={input.informationProduct.name}
           category={input.informationProduct.category}
           dimensions={input.dimensions}
+          tags={input.tags}
+          filterTagIds={filterTagIds}
+          filterMode={filterMode}
           showDimensions={showDimensions}
           accentColor="#EAB308"
           itemId={input.id}
@@ -218,13 +280,15 @@ function OutputLane({ output, showDimensions }: {
 }
 
 // ─── Single Capability SIPOC Block ──────────────────────
-function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, collapsed, onToggleCollapse }: {
+function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, collapsed, onToggleCollapse, filterTagIds, filterMode }: {
   capability: HydratedCapability
   isSelected: boolean
   onSelect: () => void
   showDimensions: boolean
   collapsed: boolean
   onToggleCollapse: () => void
+  filterTagIds?: string[]
+  filterMode?: 'any' | 'all'
 }) {
   if (collapsed) {
     return (
@@ -279,7 +343,7 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
         <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center bg-[var(--m12-bg-card)]/30">
           {capability.inputs.length > 0 ? (
             capability.inputs.map(input => (
-              <InputLane key={input.id} input={input} showDimensions={showDimensions} />
+              <InputLane key={input.id} input={input} showDimensions={showDimensions} filterTagIds={filterTagIds} filterMode={filterMode} />
             ))
           ) : (
             <div className="flex items-center justify-center py-4 text-[10px] text-[var(--m12-text-faint)] italic">
@@ -424,6 +488,112 @@ function TreeSection({ node, depth, collapsedGroups, toggleGroup, renderLeaf, ge
   )
 }
 
+// ─── Tag Filter Bar ─────────────────────────────────────
+function TagFilterBar({
+  allTags,
+  selectedTags,
+  onToggle,
+  onClear,
+  mode,
+  setMode,
+  matchCount,
+  totalCount,
+}: {
+  allTags: Tag[]
+  selectedTags: Tag[]
+  onToggle: (id: string) => void
+  onClear: () => void
+  mode: 'any' | 'all'
+  setMode: (m: 'any' | 'all') => void
+  matchCount: number
+  totalCount: number
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const active = selectedTags.length > 0
+  return (
+    <div ref={ref} className="relative flex items-center gap-1">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider border transition-colors ${
+          active
+            ? 'bg-[#2563EB]/10 border-[#2563EB]/40 text-[#93C5FD]'
+            : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[var(--m12-border)] hover:text-[var(--m12-text-secondary)]'
+        }`}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M1 2h8l-3 3.5v3L4 9.5v-4L1 2z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
+        </svg>
+        Filter Tags
+        {active && <span className="bg-[#2563EB]/30 rounded px-1 py-0">{selectedTags.length}</span>}
+      </button>
+      {active && (
+        <>
+          <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+            {matchCount}/{totalCount}
+          </span>
+          <button
+            onClick={onClear}
+            className="text-[9px] text-[var(--m12-text-muted)] hover:text-red-400 uppercase tracking-wider font-[family-name:var(--font-space-mono)] px-1"
+            title="Clear filter"
+          >
+            clear
+          </button>
+        </>
+      )}
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden min-w-[240px] w-max max-w-[360px]">
+          <div className="flex items-center gap-1 p-1.5 border-b border-[var(--m12-border)]/20">
+            <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase mr-auto">Match</span>
+            <button
+              onClick={() => setMode('any')}
+              className={`text-[9px] px-2 py-0.5 rounded font-[family-name:var(--font-space-mono)] uppercase ${mode === 'any' ? 'bg-[#2563EB]/20 text-[#93C5FD]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]'}`}
+            >
+              Any
+            </button>
+            <button
+              onClick={() => setMode('all')}
+              className={`text-[9px] px-2 py-0.5 rounded font-[family-name:var(--font-space-mono)] uppercase ${mode === 'all' ? 'bg-[#2563EB]/20 text-[#93C5FD]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]'}`}
+            >
+              All
+            </button>
+          </div>
+          <div className="max-h-[220px] overflow-y-auto py-1">
+            {allTags.map(t => {
+              const sel = selectedTags.some(s => s.id === t.id)
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => onToggle(t.id)}
+                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${sel ? 'bg-[#2563EB]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'}`}
+                >
+                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${sel ? 'bg-[#2563EB] border-[#2563EB]' : 'border-[var(--m12-border)]'}`}>
+                    {sel && (
+                      <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                        <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="inline-flex items-center rounded text-[9px] px-1 py-0 text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main SIPOC Visual ──────────────────────────────────
 export default function SIPOCVisual() {
   const rawCapabilities = useSIPOCStore(s => s.capabilities)
@@ -438,6 +608,9 @@ export default function SIPOCVisual() {
   const [showDimensions, setShowDimensions] = useState(false)
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([])
+  const [filterMode, setFilterMode] = useState<'any' | 'all'>('any')
+  const allTags = useSIPOCStore(s => s.tags)
   const initializedRef = useRef(false)
 
   const toggleCollapse = (id: string) => {
@@ -517,6 +690,8 @@ export default function SIPOCVisual() {
         showDimensions={showDimensions}
         collapsed={collapsedIds.has(cap.id)}
         onToggleCollapse={() => toggleCollapse(cap.id)}
+        filterTagIds={filterTagIds}
+        filterMode={filterMode}
       />
     )
   }
@@ -543,7 +718,29 @@ export default function SIPOCVisual() {
       )}
 
       {/* Controls */}
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2 flex-wrap">
+        {allTags.length > 0 && (() => {
+          let total = 0, match = 0
+          capabilities.forEach(c => c.inputs.forEach(inp => {
+            total++
+            const ipIds = (inp.tags || []).map(t => t.id)
+            const anyDim = (inp.dimensions || []).some(d => matchesTags((d.tags || []).map(t => t.id), filterTagIds, filterMode))
+            if (filterTagIds.length === 0 || matchesTags(ipIds, filterTagIds, filterMode) || anyDim) match++
+          }))
+          const selectedTags = allTags.filter(t => filterTagIds.includes(t.id))
+          return (
+            <TagFilterBar
+              allTags={allTags}
+              selectedTags={selectedTags}
+              onToggle={id => setFilterTagIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])}
+              onClear={() => setFilterTagIds([])}
+              mode={filterMode}
+              setMode={setFilterMode}
+              matchCount={match}
+              totalCount={total}
+            />
+          )
+        })()}
         <button
           onClick={() => setShowDimensions(!showDimensions)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider border transition-colors ${

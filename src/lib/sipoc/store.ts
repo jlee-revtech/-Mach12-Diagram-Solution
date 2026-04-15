@@ -11,6 +11,7 @@ import type {
   HydratedCapability,
   Dimension,
   CapabilityTreeNode,
+  Tag,
 } from './types'
 import * as api from '@/lib/supabase/capability-maps'
 
@@ -24,6 +25,7 @@ interface SIPOCState {
   personas: Persona[]
   informationProducts: InformationProduct[]
   logicalSystems: LogicalSystem[]
+  tags: Tag[]
 
   // Capabilities and their I/O
   capabilities: Capability[]
@@ -62,6 +64,8 @@ interface SIPOCState {
   updateInputSuppliers: (inputId: string, capabilityId: string, personaIds: string[]) => Promise<void>
   updateInputSystems: (inputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
   updateInputFeedingSystem: (inputId: string, capabilityId: string, systemId: string | null) => Promise<void>
+  updateInputTags: (inputId: string, capabilityId: string, tagIds: string[]) => Promise<void>
+  updateDimensionTags: (side: 'input' | 'output', itemId: string, capabilityId: string, dimId: string, tagIds: string[]) => Promise<void>
 
   // ─── Output CRUD ──────────────────────────────────────
   addOutput: (capabilityId: string, informationProductId: string) => Promise<void>
@@ -87,6 +91,10 @@ interface SIPOCState {
   updateLogicalSystem: (id: string, updates: Partial<Pick<LogicalSystem, 'name' | 'system_type' | 'description' | 'color'>>) => Promise<void>
   removeLogicalSystem: (id: string) => Promise<void>
 
+  addTag: (orgId: string, data: { name: string; color?: string; description?: string }) => Promise<Tag>
+  updateTag: (id: string, updates: Partial<Pick<Tag, 'name' | 'color' | 'description'>>) => Promise<void>
+  removeTag: (id: string) => Promise<void>
+
   // ─── Entity editing UI ────────────────────────────────
   setEditingEntity: (type: 'persona' | 'informationProduct' | 'logicalSystem' | null, id: string | null) => void
 
@@ -100,6 +108,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   personas: [],
   informationProducts: [],
   logicalSystems: [],
+  tags: [],
   capabilities: [],
   inputs: {},
   outputs: {},
@@ -137,12 +146,13 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   loadOrgEntities: async (orgId) => {
-    const [personas, informationProducts, logicalSystems] = await Promise.all([
+    const [personas, informationProducts, logicalSystems, tags] = await Promise.all([
       api.listPersonas(orgId),
       api.listInformationProducts(orgId),
       api.listLogicalSystems(orgId),
+      api.listTags(orgId),
     ])
-    set({ personas, informationProducts, logicalSystems })
+    set({ personas, informationProducts, logicalSystems, tags })
   },
 
   // ─── Capability map meta ──────────────────────────────
@@ -276,6 +286,35 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         ),
       },
     })
+  },
+
+  updateInputTags: async (inputId, capabilityId, tagIds) => {
+    await api.updateCapabilityInput(inputId, { tag_ids: tagIds })
+    set({
+      inputs: {
+        ...get().inputs,
+        [capabilityId]: (get().inputs[capabilityId] || []).map(i =>
+          i.id === inputId ? { ...i, tag_ids: tagIds } : i
+        ),
+      },
+    })
+  },
+
+  updateDimensionTags: async (side, itemId, capabilityId, dimId, tagIds) => {
+    const key = side === 'input' ? 'inputs' : 'outputs'
+    const items = get()[key][capabilityId] || []
+    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
+      item.id === itemId
+        ? { ...item, dimensions: (item.dimensions || []).map(d => d.id === dimId ? { ...d, tag_ids: tagIds } : d) }
+        : item
+    )
+    set({ [key]: { ...get()[key], [capabilityId]: updated } })
+    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (side === 'input') {
+      await api.updateCapabilityInput(itemId, { dimensions: target?.dimensions })
+    } else {
+      await api.updateCapabilityOutput(itemId, { dimensions: target?.dimensions })
+    }
   },
 
   updateInputFeedingSystem: async (inputId, capabilityId, systemId) => {
@@ -436,6 +475,32 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     set({ logicalSystems: get().logicalSystems.filter(s => s.id !== id) })
   },
 
+  addTag: async (orgId, data) => {
+    const tag = await api.createTag(orgId, data)
+    set({ tags: [...get().tags, tag] })
+    return tag
+  },
+
+  updateTag: async (id, updates) => {
+    await api.updateTag(id, updates)
+    set({ tags: get().tags.map(t => t.id === id ? { ...t, ...updates } : t) })
+  },
+
+  removeTag: async (id) => {
+    await api.deleteTag(id)
+    // Strip the tag from inputs + dimensions locally (DB retains orphan IDs; filtered on read)
+    const tags = get().tags.filter(t => t.id !== id)
+    const inputs = { ...get().inputs }
+    for (const capId of Object.keys(inputs)) {
+      inputs[capId] = inputs[capId].map(i => ({
+        ...i,
+        tag_ids: (i.tag_ids || []).filter(tid => tid !== id),
+        dimensions: (i.dimensions || []).map(d => ({ ...d, tag_ids: (d.tag_ids || []).filter(tid => tid !== id) })),
+      }))
+    }
+    set({ tags, inputs })
+  },
+
   // ─── Entity editing UI ────────────────────────────────
 
   setEditingEntity: (type, id) => set({ editingEntityType: type, editingEntityId: id }),
@@ -443,10 +508,13 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   // ─── Derived: hydrated capabilities ───────────────────
 
   getHydratedCapabilities: () => {
-    const { capabilities, inputs, outputs, personas, informationProducts, logicalSystems } = get()
+    const { capabilities, inputs, outputs, personas, informationProducts, logicalSystems, tags } = get()
     const personaMap = new Map(personas.map(p => [p.id, p]))
     const ipMap = new Map(informationProducts.map(ip => [ip.id, ip]))
     const sysMap = new Map(logicalSystems.map(s => [s.id, s]))
+    const tagMap = new Map(tags.map(t => [t.id, t]))
+    const resolveTags = (ids?: string[]): Tag[] =>
+      (ids || []).map(id => tagMap.get(id)).filter((t): t is Tag => !!t)
 
     return capabilities.map(cap => ({
       ...cap,
@@ -463,6 +531,8 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
           .map(id => sysMap.get(id))
           .filter((s): s is LogicalSystem => !!s),
         feedingSystem: input.feeding_system_id ? sysMap.get(input.feeding_system_id) || null : null,
+        tags: resolveTags(input.tag_ids),
+        dimensions: (input.dimensions || []).map(d => ({ ...d, tags: resolveTags(d.tag_ids) })),
       })),
       outputs: (outputs[cap.id] || []).map(output => ({
         ...output,

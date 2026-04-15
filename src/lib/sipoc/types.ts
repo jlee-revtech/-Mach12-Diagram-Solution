@@ -102,11 +102,23 @@ export interface CapabilityTemplateRow {
   updated_at: string
 }
 
+// ─── Tags (org-scoped, reusable) ───────────────────────
+export interface Tag {
+  id: string
+  organization_id: string
+  name: string
+  color: string
+  description?: string
+  created_at: string
+  updated_at: string
+}
+
 // ─── Dimensions (detail attributes on inputs/outputs) ──
 export interface Dimension {
   id: string
   name: string
   description?: string
+  tag_ids?: string[]
 }
 
 // ─── Capability Inputs (with supplier & system tags) ───
@@ -118,6 +130,7 @@ export interface CapabilityInput {
   source_system_ids: string[]       // upstream system flow (ordered)
   feeding_system_id: string | null   // single system that feeds the process
   dimensions: Dimension[]
+  tag_ids?: string[]
   sort_order: number
   created_at: string
 }
@@ -137,11 +150,13 @@ export interface CapabilityOutput {
 // ─── Hydrated capability (all data resolved) ───────────
 export interface HydratedCapability extends Capability {
   system: LogicalSystem | null
-  inputs: (CapabilityInput & {
+  inputs: (Omit<CapabilityInput, 'dimensions'> & {
     informationProduct: InformationProduct
     supplierPersonas: Persona[]
     sourceSystems: LogicalSystem[]
     feedingSystem: LogicalSystem | null
+    tags: Tag[]
+    dimensions: (Dimension & { tags: Tag[] })[]
   })[]
   outputs: (CapabilityOutput & {
     informationProduct: InformationProduct

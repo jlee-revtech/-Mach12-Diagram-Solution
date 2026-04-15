@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { Persona, InformationProduct, LogicalSystem, Dimension } from '@/lib/sipoc/types'
+import type { Persona, InformationProduct, LogicalSystem, Dimension, Tag } from '@/lib/sipoc/types'
 import { PERSONA_COLORS, IP_CATEGORIES } from '@/lib/sipoc/types'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 
@@ -283,21 +283,146 @@ function SectionLabel({ label, count }: { label: string; count?: number }) {
   )
 }
 
+// ─── Tag Picker (reusable, org-scoped tags) ─────────────
+function TagPicker({
+  selectedIds,
+  onChange,
+  orgId,
+  compact = false,
+}: {
+  selectedIds: string[]
+  onChange: (ids: string[]) => void
+  orgId: string
+  compact?: boolean
+}) {
+  const tags = useSIPOCStore(s => s.tags)
+  const addTag = useSIPOCStore(s => s.addTag)
+  const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 0)
+  }, [open])
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const selected = tags.filter(t => selectedIds.includes(t.id))
+  const filtered = filter
+    ? tags.filter(t => t.name.toLowerCase().includes(filter.toLowerCase()))
+    : tags
+  const toggle = (id: string) =>
+    onChange(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id])
+
+  const canCreate = filter.trim().length > 0 && !tags.some(t => t.name.toLowerCase() === filter.trim().toLowerCase())
+  const handleCreate = async () => {
+    const name = filter.trim()
+    if (!name) return
+    const tag = await addTag(orgId, { name })
+    onChange([...selectedIds, tag.id])
+    setFilter('')
+  }
+
+  const chipSize = compact ? 'text-[8px] px-1 py-0' : 'text-[9px] px-1.5 py-0'
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center gap-1 ${compact ? 'min-h-[20px]' : 'min-h-[24px]'} bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-1.5 py-0.5 text-left hover:border-[var(--m12-border)]/60 transition-colors`}
+      >
+        {selected.length > 0 ? (
+          <div className="flex flex-wrap gap-0.5 flex-1">
+            {selected.map(t => (
+              <span key={t.id} className={`inline-flex items-center gap-1 rounded ${chipSize} text-white`} style={{ backgroundColor: t.color }}>
+                {t.name}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className={`${compact ? 'text-[9px]' : 'text-[10px]'} text-[var(--m12-text-faint)] flex-1`}>
+            {compact ? '+ tag' : '+ Add tag'}
+          </span>
+        )}
+        <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}>
+          <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden min-w-[200px] w-max max-w-[320px]">
+          <div className="p-1.5 border-b border-[var(--m12-border)]/20">
+            <input
+              ref={searchRef}
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && canCreate) { e.preventDefault(); handleCreate() } }}
+              placeholder="Search or create..."
+              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-md px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/50"
+            />
+          </div>
+          <div className="max-h-[180px] overflow-y-auto">
+            {filtered.length > 0 ? filtered.map(t => {
+              const isSelected = selectedIds.includes(t.id)
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => toggle(t.id)}
+                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${isSelected ? 'bg-[#2563EB]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'}`}
+                >
+                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#2563EB] border-[#2563EB]' : 'border-[var(--m12-border)]'}`}>
+                    {isSelected && (
+                      <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                        <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                  <span className="flex-1">{t.name}</span>
+                </button>
+              )
+            }) : (
+              <div className="px-2.5 py-3 text-[10px] text-[var(--m12-text-faint)] text-center italic">No tags yet</div>
+            )}
+          </div>
+          {canCreate && (
+            <button
+              onClick={handleCreate}
+              className="w-full text-left px-2.5 py-1.5 text-[10px] text-[#2563EB] hover:bg-[#2563EB]/10 border-t border-[var(--m12-border)]/20 transition-colors"
+            >
+              + Create tag &quot;{filter.trim()}&quot;
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Dimensions Editor (detail attributes on an input/output) ──
 function DimensionsEditor({
   dimensions,
   side,
   itemId,
   capabilityId,
+  orgId,
 }: {
   dimensions: Dimension[]
   side: 'input' | 'output'
   itemId: string
   capabilityId: string
+  orgId: string
 }) {
   const addDimension = useSIPOCStore(s => s.addDimension)
   const updateDimension = useSIPOCStore(s => s.updateDimension)
   const removeDimension = useSIPOCStore(s => s.removeDimension)
+  const updateDimensionTags = useSIPOCStore(s => s.updateDimensionTags)
 
   return (
     <div>
@@ -305,17 +430,25 @@ function DimensionsEditor({
         Dimensions
       </div>
       {dimensions.length > 0 && (
-        <div className="space-y-0.5 mb-1.5 border-l-2 border-[var(--m12-border)]/20 ml-1 pl-2">
+        <div className="space-y-1 mb-1.5 border-l-2 border-[var(--m12-border)]/20 ml-1 pl-2">
           {dimensions.map(dim => (
             <div key={dim.id} className="flex items-center gap-1.5 group/dim">
               <input
                 value={dim.name}
                 onChange={e => updateDimension(side, itemId, capabilityId, dim.id, { name: e.target.value })}
-                className="flex-1 bg-transparent text-[10px] text-[var(--m12-text-secondary)] focus:outline-none border-b border-transparent focus:border-[#2563EB]/30 py-0.5"
+                className="flex-1 min-w-0 bg-transparent text-[10px] text-[var(--m12-text-secondary)] focus:outline-none border-b border-transparent focus:border-[#2563EB]/30 py-0.5"
               />
+              <div className="shrink-0 w-[110px]">
+                <TagPicker
+                  selectedIds={dim.tag_ids || []}
+                  onChange={ids => updateDimensionTags(side, itemId, capabilityId, dim.id, ids)}
+                  orgId={orgId}
+                  compact
+                />
+              </div>
               <button
                 onClick={() => removeDimension(side, itemId, capabilityId, dim.id)}
-                className="opacity-0 group-hover/dim:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
+                className="opacity-0 group-hover/dim:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all shrink-0"
               >
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                   <path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
@@ -378,6 +511,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const updateInputSuppliers = useSIPOCStore(s => s.updateInputSuppliers)
   const updateInputSystems = useSIPOCStore(s => s.updateInputSystems)
   const updateInputFeedingSystem = useSIPOCStore(s => s.updateInputFeedingSystem)
+  const updateInputTags = useSIPOCStore(s => s.updateInputTags)
   const addOutput = useSIPOCStore(s => s.addOutput)
   const removeOutput = useSIPOCStore(s => s.removeOutput)
   const updateOutputConsumers = useSIPOCStore(s => s.updateOutputConsumers)
@@ -539,6 +673,15 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   </button>
                 </div>
                 {expandedItems.has(input.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-[var(--m12-border)]/20 pt-2">
+                {/* Tags (reusable, org-scoped) */}
+                <div>
+                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Tags</div>
+                  <TagPicker
+                    selectedIds={input.tag_ids || []}
+                    onChange={ids => updateInputTags(input.id, capabilityId, ids)}
+                    orgId={orgId}
+                  />
+                </div>
                 {/* Supplier personas */}
                 <div>
                   <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Suppliers</div>
@@ -668,6 +811,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   side="input"
                   itemId={input.id}
                   capabilityId={capabilityId}
+                  orgId={orgId}
                 />
                 </div>}
               </div>
@@ -802,6 +946,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   side="output"
                   itemId={output.id}
                   capabilityId={capabilityId}
+                  orgId={orgId}
                 />
                 </div>}
               </div>

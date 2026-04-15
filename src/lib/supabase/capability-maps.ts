@@ -7,6 +7,7 @@ import type {
   InformationProduct,
   LogicalSystem,
   CapabilityTemplateRow,
+  Tag,
 } from '@/lib/sipoc/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -208,7 +209,7 @@ export async function createCapabilityInput(
 
 export async function updateCapabilityInput(
   id: string,
-  updates: Partial<Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'feeding_system_id' | 'dimensions' | 'sort_order'>>
+  updates: Partial<Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'feeding_system_id' | 'dimensions' | 'tag_ids' | 'sort_order'>>
 ): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/capability_inputs?id=eq.${id}`, {
     method: 'PATCH',
@@ -422,6 +423,51 @@ export async function deleteLogicalSystem(id: string): Promise<void> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.message || 'Failed to delete logical system')
+  }
+}
+
+// ─── Tags (org-scoped) ─────────────────────────────────
+
+export async function listTags(orgId: string): Promise<Tag[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/tags?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function createTag(orgId: string, data: { name: string; color?: string; description?: string }): Promise<Tag> {
+  const res = await fetch(`${URL}/rest/v1/tags`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ organization_id: orgId, ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create tag')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function updateTag(id: string, updates: Partial<Pick<Tag, 'name' | 'color' | 'description'>>): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/tags?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Prefer': 'return=minimal' },
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to update tag')
+  }
+}
+
+export async function deleteTag(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/tags?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to delete tag')
   }
 }
 
