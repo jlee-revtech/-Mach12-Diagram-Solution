@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { listDiagrams, createDiagram, archiveDiagram, restoreDiagram } from '@/lib/supabase/diagrams'
-import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreCapabilityMap } from '@/lib/supabase/capability-maps'
+import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreCapabilityMap, duplicateCapabilityMap } from '@/lib/supabase/capability-maps'
 import type { DiagramRow } from '@/lib/supabase/types'
 import type { CapabilityMapRow } from '@/lib/sipoc/types'
 import VersionBadge from '@/components/VersionBadge'
@@ -71,6 +71,24 @@ export default function Dashboard() {
       await loadAll()
     },
     [loadAll]
+  )
+
+  const [duplicating, setDuplicating] = useState<string | null>(null)
+  const handleDuplicateMap = useCallback(
+    async (id: string, e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (!organization || !user) return
+      setDuplicating(id)
+      try {
+        await duplicateCapabilityMap(id, organization.id, user.id)
+        await loadAll()
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to duplicate map')
+      } finally {
+        setDuplicating(null)
+      }
+    },
+    [organization, user, loadAll]
   )
 
   const handleArchive = useCallback(
@@ -403,17 +421,36 @@ export default function Dashboard() {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">{m.title}</h3>
-                      <button
-                        onClick={(e) => handleArchiveMap(m.id, e)}
-                        title="Archive capability map"
-                        className="text-[var(--m12-border)] hover:text-[#EAB308] transition-colors ml-2 shrink-0"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                          <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-                          <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
-                          <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                        </svg>
-                      </button>
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        <button
+                          onClick={(e) => handleDuplicateMap(m.id, e)}
+                          title="Duplicate capability map"
+                          disabled={duplicating === m.id}
+                          className="text-[var(--m12-border)] hover:text-[#2563EB] disabled:opacity-40 disabled:cursor-wait transition-colors"
+                        >
+                          {duplicating === m.id ? (
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="animate-spin">
+                              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="10" strokeLinecap="round"/>
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                              <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                              <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.3"/>
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => handleArchiveMap(m.id, e)}
+                          title="Archive capability map"
+                          className="text-[var(--m12-border)] hover:text-[#EAB308] transition-colors"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                            <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                            <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
+                            <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     <div className="inline-flex items-center gap-1.5 bg-[#8B5CF6]/10 border border-[#8B5CF6]/30 rounded px-2 py-0.5 mb-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />

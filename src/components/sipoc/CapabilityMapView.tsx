@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { CapabilityTreeNode } from '@/lib/sipoc/types'
 
@@ -14,46 +14,100 @@ const L1_COLORS = [
 let draggedId: string | null = null
 let draggedLevel: number | null = null
 
-// ─── L3 Functionality chip (draggable) ──────────────────
-function L3Chip({ node, isSelected, onSelect, onDrop }: {
+// ─── L3 Functionality chip (draggable + context menu) ───
+function L3Chip({ node, isSelected, onSelect, onDrop, allL2s }: {
   node: CapabilityTreeNode
   isSelected: boolean
   onSelect: () => void
   onDrop: (dragId: string, targetParentId: string) => void
+  allL2s: { id: string; name: string; parentName: string }[]
 }) {
-  const [dragOver, setDragOver] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const h = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [menuOpen])
+
+  const otherL2s = allL2s.filter(l2 => l2.id !== node.parent_id)
 
   return (
-    <div
-      draggable
-      onDragStart={(e) => {
-        draggedId = node.id
-        draggedLevel = node.level
-        e.dataTransfer.effectAllowed = 'move'
-        e.dataTransfer.setData('text/plain', node.id)
-      }}
-      onDragEnd={() => { draggedId = null; draggedLevel = null }}
-      onClick={onSelect}
-      className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded cursor-grab active:cursor-grabbing ${
-        isSelected
-          ? 'bg-[#2563EB]/15 text-[var(--m12-text)] font-medium'
-          : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg-card-hover)]'
-      } ${dragOver ? 'ring-1 ring-[#2563EB]/50' : ''}`}
-    >
-      <span className="text-[var(--m12-text-faint)] mr-1">⠿</span>
-      {node.name}
+    <div className="relative group/l3">
+      <div
+        draggable
+        onDragStart={(e) => {
+          draggedId = node.id
+          draggedLevel = node.level
+          e.dataTransfer.effectAllowed = 'move'
+          e.dataTransfer.setData('text/plain', node.id)
+        }}
+        onDragEnd={() => { draggedId = null; draggedLevel = null }}
+        onClick={onSelect}
+        className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded cursor-grab active:cursor-grabbing flex items-center gap-1 ${
+          isSelected
+            ? 'bg-[#2563EB]/15 text-[var(--m12-text)] font-medium'
+            : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg-card-hover)]'
+        }`}
+      >
+        <span className="text-[var(--m12-text-faint)] shrink-0">⠿</span>
+        <span className="flex-1 min-w-0 truncate">{node.name}</span>
+        {otherL2s.length > 0 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
+            className="opacity-0 group-hover/l3:opacity-100 shrink-0 w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-all"
+            title="More actions"
+          >
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <circle cx="4" cy="1.5" r="0.7" fill="currentColor"/>
+              <circle cx="4" cy="4" r="0.7" fill="currentColor"/>
+              <circle cx="4" cy="6.5" r="0.7" fill="currentColor"/>
+            </svg>
+          </button>
+        )}
+      </div>
+      {menuOpen && (
+        <div ref={menuRef} className="absolute right-0 top-full mt-0.5 z-50 w-56 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden">
+          <div className="px-2.5 py-1.5 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold border-b border-[var(--m12-border)]/20">
+            Move to...
+          </div>
+          <div className="max-h-[200px] overflow-y-auto py-0.5">
+            {otherL2s.map(l2 => (
+              <button
+                key={l2.id}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDrop(node.id, l2.id)
+                  setMenuOpen(false)
+                }}
+                className="w-full text-left px-2.5 py-1.5 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors flex items-center gap-1.5"
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-[var(--m12-text-muted)]">
+                  <path d="M1 4h5M4.5 2L6.5 4 4.5 6" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="truncate">{l2.parentName} / {l2.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── L2 Capability block (draggable + drop target for L3) ─
-function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
+function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, allL2s }: {
   node: CapabilityTreeNode
   parentColor: string
   selectedId: string | null
   onSelect: (id: string) => void
   onDrop: (dragId: string, targetParentId: string) => void
   onAddL3: (parentId: string) => void
+  allL2s: { id: string; name: string; parentName: string }[]
 }) {
   const [dragOver, setDragOver] = useState(false)
 
@@ -85,7 +139,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
         const id = e.dataTransfer.getData('text/plain')
         if (id && id !== node.id) onDrop(id, node.id)
       }}
-      className={`space-y-0.5 transition-all ${dragOver ? 'ring-2 ring-[#2563EB]/40 rounded-lg' : ''}`}
+      className={`space-y-0.5 transition-all ${dragOver ? 'ring-2 ring-[#2563EB]/50 rounded-lg bg-[#2563EB]/5' : ''}`}
     >
       <div
         className={`px-2.5 py-2 rounded-lg border bg-[var(--m12-bg-card)] cursor-grab active:cursor-grabbing ${
@@ -124,6 +178,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
                 isSelected={selectedId === child.id}
                 onSelect={() => onSelect(child.id)}
                 onDrop={onDrop}
+                allL2s={allL2s}
               />
             ))}
         </div>
@@ -133,7 +188,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3 }: {
 }
 
 // ─── L1 Core Area column (draggable + drop target) ──────
-function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onRemove }: {
+function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onRemove, allL2s }: {
   node: CapabilityTreeNode
   color: string
   index: number
@@ -145,6 +200,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
   onDrop: (dragId: string, targetParentId: string) => void
   onReorderL1: (dragId: string, targetIndex: number) => void
   onRemove: (id: string, name: string, childCount: number) => void
+  allL2s: { id: string; name: string; parentName: string }[]
 }) {
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -279,6 +335,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
                 onSelect={onSelect}
                 onDrop={onDrop}
                 onAddL3={onAddL3}
+                allL2s={allL2s}
               />
             ))
         ) : (
@@ -310,6 +367,17 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
 
   // L1 nodes for columns
   const l1Roots = useMemo(() => tree.filter(n => n.level === 1), [tree])
+
+  // All L2s across the map (for L3 "Move to" menu)
+  const allL2s = useMemo(() => {
+    const result: { id: string; name: string; parentName: string }[] = []
+    l1Roots.forEach(l1 => {
+      l1.children.forEach(l2 => {
+        result.push({ id: l2.id, name: l2.name, parentName: l1.name })
+      })
+    })
+    return result
+  }, [l1Roots])
 
   // Determine which capabilities are properly assigned in the hierarchy
   const assignedIds = useMemo(() => {
@@ -525,6 +593,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
               onDrop={handleDrop}
               onReorderL1={handleReorderL1}
               onRemove={handleRemoveL1}
+              allL2s={allL2s}
             />
           ))}
         </div>

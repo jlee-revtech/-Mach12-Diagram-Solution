@@ -509,3 +509,231 @@ export async function deleteCapabilityTemplate(id: string): Promise<void> {
     throw new Error(err.message || 'Failed to delete template')
   }
 }
+
+// ─── Capability Map Shares (read-only links) ──────────
+
+export interface CapabilityMapShare {
+  id: string
+  capability_map_id: string
+  organization_id: string
+  code: string
+  created_by: string | null
+  expires_at: string | null
+  created_at: string
+}
+
+function generateShareCode(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let code = ''
+  for (let i = 0; i < 12; i++) code += chars[Math.floor(Math.random() * chars.length)]
+  return code
+}
+
+export async function createCapabilityMapShare(
+  mapId: string,
+  orgId: string,
+  userId: string,
+  expiresAt?: string | null
+): Promise<CapabilityMapShare> {
+  const res = await fetch(`${URL}/rest/v1/capability_map_shares`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({
+      capability_map_id: mapId,
+      organization_id: orgId,
+      code: generateShareCode(),
+      created_by: userId,
+      expires_at: expiresAt || null,
+    }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create share link')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function listCapabilityMapShares(mapId: string): Promise<CapabilityMapShare[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/capability_map_shares?capability_map_id=eq.${mapId}&select=*&order=created_at.desc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function deleteCapabilityMapShare(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/capability_map_shares?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to revoke share link')
+  }
+}
+
+export async function getShareByCode(code: string): Promise<(CapabilityMapShare & { map_title?: string }) | null> {
+  // Fetch share — anon key works here (RLS allows public SELECT on shares)
+  const res = await fetch(
+    `${URL}/rest/v1/capability_map_shares?code=eq.${code}&select=*`,
+    { headers: { 'Content-Type': 'application/json', 'apikey': ANON, 'Accept': 'application/json' } }
+  )
+  if (!res.ok) return null
+  const arr = await res.json()
+  if (!arr.length) return null
+  const share = arr[0] as CapabilityMapShare
+  if (share.expires_at && new Date(share.expires_at) < new Date()) return null
+  return share
+}
+
+// ─── Anon data fetchers (for shared read-only views) ───
+
+function anonHeaders(): Record<string, string> {
+  return { 'Content-Type': 'application/json', 'apikey': ANON, 'Accept': 'application/json' }
+}
+
+export async function getCapabilityMapAnon(id: string): Promise<CapabilityMapRow | null> {
+  const res = await fetch(`${URL}/rest/v1/capability_maps?id=eq.${id}&select=*`, { headers: anonHeaders() })
+  if (!res.ok) return null
+  const arr = await res.json()
+  return arr.length ? arr[0] : null
+}
+
+export async function listCapabilitiesAnon(mapId: string): Promise<Capability[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/capabilities?capability_map_id=eq.${mapId}&select=*&order=sort_order.asc`,
+    { headers: anonHeaders() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function listCapabilityInputsAnon(capId: string): Promise<CapabilityInput[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/capability_inputs?capability_id=eq.${capId}&select=*&order=sort_order.asc`,
+    { headers: anonHeaders() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function listCapabilityOutputsAnon(capId: string): Promise<CapabilityOutput[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/capability_outputs?capability_id=eq.${capId}&select=*&order=sort_order.asc`,
+    { headers: anonHeaders() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function listPersonasAnon(orgId: string): Promise<Persona[]> {
+  const res = await fetch(`${URL}/rest/v1/personas?organization_id=eq.${orgId}&select=*&order=name.asc`, { headers: anonHeaders() })
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function listInformationProductsAnon(orgId: string): Promise<InformationProduct[]> {
+  const res = await fetch(`${URL}/rest/v1/information_products?organization_id=eq.${orgId}&select=*&order=name.asc`, { headers: anonHeaders() })
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function listLogicalSystemsAnon(orgId: string): Promise<LogicalSystem[]> {
+  const res = await fetch(`${URL}/rest/v1/logical_systems?organization_id=eq.${orgId}&select=*&order=name.asc`, { headers: anonHeaders() })
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function listTagsAnon(orgId: string): Promise<Tag[]> {
+  const res = await fetch(`${URL}/rest/v1/tags?organization_id=eq.${orgId}&select=*&order=name.asc`, { headers: anonHeaders() })
+  if (!res.ok) return []
+  return res.json()
+}
+
+// ─── Duplicate an entire Capability Map ────────────────
+export async function duplicateCapabilityMap(
+  sourceMapId: string,
+  orgId: string,
+  userId: string
+): Promise<CapabilityMapRow> {
+  // 1. Fetch source map metadata
+  const sourceMap = await getCapabilityMap(sourceMapId)
+  if (!sourceMap) throw new Error('Source map not found')
+
+  // 2. Create new map
+  const newMap = await createCapabilityMap(orgId, userId, `${sourceMap.title} (Copy)`)
+  if (sourceMap.description) {
+    await updateCapabilityMap(newMap.id, userId, { description: sourceMap.description })
+    newMap.description = sourceMap.description
+  }
+
+  // 3. Fetch all capabilities from source
+  const sourceCaps = await listCapabilities(sourceMapId)
+  if (sourceCaps.length === 0) return newMap
+
+  // 4. Sort so parents come before children (by level then sort_order)
+  sourceCaps.sort((a, b) => a.level - b.level || a.sort_order - b.sort_order)
+
+  // 5. Create capabilities in new map, mapping old IDs → new IDs
+  const idMap = new Map<string, string>()
+  for (const cap of sourceCaps) {
+    const newParentId = cap.parent_id ? (idMap.get(cap.parent_id) || null) : null
+    const newCap = await createCapability(
+      newMap.id,
+      cap.name,
+      cap.sort_order,
+      newParentId,
+      cap.level,
+      cap.color || null
+    )
+    if (cap.description || cap.features || cap.system_id) {
+      await updateCapability(newCap.id, {
+        description: cap.description,
+        features: cap.features,
+        system_id: cap.system_id,
+      })
+    }
+    idMap.set(cap.id, newCap.id)
+  }
+
+  // 6. Copy inputs + outputs for each capability
+  for (const cap of sourceCaps) {
+    const newCapId = idMap.get(cap.id)!
+
+    const inputs = await listCapabilityInputs(cap.id)
+    for (const inp of inputs) {
+      const newInp = await createCapabilityInput(
+        newCapId,
+        inp.information_product_id,
+        inp.sort_order,
+        inp.supplier_persona_ids,
+        inp.source_system_ids
+      )
+      // Copy feeding_system, dimensions, tags
+      const updates: Record<string, unknown> = {}
+      if (inp.feeding_system_id) updates.feeding_system_id = inp.feeding_system_id
+      if (inp.dimensions && inp.dimensions.length > 0) updates.dimensions = inp.dimensions
+      if (inp.tag_ids && inp.tag_ids.length > 0) updates.tag_ids = inp.tag_ids
+      if (Object.keys(updates).length > 0) {
+        await updateCapabilityInput(newInp.id, updates as any)
+      }
+    }
+
+    const outputs = await listCapabilityOutputs(cap.id)
+    for (const out of outputs) {
+      const newOut = await createCapabilityOutput(
+        newCapId,
+        out.information_product_id,
+        out.sort_order,
+        out.consumer_persona_ids
+      )
+      const updates: Record<string, unknown> = {}
+      if (out.destination_system_ids && out.destination_system_ids.length > 0) updates.destination_system_ids = out.destination_system_ids
+      if (out.dimensions && out.dimensions.length > 0) updates.dimensions = out.dimensions
+      if (Object.keys(updates).length > 0) {
+        await updateCapabilityOutput(newOut.id, updates as any)
+      }
+    }
+  }
+
+  return newMap
+}

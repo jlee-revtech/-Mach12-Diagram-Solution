@@ -12,6 +12,7 @@ import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import AIBulkLoadPanel from '@/components/sipoc/AIBulkLoadPanel'
 import VersionBadge from '@/components/VersionBadge'
 import { useTheme } from '@/lib/theme-context'
+import { createCapabilityMapShare, listCapabilityMapShares, deleteCapabilityMapShare, type CapabilityMapShare } from '@/lib/supabase/capability-maps'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -34,6 +35,11 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
   const { theme, toggleTheme } = useTheme()
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shares, setShares] = useState<CapabilityMapShare[]>([])
+  const [shareLoading, setShareLoading] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
+  const shareRef = useRef<HTMLDivElement>(null)
 
   // Auth gating
   useEffect(() => {
@@ -67,6 +73,48 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
       useSIPOCStore.getState().updateTitle(titleInput.trim(), user.id)
     }
   }, [user, titleInput, mapTitle])
+
+  // Share popover click-outside
+  useEffect(() => {
+    if (!shareOpen) return
+    const h = (e: MouseEvent) => {
+      if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [shareOpen])
+
+  const loadShares = useCallback(async () => {
+    const s = await listCapabilityMapShares(id)
+    setShares(s)
+  }, [id])
+
+  const handleOpenShare = useCallback(async () => {
+    setShareOpen(o => !o)
+    if (!shareOpen) await loadShares()
+  }, [shareOpen, loadShares])
+
+  const handleCreateShare = useCallback(async () => {
+    if (!organization || !user) return
+    setShareLoading(true)
+    try {
+      await createCapabilityMapShare(id, organization.id, user.id)
+      await loadShares()
+    } catch (e) { /* silent */ }
+    setShareLoading(false)
+  }, [id, organization, user, loadShares])
+
+  const handleRevokeShare = useCallback(async (shareId: string) => {
+    await deleteCapabilityMapShare(shareId)
+    await loadShares()
+  }, [loadShares])
+
+  const handleCopyLink = useCallback((code: string) => {
+    const url = `${window.location.origin}/share/${code}`
+    navigator.clipboard.writeText(url)
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 2000)
+  }, [])
 
   if (authLoading || !user || loading || !map) {
     return (
@@ -125,6 +173,64 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         </span>
 
         <div className="flex-1" />
+
+        {/* Share (read-only link) */}
+        <div ref={shareRef} className="relative">
+          <button
+            onClick={handleOpenShare}
+            className="flex items-center gap-1.5 border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M4 7.5a2 2 0 01-2-2v0a2 2 0 012-2h1M8 4.5a2 2 0 012 2v0a2 2 0 01-2 2H7M4 6h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            Share
+          </button>
+          {shareOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 w-80 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-xl shadow-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-[var(--m12-border)]/20">
+                <div className="text-xs font-semibold text-[var(--m12-text)]">Read-Only Share Link</div>
+                <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">Anyone with the link can view this map (no login required).</div>
+              </div>
+              <div className="p-3 space-y-2">
+                {shares.filter(s => !s.expires_at || new Date(s.expires_at) > new Date()).map(s => (
+                  <div key={s.id} className="flex items-center gap-2 bg-[var(--m12-bg)] rounded-lg px-3 py-2">
+                    <input
+                      readOnly
+                      value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/${s.code}`}
+                      className="flex-1 bg-transparent text-[10px] text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)] truncate focus:outline-none"
+                      onClick={e => (e.target as HTMLInputElement).select()}
+                    />
+                    <button
+                      onClick={() => handleCopyLink(s.code)}
+                      className="shrink-0 text-[9px] font-medium text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                    >
+                      {shareCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                    <button
+                      onClick={() => handleRevokeShare(s.id)}
+                      className="shrink-0 text-[var(--m12-text-muted)] hover:text-red-400 transition-colors"
+                      title="Revoke this link"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={handleCreateShare}
+                  disabled={shareLoading}
+                  className="w-full flex items-center justify-center gap-1.5 bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M5 2v6M2 5h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                  {shareLoading ? 'Generating...' : 'Generate New Link'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Executive summary button */}
         <button
