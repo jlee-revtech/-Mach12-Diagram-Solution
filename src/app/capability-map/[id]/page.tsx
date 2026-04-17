@@ -11,6 +11,7 @@ import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
 import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import AIBulkLoadPanel from '@/components/sipoc/AIBulkLoadPanel'
 import VersionBadge from '@/components/VersionBadge'
+import { useTheme } from '@/lib/theme-context'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -32,6 +33,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [bulkLoadTarget, setBulkLoadTarget] = useState<{ id: string; name: string } | null>(null)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
+  const { theme, toggleTheme } = useTheme()
 
   // Auth gating
   useEffect(() => {
@@ -135,7 +137,24 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           Executive Summary
         </button>
 
-
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:border-[var(--m12-border)] transition-colors"
+        >
+          {theme === 'dark' ? (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.76 3.76l1.06 1.06M11.18 11.18l1.06 1.06M3.76 12.24l1.06-1.06M11.18 4.82l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M13.5 9.5a5.5 5.5 0 01-7-7 5.5 5.5 0 107 7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+        </button>
       </div>
 
       {/* Main content: MAP + SIPOC drawer */}

@@ -10,21 +10,22 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
+  theme: 'light',
   toggleTheme: () => {},
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark')
+  const [theme, setTheme] = useState<Theme>('light')
 
-  // Load persisted theme on mount
+  // Load persisted theme on mount. Defaults to light for new users;
+  // any prior preference (including dark) is restored from localStorage.
   useEffect(() => {
     const stored = localStorage.getItem('m12-theme') as Theme | null
     if (stored === 'light' || stored === 'dark') {
       setTheme(stored)
       document.documentElement.classList.toggle('dark', stored === 'dark')
     } else {
-      document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('dark')
     }
   }, [])
 
