@@ -33,6 +33,8 @@ interface SIPOCState {
   outputs: Record<string, CapabilityOutput[]>  // keyed by capability_id
 
   // UI state
+  readOnly: boolean
+  setReadOnly: (v: boolean) => void
   selectedCapabilityId: string | null
   focusedItemId: string | null
   setFocusedItem: (id: string | null) => void
@@ -115,6 +117,8 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   capabilities: [],
   inputs: {},
   outputs: {},
+  readOnly: false,
+  setReadOnly: (v) => set({ readOnly: v }),
   selectedCapabilityId: null,
   focusedItemId: null,
   setFocusedItem: (id) => set({ focusedItemId: id }),

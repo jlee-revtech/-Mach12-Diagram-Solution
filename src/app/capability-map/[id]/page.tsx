@@ -100,7 +100,10 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
     try {
       await createCapabilityMapShare(id, organization.id, user.id)
       await loadShares()
-    } catch (e) { /* silent */ }
+    } catch (e) {
+      console.error('Share link error:', e)
+      alert(e instanceof Error ? e.message : 'Failed to create share link. Has the migration been run?')
+    }
     setShareLoading(false)
   }, [id, organization, user, loadShares])
 

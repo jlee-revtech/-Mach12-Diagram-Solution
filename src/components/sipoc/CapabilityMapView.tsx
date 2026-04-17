@@ -15,12 +15,13 @@ let draggedId: string | null = null
 let draggedLevel: number | null = null
 
 // ─── L3 Functionality chip (draggable + context menu) ───
-function L3Chip({ node, isSelected, onSelect, onDrop, allL2s }: {
+function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
   node: CapabilityTreeNode
   isSelected: boolean
   onSelect: () => void
   onDrop: (dragId: string, targetParentId: string) => void
   allL2s: { id: string; name: string; parentName: string }[]
+  readOnly?: boolean
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -39,16 +40,17 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s }: {
   return (
     <div className="relative group/l3">
       <div
-        draggable
-        onDragStart={(e) => {
+        draggable={!readOnly}
+        onDragStart={readOnly ? undefined : (e) => {
+          e.stopPropagation()
           draggedId = node.id
           draggedLevel = node.level
           e.dataTransfer.effectAllowed = 'move'
           e.dataTransfer.setData('text/plain', node.id)
         }}
-        onDragEnd={() => { draggedId = null; draggedLevel = null }}
+        onDragEnd={readOnly ? undefined : () => { draggedId = null; draggedLevel = null }}
         onClick={onSelect}
-        className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded cursor-grab active:cursor-grabbing flex items-center gap-1 ${
+        className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded ${readOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} flex items-center gap-1 ${
           isSelected
             ? 'bg-[#2563EB]/15 text-[var(--m12-text)] font-medium'
             : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg-card-hover)]'
@@ -56,7 +58,7 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s }: {
       >
         <span className="text-[var(--m12-text-faint)] shrink-0">⠿</span>
         <span className="flex-1 min-w-0 truncate">{node.name}</span>
-        {otherL2s.length > 0 && (
+        {!readOnly && otherL2s.length > 0 && (
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
             className="opacity-0 group-hover/l3:opacity-100 shrink-0 w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-all"
@@ -100,7 +102,7 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s }: {
 }
 
 // ─── L2 Capability block (draggable + drop target for L3) ─
-function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, allL2s }: {
+function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, allL2s, readOnly }: {
   node: CapabilityTreeNode
   parentColor: string
   selectedId: string | null
@@ -108,6 +110,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
   onDrop: (dragId: string, targetParentId: string) => void
   onAddL3: (parentId: string) => void
   allL2s: { id: string; name: string; parentName: string }[]
+  readOnly?: boolean
 }) {
   const [dragOver, setDragOver] = useState(false)
 
@@ -122,17 +125,17 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
 
   return (
     <div
-      draggable
-      onDragStart={(e) => {
+      draggable={!readOnly}
+      onDragStart={readOnly ? undefined : (e) => {
         draggedId = node.id
         draggedLevel = node.level
         e.dataTransfer.effectAllowed = 'move'
         e.dataTransfer.setData('text/plain', node.id)
       }}
-      onDragEnd={() => { draggedId = null; draggedLevel = null }}
-      onDragOver={handleDragOver}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
+      onDragEnd={readOnly ? undefined : () => { draggedId = null; draggedLevel = null }}
+      onDragOver={readOnly ? undefined : handleDragOver}
+      onDragLeave={readOnly ? undefined : () => setDragOver(false)}
+      onDrop={readOnly ? undefined : (e) => {
         e.preventDefault()
         e.stopPropagation()
         setDragOver(false)
@@ -142,24 +145,26 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
       className={`space-y-0.5 transition-all ${dragOver ? 'ring-2 ring-[#2563EB]/50 rounded-lg bg-[#2563EB]/5' : ''}`}
     >
       <div
-        className={`px-2.5 py-2 rounded-lg border bg-[var(--m12-bg-card)] cursor-grab active:cursor-grabbing ${
+        className={`px-2.5 py-2 rounded-lg border bg-[var(--m12-bg-card)] ${readOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} ${
           selectedId === node.id ? 'border-[#2563EB]/50 ring-1 ring-[#2563EB]/20' : 'border-[var(--m12-border)]/20'
         }`}
         style={{ borderTopWidth: 2, borderTopColor: parentColor }}
       >
         <div className="flex items-center gap-1.5">
-          <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>
+          {!readOnly && <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>}
           <div
             className="text-[11px] font-bold text-[var(--m12-text)] flex-1 cursor-pointer hover:text-[#2563EB] transition-colors"
             onClick={(e) => { e.stopPropagation(); onSelect(node.id) }}
           >{node.name}</div>
-          <button
-            onClick={(e) => { e.stopPropagation(); onAddL3(node.id) }}
-            className="w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors opacity-0 group-hover/l2:opacity-100"
-            title="Add L3"
-          >
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5v5M1.5 4h5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
-          </button>
+          {!readOnly && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onAddL3(node.id) }}
+              className="w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors opacity-0 group-hover/l2:opacity-100"
+              title="Add L3"
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5v5M1.5 4h5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
+            </button>
+          )}
         </div>
         {(node.features || []).length > 0 && (
           <div className="text-[8px] text-[var(--m12-text-muted)] leading-tight mt-0.5">
@@ -179,6 +184,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
                 onSelect={() => onSelect(child.id)}
                 onDrop={onDrop}
                 allL2s={allL2s}
+                readOnly={readOnly}
               />
             ))}
         </div>
@@ -188,7 +194,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
 }
 
 // ─── L1 Core Area column (draggable + drop target) ──────
-function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onRemove, allL2s }: {
+function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onRemove, allL2s, readOnly }: {
   node: CapabilityTreeNode
   color: string
   index: number
@@ -201,6 +207,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
   onReorderL1: (dragId: string, targetIndex: number) => void
   onRemove: (id: string, name: string, childCount: number) => void
   allL2s: { id: string; name: string; parentName: string }[]
+  readOnly?: boolean
 }) {
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -233,16 +240,15 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
             ? 'ring-2 ring-[#2563EB]/40 rounded-xl'
             : ''
       }`}
-      onDragOver={handleDragOver}
-      onDragLeave={() => { setDragOver(false); setDragOverLeft(false) }}
-      onDrop={(e) => {
+      onDragOver={readOnly ? undefined : handleDragOver}
+      onDragLeave={readOnly ? undefined : () => { setDragOver(false); setDragOverLeft(false) }}
+      onDrop={readOnly ? undefined : (e) => {
         e.preventDefault()
         setDragOver(false)
         setDragOverLeft(false)
         const id = e.dataTransfer.getData('text/plain')
         if (!id || id === node.id) return
         if (draggedLevel === 1) {
-          // Reorder: place before or after this column
           onReorderL1(id, dragOverLeft ? index : index + 1)
         } else {
           onDrop(id, node.id)
@@ -251,15 +257,15 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
     >
       {/* L1 Header (draggable for reorder) */}
       <div
-        draggable
-        onDragStart={(e) => {
+        draggable={!readOnly}
+        onDragStart={readOnly ? undefined : (e) => {
           draggedId = node.id
           draggedLevel = 1
           e.dataTransfer.effectAllowed = 'move'
           e.dataTransfer.setData('text/plain', node.id)
         }}
-        onDragEnd={() => { draggedId = null; draggedLevel = null }}
-        className="rounded-t-xl px-4 py-3 flex items-start gap-3 cursor-grab active:cursor-grabbing min-h-[72px]"
+        onDragEnd={readOnly ? undefined : () => { draggedId = null; draggedLevel = null }}
+        className={`rounded-t-xl px-4 py-3 flex items-start gap-3 ${readOnly ? '' : 'cursor-grab active:cursor-grabbing'} min-h-[72px]`}
         style={{ backgroundColor: color }}
       >
         <span className="text-[11px] font-[family-name:var(--font-space-mono)] text-white/50 font-bold mt-0.5 shrink-0">
@@ -268,7 +274,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-white leading-snug">{node.name}</div>
         </div>
-        <div className="relative shrink-0 mt-0.5">
+        {!readOnly && <div className="relative shrink-0 mt-0.5">
           <button
             onClick={() => setShowAddMenu(!showAddMenu)}
             className="w-6 h-6 rounded-md flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors"
@@ -318,7 +324,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
               </div>
             </>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* L2/L3 content */}
@@ -336,6 +342,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
                 onDrop={onDrop}
                 onAddL3={onAddL3}
                 allL2s={allL2s}
+                readOnly={readOnly}
               />
             ))
         ) : (
@@ -355,6 +362,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
 }) {
   const capabilities = useSIPOCStore(s => s.capabilities)
   const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
+  const readOnly = useSIPOCStore(s => s.readOnly)
   const addCapability = useSIPOCStore(s => s.addCapability)
   const updateCapability = useSIPOCStore(s => s.updateCapability)
   const removeCapability = useSIPOCStore(s => s.removeCapability)
@@ -511,10 +519,10 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
             Capability Map
           </div>
           <div className="text-[10px] text-[var(--m12-text-faint)] mt-0.5">
-            L1 Core Area → L2 Capability → L3 Functionality (SIPOC) &nbsp;·&nbsp; Drag to reorganize
+            L1 Core Area → L2 Capability → L3 Functionality (SIPOC){!readOnly && <> &nbsp;·&nbsp; Drag to reorganize</>}
           </div>
         </div>
-        {addingL1 ? (
+        {!readOnly && (addingL1 ? (
           <div className="flex gap-1.5">
             <input
               value={newL1Name}
@@ -537,11 +545,11 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
             </svg>
             Add Core Area
           </button>
-        )}
+        ))}
       </div>
 
       {/* Unassigned capabilities (drag these into L1 columns) */}
-      {orphans.length > 0 && (
+      {!readOnly && orphans.length > 0 && (
         <div className="bg-[var(--m12-bg-card)] border border-dashed border-[#EAB308]/40 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#EAB308]">
@@ -594,6 +602,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
               onReorderL1={handleReorderL1}
               onRemove={handleRemoveL1}
               allL2s={allL2s}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -615,7 +624,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
         <span className="flex items-center gap-1">
           <div className="w-3 h-2 rounded-sm bg-[#2563EB]/10" /> L3 Functionality (SIPOC)
         </span>
-        <span className="text-[var(--m12-text-faint)]/60">· Drag items to reorganize</span>
+        {!readOnly && <span className="text-[var(--m12-text-faint)]/60">· Drag items to reorganize</span>}
       </div>
     </div>
   )

@@ -1,0 +1,31 @@
+<svg width="76" height="76" viewBox="0 0 76 76" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="m12" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+  </defs>
+  <rect width="76" height="76" rx="16" fill="white"/>
+  <g transform="translate(38, 38)">
+    <rect x="-26" y="-26" width="52" height="52" fill="none" stroke="url(#m12)" stroke-width="1.8" opacity="0.2" />
+    <rect x="-12" y="-12" width="24" height="24" fill="none" stroke="url(#m12)" stroke-width="1.8" opacity="0.7" />
+    <line x1="-26" y1="-26" x2="-12" y2="-12" stroke="url(#m12)" stroke-width="1.1" opacity="0.25" />
+    <line x1="26" y1="-26" x2="12" y2="-12" stroke="url(#m12)" stroke-width="1.1" opacity="0.25" />
+    <line x1="26" y1="26" x2="12" y2="12" stroke="url(#m12)" stroke-width="1.1" opacity="0.25" />
+    <line x1="-26" y1="26" x2="-12" y2="12" stroke="url(#m12)" stroke-width="1.1" opacity="0.25" />
+    <polygon points="-26,-26 26,-26 12,-12 -12,-12" fill="#2563EB" opacity="0.22" />
+    <polygon points="26,-26 26,26 12,12 12,-12" fill="#3B82F6" opacity="0.16" />
+    <polygon points="-26,26 26,26 12,12 -12,12" fill="#06B6D4" opacity="0.12" />
+    <polygon points="-26,-26 -26,26 -12,12 -12,-12" fill="#1D4ED8" opacity="0.18" />
+    <rect x="-12" y="-12" width="24" height="24" fill="url(#m12)" opacity="0.12" />
+    <rect x="-5" y="-5" width="10" height="10" rx="1.5" fill="url(#m12)" opacity="0.9" />
+    <circle cx="-26" cy="-26" r="2" fill="#2563EB" opacity="0.45" />
+    <circle cx="26" cy="-26" r="2" fill="#3B82F6" opacity="0.45" />
+    <circle cx="26" cy="26" r="2" fill="#06B6D4" opacity="0.45" />
+    <circle cx="-26" cy="26" r="2" fill="#1D4ED8" opacity="0.45" />
+    <circle cx="-12" cy="-12" r="1.2" fill="#2563EB" opacity="0.6" />
+    <circle cx="12" cy="-12" r="1.2" fill="#3B82F6" opacity="0.6" />
+    <circle cx="12" cy="12" r="1.2" fill="#06B6D4" opacity="0.6" />
+    <circle cx="-12" cy="12" r="1.2" fill="#1D4ED8" opacity="0.6" />
+  </g>
+</svg>

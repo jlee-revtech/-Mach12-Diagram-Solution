@@ -129,6 +129,7 @@ function HFlowArrow({ color }: { color: string }) {
 // ─── Input lane (Suppliers → Input card) ─────────────────
 
 function InputLane({ input, onRemove, onClickCard, showDims }: { input: HydratedCapability['inputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean }) {
+  const readOnly = useSIPOCStore(s => s.readOnly)
   const hasSuppliers = input.supplierPersonas.length > 0
   const hasSystems = input.sourceSystems.length > 0
   const hasLeft = hasSuppliers || hasSystems
@@ -164,7 +165,7 @@ function InputLane({ input, onRemove, onClickCard, showDims }: { input: Hydrated
 
       {/* Input card side */}
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.I.bg }}>
-        <button
+        {!readOnly && <button
           onClick={(e) => { e.stopPropagation(); if (confirm(`Remove input "${input.informationProduct.name}"?`)) onRemove() }}
           className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/lane:opacity-100 z-10"
           title="Remove input"
@@ -172,7 +173,7 @@ function InputLane({ input, onRemove, onClickCard, showDims }: { input: Hydrated
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
             <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
-        </button>
+        </button>}
         <IPCard
           name={input.informationProduct.name}
           category={input.informationProduct.category}
@@ -198,6 +199,7 @@ function InputLane({ input, onRemove, onClickCard, showDims }: { input: Hydrated
 // ─── Output lane (Output card → Customers) ───────────────
 
 function OutputLane({ output, onRemove, onClickCard, showDims }: { output: HydratedCapability['outputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean }) {
+  const readOnly = useSIPOCStore(s => s.readOnly)
   const hasConsumers = output.consumerPersonas.length > 0
   const hasSystems = output.destinationSystems.length > 0
 
@@ -205,7 +207,7 @@ function OutputLane({ output, onRemove, onClickCard, showDims }: { output: Hydra
     <div className="flex items-stretch gap-0 group/lane">
       {/* Output card side */}
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.O.bg }}>
-        <button
+        {!readOnly && <button
           onClick={(e) => { e.stopPropagation(); if (confirm(`Remove output "${output.informationProduct.name}"?`)) onRemove() }}
           className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/lane:opacity-100 z-10"
           title="Remove output"
@@ -213,7 +215,7 @@ function OutputLane({ output, onRemove, onClickCard, showDims }: { output: Hydra
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
             <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
-        </button>
+        </button>}
         <IPCard
           name={output.informationProduct.name}
           category={output.informationProduct.category}
@@ -525,6 +527,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
 }) {
   const drawerOpen = useSIPOCStore(s => s.drawerOpen)
   const drawerHeight = useSIPOCStore(s => s.drawerHeight)
+  const readOnly = useSIPOCStore(s => s.readOnly)
   const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
   const capabilities = useSIPOCStore(s => s.capabilities)
 
@@ -733,6 +736,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
         {/* Export dropdown */}
         <ExportMenu hydrated={hydrated} mapTitle={mapTitle} orgId={orgId} />
 
+        {!readOnly && <>
         {/* Templates */}
         <button
           onClick={() => { setShowTemplates(t => !t); if (!showTemplates) setShowAnalysis(false) }}
@@ -792,6 +796,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
           </svg>
           Edit
         </button>
+        </>}
 
         {/* Fullscreen toggle */}
         <button
