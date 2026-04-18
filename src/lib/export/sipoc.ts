@@ -359,11 +359,7 @@ export function exportSIPOCPdf(
 
         y = Math.max(leftY, rightY) + 4
 
-        // Draw background rect now that we know height
-        const rowH = y - rowStart
-        drawRoundedRect(pdf, m, rowStart, cw, rowH, 0, ii % 2 === 0 ? C.white : C.bg)
-        // Re-render everything (we drew bg AFTER text — need to redraw)
-        // Actually this is wrong approach. Let me use a simpler border.
+        // Separator line between input rows
         pdf.setDrawColor(...C.border)
         pdf.setLineWidth(0.2)
         pdf.line(m, y, m + cw, y)
@@ -858,281 +854,212 @@ export function exportSIPOCPptx(
     addFooter(defSlide, `${cap.name} — Definition`)
 
     // ════════════════════════════════════════════════════
-    // SLIDE B: Suppliers & Inputs
+    // SLIDE B (1..N): Suppliers & Inputs — with slide breaks
     // ════════════════════════════════════════════════════
-    const inputSlide = pptx.addSlide()
-    inputSlide.background = { color: PPTX_COLORS.bg }
-    addSlideHeader(inputSlide, cap.name, 'SUPPLIERS & INPUTS', PPTX_COLORS.orange)
+    // Fixed sizes — no scaling. 8pt minimum.
+    const CHIP_H = 0.26
+    const CHIP_GAP = 0.06
+    const SYS_H = 0.24
+    const CARD_BASE = 0.52
+    const DIM_LINE_H = 0.16
+    const DIM_EXTRA = 0.14
+    const TAG_ROW_H = 0.18
+    const LANE_GAP = 0.18
+    const CONTENT_START_Y = 1.15
+    const MAX_Y = H - 0.55
 
-    // Column headers
     const siColX = [0.3, 4.2, 7.5]
     const siColW = [3.7, 3.1, 5.5]
-    const siColLabels = ['SUPPLIERS', 'INPUTS', 'SOURCE & FEEDING SYSTEMS']
-    const siColColors = [PPTX_COLORS.orange, PPTX_COLORS.yellow, PPTX_COLORS.muted]
-    const siHeaderY = 0.75
 
-    siColLabels.forEach((label, i) => {
-      inputSlide.addShape(pptx.ShapeType.roundRect, {
-        x: siColX[i] + 0.02, y: siHeaderY, w: 0.24, h: 0.24,
-        rectRadius: 0.05, fill: { color: siColColors[i] },
+    const addInputSlideHeader = (slide: PptxGenJS.Slide, page: number, total: number) => {
+      addSlideHeader(slide, cap.name, `SUPPLIERS & INPUTS${total > 1 ? ` (${page}/${total})` : ''}`, PPTX_COLORS.orange)
+      const hdrY = 0.75
+      const labels = ['SUPPLIERS', 'INPUTS', 'SOURCE & FEEDING SYSTEMS']
+      const colors = [PPTX_COLORS.orange, PPTX_COLORS.yellow, PPTX_COLORS.muted]
+      labels.forEach((label, i) => {
+        slide.addShape(pptx.ShapeType.roundRect, { x: siColX[i] + 0.02, y: hdrY, w: 0.24, h: 0.24, rectRadius: 0.05, fill: { color: colors[i] } })
+        slide.addText(label[0], { x: siColX[i] + 0.02, y: hdrY, w: 0.24, h: 0.24, fontSize: 9, color: PPTX_COLORS.white, bold: true, fontFace: 'Arial', align: 'center', valign: 'middle' })
+        slide.addText(label, { x: siColX[i] + 0.32, y: hdrY, w: siColW[i] - 0.35, h: 0.24, fontSize: 8, color: PPTX_COLORS.muted, bold: true, fontFace: 'Arial', valign: 'middle' })
       })
-      inputSlide.addText(label[0], {
-        x: siColX[i] + 0.02, y: siHeaderY, w: 0.24, h: 0.24,
-        fontSize: 9, color: PPTX_COLORS.white, bold: true, fontFace: 'Arial', align: 'center', valign: 'middle',
-      })
-      inputSlide.addText(label, {
-        x: siColX[i] + 0.32, y: siHeaderY, w: siColW[i] - 0.35, h: 0.24,
-        fontSize: 7, color: PPTX_COLORS.muted, bold: true, fontFace: 'Arial', valign: 'middle',
-      })
-    })
-
-    inputSlide.addShape(pptx.ShapeType.line, {
-      x: 0.3, y: siHeaderY + 0.32, w: W - 0.6, h: 0,
-      line: { color: PPTX_COLORS.borderLight, width: 0.5 },
-    })
-
-    // Dynamic scaling for inputs
-    const siContentStartY = siHeaderY + 0.42
-    const siContentEndY = H - 0.5
-    const siAvailableH = siContentEndY - siContentStartY
-
-    const SI_BASE_CHIP_H = 0.24
-    const SI_BASE_CHIP_GAP = 0.05
-    const SI_BASE_SYS_H = 0.22
-    const SI_BASE_CARD_BASE = 0.5
-    const SI_BASE_DIM_LINE_H = 0.15
-    const SI_BASE_DIM_EXTRA = 0.12
-    const SI_BASE_LANE_GAP = 0.15
-
-    let siNaturalH = 0
-    cap.inputs.forEach(inp => {
-      const dims = (inp.dimensions || [])
-      const cardH = SI_BASE_CARD_BASE + (dims.length > 0 ? dims.length * SI_BASE_DIM_LINE_H + SI_BASE_DIM_EXTRA : 0)
-      const chipCount = inp.supplierPersonas.length
-      const sysCount = inp.sourceSystems.length + (inp.feedingSystem ? 1 : 0)
-      const chipH = chipCount * (SI_BASE_CHIP_H + SI_BASE_CHIP_GAP) + sysCount * SI_BASE_SYS_H
-      siNaturalH += Math.max(cardH, chipH) + SI_BASE_LANE_GAP
-    })
-    const siScale = siNaturalH > siAvailableH ? siAvailableH / siNaturalH : 1.0
-
-    const siChipH = SI_BASE_CHIP_H * siScale
-    const siChipGap = SI_BASE_CHIP_GAP * siScale
-    const siSysH = SI_BASE_SYS_H * siScale
-    const siCardBase = SI_BASE_CARD_BASE * siScale
-    const siDimLineH = SI_BASE_DIM_LINE_H * siScale
-    const siDimExtra = SI_BASE_DIM_EXTRA * siScale
-    const siLaneGap = SI_BASE_LANE_GAP * siScale
-
-    const siFsChip = Math.max(5.5, 8 * siScale)
-    const siFsSys = Math.max(5, 7 * siScale)
-    const siFsCardName = Math.max(6, 8.5 * siScale)
-    const siFsCategory = Math.max(4, 5.5 * siScale)
-    const siFsDim = Math.max(4.5, 6 * siScale)
-
-    let siLaneY = siContentStartY
-
-    cap.inputs.forEach(inp => {
-      const dims = (inp.dimensions || [])
-      const cardH = siCardBase + (dims.length > 0 ? dims.length * siDimLineH + siDimExtra : 0)
-
-      // Supplier personas
-      let chipY = siLaneY
-      inp.supplierPersonas.forEach(p => {
-        drawPersonaChip(inputSlide, siColX[0], chipY, siColW[0], siChipH, p.name, p.color, siFsChip)
-        chipY += siChipH + siChipGap
-      })
-
-      // Arrow S→I
-      const arrowY = siLaneY + cardH / 2 - 0.02
-      inputSlide.addShape(pptx.ShapeType.line, {
-        x: siColX[0] + siColW[0] + 0.05, y: arrowY, w: siColX[1] - siColX[0] - siColW[0] - 0.1, h: 0,
-        line: { color: PPTX_COLORS.border, width: 0.8, endArrowType: 'triangle' },
-      })
-
-      // Input IP card
-      drawIPCard(inputSlide, siColX[1], siLaneY, siColW[1], cardH, inp.informationProduct.name, inp.informationProduct.category, dims, PPTX_COLORS.yellow, siFsCardName, siFsCategory, siFsDim, siDimLineH, siScale)
-
-      // Arrow I→Systems
-      inputSlide.addShape(pptx.ShapeType.line, {
-        x: siColX[1] + siColW[1] + 0.05, y: arrowY, w: siColX[2] - siColX[1] - siColW[1] - 0.1, h: 0,
-        line: { color: PPTX_COLORS.border, width: 0.6, endArrowType: 'triangle' },
-      })
-
-      // Source systems
-      let sysY = siLaneY
-      inp.sourceSystems.forEach(s => {
-        inputSlide.addShape(pptx.ShapeType.roundRect, {
-          x: siColX[2], y: sysY, w: siColW[2], h: siSysH,
-          rectRadius: 0.04, fill: { color: PPTX_COLORS.cardBgSoft },
-          line: { color: PPTX_COLORS.border, width: 0.3 },
-        })
-        const sysDot = Math.min(0.08, siSysH * 0.4)
-        inputSlide.addShape(pptx.ShapeType.roundRect, {
-          x: siColX[2] + 0.08, y: sysY + (siSysH - sysDot) / 2, w: sysDot, h: sysDot,
-          rectRadius: 0.02, fill: { color: stripHash(s.color || '#64748B') },
-        })
-        inputSlide.addText(`SOURCE: ${s.name}`, {
-          x: siColX[2] + 0.22, y: sysY, w: siColW[2] - 0.3, h: siSysH,
-          fontSize: siFsSys, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle',
-        })
-        sysY += siSysH + siChipGap
-      })
-
-      // Feeding system
-      if (inp.feedingSystem) {
-        inputSlide.addShape(pptx.ShapeType.roundRect, {
-          x: siColX[2], y: sysY, w: siColW[2], h: siSysH,
-          rectRadius: 0.04, fill: { color: PPTX_COLORS.cardBgSoft },
-          line: { color: PPTX_COLORS.blue, width: 0.5 },
-        })
-        const sysDot = Math.min(0.08, siSysH * 0.4)
-        inputSlide.addShape(pptx.ShapeType.roundRect, {
-          x: siColX[2] + 0.08, y: sysY + (siSysH - sysDot) / 2, w: sysDot, h: sysDot,
-          rectRadius: 0.02, fill: { color: stripHash(inp.feedingSystem.color || '#2563EB') },
-        })
-        inputSlide.addText(`FEEDS: ${inp.feedingSystem.name}`, {
-          x: siColX[2] + 0.22, y: sysY, w: siColW[2] - 0.3, h: siSysH,
-          fontSize: siFsSys, color: PPTX_COLORS.blue, bold: true, fontFace: 'Arial', valign: 'middle',
-        })
-      }
-
-      siLaneY += Math.max(cardH, chipY - siLaneY, sysY - siLaneY) + siLaneGap
-    })
-
-    if (cap.inputs.length === 0) {
-      inputSlide.addText('No inputs defined', {
-        x: 0.4, y: 3.2, w: W - 0.8, h: 0.4,
-        fontSize: 11, color: PPTX_COLORS.muted, fontFace: 'Arial', align: 'center', italic: true,
-      })
+      slide.addShape(pptx.ShapeType.line, { x: 0.3, y: hdrY + 0.32, w: W - 0.6, h: 0, line: { color: PPTX_COLORS.borderLight, width: 0.5 } })
     }
 
-    addFooter(inputSlide, `${cap.name} — Suppliers & Inputs`)
+    // Pre-calculate row heights for pagination
+    const inputRowHeights = cap.inputs.map(inp => {
+      const dims = inp.dimensions || []
+      const tags = inp.tags || []
+      const cardH = CARD_BASE + (tags.length > 0 ? TAG_ROW_H : 0) + (dims.length > 0 ? dims.length * DIM_LINE_H + DIM_EXTRA : 0)
+      const chipH = inp.supplierPersonas.length * (CHIP_H + CHIP_GAP)
+      const sysH = (inp.sourceSystems.length + (inp.feedingSystem ? 1 : 0)) * (SYS_H + CHIP_GAP)
+      return Math.max(cardH, chipH, sysH) + LANE_GAP
+    })
+
+    // Paginate inputs
+    const inputPages: number[][] = []
+    let pageRows: number[] = []
+    let pageH = 0
+    cap.inputs.forEach((_, idx) => {
+      if (pageH + inputRowHeights[idx] > MAX_Y - CONTENT_START_Y && pageRows.length > 0) {
+        inputPages.push(pageRows)
+        pageRows = []
+        pageH = 0
+      }
+      pageRows.push(idx)
+      pageH += inputRowHeights[idx]
+    })
+    if (pageRows.length > 0) inputPages.push(pageRows)
+    if (inputPages.length === 0) inputPages.push([])
+
+    inputPages.forEach((rowIndices, pageIdx) => {
+      const slide = pptx.addSlide()
+      slide.background = { color: PPTX_COLORS.bg }
+      addInputSlideHeader(slide, pageIdx + 1, inputPages.length)
+
+      if (rowIndices.length === 0) {
+        slide.addText('No inputs defined', { x: 0.4, y: 3.2, w: W - 0.8, h: 0.4, fontSize: 11, color: PPTX_COLORS.muted, fontFace: 'Arial', align: 'center', italic: true })
+      }
+
+      let laneY = CONTENT_START_Y
+      rowIndices.forEach(idx => {
+        const inp = cap.inputs[idx]
+        const dims = inp.dimensions || []
+        const tags = inp.tags || []
+        const cardH = CARD_BASE + (tags.length > 0 ? TAG_ROW_H : 0) + (dims.length > 0 ? dims.length * DIM_LINE_H + DIM_EXTRA : 0)
+
+        // Supplier personas
+        let chipY = laneY
+        inp.supplierPersonas.forEach(p => {
+          drawPersonaChip(slide, siColX[0], chipY, siColW[0], CHIP_H, p.name, p.color, 8)
+          chipY += CHIP_H + CHIP_GAP
+        })
+
+        // Arrow S→I
+        const arrowY = laneY + cardH / 2 - 0.02
+        slide.addShape(pptx.ShapeType.line, { x: siColX[0] + siColW[0] + 0.05, y: arrowY, w: siColX[1] - siColX[0] - siColW[0] - 0.1, h: 0, line: { color: PPTX_COLORS.border, width: 0.8, endArrowType: 'triangle' } })
+
+        // Input IP card
+        drawIPCard(slide, siColX[1], laneY, siColW[1], cardH, inp.informationProduct.name, inp.informationProduct.category, dims, PPTX_COLORS.yellow, 9, 6, 6, DIM_LINE_H, 1)
+
+        // Tags on card (below category, above dims)
+        if (tags.length > 0) {
+          const tagY = laneY + (inp.informationProduct.category ? 0.38 : 0.28)
+          let tagX = siColX[1] + 0.14
+          tags.forEach(t => {
+            const tw = Math.min(t.name.length * 0.06 + 0.12, 1.0)
+            slide.addShape(pptx.ShapeType.roundRect, { x: tagX, y: tagY, w: tw, h: 0.14, rectRadius: 0.03, fill: { color: stripHash(t.color) } })
+            slide.addText(t.name, { x: tagX, y: tagY, w: tw, h: 0.14, fontSize: 6, color: PPTX_COLORS.white, fontFace: 'Arial', align: 'center', valign: 'middle' })
+            tagX += tw + 0.04
+          })
+        }
+
+        // Arrow I→Systems
+        slide.addShape(pptx.ShapeType.line, { x: siColX[1] + siColW[1] + 0.05, y: arrowY, w: siColX[2] - siColX[1] - siColW[1] - 0.1, h: 0, line: { color: PPTX_COLORS.border, width: 0.6, endArrowType: 'triangle' } })
+
+        // Source systems
+        let sysY = laneY
+        inp.sourceSystems.forEach(s => {
+          slide.addShape(pptx.ShapeType.roundRect, { x: siColX[2], y: sysY, w: siColW[2], h: SYS_H, rectRadius: 0.04, fill: { color: PPTX_COLORS.cardBgSoft }, line: { color: PPTX_COLORS.border, width: 0.3 } })
+          slide.addText(`SOURCE: ${s.name}`, { x: siColX[2] + 0.12, y: sysY, w: siColW[2] - 0.2, h: SYS_H, fontSize: 8, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle' })
+          sysY += SYS_H + CHIP_GAP
+        })
+        if (inp.feedingSystem) {
+          slide.addShape(pptx.ShapeType.roundRect, { x: siColX[2], y: sysY, w: siColW[2], h: SYS_H, rectRadius: 0.04, fill: { color: PPTX_COLORS.cardBgSoft }, line: { color: PPTX_COLORS.blue, width: 0.5 } })
+          slide.addText(`FEEDS: ${inp.feedingSystem.name}`, { x: siColX[2] + 0.12, y: sysY, w: siColW[2] - 0.2, h: SYS_H, fontSize: 8, color: PPTX_COLORS.blue, bold: true, fontFace: 'Arial', valign: 'middle' })
+        }
+
+        laneY += inputRowHeights[idx]
+      })
+
+      addFooter(slide, `${cap.name} — Suppliers & Inputs`)
+    })
 
     // ════════════════════════════════════════════════════
-    // SLIDE C: Outputs & Customers
+    // SLIDE C (1..N): Outputs & Customers — with slide breaks
     // ════════════════════════════════════════════════════
-    const outputSlide = pptx.addSlide()
-    outputSlide.background = { color: PPTX_COLORS.bg }
-    addSlideHeader(outputSlide, cap.name, 'OUTPUTS & CUSTOMERS', PPTX_COLORS.green)
-
-    // Column headers
     const ocColX = [0.3, 5.5, 9.5]
     const ocColW = [5.0, 3.8, 3.5]
-    const ocColLabels = ['OUTPUTS', 'CUSTOMERS', 'DESTINATION SYSTEMS']
-    const ocColColors = [PPTX_COLORS.green, PPTX_COLORS.violet, PPTX_COLORS.muted]
-    const ocHeaderY = 0.75
 
-    ocColLabels.forEach((label, i) => {
-      outputSlide.addShape(pptx.ShapeType.roundRect, {
-        x: ocColX[i] + 0.02, y: ocHeaderY, w: 0.24, h: 0.24,
-        rectRadius: 0.05, fill: { color: ocColColors[i] },
+    const addOutputSlideHeader = (slide: PptxGenJS.Slide, page: number, total: number) => {
+      addSlideHeader(slide, cap.name, `OUTPUTS & CUSTOMERS${total > 1 ? ` (${page}/${total})` : ''}`, PPTX_COLORS.green)
+      const hdrY = 0.75
+      const labels = ['OUTPUTS', 'CUSTOMERS', 'DESTINATION SYSTEMS']
+      const colors = [PPTX_COLORS.green, PPTX_COLORS.violet, PPTX_COLORS.muted]
+      labels.forEach((label, i) => {
+        slide.addShape(pptx.ShapeType.roundRect, { x: ocColX[i] + 0.02, y: hdrY, w: 0.24, h: 0.24, rectRadius: 0.05, fill: { color: colors[i] } })
+        slide.addText(label[0], { x: ocColX[i] + 0.02, y: hdrY, w: 0.24, h: 0.24, fontSize: 9, color: PPTX_COLORS.white, bold: true, fontFace: 'Arial', align: 'center', valign: 'middle' })
+        slide.addText(label, { x: ocColX[i] + 0.32, y: hdrY, w: ocColW[i] - 0.35, h: 0.24, fontSize: 8, color: PPTX_COLORS.muted, bold: true, fontFace: 'Arial', valign: 'middle' })
       })
-      outputSlide.addText(label[0], {
-        x: ocColX[i] + 0.02, y: ocHeaderY, w: 0.24, h: 0.24,
-        fontSize: 9, color: PPTX_COLORS.white, bold: true, fontFace: 'Arial', align: 'center', valign: 'middle',
-      })
-      outputSlide.addText(label, {
-        x: ocColX[i] + 0.32, y: ocHeaderY, w: ocColW[i] - 0.35, h: 0.24,
-        fontSize: 7, color: PPTX_COLORS.muted, bold: true, fontFace: 'Arial', valign: 'middle',
-      })
-    })
-
-    outputSlide.addShape(pptx.ShapeType.line, {
-      x: 0.3, y: ocHeaderY + 0.32, w: W - 0.6, h: 0,
-      line: { color: PPTX_COLORS.borderLight, width: 0.5 },
-    })
-
-    // Dynamic scaling for outputs
-    const ocContentStartY = ocHeaderY + 0.42
-    const ocContentEndY = H - 0.5
-    const ocAvailableH = ocContentEndY - ocContentStartY
-
-    let ocNaturalH = 0
-    cap.outputs.forEach(out => {
-      const dims = (out.dimensions || [])
-      const cardH = SI_BASE_CARD_BASE + (dims.length > 0 ? dims.length * SI_BASE_DIM_LINE_H + SI_BASE_DIM_EXTRA : 0)
-      const chipH = out.consumerPersonas.length * (SI_BASE_CHIP_H + SI_BASE_CHIP_GAP)
-      const destH = (out.destinationSystems?.length || 0) * SI_BASE_SYS_H
-      ocNaturalH += Math.max(cardH, chipH, destH) + SI_BASE_LANE_GAP
-    })
-    const ocScale = ocNaturalH > ocAvailableH ? ocAvailableH / ocNaturalH : 1.0
-
-    const ocChipH = SI_BASE_CHIP_H * ocScale
-    const ocChipGap = SI_BASE_CHIP_GAP * ocScale
-    const ocSysH = SI_BASE_SYS_H * ocScale
-    const ocCardBase = SI_BASE_CARD_BASE * ocScale
-    const ocDimLineH = SI_BASE_DIM_LINE_H * ocScale
-    const ocDimExtra = SI_BASE_DIM_EXTRA * ocScale
-    const ocLaneGap = SI_BASE_LANE_GAP * ocScale
-
-    const ocFsChip = Math.max(5.5, 8 * ocScale)
-    const ocFsSys = Math.max(5, 7 * ocScale)
-    const ocFsCardName = Math.max(6, 8.5 * ocScale)
-    const ocFsCategory = Math.max(4, 5.5 * ocScale)
-    const ocFsDim = Math.max(4.5, 6 * ocScale)
-
-    let ocLaneY = ocContentStartY
-
-    cap.outputs.forEach(out => {
-      const dims = (out.dimensions || [])
-      const cardH = ocCardBase + (dims.length > 0 ? dims.length * ocDimLineH + ocDimExtra : 0)
-
-      // Output IP card
-      drawIPCard(outputSlide, ocColX[0], ocLaneY, ocColW[0], cardH, out.informationProduct.name, out.informationProduct.category, dims, PPTX_COLORS.green, ocFsCardName, ocFsCategory, ocFsDim, ocDimLineH, ocScale)
-
-      // Arrow O→C
-      const arrowY = ocLaneY + cardH / 2 - 0.02
-      outputSlide.addShape(pptx.ShapeType.line, {
-        x: ocColX[0] + ocColW[0] + 0.05, y: arrowY, w: ocColX[1] - ocColX[0] - ocColW[0] - 0.1, h: 0,
-        line: { color: PPTX_COLORS.border, width: 0.8, endArrowType: 'triangle' },
-      })
-
-      // Consumer personas
-      let chipY = ocLaneY
-      out.consumerPersonas.forEach(p => {
-        drawPersonaChip(outputSlide, ocColX[1], chipY, ocColW[1], ocChipH, p.name, p.color, ocFsChip)
-        chipY += ocChipH + ocChipGap
-      })
-
-      // Destination systems
-      if (out.destinationSystems && out.destinationSystems.length > 0) {
-        // Arrow C→D
-        outputSlide.addShape(pptx.ShapeType.line, {
-          x: ocColX[1] + ocColW[1] + 0.05, y: arrowY, w: ocColX[2] - ocColX[1] - ocColW[1] - 0.1, h: 0,
-          line: { color: PPTX_COLORS.border, width: 0.6, endArrowType: 'triangle' },
-        })
-
-        let destY = ocLaneY
-        out.destinationSystems.forEach(s => {
-          outputSlide.addShape(pptx.ShapeType.roundRect, {
-            x: ocColX[2], y: destY, w: ocColW[2], h: ocSysH,
-            rectRadius: 0.04, fill: { color: PPTX_COLORS.cardBgSoft },
-            line: { color: PPTX_COLORS.border, width: 0.3 },
-          })
-          const sysDot = Math.min(0.08, ocSysH * 0.4)
-          outputSlide.addShape(pptx.ShapeType.roundRect, {
-            x: ocColX[2] + 0.08, y: destY + (ocSysH - sysDot) / 2, w: sysDot, h: sysDot,
-            rectRadius: 0.02, fill: { color: stripHash(s.color || '#64748B') },
-          })
-          outputSlide.addText(s.name, {
-            x: ocColX[2] + 0.22, y: destY, w: ocColW[2] - 0.3, h: ocSysH,
-            fontSize: ocFsSys, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle',
-          })
-          destY += ocSysH + ocChipGap
-        })
-      }
-
-      ocLaneY += Math.max(cardH, chipY - ocLaneY) + ocLaneGap
-    })
-
-    if (cap.outputs.length === 0) {
-      outputSlide.addText('No outputs defined', {
-        x: 0.4, y: 3.2, w: W - 0.8, h: 0.4,
-        fontSize: 11, color: PPTX_COLORS.muted, fontFace: 'Arial', align: 'center', italic: true,
-      })
+      slide.addShape(pptx.ShapeType.line, { x: 0.3, y: hdrY + 0.32, w: W - 0.6, h: 0, line: { color: PPTX_COLORS.borderLight, width: 0.5 } })
     }
 
-    addFooter(outputSlide, `${cap.name} — Outputs & Customers`)
+    const outputRowHeights = cap.outputs.map(out => {
+      const dims = out.dimensions || []
+      const cardH = CARD_BASE + (dims.length > 0 ? dims.length * DIM_LINE_H + DIM_EXTRA : 0)
+      const chipH = out.consumerPersonas.length * (CHIP_H + CHIP_GAP)
+      const destH = (out.destinationSystems?.length || 0) * (SYS_H + CHIP_GAP)
+      return Math.max(cardH, chipH, destH) + LANE_GAP
+    })
+
+    const outputPages: number[][] = []
+    let oPageRows: number[] = []
+    let oPageH = 0
+    cap.outputs.forEach((_, idx) => {
+      if (oPageH + outputRowHeights[idx] > MAX_Y - CONTENT_START_Y && oPageRows.length > 0) {
+        outputPages.push(oPageRows)
+        oPageRows = []
+        oPageH = 0
+      }
+      oPageRows.push(idx)
+      oPageH += outputRowHeights[idx]
+    })
+    if (oPageRows.length > 0) outputPages.push(oPageRows)
+    if (outputPages.length === 0) outputPages.push([])
+
+    outputPages.forEach((rowIndices, pageIdx) => {
+      const slide = pptx.addSlide()
+      slide.background = { color: PPTX_COLORS.bg }
+      addOutputSlideHeader(slide, pageIdx + 1, outputPages.length)
+
+      if (rowIndices.length === 0) {
+        slide.addText('No outputs defined', { x: 0.4, y: 3.2, w: W - 0.8, h: 0.4, fontSize: 11, color: PPTX_COLORS.muted, fontFace: 'Arial', align: 'center', italic: true })
+      }
+
+      let laneY = CONTENT_START_Y
+      rowIndices.forEach(idx => {
+        const out = cap.outputs[idx]
+        const dims = out.dimensions || []
+        const cardH = CARD_BASE + (dims.length > 0 ? dims.length * DIM_LINE_H + DIM_EXTRA : 0)
+
+        // Output IP card
+        drawIPCard(slide, ocColX[0], laneY, ocColW[0], cardH, out.informationProduct.name, out.informationProduct.category, dims, PPTX_COLORS.green, 9, 6, 6, DIM_LINE_H, 1)
+
+        // Arrow O→C
+        const arrowY = laneY + cardH / 2 - 0.02
+        slide.addShape(pptx.ShapeType.line, { x: ocColX[0] + ocColW[0] + 0.05, y: arrowY, w: ocColX[1] - ocColX[0] - ocColW[0] - 0.1, h: 0, line: { color: PPTX_COLORS.border, width: 0.8, endArrowType: 'triangle' } })
+
+        // Consumer personas
+        let chipY = laneY
+        out.consumerPersonas.forEach(p => {
+          drawPersonaChip(slide, ocColX[1], chipY, ocColW[1], CHIP_H, p.name, p.color, 8)
+          chipY += CHIP_H + CHIP_GAP
+        })
+
+        // Destination systems
+        if (out.destinationSystems && out.destinationSystems.length > 0) {
+          slide.addShape(pptx.ShapeType.line, { x: ocColX[1] + ocColW[1] + 0.05, y: arrowY, w: ocColX[2] - ocColX[1] - ocColW[1] - 0.1, h: 0, line: { color: PPTX_COLORS.border, width: 0.6, endArrowType: 'triangle' } })
+          let destY = laneY
+          out.destinationSystems.forEach(s => {
+            slide.addShape(pptx.ShapeType.roundRect, { x: ocColX[2], y: destY, w: ocColW[2], h: SYS_H, rectRadius: 0.04, fill: { color: PPTX_COLORS.cardBgSoft }, line: { color: PPTX_COLORS.border, width: 0.3 } })
+            slide.addText(s.name, { x: ocColX[2] + 0.12, y: destY, w: ocColW[2] - 0.2, h: SYS_H, fontSize: 8, color: PPTX_COLORS.textSec, fontFace: 'Arial', valign: 'middle' })
+            destY += SYS_H + CHIP_GAP
+          })
+        }
+
+        laneY += outputRowHeights[idx]
+      })
+
+      addFooter(slide, `${cap.name} — Outputs & Customers`)
+    })
   })
 
   pptx.writeFile({ fileName: `${sanitizeFilename(title)}_SIPOC.pptx` })
