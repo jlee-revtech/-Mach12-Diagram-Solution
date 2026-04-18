@@ -779,7 +779,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
           <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
             <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="white" />
           </svg>
-          AI Generate
+          Generate
         </button>
 
         {/* Edit toggle */}
