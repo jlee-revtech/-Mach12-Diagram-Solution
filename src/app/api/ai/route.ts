@@ -93,6 +93,8 @@ export async function POST(req: NextRequest) {
       return handleSIPOCBulkLoad(prompt, context, image)
     } else if (action === 'sipoc-l2-narrative') {
       return handleSIPOCL2Narrative(context)
+    } else if (action === 'sipoc-analyze-l3') {
+      return handleSIPOCAnalyzeL3(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -936,4 +938,94 @@ Customers: ${(context.customers || []).join(', ') || '(none)'}`,
 
   const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
   return NextResponse.json({ narrative: text })
+}
+
+async function handleSIPOCAnalyzeL3(context: {
+  capabilityName: string
+  level: number
+  system?: string
+  features?: string[]
+  tags?: string[]
+  inputs: {
+    informationProduct: string
+    category?: string
+    supplierPersonas: string[]
+    sourceSystems: string[]
+    feedingSystem?: string
+    dimensions: string[]
+    tags?: string[]
+  }[]
+  outputs: {
+    informationProduct: string
+    category?: string
+    consumerPersonas: string[]
+    destinationSystems?: string[]
+    dimensions: string[]
+  }[]
+}) {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 3000,
+    system: 'You are an expert SAP data architect and business process analyst specializing in Aerospace, Defense, and Government Contracting. You provide clear, executive-ready analysis of SIPOC capability definitions.',
+    messages: [{
+      role: 'user',
+      content: `Analyze this single L${context.level} SIPOC capability for an executive audience. Return ONLY valid JSON.
+
+CAPABILITY: "${context.capabilityName}"
+${context.system ? `SYSTEM: ${context.system}` : ''}
+${(context.features || []).length > 0 ? `FEATURES: ${context.features!.join(', ')}` : ''}
+
+INPUTS:
+${context.inputs.map(i => `- ${i.informationProduct}${i.category ? ` (${i.category})` : ''}
+  Suppliers: ${i.supplierPersonas.join(', ') || 'None'}
+  Source Systems: ${i.sourceSystems.join(', ') || 'None'}${i.feedingSystem ? `\n  Feeding System: ${i.feedingSystem}` : ''}
+  Dimensions: ${i.dimensions.join(', ') || 'None'}${(i.tags || []).length > 0 ? `\n  Tags: ${i.tags!.join(', ')}` : ''}`).join('\n')}
+
+OUTPUTS:
+${context.outputs.map(o => `- ${o.informationProduct}${o.category ? ` (${o.category})` : ''}
+  Customers: ${o.consumerPersonas.join(', ') || 'None'}${(o.destinationSystems || []).length > 0 ? `\n  Destination Systems: ${o.destinationSystems!.join(', ')}` : ''}
+  Dimensions: ${o.dimensions.join(', ') || 'None'}`).join('\n')}
+
+Return this exact JSON structure:
+{
+  "executiveSummary": "2-4 sentence executive-ready description of what this capability does, who it serves, what data it consumes and produces, and why it matters to the organization. Write for a VP or C-level who needs to understand this capability in 30 seconds.",
+  "completenessScore": 75,
+  "strengths": [
+    "Specific strength of this SIPOC definition"
+  ],
+  "gaps": [
+    {
+      "area": "Missing supplier|Missing input|Missing output|Missing customer|Missing dimension|Missing system|Incomplete coverage",
+      "title": "Short gap title",
+      "description": "What's missing and why it matters",
+      "priority": "high|medium|low",
+      "recommendation": "Specific action to address this gap"
+    }
+  ],
+  "recommendations": [
+    "Specific, actionable recommendation to improve this SIPOC"
+  ]
+}
+
+Guidelines:
+- The executive summary should be the MOST important output. Write it so someone unfamiliar with SIPOC can understand the capability.
+- Score 0-100 based on completeness: are all suppliers identified? Are dimensions detailed enough? Are systems mapped?
+- Identify 2-3 strengths
+- Identify 2-5 gaps with specific recommendations
+- Provide 2-4 overall recommendations
+- Reference actual information products, personas, and systems from the data
+- Consider A&D industry best practices (CAS compliance, DCAA audit readiness, EVMS, etc.)
+
+No markdown, no explanation, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const json = JSON.parse(cleaned)
+    return NextResponse.json(json)
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse L3 analysis', raw: text }, { status: 500 })
+  }
 }

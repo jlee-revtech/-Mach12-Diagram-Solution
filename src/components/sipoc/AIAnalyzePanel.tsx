@@ -29,6 +29,14 @@ interface AnalysisResult {
   crossCapabilityInsights: string[]
 }
 
+interface L3AnalysisResult {
+  executiveSummary: string
+  completenessScore: number
+  strengths: string[]
+  gaps: { area: string; title: string; description: string; priority: 'high' | 'medium' | 'low'; recommendation: string }[]
+  recommendations: string[]
+}
+
 const PRIORITY_COLORS = {
   high: { bg: 'bg-red-400/10', border: 'border-red-400/30', text: 'text-red-400', dot: 'bg-red-400' },
   medium: { bg: 'bg-[#EAB308]/10', border: 'border-[#EAB308]/30', text: 'text-[#EAB308]', dot: 'bg-[#EAB308]' },
@@ -75,59 +83,113 @@ function SectionTitle({ icon, label, count }: { icon: React.ReactNode; label: st
 
 export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () => void; onImplement?: (capabilityName: string, prompt: string) => void }) {
   const map = useSIPOCStore(s => s.map)
-  const hydratedCaps = useSIPOCStore(s => s.getHydratedCapabilities)
+  const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
+  const [l3Result, setL3Result] = useState<L3AnalysisResult | null>(null)
+
+  // Find the selected hydrated capability
+  const getSelectedCap = () => {
+    if (!selectedId) return null
+    return useSIPOCStore.getState().getHydratedCapabilities().find(c => c.id === selectedId) || null
+  }
 
   const handleAnalyze = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setResult(null)
+    setL3Result(null)
 
-    const capabilities = useSIPOCStore.getState().getHydratedCapabilities()
+    const selectedCap = getSelectedCap()
 
-    const context = {
-      mapTitle: map?.title || 'Untitled',
-      capabilities: capabilities.map(cap => ({
-        name: cap.name,
-        features: cap.features || [],
-        inputs: cap.inputs.map(inp => ({
+    if (selectedCap) {
+      // ── L3 single-capability analysis ──
+      const context = {
+        capabilityName: selectedCap.name,
+        level: selectedCap.level,
+        system: selectedCap.system?.name,
+        features: selectedCap.features || [],
+        tags: [...new Set(selectedCap.inputs.flatMap(i => (i.tags || []).map(t => t.name)))],
+        inputs: selectedCap.inputs.map(inp => ({
           informationProduct: inp.informationProduct.name,
           category: inp.informationProduct.category,
           supplierPersonas: inp.supplierPersonas.map(p => p.name),
           sourceSystems: inp.sourceSystems.map(s => s.name),
+          feedingSystem: inp.feedingSystem?.name,
           dimensions: (inp.dimensions || []).map(d => d.name),
+          tags: (inp.tags || []).map(t => t.name),
         })),
-        outputs: cap.outputs.map(out => ({
+        outputs: selectedCap.outputs.map(out => ({
           informationProduct: out.informationProduct.name,
           category: out.informationProduct.category,
           consumerPersonas: out.consumerPersonas.map(p => p.name),
+          destinationSystems: out.destinationSystems.map(s => s.name),
           dimensions: (out.dimensions || []).map(d => d.name),
         })),
-      })),
-    }
-
-    try {
-      const res = await fetch('/api/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sipoc-analyze', context }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Analysis failed')
       }
 
-      const data: AnalysisResult = await res.json()
-      setResult(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed')
-    } finally {
-      setLoading(false)
+      try {
+        const res = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sipoc-analyze-l3', context }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Analysis failed')
+        }
+        const data: L3AnalysisResult = await res.json()
+        setL3Result(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Request failed')
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      // ── Full map analysis (fallback when no capability selected) ──
+      const capabilities = useSIPOCStore.getState().getHydratedCapabilities()
+      const context = {
+        mapTitle: map?.title || 'Untitled',
+        capabilities: capabilities.map(cap => ({
+          name: cap.name,
+          features: cap.features || [],
+          inputs: cap.inputs.map(inp => ({
+            informationProduct: inp.informationProduct.name,
+            category: inp.informationProduct.category,
+            supplierPersonas: inp.supplierPersonas.map(p => p.name),
+            sourceSystems: inp.sourceSystems.map(s => s.name),
+            dimensions: (inp.dimensions || []).map(d => d.name),
+          })),
+          outputs: cap.outputs.map(out => ({
+            informationProduct: out.informationProduct.name,
+            category: out.informationProduct.category,
+            consumerPersonas: out.consumerPersonas.map(p => p.name),
+            dimensions: (out.dimensions || []).map(d => d.name),
+          })),
+        })),
+      }
+
+      try {
+        const res = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sipoc-analyze', context }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Analysis failed')
+        }
+        const data: AnalysisResult = await res.json()
+        setResult(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Request failed')
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [map])
+  }, [map, selectedId])
 
   return (
     <div className="flex flex-col h-full">
@@ -141,8 +203,8 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
               </svg>
             </div>
             <div>
-              <div className="text-sm font-semibold text-[var(--m12-text)]">AI SIPOC Analysis</div>
-              <div className="text-[10px] text-[var(--m12-text-muted)]">{map?.title || 'Capability Map'}</div>
+              <div className="text-sm font-semibold text-[var(--m12-text)]">{getSelectedCap() ? 'AI SIPOC Analysis' : 'AI Map Analysis'}</div>
+              <div className="text-[10px] text-[var(--m12-text-muted)]">{getSelectedCap()?.name || map?.title || 'Capability Map'}</div>
             </div>
           </div>
           <button onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors">
@@ -154,29 +216,36 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {!result && !loading && (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="opacity-20">
-                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="1.5" className="text-[var(--m12-text)]" />
-                <path d="M24 14v10l7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-[var(--m12-text)]" />
-              </svg>
-              <div className="text-center">
-                <div className="text-sm text-[var(--m12-text-secondary)] mb-1">Analyze your SIPOC capability map</div>
-                <div className="text-[10px] text-[var(--m12-text-muted)] max-w-[320px]">
-                  AI will review all capabilities, information products, suppliers, consumers, and dimensions to identify gaps, suggest improvements, and assess data governance.
-                </div>
-              </div>
-              <button
-                onClick={handleAnalyze}
-                className="flex items-center gap-2 bg-gradient-to-r from-[#06B6D4] to-[#2563EB] hover:from-[#0891B2] hover:to-[#3B82F6] text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg shadow-[#2563EB]/20"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M7 1L8.5 4.5L12 5.5L9.5 8L10 11.5L7 10L4 11.5L4.5 8L2 5.5L5.5 4.5L7 1Z" fill="white" />
+          {!result && !l3Result && !loading && (() => {
+            const cap = getSelectedCap()
+            return (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="opacity-20">
+                  <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="1.5" className="text-[var(--m12-text)]" />
+                  <path d="M24 14v10l7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-[var(--m12-text)]" />
                 </svg>
-                Run Analysis
-              </button>
-            </div>
-          )}
+                <div className="text-center">
+                  <div className="text-sm text-[var(--m12-text-secondary)] mb-1">
+                    {cap ? `Analyze "${cap.name}"` : 'Analyze your SIPOC capability map'}
+                  </div>
+                  <div className="text-[10px] text-[var(--m12-text-muted)] max-w-[320px]">
+                    {cap
+                      ? 'AI will summarize this capability for an executive audience, highlight gaps, and recommend improvements.'
+                      : 'AI will review all capabilities, information products, suppliers, consumers, and dimensions to identify gaps and suggest improvements.'}
+                  </div>
+                </div>
+                <button
+                  onClick={handleAnalyze}
+                  className="flex items-center gap-2 bg-gradient-to-r from-[#06B6D4] to-[#2563EB] hover:from-[#0891B2] hover:to-[#3B82F6] text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg shadow-[#2563EB]/20"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 1L8.5 4.5L12 5.5L9.5 8L10 11.5L7 10L4 11.5L4.5 8L2 5.5L5.5 4.5L7 1Z" fill="white" />
+                  </svg>
+                  {cap ? 'Analyze This Capability' : 'Run Analysis'}
+                </button>
+              </div>
+            )
+          })()}
 
           {loading && (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -190,6 +259,77 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
           {error && (
             <div className="p-6">
               <div className="text-[11px] text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">{error}</div>
+            </div>
+          )}
+
+          {l3Result && (
+            <div className="p-6 space-y-6">
+              {/* Executive Summary */}
+              <div className="flex gap-5 items-start">
+                <ScoreRing score={l3Result.completenessScore} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[9px] uppercase tracking-widest font-[family-name:var(--font-space-mono)] text-[#06B6D4] font-bold mb-2">Executive Summary</div>
+                  <div className="text-[12px] text-[var(--m12-text)] leading-relaxed">{l3Result.executiveSummary}</div>
+                </div>
+              </div>
+
+              {/* Strengths */}
+              <div>
+                <SectionTitle icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1l1.5 3.5L11 5.5 8.5 8l.5 3.5L6 9.5 3 11.5l.5-3.5L1 5.5l3.5-1L6 1z" fill="#10B981"/></svg>} label="Strengths" count={l3Result.strengths.length} />
+                <div className="space-y-1.5">
+                  {l3Result.strengths.map((s, i) => (
+                    <div key={i} className="flex gap-2 text-[11px] text-[var(--m12-text-secondary)]">
+                      <span className="text-[#10B981] shrink-0 mt-0.5">+</span>
+                      <span>{s}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gaps */}
+              <div>
+                <SectionTitle icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#EF4444" strokeWidth="1.2"/><path d="M6 3.5v3M6 8.5v.01" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round"/></svg>} label="Gaps" count={l3Result.gaps.length} />
+                <div className="space-y-2">
+                  {l3Result.gaps.map((g, i) => {
+                    const colors = PRIORITY_COLORS[g.priority] || PRIORITY_COLORS.medium
+                    return (
+                      <div key={i} className={`${colors.bg} border ${colors.border} rounded-lg p-3`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+                          <span className="text-[10px] font-semibold text-[var(--m12-text)]">{g.title}</span>
+                          <span className={`text-[8px] ${colors.text} font-[family-name:var(--font-space-mono)] uppercase`}>{g.priority}</span>
+                          <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase ml-auto">{g.area}</span>
+                        </div>
+                        <div className="text-[10px] text-[var(--m12-text-secondary)] leading-relaxed">{g.description}</div>
+                        <div className="text-[10px] text-[#2563EB] mt-1.5 font-medium">Recommendation: {g.recommendation}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              <div>
+                <SectionTitle icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="#2563EB" strokeWidth="1.2" strokeLinecap="round"/></svg>} label="Recommendations" count={l3Result.recommendations.length} />
+                <div className="space-y-1.5">
+                  {l3Result.recommendations.map((r, i) => (
+                    <div key={i} className="flex gap-2 text-[11px] text-[var(--m12-text-secondary)]">
+                      <span className="text-[#2563EB] shrink-0 mt-0.5">{i + 1}.</span>
+                      <span>{r}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Re-run button */}
+              <div className="flex justify-center pt-2">
+                <button
+                  onClick={handleAnalyze}
+                  className="flex items-center gap-2 border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-4 py-2 rounded-lg text-xs transition-colors"
+                >
+                  Re-analyze
+                </button>
+              </div>
             </div>
           )}
 
