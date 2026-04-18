@@ -573,11 +573,25 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
                   e.dataTransfer.setData('text/plain', cap.id)
                 }}
                 onDragEnd={() => { draggedId = null; draggedLevel = null }}
-                className="flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing hover:border-[#EAB308]/40 transition-colors"
+                className="group/orphan flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing hover:border-[#EAB308]/40 transition-colors"
               >
                 <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>
                 <span className="text-xs font-medium text-[var(--m12-text)]">{cap.name}</span>
                 <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">L{cap.level}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (confirm(`Delete "${cap.name}"? This will also remove all its SIPOC detail and cannot be undone.`)) {
+                      removeCapability(cap.id)
+                    }
+                  }}
+                  className="opacity-0 group-hover/orphan:opacity-100 ml-1 w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
+                  title="Delete capability"
+                >
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                    <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                </button>
               </div>
             ))}
           </div>

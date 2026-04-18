@@ -7,20 +7,24 @@ function sanitizeFilename(title: string): string {
   return title.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '_') || 'capability-map'
 }
 
-// ─── Colors (RGB tuples for jsPDF) ──────────────────────
+// ─── Colors (RGB tuples for jsPDF) — LIGHT THEME ───────
 const C = {
-  bg: [21, 30, 46] as [number, number, number],
-  cardBg: [31, 44, 63] as [number, number, number],
-  border: [55, 74, 94] as [number, number, number],
-  text: [248, 250, 252] as [number, number, number],
-  textSec: [203, 213, 225] as [number, number, number],
-  muted: [100, 116, 139] as [number, number, number],
+  bg: [249, 250, 251] as [number, number, number],
+  cardBg: [255, 255, 255] as [number, number, number],
+  border: [209, 213, 219] as [number, number, number],
+  text: [30, 41, 59] as [number, number, number],
+  textSec: [71, 85, 105] as [number, number, number],
+  muted: [148, 163, 184] as [number, number, number],
   blue: [37, 99, 235] as [number, number, number],
   orange: [249, 115, 22] as [number, number, number],
-  yellow: [234, 179, 8] as [number, number, number],
+  yellow: [202, 138, 4] as [number, number, number],
   green: [16, 185, 129] as [number, number, number],
   violet: [139, 92, 246] as [number, number, number],
   cyan: [6, 182, 212] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+  lightYellow: [254, 252, 232] as [number, number, number],
+  lightGreen: [236, 253, 245] as [number, number, number],
+  lightBlue: [239, 246, 255] as [number, number, number],
 }
 
 // ─── PDF Helpers ────────────────────────────────────────
@@ -29,58 +33,105 @@ function drawRoundedRect(pdf: jsPDF, x: number, y: number, w: number, h: number,
   pdf.roundedRect(x, y, w, h, r, r, 'F')
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const m = hex.replace('#', '').match(/.{2}/g)
+  return m ? [parseInt(m[0], 16), parseInt(m[1], 16), parseInt(m[2], 16)] : C.muted
+}
+
 function drawPill(pdf: jsPDF, x: number, y: number, text: string, dotColor: [number, number, number]) {
   const tw = pdf.getTextWidth(text)
   const pw = tw + 14
-  drawRoundedRect(pdf, x, y, pw, 11, 5, C.cardBg)
+  drawRoundedRect(pdf, x, y, pw, 12, 5, C.white)
+  pdf.setDrawColor(...C.border)
+  pdf.setLineWidth(0.3)
+  pdf.roundedRect(x, y, pw, 12, 5, 5, 'S')
   pdf.setFillColor(...dotColor)
-  pdf.circle(x + 6, y + 5.5, 2, 'F')
-  pdf.setFontSize(6.5)
-  pdf.setTextColor(...C.textSec)
+  pdf.circle(x + 6, y + 6, 1.8, 'F')
+  pdf.setFontSize(6)
+  pdf.setTextColor(...C.text)
   pdf.text(text, x + 11, y + 7.5)
   return pw + 3
 }
 
-function drawIPCard(pdf: jsPDF, x: number, y: number, w: number, name: string, category: string | undefined, dims: string[], accentColor: [number, number, number]): number {
-  const lineH = 8
-  const lines = pdf.splitTextToSize(name, w - 10)
-  const nameH = lines.length * lineH
-  const dimH = dims.length > 0 ? dims.length * 7 + 6 : 0
-  const cardH = nameH + (category ? 8 : 0) + dimH + 10
+function drawTagChip(pdf: jsPDF, x: number, y: number, name: string, color: [number, number, number]) {
+  pdf.setFontSize(5)
+  const tw = pdf.getTextWidth(name)
+  const pw = tw + 6
+  drawRoundedRect(pdf, x, y, pw, 9, 3, color)
+  pdf.setTextColor(255, 255, 255)
+  pdf.text(name, x + 3, y + 6)
+  return pw + 2
+}
 
-  drawRoundedRect(pdf, x, y, w, cardH, 3, C.cardBg)
+function drawIPCard(
+  pdf: jsPDF, x: number, y: number, w: number,
+  name: string, category: string | undefined,
+  dims: { name: string; tags?: { name: string; color: string }[] }[],
+  tags: { name: string; color: string }[],
+  accentColor: [number, number, number],
+  bgColor: [number, number, number]
+): number {
+  const lineH = 8
+  pdf.setFontSize(7.5)
+  const lines = pdf.splitTextToSize(name, w - 12)
+  const nameH = lines.length * lineH
+  const tagH = tags.length > 0 ? 14 : 0
+  const dimH = dims.length > 0 ? dims.length * 9 + 6 : 0
+  const cardH = nameH + (category ? 8 : 0) + tagH + dimH + 12
+
+  drawRoundedRect(pdf, x, y, w, cardH, 4, bgColor)
+  pdf.setDrawColor(...C.border)
+  pdf.setLineWidth(0.3)
+  pdf.roundedRect(x, y, w, cardH, 4, 4, 'S')
   // Accent left border
   pdf.setFillColor(...accentColor)
-  pdf.rect(x, y + 2, 2, cardH - 4, 'F')
+  pdf.rect(x, y + 3, 2.5, cardH - 6, 'F')
 
   // Name
   pdf.setFontSize(7.5)
   pdf.setTextColor(...C.text)
-  let cy = y + 8
+  let cy = y + 10
   lines.forEach((line: string) => {
-    pdf.text(line, x + 8, cy)
+    pdf.text(line, x + 9, cy)
     cy += lineH
   })
 
   // Category
   if (category) {
-    pdf.setFontSize(5.5)
+    pdf.setFontSize(5)
     pdf.setTextColor(...C.muted)
-    pdf.text(category.toUpperCase(), x + 8, cy)
+    pdf.text(category.toUpperCase(), x + 9, cy)
     cy += 8
+  }
+
+  // Tags
+  if (tags.length > 0) {
+    let tx = x + 9
+    tags.forEach(t => {
+      const tw = drawTagChip(pdf, tx, cy - 2, t.name, hexToRgb(t.color))
+      tx += tw
+    })
+    cy += 12
   }
 
   // Dimensions
   if (dims.length > 0) {
-    cy += 2
     pdf.setDrawColor(...C.border)
-    pdf.setLineWidth(0.3)
-    pdf.line(x + 8, cy - 4, x + w - 6, cy - 4)
+    pdf.setLineWidth(0.2)
+    pdf.line(x + 9, cy - 3, x + w - 6, cy - 3)
     dims.forEach(dim => {
       pdf.setFontSize(5.5)
-      pdf.setTextColor(...C.muted)
-      pdf.text(`• ${dim}`, x + 10, cy)
-      cy += 7
+      pdf.setTextColor(...C.textSec)
+      pdf.text(`• ${dim.name}`, x + 11, cy + 2)
+      // Dimension tags
+      if (dim.tags && dim.tags.length > 0) {
+        let dtx = x + 11 + pdf.getTextWidth(`• ${dim.name}`) + 3
+        dim.tags.forEach(t => {
+          const tw = drawTagChip(pdf, dtx, cy - 2, t.name, hexToRgb(t.color))
+          dtx += tw
+        })
+      }
+      cy += 9
     })
   }
 
@@ -95,168 +146,236 @@ export function exportSIPOCPdf(
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: 'a4' })
   const pw = pdf.internal.pageSize.getWidth()
   const ph = pdf.internal.pageSize.getHeight()
+  const margin = 25
+  const maxY = ph - 30 // footer zone
 
   // ── Cover page ────────────────────────────────────────
   pdf.setFillColor(...C.bg)
   pdf.rect(0, 0, pw, ph, 'F')
 
-  // Brand
   pdf.setFontSize(28)
   pdf.setTextColor(...C.blue)
-  pdf.text('MACH12', 40, 80)
+  pdf.text('MACH12', 40, 70)
 
-  pdf.setFontSize(11)
+  pdf.setFontSize(14)
   pdf.setTextColor(...C.text)
-  pdf.text(title, 40, 110)
+  pdf.text(title, 40, 95)
 
-  pdf.setFontSize(8)
+  pdf.setFontSize(9)
   pdf.setTextColor(...C.muted)
-  pdf.text('SIPOC Capability Map', 40, 125)
-  pdf.text(`${capabilities.length} Capabilit${capabilities.length === 1 ? 'y' : 'ies'}`, 40, 137)
-  pdf.text(`Exported ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 40, 149)
+  pdf.text('SIPOC Capability Map', 40, 112)
+  pdf.text(`${capabilities.length} Capabilit${capabilities.length === 1 ? 'y' : 'ies'}`, 40, 126)
+  pdf.text(`Exported ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 40, 140)
 
   // Capability list on cover
   pdf.setFontSize(7)
-  let coverY = 180
+  let coverY = 170
   capabilities.forEach((cap, i) => {
-    pdf.setTextColor(...C.textSec)
+    if (coverY > maxY) return
+    pdf.setTextColor(...C.text)
     pdf.text(`${i + 1}. ${cap.name}`, 50, coverY)
     pdf.setTextColor(...C.muted)
-    pdf.text(`${cap.inputs.length} inputs, ${cap.outputs.length} outputs`, 200, coverY)
-    coverY += 12
+    const features = (cap.features || [])
+    pdf.text(`${cap.inputs.length}in / ${cap.outputs.length}out${features.length ? ` · ${features.length} features` : ''}`, 220, coverY)
+    coverY += 13
   })
 
-  // Footer
   pdf.setFontSize(6)
   pdf.setTextColor(...C.border)
-  pdf.text('Generated by Mach12.ai', 40, ph - 20)
+  pdf.text('Generated by Mach12.ai', 40, ph - 15)
 
-  // ── One page per capability ───────────────────────────
+  // ── One page (or more) per capability ─────────────────
   capabilities.forEach(cap => {
     pdf.addPage()
     pdf.setFillColor(...C.bg)
     pdf.rect(0, 0, pw, ph, 'F')
 
     // Header bar
-    drawRoundedRect(pdf, 0, 0, pw, 32, 0, C.cardBg)
-    pdf.setFontSize(9)
+    drawRoundedRect(pdf, 0, 0, pw, 28, 0, C.white)
+    pdf.setDrawColor(...C.border)
+    pdf.setLineWidth(0.3)
+    pdf.line(0, 28, pw, 28)
+    pdf.setFontSize(8)
     pdf.setTextColor(...C.blue)
-    pdf.text('MACH12', 15, 18)
+    pdf.text('MACH12', margin, 17)
     pdf.setTextColor(...C.muted)
-    pdf.text('/', 55, 18)
+    pdf.text('/', margin + 38, 17)
+    pdf.setFontSize(9)
     pdf.setTextColor(...C.text)
-    pdf.text(cap.name, 62, 18)
+    pdf.text(cap.name, margin + 44, 17)
 
     // SIPOC column headers
-    const colCenters = [80, 195, pw / 2, pw - 195, pw - 80]
+    const colCenters = [75, 195, pw / 2, pw - 195, pw - 75]
     const colLabels = ['SUPPLIERS', 'INPUTS', 'PROCESS', 'OUTPUTS', 'CUSTOMERS']
     const colColors = [C.orange, C.yellow, C.blue, C.green, C.violet]
     colLabels.forEach((label, i) => {
-      drawRoundedRect(pdf, colCenters[i] - 9, 42, 18, 18, 4, colColors[i])
-      pdf.setFontSize(8)
+      drawRoundedRect(pdf, colCenters[i] - 10, 36, 20, 20, 5, colColors[i])
+      pdf.setFontSize(9)
       pdf.setTextColor(255, 255, 255)
-      pdf.text(label[0], colCenters[i] - 3, 54)
+      const letterW = pdf.getTextWidth(label[0])
+      pdf.text(label[0], colCenters[i] - letterW / 2, 49)
       pdf.setFontSize(5)
       pdf.setTextColor(...C.muted)
       const lw = pdf.getTextWidth(label)
-      pdf.text(label, colCenters[i] - lw / 2, 68)
+      pdf.text(label, colCenters[i] - lw / 2, 64)
     })
 
     // Process box (center)
-    const procW = 130
+    const procW = 140
     const procX = pw / 2 - procW / 2
-    const procY = 85
-    drawRoundedRect(pdf, procX, procY, procW, 50, 6, [31, 50, 80])
-    pdf.setFontSize(9)
-    pdf.setTextColor(...C.text)
-    const capLines = pdf.splitTextToSize(cap.name, procW - 16)
-    let capTextY = procY + 20
-    capLines.forEach((line: string) => {
-      const lw = pdf.getTextWidth(line)
-      pdf.text(line, pw / 2 - lw / 2, capTextY)
-      capTextY += 10
-    })
+    const procY = 75
+    drawRoundedRect(pdf, procX, procY, procW, 0, 6, C.lightBlue) // placeholder - calc height
+    pdf.setDrawColor(...C.blue)
+    pdf.setLineWidth(1)
+    // Build process box content
+    pdf.setFontSize(10)
+    const capLines = pdf.splitTextToSize(cap.name, procW - 20)
+    const features = cap.features || []
+    const sysName = cap.system?.name
+    const procH = capLines.length * 11 + (sysName ? 16 : 0) + (features.length > 0 ? features.length * 8 + 12 : 0) + 26
+    drawRoundedRect(pdf, procX, procY, procW, procH, 6, C.lightBlue)
+    pdf.roundedRect(procX, procY, procW, procH, 6, 6, 'S')
+
     pdf.setFontSize(5)
     pdf.setTextColor(...C.blue)
-    pdf.text('L3 CAPABILITY', pw / 2 - pdf.getTextWidth('L3 CAPABILITY') / 2, procY + 43)
+    pdf.text('L3 CAPABILITY', pw / 2 - pdf.getTextWidth('L3 CAPABILITY') / 2, procY + 12)
+    pdf.setFontSize(10)
+    pdf.setTextColor(...C.text)
+    let ptY = procY + 24
+    capLines.forEach((line: string) => {
+      const lw = pdf.getTextWidth(line)
+      pdf.text(line, pw / 2 - lw / 2, ptY)
+      ptY += 11
+    })
+    if (sysName) {
+      pdf.setFontSize(6)
+      pdf.setTextColor(...C.blue)
+      const sw = pdf.getTextWidth(sysName)
+      drawRoundedRect(pdf, pw / 2 - sw / 2 - 8, ptY - 3, sw + 16, 12, 4, C.white)
+      pdf.text(sysName, pw / 2 - sw / 2, ptY + 5)
+      ptY += 16
+    }
+    if (features.length > 0) {
+      pdf.setDrawColor(...C.border)
+      pdf.setLineWidth(0.2)
+      pdf.line(procX + 12, ptY - 2, procX + procW - 12, ptY - 2)
+      pdf.setFontSize(5)
+      pdf.setTextColor(...C.muted)
+      pdf.text(`${features.length} FEATURE${features.length !== 1 ? 'S' : ''}`, procX + 14, ptY + 6)
+      ptY += 10
+      pdf.setTextColor(...C.textSec)
+      features.forEach(f => {
+        pdf.text(`• ${f}`, procX + 14, ptY)
+        ptY += 8
+      })
+    }
 
     // Input lanes (left side)
-    const inputX = 20
-    const inputCardW = 120
-    let inputY = 85
-    const supplierStartX = inputX
+    const supplierCol = margin
+    const inputCardX = 170
+    const inputCardW = 130
+    let inputY = 75
 
     cap.inputs.forEach(inp => {
+      // Check page overflow
+      if (inputY > maxY - 40) {
+        pdf.addPage()
+        pdf.setFillColor(...C.bg)
+        pdf.rect(0, 0, pw, ph, 'F')
+        inputY = 40
+      }
+
       // Supplier personas
       let chipY = inputY
       inp.supplierPersonas.forEach(p => {
-        const hexToRgb = (hex: string): [number, number, number] => {
-          const m = hex.replace('#', '').match(/.{2}/g)
-          return m ? [parseInt(m[0], 16), parseInt(m[1], 16), parseInt(m[2], 16)] : C.muted
-        }
-        drawPill(pdf, supplierStartX, chipY, p.name, hexToRgb(p.color))
-        chipY += 14
+        drawPill(pdf, supplierCol, chipY, p.name, hexToRgb(p.color))
+        chipY += 15
       })
+      // Source systems
       inp.sourceSystems.forEach(s => {
-        pdf.setFontSize(5)
-        pdf.setTextColor(...C.muted)
-        pdf.text(`▪ ${s.name}`, supplierStartX + 4, chipY + 7)
+        pdf.setFontSize(5.5)
+        pdf.setTextColor(...C.textSec)
+        pdf.text(`▸ ${s.name}`, supplierCol + 4, chipY + 6)
         chipY += 10
       })
+      // Feeding system
+      if (inp.feedingSystem) {
+        pdf.setFontSize(5)
+        pdf.setTextColor(...C.muted)
+        pdf.text(`⤑ ${inp.feedingSystem.name}`, supplierCol + 4, chipY + 6)
+        chipY += 10
+      }
 
       // Arrow
+      const arrowX = inputCardX - 18
+      const arrowMidY = inputY + 12
       pdf.setDrawColor(...C.border)
       pdf.setLineWidth(0.5)
-      const arrowX = 150
-      const arrowY2 = inputY + 12
-      pdf.line(arrowX, arrowY2, arrowX + 15, arrowY2)
-      pdf.line(arrowX + 12, arrowY2 - 3, arrowX + 15, arrowY2)
-      pdf.line(arrowX + 12, arrowY2 + 3, arrowX + 15, arrowY2)
+      pdf.line(arrowX, arrowMidY, arrowX + 14, arrowMidY)
+      pdf.line(arrowX + 11, arrowMidY - 3, arrowX + 14, arrowMidY)
+      pdf.line(arrowX + 11, arrowMidY + 3, arrowX + 14, arrowMidY)
 
-      // Input IP card
-      const dims = (inp.dimensions || []).map(d => d.name)
-      const cardH = drawIPCard(pdf, 170, inputY, inputCardW, inp.informationProduct.name, inp.informationProduct.category, dims, C.yellow)
+      // Input IP card with tags + dimension tags
+      const dims = (inp.dimensions || []).map(d => ({
+        name: d.name,
+        tags: (d.tags || []).map(t => ({ name: t.name, color: t.color })),
+      }))
+      const tags = (inp.tags || []).map(t => ({ name: t.name, color: t.color }))
+      const cardH = drawIPCard(pdf, inputCardX, inputY, inputCardW, inp.informationProduct.name, inp.informationProduct.category, dims, tags, C.yellow, C.lightYellow)
 
-      inputY += Math.max(cardH, chipY - inputY + 5) + 8
+      inputY += Math.max(cardH, chipY - inputY + 5) + 10
     })
 
     // Output lanes (right side)
-    const outputCardX = pw - 170 - inputCardW
-    let outputY = 85
+    const outputCardX = pw - 170 - 130
+    let outputY = 75
+    const customerCol = pw - margin - 100
 
     cap.outputs.forEach(out => {
+      if (outputY > maxY - 40) {
+        pdf.addPage()
+        pdf.setFillColor(...C.bg)
+        pdf.rect(0, 0, pw, ph, 'F')
+        outputY = 40
+      }
+
       // Output IP card
-      const dims = (out.dimensions || []).map(d => d.name)
-      const cardH = drawIPCard(pdf, outputCardX, outputY, inputCardW, out.informationProduct.name, out.informationProduct.category, dims, C.green)
+      const dims = (out.dimensions || []).map(d => ({
+        name: d.name,
+        tags: [] as { name: string; color: string }[],
+      }))
+      const cardH = drawIPCard(pdf, outputCardX, outputY, 130, out.informationProduct.name, out.informationProduct.category, dims, [], C.green, C.lightGreen)
 
       // Arrow
-      const arrowX = outputCardX + inputCardW + 5
-      const arrowY2 = outputY + 12
+      const arrowX = outputCardX + 130 + 4
+      const arrowMidY = outputY + 12
       pdf.setDrawColor(...C.border)
       pdf.setLineWidth(0.5)
-      pdf.line(arrowX, arrowY2, arrowX + 15, arrowY2)
-      pdf.line(arrowX + 12, arrowY2 - 3, arrowX + 15, arrowY2)
-      pdf.line(arrowX + 12, arrowY2 + 3, arrowX + 15, arrowY2)
+      pdf.line(arrowX, arrowMidY, arrowX + 14, arrowMidY)
+      pdf.line(arrowX + 11, arrowMidY - 3, arrowX + 14, arrowMidY)
+      pdf.line(arrowX + 11, arrowMidY + 3, arrowX + 14, arrowMidY)
 
       // Consumer personas
-      let chipX = arrowX + 22
       let chipY = outputY
       out.consumerPersonas.forEach(p => {
-        const hexToRgb = (hex: string): [number, number, number] => {
-          const m = hex.replace('#', '').match(/.{2}/g)
-          return m ? [parseInt(m[0], 16), parseInt(m[1], 16), parseInt(m[2], 16)] : C.muted
-        }
-        drawPill(pdf, chipX, chipY, p.name, hexToRgb(p.color))
-        chipY += 14
+        drawPill(pdf, customerCol, chipY, p.name, hexToRgb(p.color))
+        chipY += 15
+      })
+      // Destination systems
+      out.destinationSystems.forEach(s => {
+        pdf.setFontSize(5.5)
+        pdf.setTextColor(...C.textSec)
+        pdf.text(`▸ ${s.name}`, customerCol + 4, chipY + 6)
+        chipY += 10
       })
 
-      outputY += Math.max(cardH, chipY - outputY + 5) + 8
+      outputY += Math.max(cardH, chipY - outputY + 5) + 10
     })
 
     // Footer
     pdf.setFontSize(5)
-    pdf.setTextColor(...C.border)
-    pdf.text(`${title} — ${cap.name} | Mach12.ai`, 15, ph - 10)
+    pdf.setTextColor(...C.muted)
+    pdf.text(`${title} | ${cap.name} | Mach12.ai`, margin, ph - 10)
   })
 
   pdf.save(`${sanitizeFilename(title)}_SIPOC.pdf`)
