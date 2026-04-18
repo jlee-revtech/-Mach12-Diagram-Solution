@@ -280,26 +280,29 @@ export function exportSIPOCPdf(
 
         drawRoundedRect(pdf, m, y, cw, 0, 0, ii % 2 === 0 ? C.white : C.bg) // bg will be sized after
 
-        ipLines.forEach((line: string) => { pdf.text(line, m + 8, y + 12); y += 12 })
+        ipLines.forEach((line: string) => { pdf.text(line, m + 8, y + 14); y += 14 })
+        y += 2
         if (inp.informationProduct.category) {
           pdf.setFontSize(7)
           pdf.setTextColor(...C.muted)
-          pdf.text(inp.informationProduct.category.toUpperCase(), m + 8, y + 4)
+          pdf.text(inp.informationProduct.category.toUpperCase(), m + 8, y)
           y += 10
         }
 
         // Tags
         const inputTags = inp.tags || []
         if (inputTags.length > 0) {
+          y += 2
           let tx = m + 8
           inputTags.forEach(t => { tx += drawTagChip(pdf, tx, y, t.name, hexToRgb(t.color)) })
-          y += 14
+          y += 16
         }
 
         // Detail rows (two columns)
         const colL = m + 8
         const colR = m + cw / 2 + 8
-        const detailStart = y + 4
+        y += 6
+        const detailStart = y
 
         // Left column: Suppliers + Systems
         let leftY = detailStart
@@ -307,34 +310,36 @@ export function exportSIPOCPdf(
           pdf.setFontSize(6)
           pdf.setTextColor(...C.orange)
           pdf.text('SUPPLIERS', colL, leftY)
-          leftY += 9
+          leftY += 12
           pdf.setFontSize(8)
           pdf.setTextColor(...C.text)
           inp.supplierPersonas.forEach(p => {
             pdf.setFillColor(...hexToRgb(p.color))
-            pdf.circle(colL + 3, leftY - 2.5, 2, 'F')
-            pdf.text(p.name, colL + 8, leftY)
-            leftY += 11
+            pdf.circle(colL + 3, leftY - 2.5, 2.5, 'F')
+            pdf.text(p.name, colL + 9, leftY)
+            leftY += 13
           })
         }
         if (inp.sourceSystems.length > 0) {
+          leftY += 4
           pdf.setFontSize(6)
           pdf.setTextColor(...C.muted)
-          pdf.text('SOURCE SYSTEMS', colL, leftY + 2)
-          leftY += 10
+          pdf.text('SOURCE SYSTEMS', colL, leftY)
+          leftY += 12
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
-          inp.sourceSystems.forEach(s => { pdf.text(`>  ${s.name}`, colL + 2, leftY); leftY += 9 })
+          inp.sourceSystems.forEach(s => { pdf.text(`>  ${s.name}`, colL + 2, leftY); leftY += 11 })
         }
         if (inp.feedingSystem) {
+          leftY += 4
           pdf.setFontSize(6)
           pdf.setTextColor(...C.muted)
-          pdf.text('FEEDING SYSTEM', colL, leftY + 2)
-          leftY += 10
+          pdf.text('FEEDING SYSTEM', colL, leftY)
+          leftY += 12
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
           pdf.text(`>>  ${inp.feedingSystem.name}`, colL + 2, leftY)
-          leftY += 9
+          leftY += 11
         }
 
         // Right column: Dimensions
@@ -343,27 +348,26 @@ export function exportSIPOCPdf(
           pdf.setFontSize(6)
           pdf.setTextColor(...C.muted)
           pdf.text('DIMENSIONS', colR, rightY)
-          rightY += 9
+          rightY += 12
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
           inp.dimensions.forEach(d => {
             pdf.text(`-  ${d.name}`, colR + 2, rightY)
-            // Dimension tags
             if (d.tags && d.tags.length > 0) {
               let dtx = colR + 4 + pdf.getTextWidth(`-  ${d.name}`) + 3
               d.tags.forEach(t => { dtx += drawTagChip(pdf, dtx, rightY - 5, t.name, hexToRgb(t.color)) })
             }
-            rightY += 10
+            rightY += 12
           })
         }
 
-        y = Math.max(leftY, rightY) + 4
+        y = Math.max(leftY, rightY) + 8
 
         // Separator line between input rows
         pdf.setDrawColor(...C.border)
         pdf.setLineWidth(0.2)
         pdf.line(m, y, m + cw, y)
-        y += 6
+        y += 10
       })
     }
 
@@ -378,17 +382,19 @@ export function exportSIPOCPdf(
         pdf.setFontSize(10)
         pdf.setTextColor(...C.text)
         const ipLines = pdf.splitTextToSize(out.informationProduct.name, cw - 20)
-        ipLines.forEach((line: string) => { pdf.text(line, m + 8, y + 12); y += 12 })
+        ipLines.forEach((line: string) => { pdf.text(line, m + 8, y + 14); y += 14 })
+        y += 2
         if (out.informationProduct.category) {
           pdf.setFontSize(7)
           pdf.setTextColor(...C.muted)
-          pdf.text(out.informationProduct.category.toUpperCase(), m + 8, y + 4)
+          pdf.text(out.informationProduct.category.toUpperCase(), m + 8, y)
           y += 10
         }
 
         const colL = m + 8
         const colR = m + cw / 2 + 8
-        const detailStart = y + 4
+        y += 6
+        const detailStart = y
 
         // Left column: Customers
         let leftY = detailStart
@@ -396,24 +402,25 @@ export function exportSIPOCPdf(
           pdf.setFontSize(6)
           pdf.setTextColor(...C.violet)
           pdf.text('CUSTOMERS', colL, leftY)
-          leftY += 9
+          leftY += 12
           pdf.setFontSize(8)
           pdf.setTextColor(...C.text)
           out.consumerPersonas.forEach(p => {
             pdf.setFillColor(...hexToRgb(p.color))
-            pdf.circle(colL + 3, leftY - 2.5, 2, 'F')
-            pdf.text(p.name, colL + 8, leftY)
-            leftY += 11
+            pdf.circle(colL + 3, leftY - 2.5, 2.5, 'F')
+            pdf.text(p.name, colL + 9, leftY)
+            leftY += 13
           })
         }
         if (out.destinationSystems.length > 0) {
+          leftY += 4
           pdf.setFontSize(6)
           pdf.setTextColor(...C.muted)
-          pdf.text('DESTINATION SYSTEMS', colL, leftY + 2)
-          leftY += 10
+          pdf.text('DESTINATION SYSTEMS', colL, leftY)
+          leftY += 12
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
-          out.destinationSystems.forEach(s => { pdf.text(`>  ${s.name}`, colL + 2, leftY); leftY += 9 })
+          out.destinationSystems.forEach(s => { pdf.text(`>  ${s.name}`, colL + 2, leftY); leftY += 11 })
         }
 
         // Right column: Dimensions
@@ -422,17 +429,17 @@ export function exportSIPOCPdf(
           pdf.setFontSize(6)
           pdf.setTextColor(...C.muted)
           pdf.text('DIMENSIONS', colR, rightY)
-          rightY += 9
+          rightY += 12
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
-          out.dimensions.forEach(d => { pdf.text(`-  ${d.name}`, colR + 2, rightY); rightY += 10 })
+          out.dimensions.forEach(d => { pdf.text(`-  ${d.name}`, colR + 2, rightY); rightY += 12 })
         }
 
-        y = Math.max(leftY, rightY) + 4
+        y = Math.max(leftY, rightY) + 8
         pdf.setDrawColor(...C.border)
         pdf.setLineWidth(0.2)
         pdf.line(m, y, m + cw, y)
-        y += 6
+        y += 10
       })
     }
 
@@ -452,36 +459,54 @@ export function exportSIPOCExcel(
 ): void {
   const wb = XLSX.utils.book_new()
 
+  // Helper: bold a header row (row index)
+  const boldRow = (ws: XLSX.WorkSheet, rowIdx: number, colCount: number) => {
+    for (let c = 0; c < colCount; c++) {
+      const addr = XLSX.utils.encode_cell({ r: rowIdx, c })
+      if (ws[addr]) {
+        ws[addr].s = { font: { bold: true } }
+      }
+    }
+  }
+
   // ── Sheet 1: Summary ──────────────────────────────────
-  const summaryData = [
-    ['SIPOC Capability Map', '', '', '', ''],
-    ['Title', title, '', '', ''],
-    ['Exported', new Date().toLocaleDateString(), '', '', ''],
-    ['Capabilities', capabilities.length.toString(), '', '', ''],
-    ['', '', '', '', ''],
-    ['#', 'Capability', 'System', 'Features', 'Inputs', 'Outputs'],
-    ...capabilities.map((cap, i) => [
+  const summaryData: string[][] = [
+    ['SIPOC Capability Map', '', '', '', '', ''],
+    ['Title', title, '', '', '', ''],
+    ['Exported', new Date().toLocaleDateString(), '', '', '', ''],
+    ['Capabilities', capabilities.length.toString(), '', '', '', ''],
+    ['', '', '', '', '', ''],
+    ['#', 'Capability', 'System', 'Inputs', 'Outputs', 'Features'],
+  ]
+  capabilities.forEach((cap, i) => {
+    const features = cap.features || []
+    // Summary row for the capability
+    summaryData.push([
       (i + 1).toString(),
       cap.name,
       cap.system?.name || '',
-      (cap.features || []).join('; '),
       cap.inputs.length.toString(),
       cap.outputs.length.toString(),
-    ]),
-  ]
+      features[0] || '',
+    ])
+    // Additional rows for remaining features
+    features.slice(1).forEach(f => {
+      summaryData.push(['', '', '', '', '', f])
+    })
+  })
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
-  wsSummary['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 25 }, { wch: 50 }, { wch: 10 }, { wch: 10 }]
+  wsSummary['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 25 }, { wch: 10 }, { wch: 10 }, { wch: 40 }]
+  boldRow(wsSummary, 5, 6)
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
 
   // ── Sheet 2: Inputs ───────────────────────────────────
   const inputRows: string[][] = [
-    ['Capability', 'Features', 'Information Product', 'Category', 'Tags', 'Supplier Personas', 'Source Systems', 'Feeding System', 'Dimensions'],
+    ['Capability', 'Information Product', 'Category', 'Tags', 'Supplier Personas', 'Source Systems', 'Feeding System', 'Dimensions'],
   ]
   capabilities.forEach(cap => {
     cap.inputs.forEach(inp => {
       inputRows.push([
         cap.name,
-        (cap.features || []).join('; '),
         inp.informationProduct.name,
         inp.informationProduct.category || '',
         (inp.tags || []).map(t => t.name).join('; '),
@@ -496,18 +521,18 @@ export function exportSIPOCExcel(
     })
   })
   const wsInputs = XLSX.utils.aoa_to_sheet(inputRows)
-  wsInputs['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 35 }, { wch: 18 }, { wch: 20 }, { wch: 35 }, { wch: 30 }, { wch: 25 }, { wch: 45 }]
+  wsInputs['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 18 }, { wch: 20 }, { wch: 35 }, { wch: 30 }, { wch: 25 }, { wch: 45 }]
+  boldRow(wsInputs, 0, 8)
   XLSX.utils.book_append_sheet(wb, wsInputs, 'Inputs')
 
   // ── Sheet 3: Outputs ──────────────────────────────────
   const outputRows: string[][] = [
-    ['Capability', 'Features', 'Information Product', 'Category', 'Consumer Personas', 'Destination Systems', 'Dimensions'],
+    ['Capability', 'Information Product', 'Category', 'Consumer Personas', 'Destination Systems', 'Dimensions'],
   ]
   capabilities.forEach(cap => {
     cap.outputs.forEach(out => {
       outputRows.push([
         cap.name,
-        (cap.features || []).join('; '),
         out.informationProduct.name,
         out.informationProduct.category || '',
         out.consumerPersonas.map(p => p.name).join('; '),
@@ -517,7 +542,8 @@ export function exportSIPOCExcel(
     })
   })
   const wsOutputs = XLSX.utils.aoa_to_sheet(outputRows)
-  wsOutputs['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 35 }, { wch: 18 }, { wch: 35 }, { wch: 30 }, { wch: 45 }]
+  wsOutputs['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 18 }, { wch: 35 }, { wch: 30 }, { wch: 45 }]
+  boldRow(wsOutputs, 0, 6)
   XLSX.utils.book_append_sheet(wb, wsOutputs, 'Outputs')
 
   // ── Sheet 4: Detailed (one row per dimension) ─────────
@@ -554,6 +580,7 @@ export function exportSIPOCExcel(
   })
   const wsDetail = XLSX.utils.aoa_to_sheet(detailRows)
   wsDetail['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 8 }, { wch: 35 }, { wch: 18 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 35 }, { wch: 30 }, { wch: 25 }]
+  boldRow(wsDetail, 0, 11)
   XLSX.utils.book_append_sheet(wb, wsDetail, 'Detailed')
 
   // ── Sheet 5: Entity Registry ──────────────────────────
@@ -573,6 +600,7 @@ export function exportSIPOCExcel(
   }
   const wsRegistry = XLSX.utils.aoa_to_sheet(registryRows)
   wsRegistry['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 3 }, { wch: 35 }, { wch: 18 }, { wch: 3 }, { wch: 25 }, { wch: 15 }]
+  boldRow(wsRegistry, 0, 8)
   XLSX.utils.book_append_sheet(wb, wsRegistry, 'Entity Registry')
 
   XLSX.writeFile(wb, `${sanitizeFilename(title)}_SIPOC.xlsx`)
