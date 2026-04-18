@@ -122,10 +122,10 @@ function drawIPCard(
     dims.forEach(dim => {
       pdf.setFontSize(5.5)
       pdf.setTextColor(...C.textSec)
-      pdf.text(`• ${dim.name}`, x + 11, cy + 2)
+      pdf.text(`- ${dim.name}`, x + 11, cy + 2)
       // Dimension tags
       if (dim.tags && dim.tags.length > 0) {
-        let dtx = x + 11 + pdf.getTextWidth(`• ${dim.name}`) + 3
+        let dtx = x + 11 + pdf.getTextWidth(`- ${dim.name}`) + 3
         dim.tags.forEach(t => {
           const tw = drawTagChip(pdf, dtx, cy - 2, t.name, hexToRgb(t.color))
           dtx += tw
@@ -259,7 +259,7 @@ export function exportSIPOCPdf(
       hy += 12
       pdf.setFontSize(7)
       pdf.setTextColor(...C.textSec)
-      features.slice(0, 6).forEach(f => { pdf.text(`•  ${f}`, m + 14, hy); hy += 10 })
+      features.slice(0, 6).forEach(f => { pdf.text(`-  ${f}`, m + 14, hy); hy += 10 })
       if (features.length > 6) { pdf.text(`... and ${features.length - 6} more`, m + 14, hy); hy += 10 }
     }
 
@@ -324,7 +324,7 @@ export function exportSIPOCPdf(
           leftY += 10
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
-          inp.sourceSystems.forEach(s => { pdf.text(`▸  ${s.name}`, colL + 2, leftY); leftY += 9 })
+          inp.sourceSystems.forEach(s => { pdf.text(`>  ${s.name}`, colL + 2, leftY); leftY += 9 })
         }
         if (inp.feedingSystem) {
           pdf.setFontSize(6)
@@ -333,7 +333,7 @@ export function exportSIPOCPdf(
           leftY += 10
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
-          pdf.text(`→  ${inp.feedingSystem.name}`, colL + 2, leftY)
+          pdf.text(`>>  ${inp.feedingSystem.name}`, colL + 2, leftY)
           leftY += 9
         }
 
@@ -347,10 +347,10 @@ export function exportSIPOCPdf(
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
           inp.dimensions.forEach(d => {
-            pdf.text(`•  ${d.name}`, colR + 2, rightY)
+            pdf.text(`-  ${d.name}`, colR + 2, rightY)
             // Dimension tags
             if (d.tags && d.tags.length > 0) {
-              let dtx = colR + 4 + pdf.getTextWidth(`•  ${d.name}`) + 3
+              let dtx = colR + 4 + pdf.getTextWidth(`-  ${d.name}`) + 3
               d.tags.forEach(t => { dtx += drawTagChip(pdf, dtx, rightY - 5, t.name, hexToRgb(t.color)) })
             }
             rightY += 10
@@ -413,7 +413,7 @@ export function exportSIPOCPdf(
           leftY += 10
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
-          out.destinationSystems.forEach(s => { pdf.text(`▸  ${s.name}`, colL + 2, leftY); leftY += 9 })
+          out.destinationSystems.forEach(s => { pdf.text(`>  ${s.name}`, colL + 2, leftY); leftY += 9 })
         }
 
         // Right column: Dimensions
@@ -425,7 +425,7 @@ export function exportSIPOCPdf(
           rightY += 9
           pdf.setFontSize(7)
           pdf.setTextColor(...C.textSec)
-          out.dimensions.forEach(d => { pdf.text(`•  ${d.name}`, colR + 2, rightY); rightY += 10 })
+          out.dimensions.forEach(d => { pdf.text(`-  ${d.name}`, colR + 2, rightY); rightY += 10 })
         }
 
         y = Math.max(leftY, rightY) + 4
