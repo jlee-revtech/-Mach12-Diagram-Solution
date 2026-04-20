@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useSIPOCStore, type SystemEdge } from '@/lib/sipoc/store'
 import type { LogicalSystem } from '@/lib/sipoc/types'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
@@ -64,6 +64,24 @@ export default function NeighborhoodView() {
   const [filter, setFilter] = useState('')
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null)
 
+  // Zoom + pan + drag state
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [panning, setPanning] = useState(false)
+  const [panStart, setPanStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null)
+  const [draggingNode, setDraggingNode] = useState<string | null>(null)
+  const [dragStart, setDragStart] = useState<{ mouseX: number; mouseY: number; nodeX: number; nodeY: number } | null>(null)
+  const [nodeOverrides, setNodeOverrides] = useState<Map<string, { x: number; y: number }>>(new Map())
+  const svgRef = useRef<SVGSVGElement>(null)
+  const dragMovedRef = useRef(false)
+
+  // Reset zoom/pan/drag overrides when focus changes
+  useEffect(() => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+    setNodeOverrides(new Map())
+  }, [selectedId])
+
   // Default selection: most-connected system
   useEffect(() => {
     if (!selectedId && network.systems.length > 0) {
@@ -116,17 +134,86 @@ export default function NeighborhoodView() {
   const nodeH = 56
   const radius = Math.max(260, Math.max(neighborhood.upstream.length, neighborhood.downstream.length) * 30)
 
-  const upstreamPos = useMemo(() =>
+  const upstreamArc = useMemo(() =>
     arcPositions(neighborhood.upstream.length, 'left', centerX, centerY, radius),
     [neighborhood.upstream.length, radius]
   )
-  const downstreamPos = useMemo(() =>
+  const downstreamArc = useMemo(() =>
     arcPositions(neighborhood.downstream.length, 'right', centerX, centerY, radius),
     [neighborhood.downstream.length, radius]
   )
 
+  // Resolve each node's effective position (override if user dragged it)
+  const upstreamPos = neighborhood.upstream.map((n, i) => {
+    const o = nodeOverrides.get(n.system.id)
+    return o || upstreamArc[i]
+  })
+  const downstreamPos = neighborhood.downstream.map((n, i) => {
+    const o = nodeOverrides.get(n.system.id)
+    return o || downstreamArc[i]
+  })
+  const centerPos = selected ? (nodeOverrides.get(selected.id) || { x: centerX, y: centerY }) : { x: centerX, y: centerY }
+
   const canvasWidth = centerX * 2
   const canvasHeight = Math.max(900, radius * 2 + 160)
+
+  // Mouse handlers for drag + pan + zoom
+  const handleNodeMouseDown = (id: string, px: number, py: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDraggingNode(id)
+    setDragStart({ mouseX: e.clientX, mouseY: e.clientY, nodeX: px, nodeY: py })
+    dragMovedRef.current = false
+  }
+
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    setPanning(true)
+    setPanStart({ x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y })
+  }
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (draggingNode && dragStart) {
+      const dx = (e.clientX - dragStart.mouseX) / zoom
+      const dy = (e.clientY - dragStart.mouseY) / zoom
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragMovedRef.current = true
+      setNodeOverrides(prev => {
+        const next = new Map(prev)
+        next.set(draggingNode, { x: dragStart.nodeX + dx, y: dragStart.nodeY + dy })
+        return next
+      })
+    } else if (panning && panStart) {
+      setPan({ x: panStart.panX + (e.clientX - panStart.x), y: panStart.panY + (e.clientY - panStart.y) })
+    }
+  }, [draggingNode, dragStart, panning, panStart, zoom])
+
+  const handleMouseUp = useCallback(() => {
+    setDraggingNode(null)
+    setDragStart(null)
+    setPanning(false)
+    setPanStart(null)
+  }, [])
+
+  useEffect(() => {
+    if (draggingNode || panning) {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [draggingNode, panning, handleMouseMove, handleMouseUp])
+
+  const handleWheel = (e: React.WheelEvent) => {
+    const delta = -e.deltaY * 0.001
+    setZoom(z => Math.max(0.3, Math.min(2.5, z + delta)))
+  }
+
+  const resetView = () => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+    setNodeOverrides(new Map())
+  }
 
   return (
     <div className="flex h-full">
@@ -225,10 +312,44 @@ export default function NeighborhoodView() {
             </svg>
             {showIps ? 'Hide' : 'Show'} Info Products
           </button>
+          <button
+            onClick={resetView}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[var(--m12-border)] hover:text-[var(--m12-text-secondary)] transition-colors"
+            title="Reset zoom, pan, and node positions"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M1 1h3v3M6 1h3v3M1 6v3h3M9 6v3H6" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+            </svg>
+            Reset
+          </button>
+          <div className="flex items-center gap-1 ml-2">
+            <button
+              onClick={() => setZoom(z => Math.max(0.3, z - 0.2))}
+              className="w-7 h-7 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors"
+              title="Zoom out"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </button>
+            <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button
+              onClick={() => setZoom(z => Math.min(2.5, z + 0.2))}
+              className="w-7 h-7 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors"
+              title="Zoom in"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <div className="shrink-0 px-4 py-1.5 border-b border-[var(--m12-border)]/20 bg-[var(--m12-bg)]/30 text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] italic">
+          Drag nodes to reposition · Drag canvas to pan · Scroll to zoom · Click a neighbor to re-focus
         </div>
 
         {/* Canvas */}
-        <div className="flex-1 overflow-auto bg-[var(--m12-bg)]">
+        <div
+          className="flex-1 overflow-hidden relative bg-[var(--m12-bg)]"
+          onWheel={handleWheel}
+          style={{ cursor: panning ? 'grabbing' : 'default' }}
+        >
           {!selected ? (
             <div className="h-full flex items-center justify-center text-[var(--m12-text-muted)] text-sm italic">
               {network.systems.length === 0 ? 'No systems with SIPOC data yet.' : 'Select a system to view its connections.'}
@@ -244,7 +365,13 @@ export default function NeighborhoodView() {
               </div>
             </div>
           ) : (
-            <svg width={canvasWidth} height={canvasHeight} className="mx-auto">
+            <svg
+              ref={svgRef}
+              width="100%"
+              height="100%"
+              onMouseDown={handleCanvasMouseDown}
+              style={{ cursor: panning ? 'grabbing' : 'grab', userSelect: 'none' }}
+            >
               <defs>
                 <marker id="nb-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
@@ -255,89 +382,93 @@ export default function NeighborhoodView() {
               </defs>
               <rect width="100%" height="100%" fill="url(#nb-grid)" />
 
-              {/* Edges: upstream → center */}
-              {neighborhood.upstream.map((n, i) => {
-                const pos = upstreamPos[i]
-                const key = `u-${n.edge.from}`
-                const emphasized = hoveredEdge === key
-                const color = getSystemColor(n.system)
-                const x1 = pos.x + nodeW / 2
-                const y1 = pos.y
-                const x2 = centerX - nodeW / 2
-                const y2 = centerY
-                return (
-                  <g key={key} style={{ color }}>
-                    <path
-                      d={bezierTo(x1, y1, x2, y2)}
-                      stroke={color}
-                      strokeWidth={emphasized ? 3 : 2}
-                      fill="none"
-                      opacity={emphasized ? 1 : 0.6}
-                      markerEnd="url(#nb-arrow)"
-                    />
-                    <path
-                      d={bezierTo(x1, y1, x2, y2)}
-                      stroke="transparent"
-                      strokeWidth={18}
-                      fill="none"
-                      style={{ cursor: 'pointer' }}
-                      onMouseEnter={() => setHoveredEdge(key)}
-                      onMouseLeave={() => setHoveredEdge(null)}
-                    />
-                    <EdgeLabel edge={n.edge} x={(x1 + x2) / 2} y={(y1 + y2) / 2} showIps={showIps} emphasized={emphasized} />
-                  </g>
-                )
-              })}
-              {/* Edges: center → downstream */}
-              {neighborhood.downstream.map((n, i) => {
-                const pos = downstreamPos[i]
-                const key = `d-${n.edge.to}`
-                const emphasized = hoveredEdge === key
-                const color = getSystemColor(selected)
-                const x1 = centerX + nodeW / 2
-                const y1 = centerY
-                const x2 = pos.x - nodeW / 2
-                const y2 = pos.y
-                return (
-                  <g key={key} style={{ color }}>
-                    <path
-                      d={bezierTo(x1, y1, x2, y2)}
-                      stroke={color}
-                      strokeWidth={emphasized ? 3 : 2}
-                      fill="none"
-                      opacity={emphasized ? 1 : 0.6}
-                      markerEnd="url(#nb-arrow)"
-                    />
-                    <path
-                      d={bezierTo(x1, y1, x2, y2)}
-                      stroke="transparent"
-                      strokeWidth={18}
-                      fill="none"
-                      style={{ cursor: 'pointer' }}
-                      onMouseEnter={() => setHoveredEdge(key)}
-                      onMouseLeave={() => setHoveredEdge(null)}
-                    />
-                    <EdgeLabel edge={n.edge} x={(x1 + x2) / 2} y={(y1 + y2) / 2} showIps={showIps} emphasized={emphasized} />
-                  </g>
-                )
-              })}
+              {/* Zoom + pan transform wrapper */}
+              <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+                {/* Edges: upstream → center */}
+                {neighborhood.upstream.map((n, i) => {
+                  const pos = upstreamPos[i]
+                  const key = `u-${n.edge.from}`
+                  const emphasized = hoveredEdge === key
+                  const color = getSystemColor(n.system)
+                  const x1 = pos.x + nodeW / 2
+                  const y1 = pos.y
+                  const x2 = centerPos.x - nodeW / 2
+                  const y2 = centerPos.y
+                  // Position label ~65% from the neighbor toward center so it tracks with each neighbor's arc position
+                  const lx = x1 + (x2 - x1) * 0.35
+                  const ly = y1 + (y2 - y1) * 0.35
+                  return (
+                    <g key={key} style={{ color }}>
+                      <path d={bezierTo(x1, y1, x2, y2)} stroke={color} strokeWidth={emphasized ? 3 : 2} fill="none" opacity={emphasized ? 1 : 0.6} markerEnd="url(#nb-arrow)" />
+                      <path d={bezierTo(x1, y1, x2, y2)} stroke="transparent" strokeWidth={18} fill="none" style={{ cursor: 'pointer' }} onMouseEnter={() => setHoveredEdge(key)} onMouseLeave={() => setHoveredEdge(null)} />
+                      <EdgeLabel edge={n.edge} x={lx} y={ly} showIps={showIps} emphasized={emphasized} />
+                    </g>
+                  )
+                })}
+                {/* Edges: center → downstream */}
+                {neighborhood.downstream.map((n, i) => {
+                  const pos = downstreamPos[i]
+                  const key = `d-${n.edge.to}`
+                  const emphasized = hoveredEdge === key
+                  const color = getSystemColor(selected)
+                  const x1 = centerPos.x + nodeW / 2
+                  const y1 = centerPos.y
+                  const x2 = pos.x - nodeW / 2
+                  const y2 = pos.y
+                  const lx = x1 + (x2 - x1) * 0.65
+                  const ly = y1 + (y2 - y1) * 0.65
+                  return (
+                    <g key={key} style={{ color }}>
+                      <path d={bezierTo(x1, y1, x2, y2)} stroke={color} strokeWidth={emphasized ? 3 : 2} fill="none" opacity={emphasized ? 1 : 0.6} markerEnd="url(#nb-arrow)" />
+                      <path d={bezierTo(x1, y1, x2, y2)} stroke="transparent" strokeWidth={18} fill="none" style={{ cursor: 'pointer' }} onMouseEnter={() => setHoveredEdge(key)} onMouseLeave={() => setHoveredEdge(null)} />
+                      <EdgeLabel edge={n.edge} x={lx} y={ly} showIps={showIps} emphasized={emphasized} />
+                    </g>
+                  )
+                })}
 
-              {/* Upstream nodes */}
-              {neighborhood.upstream.map((n, i) => {
-                const pos = upstreamPos[i]
-                return <SystemNode key={`un-${n.system.id}`} system={n.system} x={pos.x - nodeW / 2} y={pos.y - nodeH / 2} w={nodeW} h={nodeH} onClick={() => setSelectedId(n.system.id)} />
-              })}
-              {/* Downstream nodes */}
-              {neighborhood.downstream.map((n, i) => {
-                const pos = downstreamPos[i]
-                return <SystemNode key={`dn-${n.system.id}`} system={n.system} x={pos.x - nodeW / 2} y={pos.y - nodeH / 2} w={nodeW} h={nodeH} onClick={() => setSelectedId(n.system.id)} />
-              })}
-              {/* Center node (focused) */}
-              <SystemNode system={selected} x={centerX - nodeW / 2} y={centerY - nodeH / 2} w={nodeW} h={nodeH} focused />
-
-              {/* Labels for sides */}
-              <text x={centerX - radius - 40} y={centerY - radius - 20} fontSize="9" fontWeight="700" fill="var(--m12-text-muted)" fontFamily="monospace" letterSpacing="1.5">UPSTREAM</text>
-              <text x={centerX + radius - 40} y={centerY - radius - 20} fontSize="9" fontWeight="700" fill="var(--m12-text-muted)" fontFamily="monospace" letterSpacing="1.5">DOWNSTREAM</text>
+                {/* Upstream nodes */}
+                {neighborhood.upstream.map((n, i) => {
+                  const pos = upstreamPos[i]
+                  return (
+                    <SystemNode
+                      key={`un-${n.system.id}`}
+                      system={n.system}
+                      x={pos.x - nodeW / 2}
+                      y={pos.y - nodeH / 2}
+                      w={nodeW}
+                      h={nodeH}
+                      onClick={() => { if (!dragMovedRef.current) setSelectedId(n.system.id) }}
+                      onMouseDown={(e) => handleNodeMouseDown(n.system.id, pos.x, pos.y, e)}
+                    />
+                  )
+                })}
+                {/* Downstream nodes */}
+                {neighborhood.downstream.map((n, i) => {
+                  const pos = downstreamPos[i]
+                  return (
+                    <SystemNode
+                      key={`dn-${n.system.id}`}
+                      system={n.system}
+                      x={pos.x - nodeW / 2}
+                      y={pos.y - nodeH / 2}
+                      w={nodeW}
+                      h={nodeH}
+                      onClick={() => { if (!dragMovedRef.current) setSelectedId(n.system.id) }}
+                      onMouseDown={(e) => handleNodeMouseDown(n.system.id, pos.x, pos.y, e)}
+                    />
+                  )
+                })}
+                {/* Center node (focused) — draggable too */}
+                <SystemNode
+                  system={selected}
+                  x={centerPos.x - nodeW / 2}
+                  y={centerPos.y - nodeH / 2}
+                  w={nodeW}
+                  h={nodeH}
+                  focused
+                  onMouseDown={(e) => handleNodeMouseDown(selected.id, centerPos.x, centerPos.y, e)}
+                />
+              </g>
             </svg>
           )}
         </div>
@@ -347,16 +478,22 @@ export default function NeighborhoodView() {
 }
 
 // ─── System node ────────────────────────────────────────
-function SystemNode({ system, x, y, w, h, focused, onClick }: {
+function SystemNode({ system, x, y, w, h, focused, onClick, onMouseDown }: {
   system: LogicalSystem
   x: number; y: number; w: number; h: number
   focused?: boolean
   onClick?: () => void
+  onMouseDown?: (e: React.MouseEvent) => void
 }) {
   const color = getSystemColor(system)
   const tmpl = SYSTEM_TEMPLATES.find(t => t.type === system.system_type)
   return (
-    <g transform={`translate(${x}, ${y})`} style={{ cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
+    <g
+      transform={`translate(${x}, ${y})`}
+      style={{ cursor: onMouseDown ? 'grab' : (onClick ? 'pointer' : 'default') }}
+      onClick={onClick}
+      onMouseDown={onMouseDown}
+    >
       <rect
         width={w}
         height={h}
