@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react'
 import { useSIPOCStore, type IPLineage, type SystemUsage } from '@/lib/sipoc/store'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
-import SystemNetworkDiagram from './SystemNetworkDiagram'
+import NeighborhoodView from './NeighborhoodView'
+import MatrixView from './MatrixView'
 
 // ─── Small reusable UI ──────────────────────────────────
 function Chip({ name, color, tone }: { name: string; color?: string; tone?: 'system' | 'persona' | 'tag' | 'cap' }) {
@@ -220,7 +221,7 @@ function SystemCard({ usage }: { usage: SystemUsage }) {
 
 // ─── Main View ──────────────────────────────────────────
 export default function DataArchitectureView({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<'network' | 'lineage' | 'systems'>('network')
+  const [tab, setTab] = useState<'neighborhood' | 'matrix' | 'lineage' | 'systems'>('neighborhood')
   const [filter, setFilter] = useState('')
 
   const data = useMemo(() => useSIPOCStore.getState().getDataArchitecture(), [])
@@ -280,7 +281,8 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
       <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--m12-border)]/30 bg-[var(--m12-bg-card)]/40 shrink-0">
         <div className="flex gap-1 bg-[var(--m12-bg)] rounded-lg p-0.5">
           {[
-            { id: 'network' as const, label: 'System Network' },
+            { id: 'neighborhood' as const, label: 'Neighborhood' },
+            { id: 'matrix' as const, label: 'Matrix' },
             { id: 'lineage' as const, label: `IP Lineage (${arch.ipLineages.length})` },
             { id: 'systems' as const, label: `By System (${systemsList.length})` },
           ].map(t => (
@@ -308,9 +310,13 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
       </div>
 
       {/* Content */}
-      {tab === 'network' ? (
+      {tab === 'neighborhood' ? (
         <div className="flex-1 overflow-hidden">
-          <SystemNetworkDiagram />
+          <NeighborhoodView />
+        </div>
+      ) : tab === 'matrix' ? (
+        <div className="flex-1 overflow-hidden">
+          <MatrixView />
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6">
