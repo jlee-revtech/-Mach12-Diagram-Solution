@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useSIPOCStore, type IPLineage, type SystemUsage, type SystemFlow } from '@/lib/sipoc/store'
+import { useSIPOCStore, type IPLineage, type SystemUsage } from '@/lib/sipoc/store'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
+import SystemNetworkDiagram from './SystemNetworkDiagram'
 
 // ─── Small reusable UI ──────────────────────────────────
 function Chip({ name, color, tone }: { name: string; color?: string; tone?: 'system' | 'persona' | 'tag' | 'cap' }) {
@@ -217,89 +218,9 @@ function SystemCard({ usage }: { usage: SystemUsage }) {
   )
 }
 
-// ─── Flow Diagram (simple SVG Sankey-ish) ───────────────
-function FlowDiagram({ flows, systems }: { flows: SystemFlow[]; systems: { id: string; name: string; color?: string | null }[] }) {
-  if (flows.length === 0) {
-    return <div className="text-center py-16 text-[var(--m12-text-muted)] text-sm italic">No system-to-system flows defined yet.</div>
-  }
-  // Simple two-column layout: sources on left, destinations on right
-  const sourceIds = [...new Set(flows.map(f => f.from))]
-  const destIds = [...new Set(flows.map(f => f.to))]
-  const allIds = [...new Set([...sourceIds, ...destIds])]
-  const sysById = new Map(systems.map(s => [s.id, s]))
-
-  // Layout: nodes arranged in two columns
-  const nodeH = 36
-  const nodeGap = 10
-  const leftX = 20
-  const rightX = 460
-  const width = 620
-  const height = Math.max(sourceIds.length, destIds.length) * (nodeH + nodeGap) + 40
-
-  const leftPos = new Map<string, number>(sourceIds.map((id, i) => [id, 20 + i * (nodeH + nodeGap)]))
-  const rightPos = new Map<string, number>(destIds.map((id, i) => [id, 20 + i * (nodeH + nodeGap)]))
-
-  const maxW = Math.max(...flows.map(f => f.ips.length))
-
-  return (
-    <div className="overflow-x-auto">
-      <svg width={width} height={height} className="mx-auto">
-        {/* Flows */}
-        {flows.map((f, i) => {
-          const y1 = (leftPos.get(f.from) ?? rightPos.get(f.from) ?? 0) + nodeH / 2
-          const y2 = (rightPos.get(f.to) ?? leftPos.get(f.to) ?? 0) + nodeH / 2
-          const strokeW = 1 + (f.ips.length / maxW) * 4
-          const sys = sysById.get(f.from)
-          return (
-            <path
-              key={i}
-              d={`M ${leftX + 140} ${y1} C ${leftX + 260} ${y1}, ${rightX - 120} ${y2}, ${rightX} ${y2}`}
-              stroke={sys?.color || '#64748B'}
-              strokeOpacity="0.4"
-              strokeWidth={strokeW}
-              fill="none"
-            />
-          )
-        })}
-        {/* Source nodes */}
-        {sourceIds.map(id => {
-          const sys = sysById.get(id)
-          if (!sys) return null
-          const y = leftPos.get(id)!
-          const ipCount = flows.filter(f => f.from === id).reduce((acc, f) => acc + f.ips.length, 0)
-          return (
-            <g key={`src-${id}`}>
-              <rect x={leftX} y={y} width={140} height={nodeH} rx={4} fill="var(--m12-bg-card)" stroke={sys.color || '#64748B'} strokeWidth="1.5" />
-              <rect x={leftX} y={y} width={4} height={nodeH} fill={sys.color || '#64748B'} />
-              <text x={leftX + 12} y={y + 14} fontSize="10" fill="var(--m12-text)" fontWeight="600">{sys.name.slice(0, 18)}</text>
-              <text x={leftX + 12} y={y + 27} fontSize="8" fill="var(--m12-text-muted)">{ipCount} IP flow{ipCount !== 1 ? 's' : ''}</text>
-            </g>
-          )
-        })}
-        {/* Destination nodes */}
-        {destIds.map(id => {
-          const sys = sysById.get(id)
-          if (!sys) return null
-          const y = rightPos.get(id)!
-          const ipCount = flows.filter(f => f.to === id).reduce((acc, f) => acc + f.ips.length, 0)
-          return (
-            <g key={`dst-${id}`}>
-              <rect x={rightX} y={y} width={140} height={nodeH} rx={4} fill="var(--m12-bg-card)" stroke={sys.color || '#64748B'} strokeWidth="1.5" />
-              <rect x={rightX} y={y} width={4} height={nodeH} fill={sys.color || '#64748B'} />
-              <text x={rightX + 12} y={y + 14} fontSize="10" fill="var(--m12-text)" fontWeight="600">{sys.name.slice(0, 18)}</text>
-              <text x={rightX + 12} y={y + 27} fontSize="8" fill="var(--m12-text-muted)">{ipCount} IP flow{ipCount !== 1 ? 's' : ''}</text>
-            </g>
-          )
-        })}
-      </svg>
-      {allIds.length === 0 && <div className="text-center py-8 text-[var(--m12-text-muted)] text-sm italic">No systems connected via IP flows.</div>}
-    </div>
-  )
-}
-
 // ─── Main View ──────────────────────────────────────────
 export default function DataArchitectureView({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<'lineage' | 'systems' | 'flow'>('lineage')
+  const [tab, setTab] = useState<'network' | 'lineage' | 'systems'>('network')
   const [filter, setFilter] = useState('')
 
   const data = useMemo(() => useSIPOCStore.getState().getDataArchitecture(), [])
@@ -359,9 +280,9 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
       <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--m12-border)]/30 bg-[var(--m12-bg-card)]/40 shrink-0">
         <div className="flex gap-1 bg-[var(--m12-bg)] rounded-lg p-0.5">
           {[
+            { id: 'network' as const, label: 'System Network' },
             { id: 'lineage' as const, label: `IP Lineage (${arch.ipLineages.length})` },
             { id: 'systems' as const, label: `By System (${systemsList.length})` },
-            { id: 'flow' as const, label: `Flow Diagram` },
           ].map(t => (
             <button
               key={t.id}
@@ -387,33 +308,34 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {tab === 'lineage' && (
-          <div className="space-y-2 max-w-5xl mx-auto">
-            {filteredLineages.length === 0 ? (
-              <div className="text-center py-16 text-[var(--m12-text-muted)] text-sm italic">
-                {arch.ipLineages.length === 0 ? 'No information products defined yet.' : 'No matches.'}
-              </div>
-            ) : (
-              filteredLineages.map(l => <LineageRow key={l.ip.id} lineage={l} />)
-            )}
-          </div>
-        )}
-        {tab === 'systems' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-6xl mx-auto">
-            {systemsList.length === 0 ? (
-              <div className="col-span-full text-center py-16 text-[var(--m12-text-muted)] text-sm italic">No systems defined yet.</div>
-            ) : (
-              systemsList.map(u => <SystemCard key={u.system.id} usage={u} />)
-            )}
-          </div>
-        )}
-        {tab === 'flow' && (
-          <div className="max-w-4xl mx-auto">
-            <FlowDiagram flows={arch.flows} systems={arch.systems} />
-          </div>
-        )}
-      </div>
+      {tab === 'network' ? (
+        <div className="flex-1 overflow-hidden">
+          <SystemNetworkDiagram />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-6">
+          {tab === 'lineage' && (
+            <div className="space-y-2 max-w-5xl mx-auto">
+              {filteredLineages.length === 0 ? (
+                <div className="text-center py-16 text-[var(--m12-text-muted)] text-sm italic">
+                  {arch.ipLineages.length === 0 ? 'No information products defined yet.' : 'No matches.'}
+                </div>
+              ) : (
+                filteredLineages.map(l => <LineageRow key={l.ip.id} lineage={l} />)
+              )}
+            </div>
+          )}
+          {tab === 'systems' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-6xl mx-auto">
+              {systemsList.length === 0 ? (
+                <div className="col-span-full text-center py-16 text-[var(--m12-text-muted)] text-sm italic">No systems defined yet.</div>
+              ) : (
+                systemsList.map(u => <SystemCard key={u.system.id} usage={u} />)
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

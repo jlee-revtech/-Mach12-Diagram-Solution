@@ -114,6 +114,22 @@ interface SIPOCState {
     systems: LogicalSystem[]
     flows: SystemFlow[]
   }
+
+  // ─── Derived: System Network (L3s on edges) ───────────
+  getSystemNetwork: () => {
+    systems: LogicalSystem[]
+    edges: SystemEdge[]
+  }
+}
+
+export interface SystemEdge {
+  from: string
+  to: string
+  l3s: {
+    capability: Capability
+    ips: InformationProduct[]
+  }[]
+  totalIps: number
 }
 
 export interface IPLineage {
@@ -862,5 +878,76 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     const flows = [...flowMap.values()].sort((a, b) => b.ips.length - a.ips.length)
 
     return { ipLineages, systemUsage, systems, flows }
+  },
+
+  // ─── Derived: System Network ──────────────────────────
+  getSystemNetwork: () => {
+    const hydrated = get().getHydratedCapabilities()
+    const capMap = new Map(get().capabilities.map(c => [c.id, c]))
+
+    // Aggregate edges by (fromId → toId)
+    const edgeMap = new Map<string, SystemEdge>()
+    const systemsInvolved = new Set<string>()
+    const systemById = new Map<string, LogicalSystem>()
+
+    const touchSystem = (s: LogicalSystem) => {
+      systemsInvolved.add(s.id)
+      systemById.set(s.id, s)
+    }
+
+    const addEdge = (fromId: string, toId: string, capId: string, ip: InformationProduct) => {
+      if (!fromId || !toId || fromId === toId) return
+      const key = `${fromId}->${toId}`
+      let edge = edgeMap.get(key)
+      if (!edge) { edge = { from: fromId, to: toId, l3s: [], totalIps: 0 }; edgeMap.set(key, edge) }
+      let l3entry = edge.l3s.find(e => e.capability.id === capId)
+      if (!l3entry) {
+        const cap = capMap.get(capId)
+        if (!cap) return
+        l3entry = { capability: cap, ips: [] }
+        edge.l3s.push(l3entry)
+      }
+      if (!l3entry.ips.some(i => i.id === ip.id)) l3entry.ips.push(ip)
+    }
+
+    hydrated.forEach(cap => {
+      const proc = cap.system
+      if (proc) touchSystem(proc)
+
+      cap.inputs.forEach(inp => {
+        inp.sourceSystems.forEach(s => touchSystem(s))
+        if (inp.feedingSystem) touchSystem(inp.feedingSystem)
+
+        // Source systems → Processing system
+        if (proc) {
+          inp.sourceSystems.forEach(s => addEdge(s.id, proc.id, cap.id, inp.informationProduct))
+          if (inp.feedingSystem) addEdge(inp.feedingSystem.id, proc.id, cap.id, inp.informationProduct)
+        }
+        // Also: source → feeding (upstream lineage) when different
+        if (inp.feedingSystem) {
+          inp.sourceSystems.forEach(s => addEdge(s.id, inp.feedingSystem!.id, cap.id, inp.informationProduct))
+        }
+      })
+
+      cap.outputs.forEach(out => {
+        out.destinationSystems.forEach(s => touchSystem(s))
+        // Processing → Destinations
+        if (proc) {
+          out.destinationSystems.forEach(s => addEdge(proc.id, s.id, cap.id, out.informationProduct))
+        }
+      })
+    })
+
+    // Finalize: compute totalIps per edge
+    edgeMap.forEach(e => {
+      const ipSet = new Set<string>()
+      e.l3s.forEach(l => l.ips.forEach(ip => ipSet.add(ip.id)))
+      e.totalIps = ipSet.size
+    })
+
+    const systems = [...systemsInvolved].map(id => systemById.get(id)!).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name))
+    const edges = [...edgeMap.values()].sort((a, b) => b.totalIps - a.totalIps)
+
+    return { systems, edges }
   },
 }))
