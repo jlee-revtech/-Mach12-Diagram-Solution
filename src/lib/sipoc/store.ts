@@ -67,6 +67,7 @@ interface SIPOCState {
   updateInputSystems: (inputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
   updateInputFeedingSystem: (inputId: string, capabilityId: string, systemId: string | null) => Promise<void>
   updateInputTags: (inputId: string, capabilityId: string, tagIds: string[]) => Promise<void>
+  updateOutputTags: (outputId: string, capabilityId: string, tagIds: string[]) => Promise<void>
   updateDimensionTags: (side: 'input' | 'output', itemId: string, capabilityId: string, dimId: string, tagIds: string[]) => Promise<void>
 
   // ─── Output CRUD ──────────────────────────────────────
@@ -105,6 +106,42 @@ interface SIPOCState {
 
   // ─── Derived: L1/L2 rollup from descendant L3 SIPOCs ───
   getRollup: (capabilityId: string) => HydratedCapability | null
+
+  // ─── Derived: Data & System Architecture ──────────────
+  getDataArchitecture: () => {
+    ipLineages: IPLineage[]
+    systemUsage: Record<string, SystemUsage>
+    systems: LogicalSystem[]
+    flows: SystemFlow[]
+  }
+}
+
+export interface IPLineage {
+  ip: InformationProduct
+  tags: Tag[]
+  dimensions: Dimension[]
+  sourceSystems: LogicalSystem[]
+  feedingSystems: LogicalSystem[]
+  processingSystems: LogicalSystem[]
+  destinationSystems: LogicalSystem[]
+  consumedBy: Capability[]
+  producedBy: Capability[]
+  supplierPersonas: Persona[]
+  consumerPersonas: Persona[]
+}
+
+export interface SystemUsage {
+  system: LogicalSystem
+  asSource: InformationProduct[]          // IPs where this system is a source_system
+  asFeeding: InformationProduct[]         // IPs where this system is the feeding_system
+  asProcessing: { capability: Capability; ips: InformationProduct[] }[] // L3s hosted here
+  asDestination: InformationProduct[]     // IPs where this system is a destination
+}
+
+export interface SystemFlow {
+  from: string     // system id
+  to: string       // system id
+  ips: InformationProduct[]
 }
 
 export const useSIPOCStore = create<SIPOCState>((set, get) => ({
@@ -302,6 +339,18 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         ...get().inputs,
         [capabilityId]: (get().inputs[capabilityId] || []).map(i =>
           i.id === inputId ? { ...i, tag_ids: tagIds } : i
+        ),
+      },
+    })
+  },
+
+  updateOutputTags: async (outputId, capabilityId, tagIds) => {
+    await api.updateCapabilityOutput(outputId, { tag_ids: tagIds })
+    set({
+      outputs: {
+        ...get().outputs,
+        [capabilityId]: (get().outputs[capabilityId] || []).map(o =>
+          o.id === outputId ? { ...o, tag_ids: tagIds } : o
         ),
       },
     })
@@ -552,6 +601,8 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         destinationSystems: (output.destination_system_ids || [])
           .map(id => sysMap.get(id))
           .filter((s): s is LogicalSystem => !!s),
+        tags: resolveTags(output.tag_ids),
+        dimensions: (output.dimensions || []).map(d => ({ ...d, tags: resolveTags(d.tag_ids) })),
       })),
     }))
   },
@@ -686,5 +737,130 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       inputs: [...inputAgg.values()],
       outputs: [...outputAgg.values()],
     }
+  },
+
+  // ─── Derived: Data & System Architecture ──────────────
+  getDataArchitecture: () => {
+    const hydrated = get().getHydratedCapabilities()
+    const capMap = new Map(get().capabilities.map(c => [c.id, c]))
+
+    // Aggregate by information product id
+    const lineageMap = new Map<string, IPLineage>()
+    const systemUsageMap = new Map<string, SystemUsage>()
+    const flowMap = new Map<string, SystemFlow>()
+
+    const ensureLineage = (ip: InformationProduct): IPLineage => {
+      let l = lineageMap.get(ip.id)
+      if (!l) {
+        l = {
+          ip, tags: [], dimensions: [],
+          sourceSystems: [], feedingSystems: [], processingSystems: [], destinationSystems: [],
+          consumedBy: [], producedBy: [],
+          supplierPersonas: [], consumerPersonas: [],
+        }
+        lineageMap.set(ip.id, l)
+      }
+      return l
+    }
+
+    const ensureSystem = (s: LogicalSystem): SystemUsage => {
+      let u = systemUsageMap.get(s.id)
+      if (!u) {
+        u = { system: s, asSource: [], asFeeding: [], asProcessing: [], asDestination: [] }
+        systemUsageMap.set(s.id, u)
+      }
+      return u
+    }
+
+    const addUnique = <T extends { id: string }>(arr: T[], item: T) => {
+      if (!arr.some(x => x.id === item.id)) arr.push(item)
+    }
+
+    const mergeDims = (target: Dimension[], src: Dimension[]) => {
+      const byName = new Map(target.map(d => [d.name.toLowerCase(), d]))
+      src.forEach(d => { if (!byName.has(d.name.toLowerCase())) { byName.set(d.name.toLowerCase(), d); target.push(d) } })
+    }
+
+    const addFlow = (fromId: string, toId: string, ip: InformationProduct) => {
+      if (!fromId || !toId || fromId === toId) return
+      const key = `${fromId}→${toId}`
+      let f = flowMap.get(key)
+      if (!f) { f = { from: fromId, to: toId, ips: [] }; flowMap.set(key, f) }
+      if (!f.ips.some(i => i.id === ip.id)) f.ips.push(ip)
+    }
+
+    // Walk every capability's inputs/outputs
+    hydrated.forEach(cap => {
+      const processingSys = cap.system
+      const capRaw = capMap.get(cap.id)
+      if (!capRaw) return
+
+      cap.inputs.forEach(inp => {
+        const lin = ensureLineage(inp.informationProduct)
+        addUnique(lin.consumedBy, capRaw)
+        inp.tags.forEach(t => addUnique(lin.tags, t))
+        mergeDims(lin.dimensions, inp.dimensions.map(d => ({ id: d.id, name: d.name, description: d.description })))
+        inp.supplierPersonas.forEach(p => addUnique(lin.supplierPersonas, p))
+        inp.sourceSystems.forEach(s => {
+          addUnique(lin.sourceSystems, s)
+          addUnique(ensureSystem(s).asSource, inp.informationProduct)
+        })
+        if (inp.feedingSystem) {
+          addUnique(lin.feedingSystems, inp.feedingSystem)
+          addUnique(ensureSystem(inp.feedingSystem).asFeeding, inp.informationProduct)
+        }
+        if (processingSys) {
+          addUnique(lin.processingSystems, processingSys)
+          const u = ensureSystem(processingSys)
+          let entry = u.asProcessing.find(e => e.capability.id === capRaw.id)
+          if (!entry) { entry = { capability: capRaw, ips: [] }; u.asProcessing.push(entry) }
+          if (!entry.ips.some(i => i.id === inp.informationProduct.id)) entry.ips.push(inp.informationProduct)
+        }
+
+        // Flows: source → feeding → processing
+        const chain = [
+          ...inp.sourceSystems.map(s => s.id),
+          inp.feedingSystem?.id,
+          processingSys?.id,
+        ].filter((x): x is string => !!x)
+        for (let i = 0; i < chain.length - 1; i++) {
+          addFlow(chain[i], chain[i + 1], inp.informationProduct)
+        }
+      })
+
+      cap.outputs.forEach(out => {
+        const lin = ensureLineage(out.informationProduct)
+        addUnique(lin.producedBy, capRaw)
+        // Pull tags from any input with same IP (outputs don't have their own tags schema)
+        const matchingInputTags = hydrated.flatMap(c => c.inputs.filter(i => i.information_product_id === out.information_product_id).flatMap(i => i.tags))
+        matchingInputTags.forEach(t => addUnique(lin.tags, t))
+        mergeDims(lin.dimensions, out.dimensions.map(d => ({ id: d.id, name: d.name, description: d.description })))
+        out.consumerPersonas.forEach(p => addUnique(lin.consumerPersonas, p))
+        out.destinationSystems.forEach(s => {
+          addUnique(lin.destinationSystems, s)
+          addUnique(ensureSystem(s).asDestination, out.informationProduct)
+        })
+        if (processingSys) {
+          addUnique(lin.processingSystems, processingSys)
+          const u = ensureSystem(processingSys)
+          let entry = u.asProcessing.find(e => e.capability.id === capRaw.id)
+          if (!entry) { entry = { capability: capRaw, ips: [] }; u.asProcessing.push(entry) }
+          if (!entry.ips.some(i => i.id === out.informationProduct.id)) entry.ips.push(out.informationProduct)
+        }
+
+        // Flows: processing → destinations
+        if (processingSys) {
+          out.destinationSystems.forEach(s => addFlow(processingSys.id, s.id, out.informationProduct))
+        }
+      })
+    })
+
+    const ipLineages = [...lineageMap.values()].sort((a, b) => a.ip.name.localeCompare(b.ip.name))
+    const systemUsage: Record<string, SystemUsage> = {}
+    systemUsageMap.forEach((v, k) => { systemUsage[k] = v })
+    const systems = [...systemUsageMap.values()].map(u => u.system).sort((a, b) => a.name.localeCompare(b.name))
+    const flows = [...flowMap.values()].sort((a, b) => b.ips.length - a.ips.length)
+
+    return { ipLineages, systemUsage, systems, flows }
   },
 }))

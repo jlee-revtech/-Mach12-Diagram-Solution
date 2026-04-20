@@ -46,10 +46,11 @@ function SystemChip({ system, small }: { system: LogicalSystem; small?: boolean 
   )
 }
 
-function IPCard({ name, category, dimensions, accent, onClick, showDims = true }: {
+function IPCard({ name, category, dimensions, tags, accent, onClick, showDims = true }: {
   name: string
   category?: string
   dimensions: Dimension[]
+  tags?: { id: string; name: string; color: string }[]
   accent: string
   onClick?: () => void
   showDims?: boolean
@@ -66,6 +67,15 @@ function IPCard({ name, category, dimensions, accent, onClick, showDims = true }
           <span className="inline-block mt-1 px-1.5 py-0.5 text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider rounded bg-[var(--m12-bg)]/80 text-[var(--m12-text-faint)]">
             {category}
           </span>
+        )}
+        {tags && tags.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-0.5">
+            {tags.map(t => (
+              <span key={t.id} className="inline-flex items-center rounded text-[8px] px-1 py-0 text-white leading-tight" style={{ backgroundColor: t.color }}>
+                {t.name}
+              </span>
+            ))}
+          </div>
         )}
       </div>
       {showDims && dimensions.length > 0 && (
@@ -178,6 +188,7 @@ function InputLane({ input, onRemove, onClickCard, showDims }: { input: Hydrated
           name={input.informationProduct.name}
           category={input.informationProduct.category}
           dimensions={input.dimensions || []}
+          tags={input.tags}
           accent={SIPOC.I.color}
           onClick={onClickCard}
           showDims={showDims}
@@ -220,6 +231,7 @@ function OutputLane({ output, onRemove, onClickCard, showDims }: { output: Hydra
           name={output.informationProduct.name}
           category={output.informationProduct.category}
           dimensions={output.dimensions || []}
+          tags={output.tags}
           accent={SIPOC.O.color}
           onClick={onClickCard}
           showDims={showDims}

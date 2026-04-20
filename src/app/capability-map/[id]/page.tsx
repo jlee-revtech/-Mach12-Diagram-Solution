@@ -10,6 +10,7 @@ import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
 import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import AIBulkLoadPanel from '@/components/sipoc/AIBulkLoadPanel'
+import DataArchitectureView from '@/components/sipoc/DataArchitectureView'
 import VersionBadge from '@/components/VersionBadge'
 import { useTheme } from '@/lib/theme-context'
 import { createCapabilityMapShare, listCapabilityMapShares, deleteCapabilityMapShare, type CapabilityMapShare } from '@/lib/supabase/capability-maps'
@@ -31,6 +32,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [editorOpen, setEditorOpen] = useState(false)
   const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
   const [showExecSummary, setShowExecSummary] = useState(false)
+  const [showDataArch, setShowDataArch] = useState(false)
   const [bulkLoadTarget, setBulkLoadTarget] = useState<{ id: string; name: string } | null>(null)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
@@ -235,6 +237,20 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
+        {/* Data Architecture button */}
+        <button
+          onClick={() => setShowDataArch(true)}
+          className="flex items-center gap-1.5 bg-gradient-to-r from-[#06B6D4]/20 to-[#2563EB]/20 border border-[#06B6D4]/30 hover:border-[#06B6D4]/50 text-[#06B6D4] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="0.5" y="0.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
+            <rect x="7.5" y="0.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
+            <rect x="4" y="7.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
+            <path d="M2.5 4.5v1.5M9.5 4.5v1.5M6 6v1.5M2.5 6h7" stroke="currentColor" strokeWidth="0.8" />
+          </svg>
+          Data Architecture
+        </button>
+
         {/* Executive summary button */}
         <button
           onClick={() => setShowExecSummary(true)}
@@ -303,6 +319,11 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
       {/* Executive Summary */}
       {showExecSummary && (
         <ExecutiveSummary onClose={() => setShowExecSummary(false)} />
+      )}
+
+      {/* Data & System Architecture */}
+      {showDataArch && (
+        <DataArchitectureView onClose={() => setShowDataArch(false)} />
       )}
 
       {/* AI Bulk Load Panel */}

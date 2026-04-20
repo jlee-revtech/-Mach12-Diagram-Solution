@@ -258,6 +258,7 @@ function OutputLane({ output, showDimensions }: {
           name={output.informationProduct.name}
           category={output.informationProduct.category}
           dimensions={output.dimensions}
+          tags={output.tags}
           showDimensions={showDimensions}
           accentColor="#10B981"
           itemId={output.id}

@@ -692,6 +692,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const removeOutput = useSIPOCStore(s => s.removeOutput)
   const updateOutputConsumers = useSIPOCStore(s => s.updateOutputConsumers)
   const updateOutputSystems = useSIPOCStore(s => s.updateOutputSystems)
+  const updateOutputTags = useSIPOCStore(s => s.updateOutputTags)
   const addInformationProduct = useSIPOCStore(s => s.addInformationProduct)
 
   const capability = capabilities.find(c => c.id === capabilityId)
@@ -1041,6 +1042,15 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   </button>
                 </div>
                 {expandedItems.has(output.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-[var(--m12-border)]/20 pt-2">
+                {/* Tags (reusable, org-scoped) */}
+                <div>
+                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Tags</div>
+                  <TagPicker
+                    selectedIds={output.tag_ids || []}
+                    onChange={ids => updateOutputTags(output.id, capabilityId, ids)}
+                    orgId={orgId}
+                  />
+                </div>
                 {/* Consumer personas */}
                 <div>
                   <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Consumers</div>
