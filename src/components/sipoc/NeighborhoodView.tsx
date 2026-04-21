@@ -20,7 +20,8 @@ function getSystemTypeLabel(s: LogicalSystem): string {
 // ─── Arc layout: arrange nodes along a semicircle ───────
 function arcPositions(count: number, side: 'left' | 'right', centerX: number, centerY: number, radius: number) {
   if (count === 0) return []
-  const angleSpread = Math.min(Math.PI * 0.85, Math.PI * 0.25 + count * 0.08)
+  // Wider angular spread + more per-node spacing for readability
+  const angleSpread = Math.min(Math.PI * 1.1, Math.PI * 0.35 + count * 0.12)
   const startAngle = side === 'left' ? Math.PI - angleSpread / 2 : -angleSpread / 2
   const step = count === 1 ? 0 : angleSpread / (count - 1)
   return Array.from({ length: count }, (_, i) => {
@@ -132,7 +133,9 @@ export default function NeighborhoodView() {
   const centerY = 450
   const nodeW = 170
   const nodeH = 56
-  const radius = Math.max(260, Math.max(neighborhood.upstream.length, neighborhood.downstream.length) * 30)
+  // Radius grows with neighbor count so each node has ~150px of arc space
+  const maxNeighbors = Math.max(neighborhood.upstream.length, neighborhood.downstream.length)
+  const radius = Math.max(340, maxNeighbors * 48)
 
   const upstreamArc = useMemo(() =>
     arcPositions(neighborhood.upstream.length, 'left', centerX, centerY, radius),
