@@ -114,18 +114,37 @@ export default function NeighborhoodView() {
   const selected = network.systems.find(s => s.id === selectedId) || null
 
   // Compute neighborhood for selected system
+  // Bidirectional neighbors (systems that are both upstream and downstream) are
+  // deduped — shown once, but with BOTH edges rendered (offset so arrows are visible).
   const neighborhood = useMemo(() => {
-    if (!selected) return { upstream: [], downstream: [] }
-    const upstream = new Map<string, SystemEdge>()
-    const downstream = new Map<string, SystemEdge>()
+    if (!selected) return { upstream: [], downstream: [], bidirectional: new Set<string>() }
+    const upstreamMap = new Map<string, SystemEdge>()
+    const downstreamMap = new Map<string, SystemEdge>()
     network.edges.forEach(e => {
-      if (e.to === selected.id) upstream.set(e.from, e)
-      if (e.from === selected.id) downstream.set(e.to, e)
+      if (e.to === selected.id) upstreamMap.set(e.from, e)
+      if (e.from === selected.id) downstreamMap.set(e.to, e)
     })
-    return {
-      upstream: [...upstream.values()].map(e => ({ edge: e, system: network.systems.find(s => s.id === e.from)! })).filter(x => x.system),
-      downstream: [...downstream.values()].map(e => ({ edge: e, system: network.systems.find(s => s.id === e.to)! })).filter(x => x.system),
-    }
+    const bidirectional = new Set<string>()
+    upstreamMap.forEach((_, id) => { if (downstreamMap.has(id)) bidirectional.add(id) })
+
+    // Upstream entries include bidirectional (we'll render the bidir edge here too).
+    // Downstream entries SKIP bidirectional to avoid double-rendering the node.
+    const upstream = [...upstreamMap.values()].map(e => {
+      const system = network.systems.find(s => s.id === e.from)!
+      return {
+        edge: e,
+        system,
+        // If bidirectional, also carry the "back" edge (focused → this system)
+        backEdge: bidirectional.has(e.from) ? downstreamMap.get(e.from) : undefined,
+      }
+    }).filter(x => x.system)
+
+    const downstream = [...downstreamMap.values()]
+      .filter(e => !bidirectional.has(e.to)) // skip bidirectional (rendered on upstream side)
+      .map(e => ({ edge: e, system: network.systems.find(s => s.id === e.to)! }))
+      .filter(x => x.system)
+
+    return { upstream, downstream, bidirectional }
   }, [selected, network])
 
   // Canvas layout
@@ -294,7 +313,10 @@ export default function NeighborhoodView() {
               </div>
               <div className="h-5 w-px bg-[var(--m12-border)]/40" />
               <div className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-                {neighborhood.upstream.length} UPSTREAM · {neighborhood.downstream.length} DOWNSTREAM
+                {neighborhood.upstream.length - neighborhood.bidirectional.size} UPSTREAM
+                {' · '}
+                {neighborhood.downstream.length} DOWNSTREAM
+                {neighborhood.bidirectional.size > 0 && <> · <span className="text-[#C4B5FD]">{neighborhood.bidirectional.size} BIDIRECTIONAL</span></>}
               </div>
             </>
           ) : (
@@ -387,24 +409,45 @@ export default function NeighborhoodView() {
 
               {/* Zoom + pan transform wrapper */}
               <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-                {/* Edges: upstream → center */}
+                {/* Edges: upstream → center (+ back edge for bidirectional) */}
                 {neighborhood.upstream.map((n, i) => {
                   const pos = upstreamPos[i]
                   const key = `u-${n.edge.from}`
                   const emphasized = hoveredEdge === key
                   const color = getSystemColor(n.system)
+                  const isBidir = !!n.backEdge
+                  // For bidirectional: offset Y so incoming + outgoing don't overlap
+                  const yOffset = isBidir ? 14 : 0
                   const x1 = pos.x + nodeW / 2
-                  const y1 = pos.y
+                  const y1in = pos.y - yOffset        // neighbor → focused attaches at upper right of neighbor
                   const x2 = centerPos.x - nodeW / 2
-                  const y2 = centerPos.y
-                  // Position label ~65% from the neighbor toward center so it tracks with each neighbor's arc position
+                  const y2in = centerPos.y - yOffset  // and upper left of focused
                   const lx = x1 + (x2 - x1) * 0.35
-                  const ly = y1 + (y2 - y1) * 0.35
+                  const ly = y1in + (y2in - y1in) * 0.35
                   return (
                     <g key={key} style={{ color }}>
-                      <path d={bezierTo(x1, y1, x2, y2)} stroke={color} strokeWidth={emphasized ? 3 : 2} fill="none" opacity={emphasized ? 1 : 0.6} markerEnd="url(#nb-arrow)" />
-                      <path d={bezierTo(x1, y1, x2, y2)} stroke="transparent" strokeWidth={18} fill="none" style={{ cursor: 'pointer' }} onMouseEnter={() => setHoveredEdge(key)} onMouseLeave={() => setHoveredEdge(null)} />
+                      {/* Incoming: neighbor → focused */}
+                      <path d={bezierTo(x1, y1in, x2, y2in)} stroke={color} strokeWidth={emphasized ? 3 : 2} fill="none" opacity={emphasized ? 1 : 0.6} markerEnd="url(#nb-arrow)" />
+                      <path d={bezierTo(x1, y1in, x2, y2in)} stroke="transparent" strokeWidth={18} fill="none" style={{ cursor: 'pointer' }} onMouseEnter={() => setHoveredEdge(key)} onMouseLeave={() => setHoveredEdge(null)} />
                       <EdgeLabel edge={n.edge} x={lx} y={ly} showIps={showIps} emphasized={emphasized} />
+
+                      {/* Back edge (bidirectional): focused → neighbor */}
+                      {isBidir && n.backEdge && (() => {
+                        const backKey = `b-${n.edge.from}`
+                        const backEmph = hoveredEdge === backKey
+                        const focusedColor = getSystemColor(selected)
+                        const y1out = pos.y + yOffset
+                        const y2out = centerPos.y + yOffset
+                        const blx = x1 + (x2 - x1) * 0.35
+                        const bly = y1out + (y2out - y1out) * 0.35
+                        return (
+                          <g style={{ color: focusedColor }}>
+                            <path d={bezierTo(x2, y2out, x1, y1out)} stroke={focusedColor} strokeWidth={backEmph ? 3 : 2} fill="none" opacity={backEmph ? 1 : 0.6} markerEnd="url(#nb-arrow)" strokeDasharray={backEmph ? undefined : '4 3'} />
+                            <path d={bezierTo(x2, y2out, x1, y1out)} stroke="transparent" strokeWidth={18} fill="none" style={{ cursor: 'pointer' }} onMouseEnter={() => setHoveredEdge(backKey)} onMouseLeave={() => setHoveredEdge(null)} />
+                            <EdgeLabel edge={n.backEdge} x={blx} y={bly} showIps={showIps} emphasized={backEmph} />
+                          </g>
+                        )
+                      })()}
                     </g>
                   )
                 })}
@@ -440,6 +483,7 @@ export default function NeighborhoodView() {
                       y={pos.y - nodeH / 2}
                       w={nodeW}
                       h={nodeH}
+                      bidirectional={!!n.backEdge}
                       onClick={() => { if (!dragMovedRef.current) setSelectedId(n.system.id) }}
                       onMouseDown={(e) => handleNodeMouseDown(n.system.id, pos.x, pos.y, e)}
                     />
@@ -481,10 +525,11 @@ export default function NeighborhoodView() {
 }
 
 // ─── System node ────────────────────────────────────────
-function SystemNode({ system, x, y, w, h, focused, onClick, onMouseDown }: {
+function SystemNode({ system, x, y, w, h, focused, bidirectional, onClick, onMouseDown }: {
   system: LogicalSystem
   x: number; y: number; w: number; h: number
   focused?: boolean
+  bidirectional?: boolean
   onClick?: () => void
   onMouseDown?: (e: React.MouseEvent) => void
 }) {
@@ -532,6 +577,12 @@ function SystemNode({ system, x, y, w, h, focused, onClick, onMouseDown }: {
         <text x="14" y="50" fontSize="7" fill="#2563EB" fontWeight="700" fontFamily="monospace" letterSpacing="1">
           FOCUSED
         </text>
+      )}
+      {bidirectional && (
+        <g transform={`translate(${w - 22}, 6)`}>
+          <rect width="16" height="14" rx="3" fill="#8B5CF6" />
+          <text x="8" y="10" fontSize="8" fontWeight="700" fill="#fff" textAnchor="middle">⇄</text>
+        </g>
       )}
     </g>
   )
