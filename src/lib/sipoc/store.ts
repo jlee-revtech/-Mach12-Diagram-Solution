@@ -12,6 +12,7 @@ import type {
   Dimension,
   CapabilityTreeNode,
   Tag,
+  SystemDataElement,
 } from './types'
 import * as api from '@/lib/supabase/capability-maps'
 
@@ -87,7 +88,7 @@ interface SIPOCState {
   removePersona: (id: string) => Promise<void>
 
   addInformationProduct: (orgId: string, data: { name: string; description?: string; category?: string }) => Promise<InformationProduct>
-  updateInformationProduct: (id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category'>>) => Promise<void>
+  updateInformationProduct: (id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category' | 'data_element_ids'>>) => Promise<void>
   removeInformationProduct: (id: string) => Promise<void>
 
   addLogicalSystem: (orgId: string, data: { name: string; system_type?: string; color?: string }) => Promise<LogicalSystem>
@@ -97,6 +98,10 @@ interface SIPOCState {
   addTag: (orgId: string, data: { name: string; color?: string; description?: string }) => Promise<Tag>
   updateTag: (id: string, updates: Partial<Pick<Tag, 'name' | 'color' | 'description'>>) => Promise<void>
   removeTag: (id: string) => Promise<void>
+
+  systemDataElements: SystemDataElement[]
+  addSystemDataElement: (orgId: string, data: { name: string; description?: string }) => Promise<SystemDataElement>
+  removeSystemDataElement: (id: string) => Promise<void>
 
   // ─── Entity editing UI ────────────────────────────────
   setEditingEntity: (type: 'persona' | 'informationProduct' | 'logicalSystem' | null, id: string | null) => void
@@ -167,6 +172,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   informationProducts: [],
   logicalSystems: [],
   tags: [],
+  systemDataElements: [],
   capabilities: [],
   inputs: {},
   outputs: {},
@@ -206,13 +212,14 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   loadOrgEntities: async (orgId) => {
-    const [personas, informationProducts, logicalSystems, tags] = await Promise.all([
+    const [personas, informationProducts, logicalSystems, tags, systemDataElements] = await Promise.all([
       api.listPersonas(orgId),
       api.listInformationProducts(orgId),
       api.listLogicalSystems(orgId),
       api.listTags(orgId),
+      api.listSystemDataElements(orgId),
     ])
-    set({ personas, informationProducts, logicalSystems, tags })
+    set({ personas, informationProducts, logicalSystems, tags, systemDataElements })
   },
 
   // ─── Capability map meta ──────────────────────────────
@@ -571,6 +578,22 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       }))
     }
     set({ tags, inputs })
+  },
+
+  addSystemDataElement: async (orgId, data) => {
+    const sde = await api.createSystemDataElement(orgId, data)
+    set({ systemDataElements: [...get().systemDataElements, sde] })
+    return sde
+  },
+
+  removeSystemDataElement: async (id) => {
+    await api.deleteSystemDataElement(id)
+    const systemDataElements = get().systemDataElements.filter(s => s.id !== id)
+    const informationProducts = get().informationProducts.map(ip => ({
+      ...ip,
+      data_element_ids: (ip.data_element_ids || []).filter(did => did !== id),
+    }))
+    set({ systemDataElements, informationProducts })
   },
 
   // ─── Entity editing UI ────────────────────────────────

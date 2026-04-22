@@ -19,6 +19,17 @@ export interface InformationProduct {
   name: string
   description?: string
   category?: string
+  data_element_ids?: string[]
+  created_at: string
+  updated_at: string
+}
+
+// ─── System Data Elements (org-scoped, reusable on IPs) ─
+export interface SystemDataElement {
+  id: string
+  organization_id: string
+  name: string
+  description?: string
   created_at: string
   updated_at: string
 }

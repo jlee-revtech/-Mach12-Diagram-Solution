@@ -405,6 +405,121 @@ function TagPicker({
   )
 }
 
+// ─── System Data Element Picker (reusable on IPs) ──────
+function SystemDataElementPicker({
+  selectedIds,
+  onChange,
+  orgId,
+}: {
+  selectedIds: string[]
+  onChange: (ids: string[]) => void
+  orgId: string
+}) {
+  const elements = useSIPOCStore(s => s.systemDataElements)
+  const addElement = useSIPOCStore(s => s.addSystemDataElement)
+  const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 0)
+  }, [open])
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const selected = elements.filter(e => selectedIds.includes(e.id))
+  const filtered = filter
+    ? elements.filter(e => e.name.toLowerCase().includes(filter.toLowerCase()))
+    : elements
+  const toggle = (id: string) =>
+    onChange(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id])
+
+  const canCreate = filter.trim().length > 0 && !elements.some(e => e.name.toLowerCase() === filter.trim().toLowerCase())
+  const handleCreate = async () => {
+    const name = filter.trim()
+    if (!name) return
+    const el = await addElement(orgId, { name })
+    onChange([...selectedIds, el.id])
+    setFilter('')
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-1 min-h-[24px] bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-1.5 py-0.5 text-left hover:border-[var(--m12-border)]/60 transition-colors"
+      >
+        {selected.length > 0 ? (
+          <div className="flex flex-wrap gap-0.5 flex-1">
+            {selected.map(e => (
+              <span key={e.id} className="inline-flex items-center gap-1 rounded text-[9px] px-1.5 py-0 bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30">
+                {e.name}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-[10px] text-[var(--m12-text-faint)] flex-1">+ Add data element</span>
+        )}
+        <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}>
+          <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden min-w-[220px] w-max max-w-[340px]">
+          <div className="p-1.5 border-b border-[var(--m12-border)]/20">
+            <input
+              ref={searchRef}
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && canCreate) { e.preventDefault(); handleCreate() } }}
+              placeholder="Search or type to create..."
+              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-md px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#06B6D4]/50"
+            />
+          </div>
+          <div className="max-h-[180px] overflow-y-auto">
+            {filtered.length > 0 ? filtered.map(e => {
+              const isSelected = selectedIds.includes(e.id)
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => toggle(e.id)}
+                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${isSelected ? 'bg-[#06B6D4]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'}`}
+                >
+                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#06B6D4] border-[#06B6D4]' : 'border-[var(--m12-border)]'}`}>
+                    {isSelected && (
+                      <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                        <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="flex-1">{e.name}</span>
+                </button>
+              )
+            }) : (
+              <div className="px-2.5 py-3 text-[10px] text-[var(--m12-text-faint)] text-center italic">No data elements yet</div>
+            )}
+          </div>
+          {canCreate && (
+            <button
+              onClick={handleCreate}
+              className="w-full text-left px-2.5 py-1.5 text-[10px] text-[#06B6D4] hover:bg-[#06B6D4]/10 border-t border-[var(--m12-border)]/20 transition-colors"
+            >
+              + Create data element &quot;{filter.trim()}&quot;
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Dimensions Editor (detail attributes on an input/output) ──
 function DimensionsEditor({
   dimensions,
@@ -1076,6 +1191,20 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   capabilityId={capabilityId}
                   orgId={orgId}
                 />
+                {/* System Data Elements (on the IP, reusable across IPs) */}
+                {ip && (
+                  <div>
+                    <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                      System Data Elements
+                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(on this info product)</span>
+                    </div>
+                    <SystemDataElementPicker
+                      selectedIds={ip.data_element_ids || []}
+                      onChange={ids => updateInformationProduct(ip.id, { data_element_ids: ids })}
+                      orgId={orgId}
+                    />
+                  </div>
+                )}
                 </div>}
               </div>
             )
@@ -1229,6 +1358,20 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   capabilityId={capabilityId}
                   orgId={orgId}
                 />
+                {/* System Data Elements (on the IP, reusable across IPs) */}
+                {ip && (
+                  <div>
+                    <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                      System Data Elements
+                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(on this info product)</span>
+                    </div>
+                    <SystemDataElementPicker
+                      selectedIds={ip.data_element_ids || []}
+                      onChange={ids => updateInformationProduct(ip.id, { data_element_ids: ids })}
+                      orgId={orgId}
+                    />
+                  </div>
+                )}
                 </div>}
               </div>
             )

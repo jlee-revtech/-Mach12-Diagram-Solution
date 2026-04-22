@@ -8,6 +8,7 @@ import type {
   LogicalSystem,
   CapabilityTemplateRow,
   Tag,
+  SystemDataElement,
 } from '@/lib/sipoc/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -358,7 +359,7 @@ export async function createInformationProduct(orgId: string, data: { name: stri
   return Array.isArray(arr) ? arr[0] : arr
 }
 
-export async function updateInformationProduct(id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category'>>): Promise<void> {
+export async function updateInformationProduct(id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category' | 'data_element_ids'>>): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/information_products?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
@@ -468,6 +469,39 @@ export async function deleteTag(id: string): Promise<void> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.message || 'Failed to delete tag')
+  }
+}
+
+// ─── System Data Elements (org-scoped) ─────────────────
+
+export async function listSystemDataElements(orgId: string): Promise<SystemDataElement[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/system_data_elements?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function createSystemDataElement(orgId: string, data: { name: string; description?: string }): Promise<SystemDataElement> {
+  const res = await fetch(`${URL}/rest/v1/system_data_elements`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ organization_id: orgId, ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create system data element')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function deleteSystemDataElement(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/system_data_elements?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to delete system data element')
   }
 }
 
