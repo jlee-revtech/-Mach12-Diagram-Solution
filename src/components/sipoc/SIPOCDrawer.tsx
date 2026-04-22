@@ -273,8 +273,11 @@ function OutputLane({ output, onRemove, onClickCard, showDims }: { output: Hydra
 
 function ProcessColumn({ capability, inputs, outputs }: { capability: HydratedCapability; inputs: HydratedCapability['inputs']; outputs: HydratedCapability['outputs'] }) {
   const [featuresExpanded, setFeaturesExpanded] = useState(false)
+  const [useCasesExpanded, setUseCasesExpanded] = useState(false)
   const features = capability.features || []
   const hasFeatures = features.length > 0
+  const useCases = capability.use_cases || []
+  const hasUseCases = useCases.length > 0
 
   return (
     <div className="w-[220px] shrink-0 flex flex-col border-l border-r border-[var(--m12-border)]/10 overflow-y-auto" style={{ background: SIPOC.P.bg }}>
@@ -317,6 +320,33 @@ function ProcessColumn({ capability, inputs, outputs }: { capability: HydratedCa
                   <div key={i} className="flex items-start gap-1.5 text-[9px] text-[var(--m12-text-secondary)] leading-snug">
                     <span className="text-[#2563EB]/40 mt-px shrink-0">•</span>
                     <span>{feat}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Use Cases — collapsible card */}
+        {hasUseCases && (
+          <div className="w-full">
+            <button
+              onClick={() => setUseCasesExpanded(e => !e)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-[#2563EB]/5 border border-[#2563EB]/15 hover:border-[#2563EB]/30 transition-colors group"
+            >
+              <span className="text-[8px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider text-[#2563EB]/70">
+                {useCases.length} Use Case{useCases.length !== 1 ? 's' : ''}
+              </span>
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`text-[#2563EB]/50 transition-transform ${useCasesExpanded ? 'rotate-180' : ''}`}>
+                <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {useCasesExpanded && (
+              <div className="mt-1.5 px-1 space-y-1 max-h-[300px] overflow-y-auto">
+                {useCases.map((uc, i) => (
+                  <div key={i} className="flex items-start gap-1.5 text-[9px] text-[var(--m12-text-secondary)] leading-snug">
+                    <span className="text-[#2563EB]/40 mt-px shrink-0">•</span>
+                    <span>{uc}</span>
                   </div>
                 ))}
               </div>
