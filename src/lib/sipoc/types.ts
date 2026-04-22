@@ -57,6 +57,8 @@ export interface Capability {
   name: string
   description?: string
   features?: string[]
+  use_cases?: string[]
+  depends_on_capability_ids?: string[]
   color?: string | null        // accent color for L1/L2 groupings
   system_id?: string | null
   sort_order: number

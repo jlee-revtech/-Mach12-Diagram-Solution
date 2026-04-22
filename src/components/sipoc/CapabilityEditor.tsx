@@ -779,6 +779,78 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
             Add feature
           </button>
         </div>
+
+        {/* Use Cases */}
+        <div className="space-y-1.5">
+          <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
+            Use Cases
+            <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(scenarios where this capability is applied)</span>
+          </div>
+          {(capability.use_cases || []).map((uc, i) => (
+            <div key={i} className="flex items-center gap-1.5 group/uc">
+              <span className="text-[var(--m12-text-faint)] text-[9px] shrink-0">•</span>
+              <input
+                value={uc}
+                onChange={e => {
+                  const updated = [...(capability.use_cases || [])]
+                  updated[i] = e.target.value
+                  updateCapability(capabilityId, { use_cases: updated })
+                }}
+                className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+              />
+              <button
+                onClick={() => {
+                  const updated = (capability.use_cases || []).filter((_, j) => j !== i)
+                  updateCapability(capabilityId, { use_cases: updated })
+                }}
+                className="w-5 h-5 rounded flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/uc:opacity-100"
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => {
+              const updated = [...(capability.use_cases || []), '']
+              updateCapability(capabilityId, { use_cases: updated })
+            }}
+            className="text-[9px] text-[#2563EB] hover:text-[#3B82F6] font-medium transition-colors flex items-center gap-1"
+          >
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <path d="M4 1v6M1 4h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            Add use case
+          </button>
+        </div>
+
+        {/* Dependencies (other L3 capabilities this one depends on) */}
+        <div className="space-y-1.5">
+          <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
+            Dependencies
+            <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(other L3s this capability depends on)</span>
+          </div>
+          {(() => {
+            const allL3s = capabilities.filter(c => c.level === 3 && c.id !== capabilityId)
+            const selectedIds = capability.depends_on_capability_ids || []
+            // Build "Parent L2 name / L3 name" label map for clarity
+            const capById = new Map(capabilities.map(c => [c.id, c]))
+            const labelFor = (c: typeof allL3s[0]) => {
+              const parent = c.parent_id ? capById.get(c.parent_id) : null
+              return parent ? `${parent.name} / ${c.name}` : c.name
+            }
+            return (
+              <MultiSelect
+                items={allL3s.map(c => ({ id: c.id, name: labelFor(c) }))}
+                selectedIds={selectedIds}
+                onChange={ids => updateCapability(capabilityId, { depends_on_capability_ids: ids })}
+                emptyLabel="No other L3 capabilities to depend on"
+                placeholder="Select dependencies..."
+              />
+            )
+          })()}
+        </div>
       </div>
 
       {/* System (where this capability is performed) */}
@@ -1653,31 +1725,54 @@ export default function CapabilityEditor({ orgId }: { orgId: string }) {
   const capabilities = useSIPOCStore(s => s.capabilities)
 
   const [sidebarMode, setSidebarMode] = useState<'detail' | 'entities'>('detail')
+  const [fullscreen, setFullscreen] = useState(false)
 
   return (
-    <div className="w-[380px] shrink-0 bg-[var(--m12-bg-card)] border-l border-[var(--m12-border)]/40 flex flex-col h-full overflow-hidden">
+    <div className={
+      fullscreen
+        ? 'fixed inset-0 z-40 bg-[var(--m12-bg-card)] flex flex-col overflow-hidden'
+        : 'w-[380px] shrink-0 bg-[var(--m12-bg-card)] border-l border-[var(--m12-border)]/40 flex flex-col h-full overflow-hidden'
+    }>
       {/* Sidebar header */}
       <div className="px-4 py-3 border-b border-[var(--m12-border)]/40">
-        <div className="flex gap-1 mb-3">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex gap-1 flex-1">
+            <button
+              onClick={() => setSidebarMode('detail')}
+              className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 rounded-md transition-colors ${
+                sidebarMode === 'detail'
+                  ? 'bg-[#2563EB]/10 text-[#93C5FD]'
+                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+              }`}
+            >
+              Capability
+            </button>
+            <button
+              onClick={() => setSidebarMode('entities')}
+              className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 rounded-md transition-colors ${
+                sidebarMode === 'entities'
+                  ? 'bg-[#2563EB]/10 text-[#93C5FD]'
+                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+              }`}
+            >
+              Entity Pool
+            </button>
+          </div>
           <button
-            onClick={() => setSidebarMode('detail')}
-            className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 rounded-md transition-colors ${
-              sidebarMode === 'detail'
-                ? 'bg-[#2563EB]/10 text-[#93C5FD]'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
+            onClick={() => setFullscreen(f => !f)}
+            title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors border border-[var(--m12-border)]/40"
           >
-            Capability
-          </button>
-          <button
-            onClick={() => setSidebarMode('entities')}
-            className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 rounded-md transition-colors ${
-              sidebarMode === 'entities'
-                ? 'bg-[#2563EB]/10 text-[#93C5FD]'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
-          >
-            Entity Pool
+            {fullscreen ? (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M4.5 1v3.5H1M7.5 11V7.5H11M1 7.5h3.5V11M11 4.5H7.5V1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1 4V1h3M11 4V1H8M1 8v3h3M11 8v3H8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
           </button>
         </div>
       </div>

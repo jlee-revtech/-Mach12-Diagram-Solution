@@ -150,7 +150,7 @@ export async function createCapability(
   return Array.isArray(arr) ? arr[0] : arr
 }
 
-export async function updateCapability(id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'sort_order' | 'parent_id' | 'level' | 'color' | 'features'>>): Promise<void> {
+export async function updateCapability(id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'sort_order' | 'parent_id' | 'level' | 'color' | 'features' | 'use_cases' | 'depends_on_capability_ids'>>): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/capabilities?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
