@@ -248,12 +248,12 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   updateCapability: async (id, updates) => {
-    await api.updateCapability(id, updates)
     set({
       capabilities: get().capabilities.map(c =>
         c.id === id ? { ...c, ...updates } : c
       ),
     })
+    await api.updateCapability(id, updates)
   },
 
   removeCapability: async (id) => {
@@ -315,13 +315,13 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   removeInput: async (inputId, capabilityId) => {
-    await api.deleteCapabilityInput(inputId)
     set({
       inputs: {
         ...get().inputs,
         [capabilityId]: (get().inputs[capabilityId] || []).filter(i => i.id !== inputId),
       },
     })
+    await api.deleteCapabilityInput(inputId)
   },
 
   updateInputSuppliers: async (inputId, capabilityId, personaIds) => {
@@ -412,13 +412,13 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   removeOutput: async (outputId, capabilityId) => {
-    await api.deleteCapabilityOutput(outputId)
     set({
       outputs: {
         ...get().outputs,
         [capabilityId]: (get().outputs[capabilityId] || []).filter(o => o.id !== outputId),
       },
     })
+    await api.deleteCapabilityOutput(outputId)
   },
 
   updateOutputConsumers: async (outputId, capabilityId, personaIds) => {
@@ -522,8 +522,8 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   updateInformationProduct: async (id, updates) => {
-    await api.updateInformationProduct(id, updates)
     set({ informationProducts: get().informationProducts.map(ip => ip.id === id ? { ...ip, ...updates } : ip) })
+    await api.updateInformationProduct(id, updates)
   },
 
   removeInformationProduct: async (id) => {

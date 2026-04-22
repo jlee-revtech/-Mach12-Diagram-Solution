@@ -694,6 +694,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const updateOutputSystems = useSIPOCStore(s => s.updateOutputSystems)
   const updateOutputTags = useSIPOCStore(s => s.updateOutputTags)
   const addInformationProduct = useSIPOCStore(s => s.addInformationProduct)
+  const updateInformationProduct = useSIPOCStore(s => s.updateInformationProduct)
 
   const capability = capabilities.find(c => c.id === capabilityId)
   const getRollup = useSIPOCStore(s => s.getRollup)
@@ -912,7 +913,16 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <div className="w-1 h-3 rounded-full bg-[#EAB308]/60 shrink-0" />
-                  <span className="text-xs font-medium text-[var(--m12-text)] flex-1 truncate">{ip?.name || '(deleted)'}</span>
+                  {ip ? (
+                    <input
+                      value={ip.name}
+                      onChange={e => updateInformationProduct(ip.id, { name: e.target.value })}
+                      onClick={e => e.stopPropagation()}
+                      className="text-xs font-medium text-[var(--m12-text)] flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-[var(--m12-border)]/40 focus:border-[#2563EB] focus:outline-none truncate"
+                    />
+                  ) : (
+                    <span className="text-xs font-medium italic text-[var(--m12-text-muted)] flex-1 truncate">(deleted)</span>
+                  )}
                   <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
                     {input.supplier_persona_ids.length}s {input.source_system_ids.length}sys {(input.dimensions || []).length}d
                   </span>
@@ -1100,7 +1110,16 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <div className="w-1 h-3 rounded-full bg-[#10B981]/60 shrink-0" />
-                  <span className="text-xs font-medium text-[var(--m12-text)] flex-1 truncate">{ip?.name || '(deleted)'}</span>
+                  {ip ? (
+                    <input
+                      value={ip.name}
+                      onChange={e => updateInformationProduct(ip.id, { name: e.target.value })}
+                      onClick={e => e.stopPropagation()}
+                      className="text-xs font-medium text-[var(--m12-text)] flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-[var(--m12-border)]/40 focus:border-[#2563EB] focus:outline-none truncate"
+                    />
+                  ) : (
+                    <span className="text-xs font-medium italic text-[var(--m12-text-muted)] flex-1 truncate">(deleted)</span>
+                  )}
                   <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
                     {output.consumer_persona_ids.length}c {(output.destination_system_ids || []).length}sys {(output.dimensions || []).length}d
                   </span>

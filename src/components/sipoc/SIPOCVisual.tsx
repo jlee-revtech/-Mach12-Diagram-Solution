@@ -369,6 +369,11 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
                 {capability.features!.length} feature{capability.features!.length !== 1 ? 's' : ''}
               </div>
             )}
+            {(capability.use_cases || []).length > 0 && (
+              <div className="mt-1 text-[8px] font-[family-name:var(--font-space-mono)] text-[#2563EB]/60 font-bold uppercase tracking-wider">
+                {capability.use_cases!.length} use case{capability.use_cases!.length !== 1 ? 's' : ''}
+              </div>
+            )}
             {capability.system && (
               <div className="mt-2 flex items-center justify-center gap-1.5">
                 <div className="w-2 h-2 rounded shrink-0" style={{ backgroundColor: capability.system.color || '#64748B' }} />
