@@ -349,6 +349,8 @@ When generating SIPOC data, think about:
 async function handleSIPOCGenerate(prompt: string, context?: {
   capabilityName?: string
   capabilityDescription?: string
+  capabilityFeatures?: string[]
+  capabilityUseCases?: string[]
   existingPersonas?: string[]
   existingInformationProducts?: string[]
   existingLogicalSystems?: string[]
@@ -367,6 +369,8 @@ async function handleSIPOCGenerate(prompt: string, context?: {
   }[]
 }) {
   const hasExistingData = (context?.currentInputs?.length || 0) > 0 || (context?.currentOutputs?.length || 0) > 0
+  const existingFeatures = context?.capabilityFeatures || []
+  const existingUseCases = context?.capabilityUseCases || []
 
   const entitiesBlock = context ? `
 EXISTING ORG ENTITIES (reuse these names when applicable):
@@ -374,7 +378,9 @@ EXISTING ORG ENTITIES (reuse these names when applicable):
 - Information Products already defined: ${(context.existingInformationProducts || []).join(', ') || 'None'}
 - Logical Systems already defined: ${(context.existingLogicalSystems || []).join(', ') || 'None'}
 ${context.capabilityName ? `\nCapability being modeled: ${context.capabilityName}` : ''}
-${context.capabilityDescription ? `Description: ${context.capabilityDescription}` : ''}` : ''
+${context.capabilityDescription ? `Description: ${context.capabilityDescription}` : ''}
+${existingFeatures.length > 0 ? `\nExisting features on this L3 (DO NOT re-suggest these):\n${existingFeatures.map(f => `- ${f}`).join('\n')}` : ''}
+${existingUseCases.length > 0 ? `\nExisting use cases on this L3 (DO NOT re-suggest these):\n${existingUseCases.map(u => `- ${u}`).join('\n')}` : ''}` : ''
 
   const currentDataBlock = hasExistingData ? `
 CURRENT CAPABILITY DATA (already configured — analyze for gaps and enhancements):
@@ -444,6 +450,12 @@ Return this exact JSON structure:
         { "name": "Dimension/attribute name" }
       ]
     }
+  ],
+  "features": [
+    "Short noun-phrase describing a sub-capability or distinct function this L3 performs"
+  ],
+  "use_cases": [
+    "Concrete business scenario where this L3 is exercised end-to-end, phrased as a short user-story-style sentence"
   ]
 }
 
@@ -455,6 +467,13 @@ Guidelines:
 - Reuse existing entity names from the org context when they match
 - Dimensions should represent the key data fields or measures within the information product
 - For enhancements: only include the NEW suppliers, systems, consumers, or dimensions being added — not what already exists
+
+Features vs Use Cases:
+- FEATURES are the distinct sub-capabilities or functions the L3 performs (e.g., "Labor rate escalation modeling", "Fringe pool allocation", "Bid & proposal rate development"). 4-8 features typically.
+- USE CASES are concrete scenarios describing how a persona uses this L3 to accomplish a goal (e.g., "Rates Manager develops forward pricing rates for an upcoming IDIQ bid", "Finance locks annual provisional billing rates for DCAA submission"). 3-6 use cases typically.
+- Both are plain strings — no objects, no nesting.
+- Do NOT repeat any of the existing features or use cases listed in the context. Only return NEW additions.
+- If the existing set already looks complete for this L3, return an empty array for that field rather than padding.
 
 No markdown, no explanation, just the JSON object.`,
       },

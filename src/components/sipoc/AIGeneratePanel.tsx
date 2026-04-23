@@ -27,6 +27,8 @@ interface AISuggestionOutput {
 interface AISuggestion {
   inputs: AISuggestionInput[]
   outputs: AISuggestionOutput[]
+  features?: string[]
+  use_cases?: string[]
 }
 
 // ─── Selection state ────────────────────────────────────
@@ -42,6 +44,8 @@ interface SelectionState {
     dimensions: Record<number, boolean>
     personas: Record<number, boolean>
   }>
+  features: Record<number, boolean>
+  useCases: Record<number, boolean>
 }
 
 function initSelection(suggestion: AISuggestion): SelectionState {
@@ -62,7 +66,9 @@ function initSelection(suggestion: AISuggestion): SelectionState {
       personas: Object.fromEntries(out.consumerPersonas.map((_, pi) => [pi, true])),
     }
   })
-  return { inputs, outputs }
+  const features = Object.fromEntries((suggestion.features || []).map((_, i) => [i, true]))
+  const useCases = Object.fromEntries((suggestion.use_cases || []).map((_, i) => [i, true]))
+  return { inputs, outputs, features, useCases }
 }
 
 // ─── Checkbox component ─────────────────────────────────
@@ -135,6 +141,7 @@ export default function AIGeneratePanel({
           context: {
             capabilityName: capability?.name,
             capabilityFeatures: capability?.features || [],
+            capabilityUseCases: capability?.use_cases || [],
             existingPersonas: personas.map(p => p.name),
             existingInformationProducts: informationProducts.map(ip => ip.name),
             existingLogicalSystems: logicalSystems.map(s => s.name),
@@ -316,6 +323,42 @@ export default function AIGeneratePanel({
         }
       }
 
+      // Merge selected features and use cases into the capability
+      const cap = store.capabilities.find(c => c.id === capabilityId)
+      if (cap) {
+        const selectedFeatures = (suggestion.features || [])
+          .filter((_, i) => selection.features[i])
+          .map(f => f.trim())
+          .filter(f => f.length > 0)
+        const selectedUseCases = (suggestion.use_cases || [])
+          .filter((_, i) => selection.useCases[i])
+          .map(u => u.trim())
+          .filter(u => u.length > 0)
+
+        const existingFeatures = cap.features || []
+        const existingUseCases = cap.use_cases || []
+        const dedupe = (arr: string[]) => {
+          const seen = new Set<string>()
+          return arr.filter(v => {
+            const k = v.toLowerCase()
+            if (seen.has(k)) return false
+            seen.add(k)
+            return true
+          })
+        }
+
+        const updates: { features?: string[]; use_cases?: string[] } = {}
+        if (selectedFeatures.length > 0) {
+          updates.features = dedupe([...existingFeatures, ...selectedFeatures])
+        }
+        if (selectedUseCases.length > 0) {
+          updates.use_cases = dedupe([...existingUseCases, ...selectedUseCases])
+        }
+        if (updates.features || updates.use_cases) {
+          await store.updateCapability(capabilityId, updates)
+        }
+      }
+
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to apply')
@@ -371,6 +414,20 @@ export default function AIGeneratePanel({
     setSelection(prev => prev ? {
       ...prev,
       outputs: { ...prev.outputs, [idx]: { ...prev.outputs[idx], personas: { ...prev.outputs[idx].personas, [pi]: !prev.outputs[idx].personas[pi] } } },
+    } : null)
+  }
+
+  const toggleFeature = (i: number) => {
+    setSelection(prev => prev ? {
+      ...prev,
+      features: { ...prev.features, [i]: !prev.features[i] },
+    } : null)
+  }
+
+  const toggleUseCase = (i: number) => {
+    setSelection(prev => prev ? {
+      ...prev,
+      useCases: { ...prev.useCases, [i]: !prev.useCases[i] },
     } : null)
   }
 
@@ -614,6 +671,46 @@ export default function AIGeneratePanel({
                   ))}
                 </div>
               </div>
+
+              {/* FEATURES */}
+              {(suggestion.features && suggestion.features.length > 0) && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded bg-[#8B5CF6]/20 flex items-center justify-center text-[#8B5CF6] text-[9px] font-bold font-[family-name:var(--font-orbitron)]">F</div>
+                    <span className="text-xs font-semibold text-[var(--m12-text)]">Features</span>
+                    <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{suggestion.features.length}</span>
+                    <span className="text-[9px] text-[var(--m12-text-muted)]">sub-capabilities of this L3</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {suggestion.features.map((f, i) => (
+                      <div key={i} className={`flex items-start gap-2 px-3 py-2 border rounded-lg transition-all ${selection.features[i] ? 'border-[#8B5CF6]/40 bg-[#8B5CF6]/[0.05]' : 'border-[var(--m12-border)]/20 opacity-50'}`}>
+                        <Check checked={selection.features[i] ?? true} onChange={() => toggleFeature(i)} size="md" />
+                        <span className={`text-[11px] leading-snug ${selection.features[i] ? 'text-[var(--m12-text)]' : 'text-[var(--m12-text-muted)] line-through'}`}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* USE CASES */}
+              {(suggestion.use_cases && suggestion.use_cases.length > 0) && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 rounded bg-[#06B6D4]/20 flex items-center justify-center text-[#06B6D4] text-[9px] font-bold font-[family-name:var(--font-orbitron)]">U</div>
+                    <span className="text-xs font-semibold text-[var(--m12-text)]">Use Cases</span>
+                    <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{suggestion.use_cases.length}</span>
+                    <span className="text-[9px] text-[var(--m12-text-muted)]">concrete scenarios</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {suggestion.use_cases.map((u, i) => (
+                      <div key={i} className={`flex items-start gap-2 px-3 py-2 border rounded-lg transition-all ${selection.useCases[i] ? 'border-[#06B6D4]/40 bg-[#06B6D4]/[0.05]' : 'border-[var(--m12-border)]/20 opacity-50'}`}>
+                        <Check checked={selection.useCases[i] ?? true} onChange={() => toggleUseCase(i)} size="md" />
+                        <span className={`text-[11px] leading-snug ${selection.useCases[i] ? 'text-[var(--m12-text)]' : 'text-[var(--m12-text-muted)] line-through'}`}>{u}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -632,7 +729,9 @@ export default function AIGeneratePanel({
         {suggestion && selection && (
           <div className="px-6 py-3 border-t border-[var(--m12-border)]/30 flex items-center justify-between">
             <div className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-              {Object.values(selection.inputs).filter(i => i.selected).length} inputs, {Object.values(selection.outputs).filter(o => o.selected).length} outputs selected
+              {Object.values(selection.inputs).filter(i => i.selected).length} inputs, {Object.values(selection.outputs).filter(o => o.selected).length} outputs
+              {(suggestion.features?.length || 0) > 0 && `, ${Object.values(selection.features).filter(Boolean).length} features`}
+              {(suggestion.use_cases?.length || 0) > 0 && `, ${Object.values(selection.useCases).filter(Boolean).length} use cases`} selected
             </div>
             <div className="flex gap-2">
               <button
