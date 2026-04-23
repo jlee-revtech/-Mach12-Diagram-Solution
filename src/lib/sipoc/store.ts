@@ -65,6 +65,8 @@ interface SIPOCState {
   addInput: (capabilityId: string, informationProductId: string) => Promise<void>
   removeInput: (inputId: string, capabilityId: string) => Promise<void>
   reorderInputs: (capabilityId: string, orderedIds: string[]) => Promise<void>
+  archiveInput: (inputId: string, capabilityId: string) => Promise<void>
+  unarchiveInput: (inputId: string, capabilityId: string) => Promise<void>
   updateInputSuppliers: (inputId: string, capabilityId: string, personaIds: string[]) => Promise<void>
   updateInputSystems: (inputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
   updateInputFeedingSystem: (inputId: string, capabilityId: string, systemId: string | null) => Promise<void>
@@ -76,6 +78,8 @@ interface SIPOCState {
   addOutput: (capabilityId: string, informationProductId: string) => Promise<void>
   removeOutput: (outputId: string, capabilityId: string) => Promise<void>
   reorderOutputs: (capabilityId: string, orderedIds: string[]) => Promise<void>
+  archiveOutput: (outputId: string, capabilityId: string) => Promise<void>
+  unarchiveOutput: (outputId: string, capabilityId: string) => Promise<void>
   updateOutputConsumers: (outputId: string, capabilityId: string, personaIds: string[]) => Promise<void>
   updateOutputSystems: (outputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
 
@@ -342,8 +346,31 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         return item ? { ...item, sort_order: idx } : null
       })
       .filter((i): i is CapabilityInput => i !== null)
-    set({ inputs: { ...get().inputs, [capabilityId]: reordered } })
+    const touched = new Set(orderedIds)
+    const preserved = current.filter(i => !touched.has(i.id))
+    set({ inputs: { ...get().inputs, [capabilityId]: [...reordered, ...preserved] } })
     await Promise.all(reordered.map(i => api.updateCapabilityInput(i.id, { sort_order: i.sort_order })))
+  },
+
+  archiveInput: async (inputId, capabilityId) => {
+    const now = new Date().toISOString()
+    set({
+      inputs: {
+        ...get().inputs,
+        [capabilityId]: (get().inputs[capabilityId] || []).map(i => i.id === inputId ? { ...i, archived_at: now } : i),
+      },
+    })
+    await api.updateCapabilityInput(inputId, { archived_at: now })
+  },
+
+  unarchiveInput: async (inputId, capabilityId) => {
+    set({
+      inputs: {
+        ...get().inputs,
+        [capabilityId]: (get().inputs[capabilityId] || []).map(i => i.id === inputId ? { ...i, archived_at: null } : i),
+      },
+    })
+    await api.updateCapabilityInput(inputId, { archived_at: null })
   },
 
   updateInputSuppliers: async (inputId, capabilityId, personaIds) => {
@@ -452,8 +479,31 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         return item ? { ...item, sort_order: idx } : null
       })
       .filter((o): o is CapabilityOutput => o !== null)
-    set({ outputs: { ...get().outputs, [capabilityId]: reordered } })
+    const touched = new Set(orderedIds)
+    const preserved = current.filter(o => !touched.has(o.id))
+    set({ outputs: { ...get().outputs, [capabilityId]: [...reordered, ...preserved] } })
     await Promise.all(reordered.map(o => api.updateCapabilityOutput(o.id, { sort_order: o.sort_order })))
+  },
+
+  archiveOutput: async (outputId, capabilityId) => {
+    const now = new Date().toISOString()
+    set({
+      outputs: {
+        ...get().outputs,
+        [capabilityId]: (get().outputs[capabilityId] || []).map(o => o.id === outputId ? { ...o, archived_at: now } : o),
+      },
+    })
+    await api.updateCapabilityOutput(outputId, { archived_at: now })
+  },
+
+  unarchiveOutput: async (outputId, capabilityId) => {
+    set({
+      outputs: {
+        ...get().outputs,
+        [capabilityId]: (get().outputs[capabilityId] || []).map(o => o.id === outputId ? { ...o, archived_at: null } : o),
+      },
+    })
+    await api.updateCapabilityOutput(outputId, { archived_at: null })
   },
 
   updateOutputConsumers: async (outputId, capabilityId, personaIds) => {
@@ -642,7 +692,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     return capabilities.map(cap => ({
       ...cap,
       system: cap.system_id ? sysMap.get(cap.system_id) || null : null,
-      inputs: (inputs[cap.id] || []).map(input => ({
+      inputs: (inputs[cap.id] || []).filter(i => !i.archived_at).map(input => ({
         ...input,
         informationProduct: ipMap.get(input.information_product_id) || {
           id: input.information_product_id, organization_id: '', name: '(deleted)', created_at: '', updated_at: '',
@@ -657,7 +707,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
         tags: resolveTags(input.tag_ids),
         dimensions: (input.dimensions || []).map(d => ({ ...d, tags: resolveTags(d.tag_ids) })),
       })),
-      outputs: (outputs[cap.id] || []).map(output => ({
+      outputs: (outputs[cap.id] || []).filter(o => !o.archived_at).map(output => ({
         ...output,
         informationProduct: ipMap.get(output.information_product_id) || {
           id: output.information_product_id, organization_id: '', name: '(deleted)', created_at: '', updated_at: '',

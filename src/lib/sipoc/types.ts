@@ -145,6 +145,7 @@ export interface CapabilityInput {
   dimensions: Dimension[]
   tag_ids?: string[]
   sort_order: number
+  archived_at?: string | null
   created_at: string
 }
 
@@ -158,6 +159,7 @@ export interface CapabilityOutput {
   dimensions: Dimension[]
   tag_ids?: string[]
   sort_order: number
+  archived_at?: string | null
   created_at: string
 }
 

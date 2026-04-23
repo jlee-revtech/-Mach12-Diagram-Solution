@@ -762,6 +762,8 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [dragState, setDragState] = useState<{ side: 'input' | 'output'; id: string } | null>(null)
   const [dropTarget, setDropTarget] = useState<{ side: 'input' | 'output'; id: string; above: boolean } | null>(null)
+  const [archivedInputsOpen, setArchivedInputsOpen] = useState(false)
+  const [archivedOutputsOpen, setArchivedOutputsOpen] = useState(false)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const focusedItemId = useSIPOCStore(s => s.focusedItemId)
   const setFocusedItem = useSIPOCStore(s => s.setFocusedItem)
@@ -802,6 +804,8 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const addInput = useSIPOCStore(s => s.addInput)
   const removeInput = useSIPOCStore(s => s.removeInput)
   const reorderInputs = useSIPOCStore(s => s.reorderInputs)
+  const archiveInput = useSIPOCStore(s => s.archiveInput)
+  const unarchiveInput = useSIPOCStore(s => s.unarchiveInput)
   const updateInputSuppliers = useSIPOCStore(s => s.updateInputSuppliers)
   const updateInputSystems = useSIPOCStore(s => s.updateInputSystems)
   const updateInputFeedingSystem = useSIPOCStore(s => s.updateInputFeedingSystem)
@@ -809,6 +813,8 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const addOutput = useSIPOCStore(s => s.addOutput)
   const removeOutput = useSIPOCStore(s => s.removeOutput)
   const reorderOutputs = useSIPOCStore(s => s.reorderOutputs)
+  const archiveOutput = useSIPOCStore(s => s.archiveOutput)
+  const unarchiveOutput = useSIPOCStore(s => s.unarchiveOutput)
   const updateOutputConsumers = useSIPOCStore(s => s.updateOutputConsumers)
   const updateOutputSystems = useSIPOCStore(s => s.updateOutputSystems)
   const updateOutputTags = useSIPOCStore(s => s.updateOutputTags)
@@ -821,9 +827,15 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   if (!capability) return null
   const rollup = hasChildren ? getRollup(capabilityId) : null
 
-  // Get IPs not already used as inputs/outputs for this capability
-  const usedInputIpIds = new Set(inputs.map(i => i.information_product_id))
-  const usedOutputIpIds = new Set(outputs.map(o => o.information_product_id))
+  // Split active vs archived; archived items keep their detail but are hidden from the main list
+  const activeInputs = inputs.filter(i => !i.archived_at)
+  const archivedInputs = inputs.filter(i => i.archived_at)
+  const activeOutputs = outputs.filter(o => !o.archived_at)
+  const archivedOutputs = outputs.filter(o => o.archived_at)
+
+  // Get IPs not already used as active inputs/outputs for this capability
+  const usedInputIpIds = new Set(activeInputs.map(i => i.information_product_id))
+  const usedOutputIpIds = new Set(activeOutputs.map(o => o.information_product_id))
   const availableForInput = informationProducts.filter(ip => !usedInputIpIds.has(ip.id))
   const availableForOutput = informationProducts.filter(ip => !usedOutputIpIds.has(ip.id))
 
@@ -1053,9 +1065,9 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
 
       {/* INPUTS section */}
       <div>
-        <SectionLabel label="Inputs" count={inputs.length} />
+        <SectionLabel label="Inputs" count={activeInputs.length} />
         <div className="space-y-2">
-          {inputs.map(input => {
+          {activeInputs.map(input => {
             const ip = informationProducts.find(p => p.id === input.information_product_id)
             const isDragging = dragState?.side === 'input' && dragState.id === input.id
             const drop = dropTarget?.side === 'input' && dropTarget.id === input.id ? dropTarget : null
@@ -1103,8 +1115,20 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     {input.supplier_persona_ids.length}s {input.source_system_ids.length}sys {(input.dimensions || []).length}d
                   </span>
                   <button
+                    onClick={(e) => { e.stopPropagation(); archiveInput(input.id, capabilityId) }}
+                    className="text-[var(--m12-text-muted)] hover:text-[#2563EB] transition-colors shrink-0"
+                    title="Unassign from L3 (keeps all detail; can restore from Archived)"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <rect x="1" y="2" width="8" height="2" stroke="currentColor" strokeWidth="1"/>
+                      <path d="M2 4v5h6V4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M4 6h2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                  <button
                     onClick={(e) => { e.stopPropagation(); removeInput(input.id, capabilityId) }}
                     className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
+                    title="Delete permanently"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                       <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -1271,6 +1295,54 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
             )
           })}
 
+          {/* Archived inputs (unassigned; detail preserved) */}
+          {archivedInputs.length > 0 && (
+            <div className="mt-1">
+              <button
+                onClick={() => setArchivedInputsOpen(o => !o)}
+                className="flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider hover:text-[var(--m12-text)] transition-colors"
+              >
+                <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${archivedInputsOpen ? 'rotate-90' : ''}`}>
+                  <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Archived</span>
+                <span className="text-[var(--m12-text-faint)]">({archivedInputs.length})</span>
+              </button>
+              {archivedInputsOpen && (
+                <div className="mt-1 space-y-1">
+                  {archivedInputs.map(input => {
+                    const ip = informationProducts.find(p => p.id === input.information_product_id)
+                    return (
+                      <div key={input.id} className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--m12-bg)]/40 border border-dashed border-[var(--m12-border)]/30">
+                        <div className="w-1 h-3 rounded-full bg-[#EAB308]/30 shrink-0" />
+                        <span className="text-[10px] text-[var(--m12-text-muted)] flex-1 truncate italic">{ip?.name || '(deleted)'}</span>
+                        <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                          {input.supplier_persona_ids.length}s {input.source_system_ids.length}sys {(input.dimensions || []).length}d
+                        </span>
+                        <button
+                          onClick={() => unarchiveInput(input.id, capabilityId)}
+                          className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                          title="Restore to active inputs"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          onClick={() => { if (confirm('Delete this archived input permanently? Detail will be lost.')) removeInput(input.id, capabilityId) }}
+                          className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
+                          title="Delete permanently"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Add existing IP as input */}
           <SearchableIPDropdown
             items={availableForInput}
@@ -1286,9 +1358,9 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
 
       {/* OUTPUTS section */}
       <div>
-        <SectionLabel label="Outputs" count={outputs.length} />
+        <SectionLabel label="Outputs" count={activeOutputs.length} />
         <div className="space-y-2">
-          {outputs.map(output => {
+          {activeOutputs.map(output => {
             const ip = informationProducts.find(p => p.id === output.information_product_id)
             const isDragging = dragState?.side === 'output' && dragState.id === output.id
             const drop = dropTarget?.side === 'output' && dropTarget.id === output.id ? dropTarget : null
@@ -1333,8 +1405,20 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     {output.consumer_persona_ids.length}c {(output.destination_system_ids || []).length}sys {(output.dimensions || []).length}d
                   </span>
                   <button
+                    onClick={(e) => { e.stopPropagation(); archiveOutput(output.id, capabilityId) }}
+                    className="text-[var(--m12-text-muted)] hover:text-[#2563EB] transition-colors shrink-0"
+                    title="Unassign from L3 (keeps all detail; can restore from Archived)"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <rect x="1" y="2" width="8" height="2" stroke="currentColor" strokeWidth="1"/>
+                      <path d="M2 4v5h6V4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M4 6h2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                  <button
                     onClick={(e) => { e.stopPropagation(); removeOutput(output.id, capabilityId) }}
                     className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
+                    title="Delete permanently"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                       <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -1464,6 +1548,54 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
             accent="#10B981"
             placeholder="Search info products..."
           />
+
+          {/* Archived outputs (unassigned; detail preserved) */}
+          {archivedOutputs.length > 0 && (
+            <div className="mt-1">
+              <button
+                onClick={() => setArchivedOutputsOpen(o => !o)}
+                className="flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider hover:text-[var(--m12-text)] transition-colors"
+              >
+                <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${archivedOutputsOpen ? 'rotate-90' : ''}`}>
+                  <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Archived</span>
+                <span className="text-[var(--m12-text-faint)]">({archivedOutputs.length})</span>
+              </button>
+              {archivedOutputsOpen && (
+                <div className="mt-1 space-y-1">
+                  {archivedOutputs.map(output => {
+                    const ip = informationProducts.find(p => p.id === output.information_product_id)
+                    return (
+                      <div key={output.id} className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--m12-bg)]/40 border border-dashed border-[var(--m12-border)]/30">
+                        <div className="w-1 h-3 rounded-full bg-[#10B981]/30 shrink-0" />
+                        <span className="text-[10px] text-[var(--m12-text-muted)] flex-1 truncate italic">{ip?.name || '(deleted)'}</span>
+                        <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                          {output.consumer_persona_ids.length}c {(output.destination_system_ids || []).length}sys {(output.dimensions || []).length}d
+                        </span>
+                        <button
+                          onClick={() => unarchiveOutput(output.id, capabilityId)}
+                          className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                          title="Restore to active outputs"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          onClick={() => { if (confirm('Delete this archived output permanently? Detail will be lost.')) removeOutput(output.id, capabilityId) }}
+                          className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
+                          title="Delete permanently"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Quick-create new IP as output */}
           <QuickAdd placeholder="New output info product..." onAdd={handleQuickCreateAndAddOutput} />
