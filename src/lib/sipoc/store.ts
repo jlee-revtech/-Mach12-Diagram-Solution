@@ -64,6 +64,7 @@ interface SIPOCState {
   // ─── Input CRUD ───────────────────────────────────────
   addInput: (capabilityId: string, informationProductId: string) => Promise<void>
   removeInput: (inputId: string, capabilityId: string) => Promise<void>
+  reorderInputs: (capabilityId: string, orderedIds: string[]) => Promise<void>
   updateInputSuppliers: (inputId: string, capabilityId: string, personaIds: string[]) => Promise<void>
   updateInputSystems: (inputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
   updateInputFeedingSystem: (inputId: string, capabilityId: string, systemId: string | null) => Promise<void>
@@ -74,6 +75,7 @@ interface SIPOCState {
   // ─── Output CRUD ──────────────────────────────────────
   addOutput: (capabilityId: string, informationProductId: string) => Promise<void>
   removeOutput: (outputId: string, capabilityId: string) => Promise<void>
+  reorderOutputs: (capabilityId: string, orderedIds: string[]) => Promise<void>
   updateOutputConsumers: (outputId: string, capabilityId: string, personaIds: string[]) => Promise<void>
   updateOutputSystems: (outputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
 
@@ -331,6 +333,19 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     await api.deleteCapabilityInput(inputId)
   },
 
+  reorderInputs: async (capabilityId, orderedIds) => {
+    const current = get().inputs[capabilityId] || []
+    const byId = new Map(current.map(i => [i.id, i]))
+    const reordered = orderedIds
+      .map((id, idx) => {
+        const item = byId.get(id)
+        return item ? { ...item, sort_order: idx } : null
+      })
+      .filter((i): i is CapabilityInput => i !== null)
+    set({ inputs: { ...get().inputs, [capabilityId]: reordered } })
+    await Promise.all(reordered.map(i => api.updateCapabilityInput(i.id, { sort_order: i.sort_order })))
+  },
+
   updateInputSuppliers: async (inputId, capabilityId, personaIds) => {
     await api.updateCapabilityInput(inputId, { supplier_persona_ids: personaIds })
     set({
@@ -426,6 +441,19 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       },
     })
     await api.deleteCapabilityOutput(outputId)
+  },
+
+  reorderOutputs: async (capabilityId, orderedIds) => {
+    const current = get().outputs[capabilityId] || []
+    const byId = new Map(current.map(o => [o.id, o]))
+    const reordered = orderedIds
+      .map((id, idx) => {
+        const item = byId.get(id)
+        return item ? { ...item, sort_order: idx } : null
+      })
+      .filter((o): o is CapabilityOutput => o !== null)
+    set({ outputs: { ...get().outputs, [capabilityId]: reordered } })
+    await Promise.all(reordered.map(o => api.updateCapabilityOutput(o.id, { sort_order: o.sort_order })))
   },
 
   updateOutputConsumers: async (outputId, capabilityId, personaIds) => {

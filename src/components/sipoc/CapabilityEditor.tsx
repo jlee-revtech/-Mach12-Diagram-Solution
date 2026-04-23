@@ -760,6 +760,8 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
 // ─── Capability Detail Editor ───────────────────────────
 function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId: string }) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  const [dragState, setDragState] = useState<{ side: 'input' | 'output'; id: string } | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ side: 'input' | 'output'; id: string; above: boolean } | null>(null)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const focusedItemId = useSIPOCStore(s => s.focusedItemId)
   const setFocusedItem = useSIPOCStore(s => s.setFocusedItem)
@@ -799,12 +801,14 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const removeCapability = useSIPOCStore(s => s.removeCapability)
   const addInput = useSIPOCStore(s => s.addInput)
   const removeInput = useSIPOCStore(s => s.removeInput)
+  const reorderInputs = useSIPOCStore(s => s.reorderInputs)
   const updateInputSuppliers = useSIPOCStore(s => s.updateInputSuppliers)
   const updateInputSystems = useSIPOCStore(s => s.updateInputSystems)
   const updateInputFeedingSystem = useSIPOCStore(s => s.updateInputFeedingSystem)
   const updateInputTags = useSIPOCStore(s => s.updateInputTags)
   const addOutput = useSIPOCStore(s => s.addOutput)
   const removeOutput = useSIPOCStore(s => s.removeOutput)
+  const reorderOutputs = useSIPOCStore(s => s.reorderOutputs)
   const updateOutputConsumers = useSIPOCStore(s => s.updateOutputConsumers)
   const updateOutputSystems = useSIPOCStore(s => s.updateOutputSystems)
   const updateOutputTags = useSIPOCStore(s => s.updateOutputTags)
@@ -840,6 +844,41 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
     const ip = await addInformationProduct(orgId, { name })
     await addOutput(capabilityId, ip.id)
   }
+
+  const handleRowDragStart = (side: 'input' | 'output', id: string) => (e: React.DragEvent) => {
+    setDragState({ side, id })
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `${side}:${id}`)
+  }
+  const handleRowDragOver = (side: 'input' | 'output', id: string) => (e: React.DragEvent) => {
+    if (!dragState || dragState.side !== side) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const above = e.clientY < rect.top + rect.height / 2
+    setDropTarget(prev => prev?.id === id && prev.above === above && prev.side === side ? prev : { side, id, above })
+  }
+  const handleRowDrop = (side: 'input' | 'output', targetId: string) => (e: React.DragEvent) => {
+    e.preventDefault()
+    if (!dragState || dragState.side !== side || dragState.id === targetId) {
+      setDragState(null); setDropTarget(null); return
+    }
+    const list = (side === 'input' ? inputs : outputs).map(i => i.id)
+    const from = list.indexOf(dragState.id)
+    const to = list.indexOf(targetId)
+    if (from < 0 || to < 0) { setDragState(null); setDropTarget(null); return }
+    const above = dropTarget?.above ?? true
+    let insertAt = above ? to : to + 1
+    if (from < insertAt) insertAt--
+    const next = [...list]
+    next.splice(from, 1)
+    next.splice(insertAt, 0, dragState.id)
+    if (side === 'input') reorderInputs(capabilityId, next)
+    else reorderOutputs(capabilityId, next)
+    setDragState(null)
+    setDropTarget(null)
+  }
+  const handleRowDragEnd = () => { setDragState(null); setDropTarget(null) }
 
   return (
     <div className="space-y-5">
@@ -1018,12 +1057,34 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
         <div className="space-y-2">
           {inputs.map(input => {
             const ip = informationProducts.find(p => p.id === input.information_product_id)
+            const isDragging = dragState?.side === 'input' && dragState.id === input.id
+            const drop = dropTarget?.side === 'input' && dropTarget.id === input.id ? dropTarget : null
             return (
-              <div key={input.id} ref={el => { itemRefs.current[input.id] = el }} className={`bg-[var(--m12-bg)] border rounded-lg overflow-hidden transition-colors ${expandedItems.has(input.id) ? 'border-[#EAB308]/30' : 'border-[var(--m12-border)]/30'}`}>
+              <div
+                key={input.id}
+                ref={el => { itemRefs.current[input.id] = el }}
+                draggable
+                onDragStart={handleRowDragStart('input', input.id)}
+                onDragOver={handleRowDragOver('input', input.id)}
+                onDrop={handleRowDrop('input', input.id)}
+                onDragEnd={handleRowDragEnd}
+                className={`bg-[var(--m12-bg)] border rounded-lg overflow-hidden transition-colors ${expandedItems.has(input.id) ? 'border-[#EAB308]/30' : 'border-[var(--m12-border)]/30'} ${isDragging ? 'opacity-40' : ''} ${drop?.above ? 'shadow-[0_-2px_0_0_#2563EB]' : ''} ${drop && !drop.above ? 'shadow-[0_2px_0_0_#2563EB]' : ''}`}
+              >
                 <div
-                  className="flex items-center gap-2 px-2.5 py-2 cursor-pointer hover:bg-[var(--m12-bg-card)]/30 transition-colors"
+                  className="flex items-center gap-2 px-2.5 py-2 cursor-grab active:cursor-grabbing hover:bg-[var(--m12-bg-card)]/30 transition-colors"
                   onClick={() => toggleItem(input.id)}
                 >
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-[var(--m12-text-faint)]" aria-hidden>
+                    <circle cx="2.5" cy="2" r="0.6" fill="currentColor"/>
+                    <circle cx="5.5" cy="2" r="0.6" fill="currentColor"/>
+                    <circle cx="2.5" cy="4" r="0.6" fill="currentColor"/>
+                    <circle cx="5.5" cy="4" r="0.6" fill="currentColor"/>
+                    <circle cx="2.5" cy="6" r="0.6" fill="currentColor"/>
+                    <circle cx="5.5" cy="6" r="0.6" fill="currentColor"/>
+                  </svg>
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(input.id) ? 'rotate-90' : ''}`}>
+                    <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(input.id) ? 'rotate-90' : ''}`}>
                     <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -1229,12 +1290,31 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
         <div className="space-y-2">
           {outputs.map(output => {
             const ip = informationProducts.find(p => p.id === output.information_product_id)
+            const isDragging = dragState?.side === 'output' && dragState.id === output.id
+            const drop = dropTarget?.side === 'output' && dropTarget.id === output.id ? dropTarget : null
             return (
-              <div key={output.id} ref={el => { itemRefs.current[output.id] = el }} className={`bg-[var(--m12-bg)] border rounded-lg overflow-hidden transition-colors ${expandedItems.has(output.id) ? 'border-[#10B981]/30' : 'border-[var(--m12-border)]/30'}`}>
+              <div
+                key={output.id}
+                ref={el => { itemRefs.current[output.id] = el }}
+                draggable
+                onDragStart={handleRowDragStart('output', output.id)}
+                onDragOver={handleRowDragOver('output', output.id)}
+                onDrop={handleRowDrop('output', output.id)}
+                onDragEnd={handleRowDragEnd}
+                className={`bg-[var(--m12-bg)] border rounded-lg overflow-hidden transition-colors ${expandedItems.has(output.id) ? 'border-[#10B981]/30' : 'border-[var(--m12-border)]/30'} ${isDragging ? 'opacity-40' : ''} ${drop?.above ? 'shadow-[0_-2px_0_0_#2563EB]' : ''} ${drop && !drop.above ? 'shadow-[0_2px_0_0_#2563EB]' : ''}`}
+              >
                 <div
-                  className="flex items-center gap-2 px-2.5 py-2 cursor-pointer hover:bg-[var(--m12-bg-card)]/30 transition-colors"
+                  className="flex items-center gap-2 px-2.5 py-2 cursor-grab active:cursor-grabbing hover:bg-[var(--m12-bg-card)]/30 transition-colors"
                   onClick={() => toggleItem(output.id)}
                 >
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-[var(--m12-text-faint)]" aria-hidden>
+                    <circle cx="2.5" cy="2" r="0.6" fill="currentColor"/>
+                    <circle cx="5.5" cy="2" r="0.6" fill="currentColor"/>
+                    <circle cx="2.5" cy="4" r="0.6" fill="currentColor"/>
+                    <circle cx="5.5" cy="4" r="0.6" fill="currentColor"/>
+                    <circle cx="2.5" cy="6" r="0.6" fill="currentColor"/>
+                    <circle cx="5.5" cy="6" r="0.6" fill="currentColor"/>
+                  </svg>
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(output.id) ? 'rotate-90' : ''}`}>
                     <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>

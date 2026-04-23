@@ -37,9 +37,6 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
 
   const otherL2s = allL2s.filter(l2 => l2.id !== node.parent_id)
 
-  const features = node.features || []
-  const useCases = node.use_cases || []
-
   return (
     <div className="relative group/l3">
       <div
@@ -53,38 +50,26 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
         }}
         onDragEnd={readOnly ? undefined : () => { draggedId = null; draggedLevel = null }}
         onClick={onSelect}
-        className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded ${readOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} ${
+        className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded ${readOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} flex items-center gap-1 ${
           isSelected
             ? 'bg-[#2563EB]/15 text-[var(--m12-text)] font-medium'
             : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg-card-hover)]'
         }`}
       >
-        <div className="flex items-center gap-1">
-          <span className="text-[var(--m12-text-faint)] shrink-0">⠿</span>
-          <span className="flex-1 min-w-0 truncate">{node.name}</span>
-          {!readOnly && otherL2s.length > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
-              className="opacity-0 group-hover/l3:opacity-100 shrink-0 w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-all"
-              title="More actions"
-            >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                <circle cx="4" cy="1.5" r="0.7" fill="currentColor"/>
-                <circle cx="4" cy="4" r="0.7" fill="currentColor"/>
-                <circle cx="4" cy="6.5" r="0.7" fill="currentColor"/>
-              </svg>
-            </button>
-          )}
-        </div>
-        {features.length > 0 && (
-          <div className="text-[8px] text-[var(--m12-text-muted)] leading-tight mt-0.5 pl-3 truncate">
-            {features.slice(0, 2).join(' · ')}{features.length > 2 ? ` +${features.length - 2}` : ''}
-          </div>
-        )}
-        {useCases.length > 0 && (
-          <div className="text-[8px] text-[var(--m12-text-faint)] leading-tight mt-0.5 pl-3 truncate italic">
-            {useCases.slice(0, 2).join(' · ')}{useCases.length > 2 ? ` +${useCases.length - 2}` : ''}
-          </div>
+        <span className="text-[var(--m12-text-faint)] shrink-0">⠿</span>
+        <span className="flex-1 min-w-0 truncate">{node.name}</span>
+        {!readOnly && otherL2s.length > 0 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
+            className="opacity-0 group-hover/l3:opacity-100 shrink-0 w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-all"
+            title="More actions"
+          >
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <circle cx="4" cy="1.5" r="0.7" fill="currentColor"/>
+              <circle cx="4" cy="4" r="0.7" fill="currentColor"/>
+              <circle cx="4" cy="6.5" r="0.7" fill="currentColor"/>
+            </svg>
+          </button>
         )}
       </div>
       {menuOpen && (
