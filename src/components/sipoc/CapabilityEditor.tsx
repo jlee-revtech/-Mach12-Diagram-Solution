@@ -1097,9 +1097,6 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(input.id) ? 'rotate-90' : ''}`}>
                     <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(input.id) ? 'rotate-90' : ''}`}>
-                    <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
                   <div className="w-1 h-3 rounded-full bg-[#EAB308]/60 shrink-0" />
                   {ip ? (
                     <input
