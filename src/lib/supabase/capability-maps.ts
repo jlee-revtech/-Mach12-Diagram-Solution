@@ -37,6 +37,28 @@ function headers(): Record<string, string> {
   }
 }
 
+// PostgREST caps GETs at db-max-rows (1000 on Supabase). For org-scoped
+// pools that can exceed that (information_products, etc.), page via Range.
+async function fetchAllPaginated<T>(url: string, hdrs: Record<string, string>, pageSize = 1000): Promise<T[]> {
+  const all: T[] = []
+  let from = 0
+  while (true) {
+    const to = from + pageSize - 1
+    const res = await fetch(url, {
+      headers: { ...hdrs, 'Range-Unit': 'items', 'Range': `${from}-${to}` },
+    })
+    if (!res.ok) {
+      if (res.status === 416) break
+      return all
+    }
+    const chunk = (await res.json()) as T[]
+    all.push(...chunk)
+    if (chunk.length < pageSize) break
+    from += pageSize
+  }
+  return all
+}
+
 // ─── Capability Maps ───────────────────────────────────
 
 export async function listCapabilityMaps(orgId: string, includeArchived = false): Promise<CapabilityMapRow[]> {
@@ -295,12 +317,10 @@ export async function deleteCapabilityOutput(id: string): Promise<void> {
 // ─── Personas (org-scoped) ─────────────────────────────
 
 export async function listPersonas(orgId: string): Promise<Persona[]> {
-  const res = await fetch(
+  return fetchAllPaginated<Persona>(
     `${URL}/rest/v1/personas?organization_id=eq.${orgId}&select=*&order=name.asc`,
-    { headers: headers() }
+    headers()
   )
-  if (!res.ok) return []
-  return res.json()
 }
 
 export async function createPersona(orgId: string, data: { name: string; role?: string; description?: string; color?: string }): Promise<Persona> {
@@ -340,12 +360,10 @@ export async function deletePersona(id: string): Promise<void> {
 // ─── Information Products (org-scoped) ─────────────────
 
 export async function listInformationProducts(orgId: string): Promise<InformationProduct[]> {
-  const res = await fetch(
+  return fetchAllPaginated<InformationProduct>(
     `${URL}/rest/v1/information_products?organization_id=eq.${orgId}&select=*&order=name.asc`,
-    { headers: headers() }
+    headers()
   )
-  if (!res.ok) return []
-  return res.json()
 }
 
 export async function createInformationProduct(orgId: string, data: { name: string; description?: string; category?: string }): Promise<InformationProduct> {
@@ -385,12 +403,10 @@ export async function deleteInformationProduct(id: string): Promise<void> {
 // ─── Logical Systems (org-scoped) ──────────────────────
 
 export async function listLogicalSystems(orgId: string): Promise<LogicalSystem[]> {
-  const res = await fetch(
+  return fetchAllPaginated<LogicalSystem>(
     `${URL}/rest/v1/logical_systems?organization_id=eq.${orgId}&select=*&order=name.asc`,
-    { headers: headers() }
+    headers()
   )
-  if (!res.ok) return []
-  return res.json()
 }
 
 export async function createLogicalSystem(orgId: string, data: { name: string; system_type?: string; description?: string; color?: string }): Promise<LogicalSystem> {
@@ -430,12 +446,10 @@ export async function deleteLogicalSystem(id: string): Promise<void> {
 // ─── Tags (org-scoped) ─────────────────────────────────
 
 export async function listTags(orgId: string): Promise<Tag[]> {
-  const res = await fetch(
+  return fetchAllPaginated<Tag>(
     `${URL}/rest/v1/tags?organization_id=eq.${orgId}&select=*&order=name.asc`,
-    { headers: headers() }
+    headers()
   )
-  if (!res.ok) return []
-  return res.json()
 }
 
 export async function createTag(orgId: string, data: { name: string; color?: string; description?: string }): Promise<Tag> {
@@ -475,12 +489,10 @@ export async function deleteTag(id: string): Promise<void> {
 // ─── System Data Elements (org-scoped) ─────────────────
 
 export async function listSystemDataElements(orgId: string): Promise<SystemDataElement[]> {
-  const res = await fetch(
+  return fetchAllPaginated<SystemDataElement>(
     `${URL}/rest/v1/system_data_elements?organization_id=eq.${orgId}&select=*&order=name.asc`,
-    { headers: headers() }
+    headers()
   )
-  if (!res.ok) return []
-  return res.json()
 }
 
 export async function createSystemDataElement(orgId: string, data: { name: string; description?: string }): Promise<SystemDataElement> {
@@ -660,27 +672,31 @@ export async function listCapabilityOutputsAnon(capId: string): Promise<Capabili
 }
 
 export async function listPersonasAnon(orgId: string): Promise<Persona[]> {
-  const res = await fetch(`${URL}/rest/v1/personas?organization_id=eq.${orgId}&select=*&order=name.asc`, { headers: anonHeaders() })
-  if (!res.ok) return []
-  return res.json()
+  return fetchAllPaginated<Persona>(
+    `${URL}/rest/v1/personas?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    anonHeaders()
+  )
 }
 
 export async function listInformationProductsAnon(orgId: string): Promise<InformationProduct[]> {
-  const res = await fetch(`${URL}/rest/v1/information_products?organization_id=eq.${orgId}&select=*&order=name.asc`, { headers: anonHeaders() })
-  if (!res.ok) return []
-  return res.json()
+  return fetchAllPaginated<InformationProduct>(
+    `${URL}/rest/v1/information_products?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    anonHeaders()
+  )
 }
 
 export async function listLogicalSystemsAnon(orgId: string): Promise<LogicalSystem[]> {
-  const res = await fetch(`${URL}/rest/v1/logical_systems?organization_id=eq.${orgId}&select=*&order=name.asc`, { headers: anonHeaders() })
-  if (!res.ok) return []
-  return res.json()
+  return fetchAllPaginated<LogicalSystem>(
+    `${URL}/rest/v1/logical_systems?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    anonHeaders()
+  )
 }
 
 export async function listTagsAnon(orgId: string): Promise<Tag[]> {
-  const res = await fetch(`${URL}/rest/v1/tags?organization_id=eq.${orgId}&select=*&order=name.asc`, { headers: anonHeaders() })
-  if (!res.ok) return []
-  return res.json()
+  return fetchAllPaginated<Tag>(
+    `${URL}/rest/v1/tags?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    anonHeaders()
+  )
 }
 
 // ─── Duplicate an entire Capability Map ────────────────
