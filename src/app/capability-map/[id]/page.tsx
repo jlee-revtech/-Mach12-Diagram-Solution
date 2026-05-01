@@ -91,7 +91,13 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
     if (!ok) return
     setPushingToDiagram(true)
     try {
-      const newDiagramId = await pushL3ToNewDiagram(hydrated, organization.id, user.id, map?.title)
+      const newDiagramId = await pushL3ToNewDiagram(
+        hydrated,
+        organization.id,
+        user.id,
+        map?.title,
+        store.systemDataElements,
+      )
       router.push(`/diagram/${newDiagramId}`)
     } catch (err) {
       console.error('Push to diagram failed:', err)

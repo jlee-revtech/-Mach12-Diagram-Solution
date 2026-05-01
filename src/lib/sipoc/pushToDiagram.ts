@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid'
-import type { HydratedCapability, LogicalSystem } from './types'
-import type { SystemNode, SystemGroupNode, DataFlowEdge } from '@/lib/diagram/types'
+import type { HydratedCapability, LogicalSystem, SystemDataElement, InformationProduct } from './types'
+import type { SystemNode, SystemGroupNode, DataFlowEdge, DataElement } from '@/lib/diagram/types'
 import { createDiagram, saveDiagram } from '@/lib/supabase/diagrams'
 
 const SYSTEM_W = 180
@@ -17,23 +17,38 @@ interface SeedResult {
   groups: SystemGroupNode[]
 }
 
+interface BuildOptions {
+  baseX?: number
+  baseY?: number
+  /** Org-scoped system data elements; used to populate per-IP attributes. */
+  systemDataElements?: SystemDataElement[]
+}
+
 /**
  * Build a canvas seed (nodes/edges/group) representing one L3 SIPOC.
  *
  * Layout (left to right, one row per input):
  *   [Source systems] → [Feeding system] → [Capability host system]
  *
- * Each `feeding → host` edge is labeled with the input information product name.
+ * Each information product flows along the chain as a `DataElement` on every
+ * edge it traverses (source→feeding, feeding→host). Edges are coalesced per
+ * (source, target) pair so multiple inputs sharing the same wire show as a
+ * single edge with multiple data elements rather than parallel edges.
+ *
  * Systems are deduped by LogicalSystem.id within the push so the same system
  * appears as a single box even when reused across inputs (e.g. capability host).
  */
 export function buildL3GroupCanvasData(
   hydrated: HydratedCapability,
-  baseX = 100,
-  baseY = 100,
+  options: BuildOptions = {},
 ): SeedResult {
+  const baseX = options.baseX ?? 100
+  const baseY = options.baseY ?? 100
+  const sdesById = new Map(
+    (options.systemDataElements ?? []).map(s => [s.id, s] as const),
+  )
+
   const nodes: SystemNode[] = []
-  const edges: DataFlowEdge[] = []
   const systemIdToNodeId = new Map<string, string>()
 
   const colSourceX = baseX + PAD_X
@@ -58,6 +73,22 @@ export function buildL3GroupCanvasData(
     return id
   }
 
+  // Build a fresh DataElement from an InformationProduct. Each edge gets its
+  // own copy (own ids) so edits on one edge don't bleed onto another.
+  const buildDataElement = (ip: InformationProduct): DataElement => {
+    const attributes = (ip.data_element_ids || [])
+      .map(sid => sdesById.get(sid))
+      .filter((s): s is SystemDataElement => !!s)
+      .map(s => ({ id: uuid(), name: s.name, description: s.description }))
+    return {
+      id: uuid(),
+      name: ip.name,
+      elementType: 'data_object',
+      ...(ip.description ? { description: ip.description } : {}),
+      ...(attributes.length > 0 ? { attributes } : {}),
+    }
+  }
+
   // Place the capability's host system once, vertically centered later
   let hostNodeId: string | null = null
 
@@ -65,7 +96,7 @@ export function buildL3GroupCanvasData(
   let cursorY = baseY + PAD_TOP
 
   // First pass: drop source/feeding systems per input row, collect rows for edge wiring
-  type Row = { sourceIds: string[]; feedingId: string | null; ipName: string }
+  type Row = { sourceIds: string[]; feedingId: string | null; ip: InformationProduct }
   const rows: Row[] = []
 
   for (const input of activeInputs) {
@@ -80,9 +111,8 @@ export function buildL3GroupCanvasData(
       ? placeSystem(input.feedingSystem, colFeedingX, cursorY)
       : null
 
-    rows.push({ sourceIds, feedingId, ipName: input.informationProduct.name })
+    rows.push({ sourceIds, feedingId, ip: input.informationProduct })
 
-    // Advance cursor by the taller of the two columns for this row
     const sourceColEndY = sourceIds.length > 0 ? rowY : cursorY + SYSTEM_H
     const feedingColEndY = feedingId ? cursorY + SYSTEM_H : cursorY
     cursorY = Math.max(sourceColEndY, feedingColEndY) + ROW_GAP
@@ -95,41 +125,56 @@ export function buildL3GroupCanvasData(
     hostNodeId = placeSystem(hydrated.system, colHostX, hostY)
   }
 
-  // Wire edges
+  // Coalesce edges by (source, target). Each input's IP becomes a DataElement
+  // on every edge along its path through the chain.
+  const edgeByKey = new Map<string, DataFlowEdge>()
+
+  const addToEdge = (source: string, target: string, ip: InformationProduct) => {
+    const key = `${source}->${target}`
+    let edge = edgeByKey.get(key)
+    if (!edge) {
+      edge = {
+        id: `edge-${uuid()}`,
+        source,
+        target,
+        type: 'dataFlow',
+        data: { label: '', dataElements: [], direction: 'forward' },
+      }
+      edgeByKey.set(key, edge)
+    }
+    const list = edge.data!.dataElements
+    // Dedup by IP name (case-insensitive) within a single edge — the same IP
+    // shouldn't appear twice on one wire even if multiple input rows land here.
+    const exists = list.some(d => d.name.trim().toLowerCase() === ip.name.trim().toLowerCase())
+    if (!exists) list.push(buildDataElement(ip))
+  }
+
   for (const row of rows) {
     if (row.feedingId) {
-      // Sources → Feeding (no label)
       for (const sid of row.sourceIds) {
-        edges.push({
-          id: `edge-${uuid()}`,
-          source: sid,
-          target: row.feedingId,
-          type: 'dataFlow',
-          data: { label: '', dataElements: [], direction: 'forward' },
-        })
+        addToEdge(sid, row.feedingId, row.ip)
       }
-      // Feeding → Host (label = IP name)
       if (hostNodeId) {
-        edges.push({
-          id: `edge-${uuid()}`,
-          source: row.feedingId,
-          target: hostNodeId,
-          type: 'dataFlow',
-          data: { label: row.ipName, dataElements: [], direction: 'forward' },
-        })
+        addToEdge(row.feedingId, hostNodeId, row.ip)
       }
     } else if (hostNodeId) {
-      // No feeding system declared — sources go straight to host with the IP label
+      // No feeding system declared — sources go straight to host
       for (const sid of row.sourceIds) {
-        edges.push({
-          id: `edge-${uuid()}`,
-          source: sid,
-          target: hostNodeId,
-          type: 'dataFlow',
-          data: { label: row.ipName, dataElements: [], direction: 'forward' },
-        })
+        addToEdge(sid, hostNodeId, row.ip)
       }
     }
+  }
+
+  // Finalize edges: when a wire carries exactly one data element, set its
+  // label to that element's name so it's visible without selecting the edge.
+  // Multi-element edges leave the label blank — the elements panel reveals them.
+  const edges: DataFlowEdge[] = []
+  for (const edge of edgeByKey.values()) {
+    const list = edge.data!.dataElements
+    if (list.length === 1) {
+      edge.data!.label = list[0].name
+    }
+    edges.push(edge)
   }
 
   // Compute group dimensions
@@ -165,9 +210,10 @@ export async function pushL3ToNewDiagram(
   hydrated: HydratedCapability,
   orgId: string,
   userId: string,
-  mapTitle?: string,
+  mapTitle: string | undefined,
+  systemDataElements?: SystemDataElement[],
 ): Promise<string> {
-  const seed = buildL3GroupCanvasData(hydrated)
+  const seed = buildL3GroupCanvasData(hydrated, { systemDataElements })
   const title = mapTitle
     ? `${mapTitle} — ${hydrated.name}`
     : hydrated.name

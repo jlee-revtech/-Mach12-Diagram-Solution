@@ -91,12 +91,13 @@ export default function ImportL3Dialog({
       }
       await Promise.all(promises)
 
-      const hydrated = useSIPOCStore.getState()
-        .getHydratedCapabilities()
-        .find(c => c.id === selectedCapId)
+      const fresh = useSIPOCStore.getState()
+      const hydrated = fresh.getHydratedCapabilities().find(c => c.id === selectedCapId)
       if (!hydrated) throw new Error('Could not load that L3 — try again')
 
-      const seed = buildL3GroupCanvasData(hydrated)
+      const seed = buildL3GroupCanvasData(hydrated, {
+        systemDataElements: fresh.systemDataElements,
+      })
       const groupId = insertSeed(seed)
       onImported?.(groupId)
       onClose()
