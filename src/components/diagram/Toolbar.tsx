@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/supabase/auth-context'
 import { useTheme } from '@/lib/theme-context'
 import ExportMenu from './ExportMenu'
 
-export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpen?: () => void; onHelpOpen?: () => void; onShareOpen?: () => void }) {
+export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen, onImportL3Open }: { onAiOpen?: () => void; onHelpOpen?: () => void; onShareOpen?: () => void; onImportL3Open?: () => void }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -121,6 +121,22 @@ export default function Toolbar({ onAiOpen, onHelpOpen, onShareOpen }: { onAiOpe
           className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[#06B6D4] hover:bg-[#06B6D4]/10 transition-colors"
         >
           <span className="text-[10px] font-bold font-[family-name:var(--font-space-mono)]">AI</span>
+        </button>
+      )}
+
+      {onImportL3Open && (
+        <button
+          onClick={onImportL3Open}
+          title="Import an L3 SIPOC as a Group"
+          className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[var(--m12-text-secondary)] hover:bg-[#06B6D4]/10 hover:text-[#06B6D4] transition-colors text-xs font-medium"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="0.5" y="0.5" width="5" height="5" rx="0.8" stroke="currentColor" strokeWidth="1" />
+            <rect x="8.5" y="0.5" width="5" height="5" rx="0.8" stroke="currentColor" strokeWidth="1" />
+            <rect x="4.5" y="8.5" width="5" height="5" rx="0.8" stroke="currentColor" strokeWidth="1" />
+            <path d="M3 5.5v2M11 5.5v2M7 7v1.5M3 7h8" stroke="currentColor" strokeWidth="0.8" />
+          </svg>
+          L3 SIPOC
         </button>
       )}
 

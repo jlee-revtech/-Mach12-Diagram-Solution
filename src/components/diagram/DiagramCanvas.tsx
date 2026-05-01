@@ -25,6 +25,7 @@ import Sidebar from './Sidebar'
 import AICommandPalette from './AICommandPalette'
 import OnboardingGuide from './OnboardingGuide'
 import ShareDialog from './ShareDialog'
+import ImportL3Dialog from './ImportL3Dialog'
 import { PresenceBadge, RemoteCursors } from './CollabPresence'
 import VersionBadge from '@/components/VersionBadge'
 
@@ -69,6 +70,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   const [aiOpen, setAiOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [importL3Open, setImportL3Open] = useState(false)
   // Collaboration disabled — WS server creates ghost sessions when not running
   const connected = false
   const users: any[] = []
@@ -351,11 +353,12 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           <ArtifactSpotlightBar />
         </div>
 
-        <Toolbar onAiOpen={() => setAiOpen(true)} onHelpOpen={() => setHelpOpen(true)} onShareOpen={() => setShareOpen(true)} />
+        <Toolbar onAiOpen={() => setAiOpen(true)} onHelpOpen={() => setHelpOpen(true)} onShareOpen={() => setShareOpen(true)} onImportL3Open={() => setImportL3Open(true)} />
         <EdgeMarkerDefs />
         <AICommandPalette open={aiOpen} onClose={() => setAiOpen(false)} />
         <OnboardingGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
         <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} />
+        <ImportL3Dialog open={importL3Open} onClose={() => setImportL3Open(false)} />
 
         {/* Toast notification */}
         {toast && (

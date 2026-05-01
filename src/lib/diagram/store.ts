@@ -67,6 +67,9 @@ interface DiagramState {
   addGroup: (label: string, position: XYPosition, color?: string, width?: number, height?: number) => string
   updateGroupLabel: (nodeId: string, label: string) => void
   updateGroupColor: (nodeId: string, color: string) => void
+  // Bulk-merge a pre-built {nodes, edges, groups} seed (e.g. an L3 SIPOC import)
+  // Places the new group to the right of existing content; returns new group id.
+  insertSeed: (seed: { nodes: SystemNode[]; edges: DataFlowEdge[]; groups: SystemGroupNode[] }) => string
   // Edge endpoint editing (sidebar dropdowns)
   updateEdgeEndpoint: (edgeId: string, endpoint: 'source' | 'target', newNodeId: string) => void
   // Reverse edge direction (swap source and target)
@@ -525,6 +528,45 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         g.id === nodeId ? { ...g, data: { ...g.data, label } } : g
       ),
     })
+  },
+
+  insertSeed: (seed) => {
+    get().pushUndo()
+    const { nodes, edges, groups } = get()
+
+    // Determine a free spot: place the imported group to the right of the
+    // rightmost existing node or group, with some padding. For an empty
+    // diagram, the seed's own positions are kept.
+    const allXs: number[] = []
+    nodes.forEach(n => allXs.push((n.position?.x ?? 0) + 200))
+    groups.forEach(g => {
+      const w = (g.style?.width as number | undefined) ?? 500
+      allXs.push((g.position?.x ?? 0) + w)
+    })
+    const rightmost = allXs.length > 0 ? Math.max(...allXs) : null
+
+    let dx = 0
+    let dy = 0
+    if (rightmost !== null) {
+      const seedMinX = Math.min(
+        ...seed.nodes.map(n => n.position.x),
+        ...seed.groups.map(g => g.position.x),
+      )
+      dx = (rightmost + 80) - seedMinX
+    }
+
+    const shift = (pos: { x: number; y: number }) => ({ x: pos.x + dx, y: pos.y + dy })
+
+    const shiftedNodes: SystemNode[] = seed.nodes.map(n => ({ ...n, position: shift(n.position) }))
+    const shiftedGroups: SystemGroupNode[] = seed.groups.map(g => ({ ...g, position: shift(g.position) }))
+
+    set({
+      nodes: [...nodes, ...shiftedNodes],
+      edges: [...edges, ...seed.edges],
+      groups: [...groups, ...shiftedGroups],
+    })
+
+    return shiftedGroups[0]?.id ?? ''
   },
 
   updateGroupColor: (nodeId, color) => {

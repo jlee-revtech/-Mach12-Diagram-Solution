@@ -17,6 +17,7 @@ import { createCapabilityMapShare, listCapabilityMapShares, deleteCapabilityMapS
 import { useCapabilityMapCollab } from '@/lib/collab/useCapabilityMapCollab'
 import { CapabilityMapCollabProvider } from '@/lib/collab/CapabilityMapCollabContext'
 import CollabPresence from '@/components/sipoc/CollabPresence'
+import { pushL3ToNewDiagram } from '@/lib/sipoc/pushToDiagram'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -76,6 +77,28 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     if (lockedByOther && editorOpen) setEditorOpen(false)
   }, [lockedByOther, editorOpen])
+
+  // Push the currently-selected L3 SIPOC into a brand-new data diagram.
+  const [pushingToDiagram, setPushingToDiagram] = useState(false)
+  const handlePushToDiagram = useCallback(async () => {
+    if (!user || !organization || !selectedCapabilityId || pushingToDiagram) return
+    const store = useSIPOCStore.getState()
+    const cap = store.capabilities.find(c => c.id === selectedCapabilityId)
+    if (!cap) return
+    const hydrated = store.getHydratedCapabilities().find(h => h.id === selectedCapabilityId)
+    if (!hydrated) return
+    const ok = window.confirm(`Push "${cap.name}" into a new data architecture diagram?`)
+    if (!ok) return
+    setPushingToDiagram(true)
+    try {
+      const newDiagramId = await pushL3ToNewDiagram(hydrated, organization.id, user.id, map?.title)
+      router.push(`/diagram/${newDiagramId}`)
+    } catch (err) {
+      console.error('Push to diagram failed:', err)
+      alert(err instanceof Error ? err.message : 'Failed to push to diagram')
+      setPushingToDiagram(false)
+    }
+  }, [user, organization, selectedCapabilityId, pushingToDiagram, map?.title, router])
 
   // Load map data (once)
   useEffect(() => {
@@ -335,7 +358,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
 
         {/* SIPOC Drawer + Editor */}
         {organization && (
-          <SIPOCDrawer orgId={organization.id} editorOpen={editorOpen} onToggleEditor={() => setEditorOpen(e => !e)} onShowAI={(prompt?: string) => { if (prompt) setAiPromptOverride(prompt); setShowAI(true) }} mapTitle={map.title}>
+          <SIPOCDrawer orgId={organization.id} editorOpen={editorOpen} onToggleEditor={() => setEditorOpen(e => !e)} onShowAI={(prompt?: string) => { if (prompt) setAiPromptOverride(prompt); setShowAI(true) }} onPushToDiagram={handlePushToDiagram} pushingToDiagram={pushingToDiagram} mapTitle={map.title}>
             {editorOpen && selectedCapabilityId && !lockedByOther && (
               <CapabilityEditor orgId={organization.id} />
             )}

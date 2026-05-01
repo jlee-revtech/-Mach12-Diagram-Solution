@@ -560,11 +560,13 @@ function ExportMenu({ hydrated, mapTitle, orgId }: { hydrated: HydratedCapabilit
 
 // ─── Main Drawer ─────────────────────────────────────────
 
-export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowAI, mapTitle, children }: {
+export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowAI, onPushToDiagram, pushingToDiagram, mapTitle, children }: {
   orgId: string
   editorOpen: boolean
   onToggleEditor: () => void
   onShowAI: (prompt?: string) => void
+  onPushToDiagram?: () => void
+  pushingToDiagram?: boolean
   mapTitle: string
   children?: React.ReactNode
 }) {
@@ -780,6 +782,24 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
 
         {/* Export dropdown */}
         <ExportMenu hydrated={hydrated} mapTitle={mapTitle} orgId={orgId} />
+
+        {/* Push L3 SIPOC into a new data architecture diagram */}
+        {onPushToDiagram && hydrated && !isRollupView && (
+          <button
+            onClick={onPushToDiagram}
+            disabled={!!pushingToDiagram}
+            title="Push this L3 SIPOC into a new data architecture diagram as a Group"
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors text-[var(--m12-text-muted)] hover:text-[#06B6D4] hover:bg-[#06B6D4]/10 disabled:opacity-50 disabled:hover:bg-transparent`}
+          >
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+              <rect x="0.5" y="0.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
+              <rect x="7.5" y="0.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
+              <rect x="4" y="7.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
+              <path d="M2.5 4.5v1.5M9.5 4.5v1.5M6 6v1.5M2.5 6h7" stroke="currentColor" strokeWidth="0.8" />
+            </svg>
+            {pushingToDiagram ? 'Pushing...' : 'To Diagram'}
+          </button>
+        )}
 
         {!readOnly && <>
         {/* Templates */}
