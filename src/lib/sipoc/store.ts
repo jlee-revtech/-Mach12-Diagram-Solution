@@ -171,6 +171,81 @@ export interface SystemFlow {
   ips: InformationProduct[]
 }
 
+// When the same IP is reused on a new capability, seed the new join row's
+// metadata by merging across all other (non-archived) usages of that IP in
+// the loaded map. Union persona/system/tag IDs, dedupe dimensions by name,
+// take the first non-null feeding_system_id.
+function mergeInputUsageMetadata(
+  allInputs: Record<string, CapabilityInput[]>,
+  informationProductId: string,
+  excludeInputId: string,
+): Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'feeding_system_id' | 'tag_ids' | 'dimensions'> | null {
+  const personas = new Set<string>()
+  const systems = new Set<string>()
+  const tags = new Set<string>()
+  const dims = new Map<string, Dimension>()
+  let feeding: string | null = null
+  let found = false
+  for (const list of Object.values(allInputs)) {
+    for (const row of list) {
+      if (row.id === excludeInputId) continue
+      if (row.information_product_id !== informationProductId) continue
+      if (row.archived_at) continue
+      found = true
+      ;(row.supplier_persona_ids || []).forEach(id => personas.add(id))
+      ;(row.source_system_ids || []).forEach(id => systems.add(id))
+      ;(row.tag_ids || []).forEach(id => tags.add(id))
+      if (!feeding && row.feeding_system_id) feeding = row.feeding_system_id
+      ;(row.dimensions || []).forEach(d => {
+        const key = d.name.trim().toLowerCase()
+        if (!dims.has(key)) dims.set(key, { ...d })
+      })
+    }
+  }
+  if (!found) return null
+  return {
+    supplier_persona_ids: Array.from(personas),
+    source_system_ids: Array.from(systems),
+    feeding_system_id: feeding,
+    tag_ids: Array.from(tags),
+    dimensions: Array.from(dims.values()),
+  }
+}
+
+function mergeOutputUsageMetadata(
+  allOutputs: Record<string, CapabilityOutput[]>,
+  informationProductId: string,
+  excludeOutputId: string,
+): Pick<CapabilityOutput, 'consumer_persona_ids' | 'destination_system_ids' | 'tag_ids' | 'dimensions'> | null {
+  const personas = new Set<string>()
+  const systems = new Set<string>()
+  const tags = new Set<string>()
+  const dims = new Map<string, Dimension>()
+  let found = false
+  for (const list of Object.values(allOutputs)) {
+    for (const row of list) {
+      if (row.id === excludeOutputId) continue
+      if (row.information_product_id !== informationProductId) continue
+      if (row.archived_at) continue
+      found = true
+      ;(row.consumer_persona_ids || []).forEach(id => personas.add(id))
+      ;(row.destination_system_ids || []).forEach(id => systems.add(id))
+      ;(row.tag_ids || []).forEach(id => tags.add(id))
+      ;(row.dimensions || []).forEach(d => {
+        const key = d.name.trim().toLowerCase()
+        if (!dims.has(key)) dims.set(key, { ...d })
+      })
+    }
+  }
+  if (!found) return null
+  return {
+    consumer_persona_ids: Array.from(personas),
+    destination_system_ids: Array.from(systems),
+    tag_ids: Array.from(tags),
+    dimensions: Array.from(dims.values()),
+  }
+}
+
 export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   map: null,
   loading: false,
@@ -322,6 +397,11 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   addInput: async (capabilityId, informationProductId) => {
     const currentInputs = get().inputs[capabilityId] || []
     const input = await api.createCapabilityInput(capabilityId, informationProductId, currentInputs.length)
+    const merged = mergeInputUsageMetadata(get().inputs, informationProductId, input.id)
+    if (merged) {
+      await api.updateCapabilityInput(input.id, merged)
+      Object.assign(input, merged)
+    }
     set({
       inputs: { ...get().inputs, [capabilityId]: [...currentInputs, input] },
     })
@@ -455,6 +535,11 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   addOutput: async (capabilityId, informationProductId) => {
     const currentOutputs = get().outputs[capabilityId] || []
     const output = await api.createCapabilityOutput(capabilityId, informationProductId, currentOutputs.length)
+    const merged = mergeOutputUsageMetadata(get().outputs, informationProductId, output.id)
+    if (merged) {
+      await api.updateCapabilityOutput(output.id, merged)
+      Object.assign(output, merged)
+    }
     set({
       outputs: { ...get().outputs, [capabilityId]: [...currentOutputs, output] },
     })

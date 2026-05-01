@@ -52,6 +52,17 @@ wss.on('connection', (conn, req) => {
   doc.conns.set(conn, awarenessStates)
   console.log(`[ws] Client joined "${room}" (${doc.conns.size} clients)`)
 
+  // Track awareness client ids registered through this connection so close
+  // cleanup can release them immediately (otherwise locks linger until the
+  // 30s outdated timeout fires on every peer).
+  const awarenessChangeHandler = ({ added, updated, removed }, origin) => {
+    if (origin !== conn) return
+    added.forEach((id) => awarenessStates.add(id))
+    updated.forEach((id) => awarenessStates.add(id))
+    removed.forEach((id) => awarenessStates.delete(id))
+  }
+  doc.awareness.on('change', awarenessChangeHandler)
+
   // Send initial sync step 1
   const encoder = encoding.createEncoder()
   encoding.writeVarUint(encoder, MSG_SYNC)
@@ -129,6 +140,7 @@ wss.on('connection', (conn, req) => {
   conn.on('close', () => {
     doc.conns.delete(conn)
     doc.off('update', updateHandler)
+    doc.awareness.off('change', awarenessChangeHandler)
     awarenessProtocol.removeAwarenessStates(doc.awareness, Array.from(awarenessStates), null)
     console.log(`[ws] Client left "${room}" (${doc.conns.size} clients)`)
 

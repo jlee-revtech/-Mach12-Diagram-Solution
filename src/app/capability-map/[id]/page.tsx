@@ -14,11 +14,14 @@ import DataArchitectureView from '@/components/sipoc/DataArchitectureView'
 import VersionBadge from '@/components/VersionBadge'
 import { useTheme } from '@/lib/theme-context'
 import { createCapabilityMapShare, listCapabilityMapShares, deleteCapabilityMapShare, type CapabilityMapShare } from '@/lib/supabase/capability-maps'
+import { useCapabilityMapCollab } from '@/lib/collab/useCapabilityMapCollab'
+import { CapabilityMapCollabProvider } from '@/lib/collab/CapabilityMapCollabContext'
+import CollabPresence from '@/components/sipoc/CollabPresence'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const { user, organization, loading: authLoading } = useAuth()
+  const { user, profile, organization, loading: authLoading } = useAuth()
 
   const map = useSIPOCStore(s => s.map)
   const mapTitle = map?.title ?? ''
@@ -47,6 +50,32 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     if (!authLoading && !user) router.push('/auth')
   }, [user, authLoading, router])
+
+  // Collaboration: presence + per-L3 lock via Yjs awareness
+  const collabName =
+    profile?.display_name?.trim() ||
+    (user?.email ? user.email.split('@')[0] : '') ||
+    'Anonymous'
+  const collab = useCapabilityMapCollab(id, user?.id, collabName)
+
+  // Sync our editing-target awareness to whichever L3 is open in the drawer
+  useEffect(() => {
+    collab.setEditingCapability(selectedCapabilityId)
+  }, [selectedCapabilityId, collab.setEditingCapability])
+
+  // Whether another collaborator already holds the lock on the selected L3
+  const lockedByOther = !!(
+    selectedCapabilityId &&
+    collab.users.find(
+      u => u.editingCapabilityId === selectedCapabilityId && u.clientId !== collab.myClientId,
+    )
+  )
+
+  // If we open a locked L3, force the editor side-panel closed so the user
+  // can't even see edit affordances.
+  useEffect(() => {
+    if (lockedByOther && editorOpen) setEditorOpen(false)
+  }, [lockedByOther, editorOpen])
 
   // Load map data (once)
   useEffect(() => {
@@ -130,6 +159,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   }
 
   return (
+    <CapabilityMapCollabProvider users={collab.users} myClientId={collab.myClientId}>
     <div className="fixed inset-0 bg-[var(--m12-bg)] flex flex-col">
       {/* Top bar */}
       <div className="h-12 border-b border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)] flex items-center px-4 gap-4 shrink-0">
@@ -178,6 +208,13 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         </span>
 
         <div className="flex-1" />
+
+        {/* Live presence (other users in this map) */}
+        <CollabPresence
+          users={collab.users}
+          myClientId={collab.myClientId}
+          connected={collab.connected}
+        />
 
         {/* Share (read-only link) */}
         <div ref={shareRef} className="relative">
@@ -299,7 +336,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         {/* SIPOC Drawer + Editor */}
         {organization && (
           <SIPOCDrawer orgId={organization.id} editorOpen={editorOpen} onToggleEditor={() => setEditorOpen(e => !e)} onShowAI={(prompt?: string) => { if (prompt) setAiPromptOverride(prompt); setShowAI(true) }} mapTitle={map.title}>
-            {editorOpen && selectedCapabilityId && (
+            {editorOpen && selectedCapabilityId && !lockedByOther && (
               <CapabilityEditor orgId={organization.id} />
             )}
           </SIPOCDrawer>
@@ -335,5 +372,6 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         />
       )}
     </div>
+    </CapabilityMapCollabProvider>
   )
 }

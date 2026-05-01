@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { CapabilityTreeNode } from '@/lib/sipoc/types'
+import { useLockHolder } from '@/lib/collab/CapabilityMapCollabContext'
 
 const L1_COLORS = [
   '#2563EB', '#10B981', '#F97316', '#8B5CF6',
@@ -23,6 +24,7 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
   allL2s: { id: string; name: string; parentName: string }[]
   readOnly?: boolean
 }) {
+  const lockedBy = useLockHolder(node.id)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -58,6 +60,21 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
       >
         <span className="text-[var(--m12-text-faint)] shrink-0">⠿</span>
         <span className="flex-1 min-w-0 truncate">{node.name}</span>
+        {lockedBy && (
+          <span
+            title={`Currently editing: ${lockedBy.name}`}
+            className="shrink-0 flex items-center gap-1 px-1 py-0.5 rounded bg-[#EAB308]/15 text-[#A16207]"
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: lockedBy.color }}
+            />
+            <svg width="8" height="8" viewBox="0 0 12 12" fill="none">
+              <rect x="2" y="5" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M4 5V3.5a2 2 0 014 0V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+          </span>
+        )}
         {!readOnly && otherL2s.length > 0 && (
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}

@@ -8,6 +8,7 @@ import { createCapabilityTemplate } from '@/lib/supabase/capability-maps'
 import { useAuth } from '@/lib/supabase/auth-context'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 import SIPOCTemplatesPanel from '@/components/sipoc/SIPOCTemplatesPanel'
+import { useLockHolder } from '@/lib/collab/CapabilityMapCollabContext'
 
 // ─── SIPOC color tokens ──────────────────────────────────
 const SIPOC = {
@@ -569,9 +570,11 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
 }) {
   const drawerOpen = useSIPOCStore(s => s.drawerOpen)
   const drawerHeight = useSIPOCStore(s => s.drawerHeight)
-  const readOnly = useSIPOCStore(s => s.readOnly)
+  const storeReadOnly = useSIPOCStore(s => s.readOnly)
   const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
   const capabilities = useSIPOCStore(s => s.capabilities)
+  const lockedBy = useLockHolder(selectedId)
+  const readOnly = storeReadOnly || !!lockedBy
 
   const fullscreen = useSIPOCStore(s => s.drawerFullscreen)
 
@@ -871,6 +874,23 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
           </svg>
         </button>
       </div>
+
+      {/* Lock banner — another collaborator is editing this L3 */}
+      {lockedBy && (
+        <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 bg-[#EAB308]/10 border-b border-[#EAB308]/30">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="text-[#EAB308]">
+            <rect x="2" y="5" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M4 5V3.5a2 2 0 014 0V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          <div
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: lockedBy.color }}
+          />
+          <span className="text-[10px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#A16207]">
+            Currently editing: {lockedBy.name} · view-only
+          </span>
+        </div>
+      )}
 
       {/* Content: SIPOC flow + optional editor panel */}
       <div
