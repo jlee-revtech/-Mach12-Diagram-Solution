@@ -10,6 +10,7 @@ import AIGeneratePanel from '@/components/sipoc/AIGeneratePanel'
 import ExecutiveSummary from '@/components/sipoc/ExecutiveSummary'
 import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import AIBulkLoadPanel from '@/components/sipoc/AIBulkLoadPanel'
+import AIAutoFillBlankL3sPanel from '@/components/sipoc/AIAutoFillBlankL3sPanel'
 import DataArchitectureView from '@/components/sipoc/DataArchitectureView'
 import VersionBadge from '@/components/VersionBadge'
 import { useTheme } from '@/lib/theme-context'
@@ -38,6 +39,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [showExecSummary, setShowExecSummary] = useState(false)
   const [showDataArch, setShowDataArch] = useState(false)
   const [bulkLoadTarget, setBulkLoadTarget] = useState<{ id: string; name: string } | null>(null)
+  const [showAutoFill, setShowAutoFill] = useState(false)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
   const { theme, toggleTheme } = useTheme()
@@ -317,6 +319,18 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           Data Architecture
         </button>
 
+        {/* AI auto-fill blank L3s */}
+        <button
+          onClick={() => setShowAutoFill(true)}
+          title="Auto-generate SIPOC for every L3 with no inputs/outputs"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-[#8B5CF6]/20 to-[#2563EB]/20 border border-[#8B5CF6]/30 hover:border-[#8B5CF6]/50 text-[#8B5CF6] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="currentColor" />
+          </svg>
+          Fill Blank L3s
+        </button>
+
         {/* Executive summary button */}
         <button
           onClick={() => setShowExecSummary(true)}
@@ -398,6 +412,15 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           coreAreaId={bulkLoadTarget.id}
           coreAreaName={bulkLoadTarget.name}
           onClose={() => setBulkLoadTarget(null)}
+        />
+      )}
+
+      {/* AI Auto-Fill Blank L3s */}
+      {showAutoFill && organization && (
+        <AIAutoFillBlankL3sPanel
+          orgId={organization.id}
+          mapTitle={map.title}
+          onClose={() => setShowAutoFill(false)}
         />
       )}
     </div>
