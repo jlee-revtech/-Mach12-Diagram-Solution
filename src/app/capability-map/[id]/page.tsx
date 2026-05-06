@@ -25,6 +25,8 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const { id } = use(params)
   const router = useRouter()
   const { user, profile, organization, loading: authLoading } = useAuth()
+  const pageMountTimeRef = useRef<number>(performance.now())
+  const firstRenderLoggedRef = useRef(false)
 
   const map = useSIPOCStore(s => s.map)
   const mapTitle = map?.title ?? ''
@@ -113,11 +115,22 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     if (id && !loadedRef.current) {
       loadedRef.current = true
+      const tStart = performance.now()
+      console.log(`[capmap-perf] loadMap kicked off at +${(tStart - pageMountTimeRef.current).toFixed(0)}ms after mount`)
       useSIPOCStore.getState().loadMap(id).then(ok => {
         if (ok) useSIPOCStore.getState().loadComments(id, false)
       })
     }
   }, [id])
+
+  // Log when the page gate releases (auth + map both ready)
+  useEffect(() => {
+    if (!authLoading && user && !loading && map && !firstRenderLoggedRef.current) {
+      firstRenderLoggedRef.current = true
+      const total = performance.now() - pageMountTimeRef.current
+      console.log(`[capmap-perf] page-ready total=${total.toFixed(0)}ms (mount → first usable render)`)
+    }
+  }, [authLoading, user, loading, map])
 
   // Load org entities when org is available (once per org)
   useEffect(() => {

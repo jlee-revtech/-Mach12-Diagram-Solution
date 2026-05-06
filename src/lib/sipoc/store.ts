@@ -306,14 +306,25 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
 
   loadMap: async (mapId) => {
     set({ loading: true })
+    const t0 = performance.now()
+
+    const tMap = performance.now()
     const map = await api.getCapabilityMap(mapId)
+    const dMap = performance.now() - tMap
     if (!map) { set({ loading: false }); return false }
 
+    const tCaps = performance.now()
     const capabilities = await api.listCapabilities(mapId)
+    const dCaps = performance.now() - tCaps
 
     // Load all inputs/outputs for all capabilities in parallel
+    const tIn = performance.now()
     const inputResults = await Promise.all(capabilities.map(c => api.listCapabilityInputs(c.id)))
+    const dIn = performance.now() - tIn
+
+    const tOut = performance.now()
     const outputResults = await Promise.all(capabilities.map(c => api.listCapabilityOutputs(c.id)))
+    const dOut = performance.now() - tOut
 
     const inputs: Record<string, CapabilityInput[]> = {}
     const outputs: Record<string, CapabilityOutput[]> = {}
@@ -323,18 +334,48 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     })
 
     set({ map, capabilities, inputs, outputs, loading: false })
+    const dTotal = performance.now() - t0
+    const inputCount = inputResults.reduce((n, r) => n + r.length, 0)
+    const outputCount = outputResults.reduce((n, r) => n + r.length, 0)
+    console.log(
+      `[capmap-perf] loadMap total=${dTotal.toFixed(0)}ms`,
+      `| getMap=${dMap.toFixed(0)}ms`,
+      `listCapabilities=${dCaps.toFixed(0)}ms (${capabilities.length} caps)`,
+      `inputs=${dIn.toFixed(0)}ms (${capabilities.length} requests, ${inputCount} rows)`,
+      `outputs=${dOut.toFixed(0)}ms (${capabilities.length} requests, ${outputCount} rows)`,
+    )
     return true
   },
 
   loadOrgEntities: async (orgId) => {
-    const [personas, informationProducts, logicalSystems, tags, systemDataElements] = await Promise.all([
-      api.listPersonas(orgId),
-      api.listInformationProducts(orgId),
-      api.listLogicalSystems(orgId),
-      api.listTags(orgId),
-      api.listSystemDataElements(orgId),
+    const t0 = performance.now()
+    const time = <T,>(label: string, p: Promise<T>): Promise<{ r: T; d: number; label: string }> => {
+      const start = performance.now()
+      return p.then(r => ({ r, d: performance.now() - start, label }))
+    }
+    const [pRes, ipRes, sysRes, tagRes, sdeRes] = await Promise.all([
+      time('personas', api.listPersonas(orgId)),
+      time('IPs', api.listInformationProducts(orgId)),
+      time('systems', api.listLogicalSystems(orgId)),
+      time('tags', api.listTags(orgId)),
+      time('dataElements', api.listSystemDataElements(orgId)),
     ])
-    set({ personas, informationProducts, logicalSystems, tags, systemDataElements })
+    set({
+      personas: pRes.r,
+      informationProducts: ipRes.r,
+      logicalSystems: sysRes.r,
+      tags: tagRes.r,
+      systemDataElements: sdeRes.r,
+    })
+    const dTotal = performance.now() - t0
+    console.log(
+      `[capmap-perf] loadOrgEntities total=${dTotal.toFixed(0)}ms`,
+      `| personas=${pRes.d.toFixed(0)}ms (${pRes.r.length})`,
+      `IPs=${ipRes.d.toFixed(0)}ms (${ipRes.r.length})`,
+      `systems=${sysRes.d.toFixed(0)}ms (${sysRes.r.length})`,
+      `tags=${tagRes.d.toFixed(0)}ms (${tagRes.r.length})`,
+      `dataElements=${sdeRes.d.toFixed(0)}ms (${sdeRes.r.length})`,
+    )
   },
 
   // ─── Capability map meta ──────────────────────────────
@@ -808,10 +849,12 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   loadComments: async (mapId, anon) => {
+    const t0 = performance.now()
     const list = anon
       ? await api.listSipocCommentsAnon(mapId)
       : await api.listSipocComments(mapId)
     set({ comments: list })
+    console.log(`[capmap-perf] loadComments total=${(performance.now() - t0).toFixed(0)}ms (${list.length} comments)`)
   },
 
   addComment: async (input) => {
