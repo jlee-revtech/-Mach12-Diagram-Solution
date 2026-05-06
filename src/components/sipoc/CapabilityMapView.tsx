@@ -59,7 +59,7 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
         }`}
       >
         <span className="text-[var(--m12-text-faint)] shrink-0">⠿</span>
-        <span className="flex-1 min-w-0 truncate">{node.name}</span>
+        <span className="flex-1 min-w-0 truncate" title={node.description ? `${node.name}\n\n${node.description}` : node.name}>{node.name}</span>
         {lockedBy && (
           <span
             title={`Currently editing: ${lockedBy.name}`}
@@ -170,8 +170,9 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
         <div className="flex items-center gap-1.5">
           {!readOnly && <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>}
           <div
-            className="text-[11px] font-bold text-[var(--m12-text)] flex-1 cursor-pointer hover:text-[#2563EB] transition-colors"
+            className="text-[11px] font-bold text-[var(--m12-text)] flex-1 min-w-0 truncate cursor-pointer hover:text-[#2563EB] transition-colors"
             onClick={(e) => { e.stopPropagation(); onSelect(node.id) }}
+            title={node.description ? `${node.name}\n\n${node.description}` : node.name}
           >{node.name}</div>
           {!readOnly && (
             <button
@@ -211,7 +212,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
 }
 
 // ─── L1 Core Area column (draggable + drop target) ──────
-function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onRemove, allL2s, readOnly }: {
+function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onRemove, allL2s, readOnly, focusState, onToggleFocus }: {
   node: CapabilityTreeNode
   color: string
   index: number
@@ -225,6 +226,8 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
   onRemove: (id: string, name: string, childCount: number) => void
   allL2s: { id: string; name: string; parentName: string }[]
   readOnly?: boolean
+  focusState: 'focused' | 'shrunk' | 'normal'
+  onToggleFocus: (id: string) => void
 }) {
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -246,9 +249,17 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
     }
   }
 
+  // Click-to-focus column sizing. Focused column gets ~3x growth and a wider
+  // floor so long L3 names can render in full; shrunk siblings collapse to a
+  // narrow rail (still readable, but no longer competing for width).
+  const focusFlex =
+    focusState === 'focused' ? 'flex-[3_1_0%] min-w-[280px]'
+    : focusState === 'shrunk' ? 'flex-[0.6_1_0%] min-w-[120px] max-w-[180px]'
+    : 'flex-1 min-w-[140px]'
+
   return (
     <div
-      className={`flex flex-col flex-1 min-w-[140px] transition-all ${
+      className={`flex flex-col transition-all duration-200 ${focusFlex} ${
         dragOver && draggedLevel === 1
           ? dragOverLeft
             ? 'border-l-4 border-[#2563EB] rounded-xl'
@@ -272,7 +283,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
         }
       }}
     >
-      {/* L1 Header (draggable for reorder) */}
+      {/* L1 Header (draggable for reorder; click name to focus column) */}
       <div
         draggable={!readOnly}
         onDragStart={readOnly ? undefined : (e) => {
@@ -282,15 +293,25 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
           e.dataTransfer.setData('text/plain', node.id)
         }}
         onDragEnd={readOnly ? undefined : () => { draggedId = null; draggedLevel = null }}
-        className={`rounded-t-xl px-4 py-3 flex items-start gap-3 ${readOnly ? '' : 'cursor-grab active:cursor-grabbing'} min-h-[72px]`}
+        className={`rounded-t-xl px-4 py-3 flex items-start gap-3 ${readOnly ? '' : 'cursor-grab active:cursor-grabbing'} min-h-[72px] ${focusState === 'focused' ? 'ring-2 ring-white/40' : ''}`}
         style={{ backgroundColor: color }}
       >
         <span className="text-[11px] font-[family-name:var(--font-space-mono)] text-white/50 font-bold mt-0.5 shrink-0">
           {index + 1}.
         </span>
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-white leading-snug">{node.name}</div>
-        </div>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleFocus(node.id) }}
+          className="flex-1 min-w-0 text-left cursor-pointer group/focus"
+          title={focusState === 'focused' ? 'Click to reset column widths' : 'Click to focus this column (others shrink)'}
+        >
+          <div
+            className={`text-[13px] font-semibold text-white leading-snug ${focusState === 'shrunk' ? 'truncate' : ''}`}
+          >{node.name}</div>
+          <div className="text-[8px] text-white/60 font-[family-name:var(--font-space-mono)] uppercase tracking-wider mt-0.5 opacity-0 group-hover/focus:opacity-100 transition-opacity">
+            {focusState === 'focused' ? '← reset' : 'focus →'}
+          </div>
+        </button>
         {!readOnly && <div className="relative shrink-0 mt-0.5">
           <button
             onClick={() => setShowAddMenu(!showAddMenu)}
@@ -385,6 +406,10 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
   const removeCapability = useSIPOCStore(s => s.removeCapability)
   const [addingL1, setAddingL1] = useState(false)
   const [newL1Name, setNewL1Name] = useState('')
+  const [focusedL1Id, setFocusedL1Id] = useState<string | null>(null)
+  const handleToggleFocus = useCallback((id: string) => {
+    setFocusedL1Id(prev => prev === id ? null : id)
+  }, [])
 
   const tree = useMemo(() => {
     return useSIPOCStore.getState().getCapabilityTree()
@@ -634,6 +659,8 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
               onRemove={handleRemoveL1}
               allL2s={allL2s}
               readOnly={readOnly}
+              focusState={focusedL1Id === null ? 'normal' : focusedL1Id === l1.id ? 'focused' : 'shrunk'}
+              onToggleFocus={handleToggleFocus}
             />
           ))}
         </div>

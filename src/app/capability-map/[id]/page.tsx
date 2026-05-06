@@ -19,6 +19,7 @@ import { useCapabilityMapCollab } from '@/lib/collab/useCapabilityMapCollab'
 import { CapabilityMapCollabProvider } from '@/lib/collab/CapabilityMapCollabContext'
 import CollabPresence from '@/components/sipoc/CollabPresence'
 import { pushL3ToNewDiagram } from '@/lib/sipoc/pushToDiagram'
+import { exportCapabilityMapWorkbook } from '@/lib/export/capabilityMap'
 
 export default function CapabilityMapPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -176,6 +177,25 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
     await loadShares()
   }, [loadShares])
 
+  const handleExportAll = useCallback(() => {
+    const store = useSIPOCStore.getState()
+    if (!map) return
+    try {
+      exportCapabilityMapWorkbook({
+        title: map.title,
+        tree: store.getCapabilityTree(),
+        hydrated: store.getHydratedCapabilities(),
+        informationProducts: store.informationProducts,
+        systemDataElements: store.systemDataElements,
+        logicalSystems: store.logicalSystems,
+        personas: store.personas,
+      })
+    } catch (e) {
+      console.error('Export failed:', e)
+      alert(e instanceof Error ? e.message : 'Export failed')
+    }
+  }, [map])
+
   const handleCopyLink = useCallback((code: string) => {
     const url = `${window.location.origin}/share/${code}`
     navigator.clipboard.writeText(url)
@@ -319,6 +339,18 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
             <path d="M2.5 4.5v1.5M9.5 4.5v1.5M6 6v1.5M2.5 6h7" stroke="currentColor" strokeWidth="0.8" />
           </svg>
           Data Architecture
+        </button>
+
+        {/* Easy button: full capability-map Excel export */}
+        <button
+          onClick={handleExportAll}
+          title="Download the full capability map (L1 → L2 → L3 → SIPOC, IPs, data elements, use cases) as a structured Excel workbook"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-[#10B981]/20 to-[#06B6D4]/20 border border-[#10B981]/30 hover:border-[#10B981]/50 text-[#10B981] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M6 1.5v6M3.5 5L6 7.5 8.5 5M2 9.5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Export to Excel
         </button>
 
         {/* AI auto-fill blank L3s */}
