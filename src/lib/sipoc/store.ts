@@ -128,8 +128,23 @@ interface SIPOCState {
     body: string
   }) => Promise<SipocComment | null>
   removeComment: (id: string) => Promise<void>
-  commentsAnchorOpen: { capability_id: string; region: SipocRegion; item_id: string | null } | null
-  setCommentsAnchor: (anchor: { capability_id: string; region: SipocRegion; item_id?: string | null } | null) => void
+  resolveThread: (
+    anchor: { capability_id: string; region: SipocRegion; item_id: string | null },
+    resolverName: string,
+  ) => Promise<void>
+  unresolveThread: (anchor: { capability_id: string; region: SipocRegion; item_id: string | null }) => Promise<void>
+
+  // Rail UI state
+  commentsRailOpen: boolean
+  setCommentsRailOpen: (v: boolean) => void
+  selectedThreadKey: string | null
+  setSelectedThreadKey: (key: string | null) => void
+  pickingAnchor: boolean
+  setPickingAnchor: (v: boolean) => void
+  highlightedAnchorKey: string | null
+  setHighlightedAnchorKey: (key: string | null) => void
+  pendingNewAnchor: { capability_id: string; region: SipocRegion; item_id: string | null } | null
+  setPendingNewAnchor: (a: { capability_id: string; region: SipocRegion; item_id: string | null } | null) => void
 
   // ─── Derived: hydrated capabilities ───────────────────
   getHydratedCapabilities: () => HydratedCapability[]
@@ -835,12 +850,68 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     await api.deleteSipocComment(id)
   },
 
-  commentsAnchorOpen: null,
-  setCommentsAnchor: (anchor) => set({
-    commentsAnchorOpen: anchor
-      ? { capability_id: anchor.capability_id, region: anchor.region, item_id: anchor.item_id ?? null }
-      : null,
-  }),
+  resolveThread: async (anchor, resolverName) => {
+    const { map, readOnly } = get()
+    if (!map) return
+    const now = new Date().toISOString()
+    const name = resolverName.trim() || 'Anonymous'
+    set({
+      comments: get().comments.map(c =>
+        c.capability_id === anchor.capability_id &&
+        c.region === anchor.region &&
+        (c.item_id || null) === (anchor.item_id || null)
+          ? { ...c, resolved_at: now, resolved_by_name: name }
+          : c
+      ),
+    })
+    try {
+      if (readOnly) {
+        await api.resolveSipocThreadAnon(map.id, anchor.capability_id, anchor.region, anchor.item_id, name)
+      } else {
+        await api.resolveSipocThread(map.id, anchor.capability_id, anchor.region, anchor.item_id, name)
+      }
+    } catch (e) {
+      console.error('Failed to resolve thread:', e)
+      // best-effort; reload to recover
+      await get().loadComments(map.id, readOnly)
+    }
+  },
+
+  unresolveThread: async (anchor) => {
+    const { map, readOnly } = get()
+    if (!map) return
+    set({
+      comments: get().comments.map(c =>
+        c.capability_id === anchor.capability_id &&
+        c.region === anchor.region &&
+        (c.item_id || null) === (anchor.item_id || null)
+          ? { ...c, resolved_at: null, resolved_by_name: null }
+          : c
+      ),
+    })
+    try {
+      if (readOnly) {
+        await api.unresolveSipocThreadAnon(map.id, anchor.capability_id, anchor.region, anchor.item_id)
+      } else {
+        await api.unresolveSipocThread(map.id, anchor.capability_id, anchor.region, anchor.item_id)
+      }
+    } catch (e) {
+      console.error('Failed to unresolve thread:', e)
+      await get().loadComments(map.id, readOnly)
+    }
+  },
+
+  // Rail UI state
+  commentsRailOpen: false,
+  setCommentsRailOpen: (v) => set({ commentsRailOpen: v, ...(v ? {} : { pickingAnchor: false, pendingNewAnchor: null }) }),
+  selectedThreadKey: null,
+  setSelectedThreadKey: (key) => set({ selectedThreadKey: key }),
+  pickingAnchor: false,
+  setPickingAnchor: (v) => set({ pickingAnchor: v }),
+  highlightedAnchorKey: null,
+  setHighlightedAnchorKey: (key) => set({ highlightedAnchorKey: key }),
+  pendingNewAnchor: null,
+  setPendingNewAnchor: (a) => set({ pendingNewAnchor: a }),
 
   // ─── Derived: hydrated capabilities ───────────────────
 

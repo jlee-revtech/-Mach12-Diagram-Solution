@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { HydratedCapability, Dimension, Tag, SipocRegion } from '@/lib/sipoc/types'
-import CommentPin from '@/components/sipoc/CommentPin'
+import ArtifactCommentBadge from '@/components/sipoc/ArtifactCommentBadge'
 
 // ─── Column Header ──────────────────────────────────────
 function ColumnHeader({ label, color, letter }: { label: string; color: string; letter: string }) {
@@ -92,7 +92,7 @@ function IPCard({
       <div className="flex items-center gap-1.5">
         <div className="text-[11px] font-semibold text-[var(--m12-text)] flex-1 leading-tight">{name}</div>
         {capabilityId && commentRegion && itemId && !itemId.startsWith('rollup-') && (
-          <CommentPin capabilityId={capabilityId} region={commentRegion} itemId={itemId} />
+          <ArtifactCommentBadge capabilityId={capabilityId} region={commentRegion} itemId={itemId} />
         )}
         {hasDims && (
           <span className="text-[7px] bg-[var(--m12-bg)] text-[var(--m12-text-muted)] rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] font-bold border border-[var(--m12-border)]/20">
@@ -294,12 +294,12 @@ function OutputLane({ output, showDimensions, capabilityId }: {
   )
 }
 
-// ─── Region pin strip (S/I/P/O/C comments at the capability level) ─
+// ─── Region badge strip (S/I/P/O/C comment counts at the capability level) ─
 function RegionPinStrip({ capabilityId }: { capabilityId: string }) {
   return (
     <div className="flex items-center gap-1.5">
       {(['S','I','P','O','C'] as const).map(r => (
-        <CommentPin key={r} capabilityId={capabilityId} region={r} label={r} />
+        <ArtifactCommentBadge key={r} capabilityId={capabilityId} region={r} />
       ))}
     </div>
   )

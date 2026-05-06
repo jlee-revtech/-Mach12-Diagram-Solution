@@ -196,6 +196,19 @@ export interface SipocComment {
   author_name: string
   body: string
   created_at: string
+  resolved_at: string | null
+  resolved_by_name: string | null
+}
+
+export interface SipocAnchor {
+  capability_id: string
+  region: SipocRegion
+  item_id: string | null
+}
+
+// Stable string key for grouping comments into threads in the UI.
+export function anchorKey(a: { capability_id: string; region: SipocRegion; item_id: string | null }): string {
+  return `${a.capability_id}::${a.region}::${a.item_id || 'none'}`
 }
 
 // ─── Tag color presets ─────────────────────────────────

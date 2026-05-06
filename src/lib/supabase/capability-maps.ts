@@ -766,6 +766,81 @@ export async function deleteSipocComment(id: string): Promise<void> {
   })
 }
 
+// Bulk update of every row whose anchor matches — flips a thread
+// to resolved or back to open. Works under both authed and anon paths.
+async function patchThreadResolution(
+  hdrs: Record<string, string>,
+  capabilityMapId: string,
+  capabilityId: string,
+  region: SipocRegion,
+  itemId: string | null,
+  body: { resolved_at: string | null; resolved_by_name: string | null },
+): Promise<void> {
+  const itemFilter = itemId
+    ? `&item_id=eq.${itemId}`
+    : `&item_id=is.null`
+  const url = `${URL}/rest/v1/sipoc_comments?capability_map_id=eq.${capabilityMapId}&capability_id=eq.${capabilityId}&region=eq.${region}${itemFilter}`
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { ...hdrs, 'Prefer': 'return=minimal' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}))
+    throw new Error(j.message || 'Failed to update thread resolution')
+  }
+}
+
+export async function resolveSipocThread(
+  capabilityMapId: string,
+  capabilityId: string,
+  region: SipocRegion,
+  itemId: string | null,
+  resolvedByName: string,
+): Promise<void> {
+  return patchThreadResolution(headers(), capabilityMapId, capabilityId, region, itemId, {
+    resolved_at: new Date().toISOString(),
+    resolved_by_name: resolvedByName.trim(),
+  })
+}
+
+export async function unresolveSipocThread(
+  capabilityMapId: string,
+  capabilityId: string,
+  region: SipocRegion,
+  itemId: string | null,
+): Promise<void> {
+  return patchThreadResolution(headers(), capabilityMapId, capabilityId, region, itemId, {
+    resolved_at: null,
+    resolved_by_name: null,
+  })
+}
+
+export async function resolveSipocThreadAnon(
+  capabilityMapId: string,
+  capabilityId: string,
+  region: SipocRegion,
+  itemId: string | null,
+  resolvedByName: string,
+): Promise<void> {
+  return patchThreadResolution(anonHeaders(), capabilityMapId, capabilityId, region, itemId, {
+    resolved_at: new Date().toISOString(),
+    resolved_by_name: resolvedByName.trim(),
+  })
+}
+
+export async function unresolveSipocThreadAnon(
+  capabilityMapId: string,
+  capabilityId: string,
+  region: SipocRegion,
+  itemId: string | null,
+): Promise<void> {
+  return patchThreadResolution(anonHeaders(), capabilityMapId, capabilityId, region, itemId, {
+    resolved_at: null,
+    resolved_by_name: null,
+  })
+}
+
 // ─── Duplicate an entire Capability Map ────────────────
 export async function duplicateCapabilityMap(
   sourceMapId: string,

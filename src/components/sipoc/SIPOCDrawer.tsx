@@ -8,10 +8,57 @@ import { createCapabilityTemplate } from '@/lib/supabase/capability-maps'
 import { useAuth } from '@/lib/supabase/auth-context'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 import SIPOCTemplatesPanel from '@/components/sipoc/SIPOCTemplatesPanel'
-import CommentPin from '@/components/sipoc/CommentPin'
-import CommentsPanel from '@/components/sipoc/CommentsPanel'
+import ArtifactCommentBadge from '@/components/sipoc/ArtifactCommentBadge'
+import AnchorPickTarget from '@/components/sipoc/AnchorPickTarget'
+import CommentsRail from '@/components/sipoc/CommentsRail'
 import { useLockHolder } from '@/lib/collab/CapabilityMapCollabContext'
 import type { SipocRegion } from '@/lib/sipoc/types'
+
+// ─── Comments toolbar toggle ─────────────────────────────
+function CommentsToggleButton() {
+  const open = useSIPOCStore(s => s.commentsRailOpen)
+  const setOpen = useSIPOCStore(s => s.setCommentsRailOpen)
+  const comments = useSIPOCStore(s => s.comments)
+  const selectedId = useSIPOCStore(s => s.selectedCapabilityId)
+  // Count unresolved threads on the currently-open capability
+  const unresolved = (() => {
+    if (!selectedId) return 0
+    const seen = new Set<string>()
+    let n = 0
+    for (const c of comments) {
+      if (c.capability_id !== selectedId) continue
+      const k = `${c.region}::${c.item_id || 'none'}`
+      if (seen.has(k)) continue
+      seen.add(k)
+      // find latest in this thread for resolution flag
+      const peers = comments.filter(p => p.capability_id === selectedId && p.region === c.region && (p.item_id || null) === (c.item_id || null))
+      const latest = peers.reduce((a, b) => a.created_at > b.created_at ? a : b)
+      if (!latest.resolved_at) n++
+    }
+    return n
+  })()
+  return (
+    <button
+      onClick={() => setOpen(!open)}
+      className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider transition-colors ${
+        open
+          ? 'bg-[#2563EB]/15 text-[#2563EB]'
+          : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)]'
+      }`}
+      title="Open comments rail"
+    >
+      <svg width="9" height="9" viewBox="0 0 14 14" fill="none">
+        <path d="M2.5 2.5h9a1 1 0 011 1v5a1 1 0 01-1 1H7L4.5 12V9.5H2.5a1 1 0 01-1-1v-5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      </svg>
+      Comments
+      {unresolved > 0 && (
+        <span className="ml-0.5 inline-flex items-center justify-center min-w-[14px] h-3.5 px-1 rounded-full bg-amber-500 text-white text-[8px] leading-none">
+          {unresolved}
+        </span>
+      )}
+    </button>
+  )
+}
 
 // ─── SIPOC color tokens ──────────────────────────────────
 const SIPOC = {
@@ -116,7 +163,7 @@ function MiniLineageArrow() {
 // ─── Column header ───────────────────────────────────────
 
 function ColumnHeader({ sipoc, capabilityId }: { sipoc: typeof SIPOC[keyof typeof SIPOC]; capabilityId?: string }) {
-  return (
+  const inner = (
     <div className="flex items-center gap-2 mb-3 px-1">
       <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white" style={{ backgroundColor: sipoc.color }}>
         {sipoc.letter}
@@ -126,10 +173,16 @@ function ColumnHeader({ sipoc, capabilityId }: { sipoc: typeof SIPOC[keyof typeo
       </span>
       {capabilityId && (
         <span className="ml-auto">
-          <CommentPin capabilityId={capabilityId} region={sipoc.letter as SipocRegion} />
+          <ArtifactCommentBadge capabilityId={capabilityId} region={sipoc.letter as SipocRegion} />
         </span>
       )}
     </div>
+  )
+  if (!capabilityId) return inner
+  return (
+    <AnchorPickTarget capabilityId={capabilityId} region={sipoc.letter as SipocRegion} className="rounded">
+      {inner}
+    </AnchorPickTarget>
   )
 }
 
@@ -156,9 +209,10 @@ function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { i
   return (
     <div className="flex items-stretch gap-0 group/lane">
       {/* Supplier side */}
+      <AnchorPickTarget capabilityId={capabilityId} region="S" itemId={input.id} className="flex-1 min-w-0 flex">
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.S.bg }}>
         <div className="absolute top-1.5 right-1.5 z-10">
-          <CommentPin capabilityId={capabilityId} region="S" itemId={input.id} />
+          <ArtifactCommentBadge capabilityId={capabilityId} region="S" itemId={input.id} />
         </div>
         {hasSuppliers && (
           <div className="space-y-1 mb-1.5">
@@ -181,14 +235,16 @@ function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { i
           <div className="text-[9px] italic text-[var(--m12-text-faint)]">No suppliers</div>
         )}
       </div>
+      </AnchorPickTarget>
 
       {/* Arrow: suppliers → input */}
       <HFlowArrow color={SIPOC.S.color} />
 
       {/* Input card side */}
+      <AnchorPickTarget capabilityId={capabilityId} region="I" itemId={input.id} className="flex-1 min-w-0 flex">
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.I.bg }}>
         <div className="absolute top-1.5 left-1.5 z-10">
-          <CommentPin capabilityId={capabilityId} region="I" itemId={input.id} />
+          <ArtifactCommentBadge capabilityId={capabilityId} region="I" itemId={input.id} />
         </div>
         {!readOnly && <button
           onClick={(e) => { e.stopPropagation(); if (confirm(`Remove input "${input.informationProduct.name}"?`)) onRemove() }}
@@ -218,6 +274,7 @@ function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { i
           </div>
         )}
       </div>
+      </AnchorPickTarget>
     </div>
   )
 }
@@ -232,9 +289,10 @@ function OutputLane({ output, onRemove, onClickCard, showDims, capabilityId }: {
   return (
     <div className="flex items-stretch gap-0 group/lane">
       {/* Output card side */}
+      <AnchorPickTarget capabilityId={capabilityId} region="O" itemId={output.id} className="flex-1 min-w-0 flex">
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.O.bg }}>
         <div className="absolute top-1.5 left-1.5 z-10">
-          <CommentPin capabilityId={capabilityId} region="O" itemId={output.id} />
+          <ArtifactCommentBadge capabilityId={capabilityId} region="O" itemId={output.id} />
         </div>
         {!readOnly && <button
           onClick={(e) => { e.stopPropagation(); if (confirm(`Remove output "${output.informationProduct.name}"?`)) onRemove() }}
@@ -267,14 +325,16 @@ function OutputLane({ output, onRemove, onClickCard, showDims, capabilityId }: {
           </div>
         )}
       </div>
+      </AnchorPickTarget>
 
       {/* Arrow: output → customers */}
       <HFlowArrow color={SIPOC.O.color} />
 
       {/* Customer side */}
+      <AnchorPickTarget capabilityId={capabilityId} region="C" itemId={output.id} className="flex-1 min-w-0 flex">
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.C.bg }}>
         <div className="absolute top-1.5 right-1.5 z-10">
-          <CommentPin capabilityId={capabilityId} region="C" itemId={output.id} />
+          <ArtifactCommentBadge capabilityId={capabilityId} region="C" itemId={output.id} />
         </div>
         {hasConsumers ? (
           <div className="space-y-1">
@@ -286,6 +346,7 @@ function OutputLane({ output, onRemove, onClickCard, showDims, capabilityId }: {
           <div className="text-[9px] italic text-[var(--m12-text-faint)]">No consumers</div>
         )}
       </div>
+      </AnchorPickTarget>
     </div>
   )
 }
@@ -821,6 +882,9 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
           </button>
         )}
 
+        {/* Comments */}
+        <CommentsToggleButton />
+
         {!readOnly && <>
         {/* Templates */}
         <button
@@ -1003,7 +1067,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
           {children}
         </div>
       </div>
-      <CommentsPanel />
+      <CommentsRail />
     </div>
   )
 }
