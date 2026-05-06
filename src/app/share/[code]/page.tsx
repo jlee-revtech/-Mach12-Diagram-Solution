@@ -70,6 +70,9 @@ export default function SharePage({ params }: { params: Promise<{ code: string }
         loading: false,
       })
 
+      // Load comments (anon path)
+      useSIPOCStore.getState().loadComments(map.id, true)
+
       setStatus('ready')
     }
     load()

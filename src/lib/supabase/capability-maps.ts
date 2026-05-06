@@ -9,6 +9,8 @@ import type {
   CapabilityTemplateRow,
   Tag,
   SystemDataElement,
+  SipocComment,
+  SipocRegion,
 } from '@/lib/sipoc/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -697,6 +699,71 @@ export async function listTagsAnon(orgId: string): Promise<Tag[]> {
     `${URL}/rest/v1/tags?organization_id=eq.${orgId}&select=*&order=name.asc`,
     anonHeaders()
   )
+}
+
+// ─── SIPOC comments ────────────────────────────────────
+
+export interface CreateSipocCommentInput {
+  capability_map_id: string
+  capability_id: string
+  region: SipocRegion
+  item_type?: string | null
+  item_id?: string | null
+  author_name: string
+  body: string
+}
+
+// Authed: list all comments for a map
+export async function listSipocComments(mapId: string): Promise<SipocComment[]> {
+  return fetchAllPaginated<SipocComment>(
+    `${URL}/rest/v1/sipoc_comments?capability_map_id=eq.${mapId}&select=*&order=created_at.asc`,
+    headers()
+  )
+}
+
+// Anon: list comments for a publicly shared map
+export async function listSipocCommentsAnon(mapId: string): Promise<SipocComment[]> {
+  return fetchAllPaginated<SipocComment>(
+    `${URL}/rest/v1/sipoc_comments?capability_map_id=eq.${mapId}&select=*&order=created_at.asc`,
+    anonHeaders()
+  )
+}
+
+async function postComment(
+  hdrs: Record<string, string>,
+  payload: CreateSipocCommentInput,
+): Promise<SipocComment> {
+  const res = await fetch(`${URL}/rest/v1/sipoc_comments`, {
+    method: 'POST',
+    headers: { ...hdrs, 'Prefer': 'return=representation' },
+    body: JSON.stringify({
+      capability_map_id: payload.capability_map_id,
+      capability_id: payload.capability_id,
+      region: payload.region,
+      item_type: payload.item_type ?? null,
+      item_id: payload.item_id ?? null,
+      author_name: payload.author_name.trim(),
+      body: payload.body.trim(),
+    }),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.message || 'Failed to create comment')
+  return Array.isArray(json) ? json[0] : json
+}
+
+export async function createSipocComment(payload: CreateSipocCommentInput): Promise<SipocComment> {
+  return postComment(headers(), payload)
+}
+
+export async function createSipocCommentAnon(payload: CreateSipocCommentInput): Promise<SipocComment> {
+  return postComment(anonHeaders(), payload)
+}
+
+export async function deleteSipocComment(id: string): Promise<void> {
+  await fetch(`${URL}/rest/v1/sipoc_comments?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  })
 }
 
 // ─── Duplicate an entire Capability Map ────────────────

@@ -8,7 +8,10 @@ import { createCapabilityTemplate } from '@/lib/supabase/capability-maps'
 import { useAuth } from '@/lib/supabase/auth-context'
 import AIAnalyzePanel from '@/components/sipoc/AIAnalyzePanel'
 import SIPOCTemplatesPanel from '@/components/sipoc/SIPOCTemplatesPanel'
+import CommentPin from '@/components/sipoc/CommentPin'
+import CommentsPanel from '@/components/sipoc/CommentsPanel'
 import { useLockHolder } from '@/lib/collab/CapabilityMapCollabContext'
+import type { SipocRegion } from '@/lib/sipoc/types'
 
 // ─── SIPOC color tokens ──────────────────────────────────
 const SIPOC = {
@@ -112,7 +115,7 @@ function MiniLineageArrow() {
 
 // ─── Column header ───────────────────────────────────────
 
-function ColumnHeader({ sipoc }: { sipoc: typeof SIPOC[keyof typeof SIPOC] }) {
+function ColumnHeader({ sipoc, capabilityId }: { sipoc: typeof SIPOC[keyof typeof SIPOC]; capabilityId?: string }) {
   return (
     <div className="flex items-center gap-2 mb-3 px-1">
       <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white" style={{ backgroundColor: sipoc.color }}>
@@ -121,6 +124,11 @@ function ColumnHeader({ sipoc }: { sipoc: typeof SIPOC[keyof typeof SIPOC] }) {
       <span className="text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-[0.15em] text-[var(--m12-text-muted)]">
         {sipoc.label}
       </span>
+      {capabilityId && (
+        <span className="ml-auto">
+          <CommentPin capabilityId={capabilityId} region={sipoc.letter as SipocRegion} />
+        </span>
+      )}
     </div>
   )
 }
@@ -139,7 +147,7 @@ function HFlowArrow({ color }: { color: string }) {
 
 // ─── Input lane (Suppliers → Input card) ─────────────────
 
-function InputLane({ input, onRemove, onClickCard, showDims }: { input: HydratedCapability['inputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean }) {
+function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { input: HydratedCapability['inputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean; capabilityId: string }) {
   const readOnly = useSIPOCStore(s => s.readOnly)
   const hasSuppliers = input.supplierPersonas.length > 0
   const hasSystems = input.sourceSystems.length > 0
@@ -148,7 +156,10 @@ function InputLane({ input, onRemove, onClickCard, showDims }: { input: Hydrated
   return (
     <div className="flex items-stretch gap-0 group/lane">
       {/* Supplier side */}
-      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center" style={{ background: SIPOC.S.bg }}>
+      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.S.bg }}>
+        <div className="absolute top-1.5 right-1.5 z-10">
+          <CommentPin capabilityId={capabilityId} region="S" itemId={input.id} />
+        </div>
         {hasSuppliers && (
           <div className="space-y-1 mb-1.5">
             {input.supplierPersonas.map(p => (
@@ -176,6 +187,9 @@ function InputLane({ input, onRemove, onClickCard, showDims }: { input: Hydrated
 
       {/* Input card side */}
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.I.bg }}>
+        <div className="absolute top-1.5 left-1.5 z-10">
+          <CommentPin capabilityId={capabilityId} region="I" itemId={input.id} />
+        </div>
         {!readOnly && <button
           onClick={(e) => { e.stopPropagation(); if (confirm(`Remove input "${input.informationProduct.name}"?`)) onRemove() }}
           className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/lane:opacity-100 z-10"
@@ -210,7 +224,7 @@ function InputLane({ input, onRemove, onClickCard, showDims }: { input: Hydrated
 
 // ─── Output lane (Output card → Customers) ───────────────
 
-function OutputLane({ output, onRemove, onClickCard, showDims }: { output: HydratedCapability['outputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean }) {
+function OutputLane({ output, onRemove, onClickCard, showDims, capabilityId }: { output: HydratedCapability['outputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean; capabilityId: string }) {
   const readOnly = useSIPOCStore(s => s.readOnly)
   const hasConsumers = output.consumerPersonas.length > 0
   const hasSystems = output.destinationSystems.length > 0
@@ -219,6 +233,9 @@ function OutputLane({ output, onRemove, onClickCard, showDims }: { output: Hydra
     <div className="flex items-stretch gap-0 group/lane">
       {/* Output card side */}
       <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.O.bg }}>
+        <div className="absolute top-1.5 left-1.5 z-10">
+          <CommentPin capabilityId={capabilityId} region="O" itemId={output.id} />
+        </div>
         {!readOnly && <button
           onClick={(e) => { e.stopPropagation(); if (confirm(`Remove output "${output.informationProduct.name}"?`)) onRemove() }}
           className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/lane:opacity-100 z-10"
@@ -255,7 +272,10 @@ function OutputLane({ output, onRemove, onClickCard, showDims }: { output: Hydra
       <HFlowArrow color={SIPOC.O.color} />
 
       {/* Customer side */}
-      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center" style={{ background: SIPOC.C.bg }}>
+      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center relative" style={{ background: SIPOC.C.bg }}>
+        <div className="absolute top-1.5 right-1.5 z-10">
+          <CommentPin capabilityId={capabilityId} region="C" itemId={output.id} />
+        </div>
         {hasConsumers ? (
           <div className="space-y-1">
             {output.consumerPersonas.map(p => (
@@ -283,7 +303,7 @@ function ProcessColumn({ capability, inputs, outputs }: { capability: HydratedCa
   return (
     <div className="w-[220px] shrink-0 flex flex-col border-l border-r border-[var(--m12-border)]/10 overflow-y-auto" style={{ background: SIPOC.P.bg }}>
       <div className="p-3 pb-1 shrink-0 border-b border-[var(--m12-border)]/10">
-        <ColumnHeader sipoc={SIPOC.P} />
+        <ColumnHeader sipoc={SIPOC.P} capabilityId={capability.id} />
       </div>
       <div className="flex-1 flex flex-col items-center p-4 gap-3">
         {/* Process box — compact */}
@@ -385,11 +405,11 @@ function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: 
         {/* Column headers */}
         <div className="flex shrink-0 border-b border-[var(--m12-border)]/10">
           <div className="flex-1 p-3 pb-1" style={{ background: SIPOC.S.bg }}>
-            <ColumnHeader sipoc={SIPOC.S} />
+            <ColumnHeader sipoc={SIPOC.S} capabilityId={capability.id} />
           </div>
           <div className="w-6" />
           <div className="flex-1 p-3 pb-1" style={{ background: SIPOC.I.bg }}>
-            <ColumnHeader sipoc={SIPOC.I} />
+            <ColumnHeader sipoc={SIPOC.I} capabilityId={capability.id} />
           </div>
         </div>
         {/* Input lanes */}
@@ -397,7 +417,7 @@ function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: 
           <div className="flex-1">
             {inputs.map((input, i) => (
               <div key={input.id} className={i > 0 ? 'border-t border-[var(--m12-border)]/8' : ''}>
-                <InputLane input={input} onRemove={() => removeInput(input.id, capability.id)} onClickCard={() => handleClickItem(input.id)} showDims={showDims} />
+                <InputLane input={input} onRemove={() => removeInput(input.id, capability.id)} onClickCard={() => handleClickItem(input.id)} showDims={showDims} capabilityId={capability.id} />
               </div>
             ))}
           </div>
@@ -426,11 +446,11 @@ function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: 
         {/* Column headers */}
         <div className="flex shrink-0 border-b border-[var(--m12-border)]/10">
           <div className="flex-1 p-3 pb-1" style={{ background: SIPOC.O.bg }}>
-            <ColumnHeader sipoc={SIPOC.O} />
+            <ColumnHeader sipoc={SIPOC.O} capabilityId={capability.id} />
           </div>
           <div className="w-6" />
           <div className="flex-1 p-3 pb-1" style={{ background: SIPOC.C.bg }}>
-            <ColumnHeader sipoc={SIPOC.C} />
+            <ColumnHeader sipoc={SIPOC.C} capabilityId={capability.id} />
           </div>
         </div>
         {/* Output lanes */}
@@ -438,7 +458,7 @@ function SIPOCFlowContent({ capability, onOpenEditor, showDims }: { capability: 
           <div className="flex-1">
             {outputs.map((output, i) => (
               <div key={output.id} className={i > 0 ? 'border-t border-[var(--m12-border)]/8' : ''}>
-                <OutputLane output={output} onRemove={() => removeOutput(output.id, capability.id)} onClickCard={() => handleClickItem(output.id)} showDims={showDims} />
+                <OutputLane output={output} onRemove={() => removeOutput(output.id, capability.id)} onClickCard={() => handleClickItem(output.id)} showDims={showDims} capabilityId={capability.id} />
               </div>
             ))}
           </div>
@@ -983,6 +1003,7 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
           {children}
         </div>
       </div>
+      <CommentsPanel />
     </div>
   )
 }

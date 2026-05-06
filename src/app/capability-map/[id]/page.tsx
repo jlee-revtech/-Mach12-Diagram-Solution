@@ -112,7 +112,9 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     if (id && !loadedRef.current) {
       loadedRef.current = true
-      useSIPOCStore.getState().loadMap(id)
+      useSIPOCStore.getState().loadMap(id).then(ok => {
+        if (ok) useSIPOCStore.getState().loadComments(id, false)
+      })
     }
   }, [id])
 

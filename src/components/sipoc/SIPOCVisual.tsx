@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { HydratedCapability, Dimension, Tag } from '@/lib/sipoc/types'
+import type { HydratedCapability, Dimension, Tag, SipocRegion } from '@/lib/sipoc/types'
+import CommentPin from '@/components/sipoc/CommentPin'
 
 // ─── Column Header ──────────────────────────────────────
 function ColumnHeader({ label, color, letter }: { label: string; color: string; letter: string }) {
@@ -65,6 +66,8 @@ function IPCard({
   tags,
   filterTagIds,
   filterMode,
+  capabilityId,
+  commentRegion,
 }: {
   name: string
   category?: string
@@ -75,6 +78,8 @@ function IPCard({
   tags?: Tag[]
   filterTagIds?: string[]
   filterMode?: 'any' | 'all'
+  capabilityId?: string
+  commentRegion?: SipocRegion
 }) {
   const setFocusedItem = useSIPOCStore(s => s.setFocusedItem)
   const hasDims = dimensions && dimensions.length > 0
@@ -86,6 +91,9 @@ function IPCard({
     >
       <div className="flex items-center gap-1.5">
         <div className="text-[11px] font-semibold text-[var(--m12-text)] flex-1 leading-tight">{name}</div>
+        {capabilityId && commentRegion && itemId && !itemId.startsWith('rollup-') && (
+          <CommentPin capabilityId={capabilityId} region={commentRegion} itemId={itemId} />
+        )}
         {hasDims && (
           <span className="text-[7px] bg-[var(--m12-bg)] text-[var(--m12-text-muted)] rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] font-bold border border-[var(--m12-border)]/20">
             {dimensions.length}
@@ -168,11 +176,12 @@ function FeedingSystemChip({ name, color }: { name: string; color?: string }) {
 }
 
 // ─── Single input lane (Suppliers → Input) ──────────────
-function InputLane({ input, showDimensions, filterTagIds, filterMode }: {
+function InputLane({ input, showDimensions, filterTagIds, filterMode, capabilityId }: {
   input: HydratedCapability['inputs'][0]
   showDimensions: boolean
   filterTagIds?: string[]
   filterMode?: 'any' | 'all'
+  capabilityId: string
 }) {
   const hasSuppliers = input.supplierPersonas.length > 0 || input.sourceSystems.length > 0 || !!input.feedingSystem
   const sourceSystems = input.sourceSystems
@@ -228,6 +237,8 @@ function InputLane({ input, showDimensions, filterTagIds, filterMode }: {
           showDimensions={showDimensions}
           accentColor="#EAB308"
           itemId={input.id}
+          capabilityId={capabilityId}
+          commentRegion="I"
         />
       </div>
 
@@ -244,9 +255,10 @@ function InputLane({ input, showDimensions, filterTagIds, filterMode }: {
 }
 
 // ─── Single output lane (Output → Consumers) ────────────
-function OutputLane({ output, showDimensions }: {
+function OutputLane({ output, showDimensions, capabilityId }: {
   output: HydratedCapability['outputs'][0]
   showDimensions: boolean
+  capabilityId: string
 }) {
   const hasConsumers = output.consumerPersonas.length > 0
 
@@ -262,6 +274,8 @@ function OutputLane({ output, showDimensions }: {
           showDimensions={showDimensions}
           accentColor="#10B981"
           itemId={output.id}
+          capabilityId={capabilityId}
+          commentRegion="O"
         />
       </div>
 
@@ -276,6 +290,17 @@ function OutputLane({ output, showDimensions }: {
           <div className="text-[9px] text-[var(--m12-text-faint)] italic">—</div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── Region pin strip (S/I/P/O/C comments at the capability level) ─
+function RegionPinStrip({ capabilityId }: { capabilityId: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {(['S','I','P','O','C'] as const).map(r => (
+        <CommentPin key={r} capabilityId={capabilityId} region={r} label={r} />
+      ))}
     </div>
   )
 }
@@ -310,6 +335,7 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
         </button>
         <div className="w-2 h-2 rounded-full bg-[#2563EB]/40" />
         <span className="text-xs font-semibold text-[var(--m12-text)] flex-1" onClick={onSelect}>{capability.name}</span>
+        <RegionPinStrip capabilityId={capability.id} />
         <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
           {capability.inputs.length}in / {capability.outputs.length}out
         </span>
@@ -335,7 +361,8 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
             <path d="M1.5 3l3.5 4 3.5-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider" onClick={onSelect}>{capability.name}</span>
+        <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider flex-1" onClick={onSelect}>{capability.name}</span>
+        <RegionPinStrip capabilityId={capability.id} />
       </div>
 
       {/* Capability block uses a 3-column layout: left (S→I) | center (P) | right (O→C) */}
@@ -344,7 +371,7 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
         <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center bg-[var(--m12-bg-card)]/30">
           {capability.inputs.length > 0 ? (
             capability.inputs.map(input => (
-              <InputLane key={input.id} input={input} showDimensions={showDimensions} filterTagIds={filterTagIds} filterMode={filterMode} />
+              <InputLane key={input.id} input={input} showDimensions={showDimensions} filterTagIds={filterTagIds} filterMode={filterMode} capabilityId={capability.id} />
             ))
           ) : (
             <div className="flex items-center justify-center py-4 text-[10px] text-[var(--m12-text-faint)] italic">
@@ -401,7 +428,7 @@ function CapabilityBlock({ capability, isSelected, onSelect, showDimensions, col
         <div className="flex-1 p-4 flex flex-col gap-2.5 justify-center bg-[var(--m12-bg-card)]/30">
           {capability.outputs.length > 0 ? (
             capability.outputs.map(output => (
-              <OutputLane key={output.id} output={output} showDimensions={showDimensions} />
+              <OutputLane key={output.id} output={output} showDimensions={showDimensions} capabilityId={capability.id} />
             ))
           ) : (
             <div className="flex items-center justify-center py-4 text-[10px] text-[var(--m12-text-faint)] italic">

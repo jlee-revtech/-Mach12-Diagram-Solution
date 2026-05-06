@@ -183,6 +183,21 @@ export interface HydratedCapability extends Capability {
   })[]
 }
 
+// ─── Comments on SIPOC blocks ──────────────────────────
+export type SipocRegion = 'S' | 'I' | 'P' | 'O' | 'C'
+
+export interface SipocComment {
+  id: string
+  capability_map_id: string
+  capability_id: string
+  region: SipocRegion
+  item_type: string | null   // 'input' | 'output' | null
+  item_id: string | null
+  author_name: string
+  body: string
+  created_at: string
+}
+
 // ─── Tag color presets ─────────────────────────────────
 export const TAG_COLORS = [
   '#64748B', // slate (default)

@@ -13,6 +13,8 @@ import type {
   CapabilityTreeNode,
   Tag,
   SystemDataElement,
+  SipocComment,
+  SipocRegion,
 } from './types'
 import * as api from '@/lib/supabase/capability-maps'
 
@@ -111,6 +113,23 @@ interface SIPOCState {
 
   // ─── Entity editing UI ────────────────────────────────
   setEditingEntity: (type: 'persona' | 'informationProduct' | 'logicalSystem' | null, id: string | null) => void
+
+  // ─── Comments ─────────────────────────────────────────
+  comments: SipocComment[]
+  commenterName: string
+  setCommenterName: (name: string) => void
+  loadComments: (mapId: string, anon?: boolean) => Promise<void>
+  addComment: (input: {
+    capability_id: string
+    region: SipocRegion
+    item_type?: string | null
+    item_id?: string | null
+    author_name: string
+    body: string
+  }) => Promise<SipocComment | null>
+  removeComment: (id: string) => Promise<void>
+  commentsAnchorOpen: { capability_id: string; region: SipocRegion; item_id: string | null } | null
+  setCommentsAnchor: (anchor: { capability_id: string; region: SipocRegion; item_id?: string | null } | null) => void
 
   // ─── Derived: hydrated capabilities ───────────────────
   getHydratedCapabilities: () => HydratedCapability[]
@@ -762,6 +781,66 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   // ─── Entity editing UI ────────────────────────────────
 
   setEditingEntity: (type, id) => set({ editingEntityType: type, editingEntityId: id }),
+
+  // ─── Comments ─────────────────────────────────────────
+  comments: [],
+  commenterName: typeof window !== 'undefined' ? (localStorage.getItem('m12.commenterName') || '') : '',
+  setCommenterName: (name) => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('m12.commenterName', name) } catch {}
+    }
+    set({ commenterName: name })
+  },
+
+  loadComments: async (mapId, anon) => {
+    const list = anon
+      ? await api.listSipocCommentsAnon(mapId)
+      : await api.listSipocComments(mapId)
+    set({ comments: list })
+  },
+
+  addComment: async (input) => {
+    const { map, readOnly } = get()
+    if (!map) return null
+    try {
+      const created = readOnly
+        ? await api.createSipocCommentAnon({
+            capability_map_id: map.id,
+            capability_id: input.capability_id,
+            region: input.region,
+            item_type: input.item_type ?? null,
+            item_id: input.item_id ?? null,
+            author_name: input.author_name,
+            body: input.body,
+          })
+        : await api.createSipocComment({
+            capability_map_id: map.id,
+            capability_id: input.capability_id,
+            region: input.region,
+            item_type: input.item_type ?? null,
+            item_id: input.item_id ?? null,
+            author_name: input.author_name,
+            body: input.body,
+          })
+      set({ comments: [...get().comments, created] })
+      return created
+    } catch (e) {
+      console.error('Failed to create comment:', e)
+      return null
+    }
+  },
+
+  removeComment: async (id) => {
+    set({ comments: get().comments.filter(c => c.id !== id) })
+    await api.deleteSipocComment(id)
+  },
+
+  commentsAnchorOpen: null,
+  setCommentsAnchor: (anchor) => set({
+    commentsAnchorOpen: anchor
+      ? { capability_id: anchor.capability_id, region: anchor.region, item_id: anchor.item_id ?? null }
+      : null,
+  }),
 
   // ─── Derived: hydrated capabilities ───────────────────
 
