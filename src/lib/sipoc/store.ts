@@ -1120,15 +1120,30 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       }
     }
 
-    // Feature list = immediate-child names, sorted
-    const immediateChildren = rawCaps
-      .filter(c => c.parent_id === capabilityId)
-      .sort((a, b) => a.sort_order - b.sort_order)
-    const features = immediateChildren.map(c => c.name)
+    // Roll up features and use cases from descendant L3s, prefixed with L3 name.
+    // Format: "[L3 name] - [feature]" / "[L3 name] - [use case]"
+    const sortedDescendants = [...descendants].sort((a, b) => {
+      const ra = rawCaps.find(c => c.id === a.id)?.sort_order ?? 0
+      const rb = rawCaps.find(c => c.id === b.id)?.sort_order ?? 0
+      return ra - rb
+    })
+    const features: string[] = []
+    const useCases: string[] = []
+    for (const d of sortedDescendants) {
+      for (const f of (d.features || [])) {
+        const t = f.trim()
+        if (t) features.push(`${d.name} - ${t}`)
+      }
+      for (const u of (d.use_cases || [])) {
+        const t = u.trim()
+        if (t) useCases.push(`${d.name} - ${t}`)
+      }
+    }
 
     return {
       ...root,
       features,
+      use_cases: useCases,
       inputs: [...inputAgg.values()],
       outputs: [...outputAgg.values()],
     }

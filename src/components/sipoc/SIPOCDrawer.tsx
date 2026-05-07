@@ -1026,14 +1026,17 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
             />
           ) : hydrated ? (
             <div className="flex flex-col h-full">
-              {isRollupView && (
-                <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 bg-[#8B5CF6]/10 border-b border-[#8B5CF6]/25 text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#C4B5FD]">
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Rollup view · aggregated from {(hydrated.features || []).length} sub-capabilit{(hydrated.features || []).length === 1 ? 'y' : 'ies'} (read-only)
-                </div>
-              )}
+              {isRollupView && (() => {
+                const subCount = capabilities.filter(c => c.parent_id === hydrated.id).length
+                return (
+                  <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 bg-[#8B5CF6]/10 border-b border-[#8B5CF6]/25 text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#C4B5FD]">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Rollup view · aggregated from {subCount} sub-capabilit{subCount === 1 ? 'y' : 'ies'} (read-only)
+                  </div>
+                )
+              })()}
               <div className="flex-1 overflow-hidden">
                 <SIPOCFlowContent capability={hydrated} onOpenEditor={() => { if (!editorOpen) onToggleEditor() }} showDims={showDims} />
               </div>

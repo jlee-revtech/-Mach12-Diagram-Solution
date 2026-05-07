@@ -584,6 +584,7 @@ function DimensionsEditor({
 // ─── Rollup summary (read-only, shown for L1/L2 with children) ──
 function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/types').HydratedCapability; capabilityId: string }) {
   const updateCapability = useSIPOCStore(s => s.updateCapability)
+  const allCapabilities = useSIPOCStore(s => s.capabilities)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
 
@@ -627,7 +628,7 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
       setGenerating(false)
     }
   }
-  const childCount = (rollup.features || []).length
+  const childCount = allCapabilities.filter(c => c.parent_id === capabilityId).length
   const allSuppliers = new Map<string, Persona>()
   const allCustomers = new Map<string, Persona>()
   const allInputIPs = new Map<string, string>()
@@ -748,7 +749,51 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
               <span className="text-[var(--m12-text-faint)]">({(rollup.features || []).length})</span>
             </button>
             {isOpen && (
-              <div className="text-[10px] text-[var(--m12-text-secondary)] pl-3">{(rollup.features || []).join(' · ')}</div>
+              <ul className="pl-3 space-y-0.5">
+                {(rollup.features || []).map((f, i) => {
+                  const dashIdx = f.indexOf(' - ')
+                  const head = dashIdx >= 0 ? f.slice(0, dashIdx) : ''
+                  const tail = dashIdx >= 0 ? f.slice(dashIdx + 3) : f
+                  return (
+                    <li key={i} className="text-[10px] leading-snug">
+                      {head && <span className="text-[#93C5FD] font-[family-name:var(--font-space-mono)] mr-1">{head}</span>}
+                      <span className="text-[var(--m12-text-secondary)]">{tail}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        )
+      })()}
+      {(rollup.use_cases || []).length > 0 && (() => {
+        const isOpen = openSections.has('use_cases')
+        return (
+          <div>
+            <button
+              onClick={() => toggle('use_cases')}
+              className="w-full flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--m12-text-secondary)] transition-colors"
+            >
+              <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
+                <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Use Cases (auto)</span>
+              <span className="text-[var(--m12-text-faint)]">({(rollup.use_cases || []).length})</span>
+            </button>
+            {isOpen && (
+              <ul className="pl-3 space-y-0.5">
+                {(rollup.use_cases || []).map((u, i) => {
+                  const dashIdx = u.indexOf(' - ')
+                  const head = dashIdx >= 0 ? u.slice(0, dashIdx) : ''
+                  const tail = dashIdx >= 0 ? u.slice(dashIdx + 3) : u
+                  return (
+                    <li key={i} className="text-[10px] leading-snug">
+                      {head && <span className="text-[#93C5FD] font-[family-name:var(--font-space-mono)] mr-1">{head}</span>}
+                      <span className="text-[var(--m12-text-secondary)]">{tail}</span>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
           </div>
         )

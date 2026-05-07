@@ -772,7 +772,7 @@ export default function SIPOCVisual() {
         </div>
       )
     }
-    const childCount = (rolled.features || []).length
+    const childCount = rawCapabilities.filter(c => c.parent_id === nodeId).length
     return (
       <div className="space-y-1.5">
         <div className="flex items-center gap-2 text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#93C5FD]">
