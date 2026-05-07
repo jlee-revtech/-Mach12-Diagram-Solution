@@ -71,7 +71,7 @@ Common A&D data flows by process:
 
 export async function POST(req: NextRequest) {
   try {
-    const { action, prompt, context, image } = await req.json()
+    const { action, prompt, context, image, scope } = await req.json()
 
     if (action === 'generate') {
       return handleGenerate(prompt, image)
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     } else if (action === 'implement') {
       return handleImplement(context)
     } else if (action === 'sipoc-generate') {
-      return handleSIPOCGenerate(prompt, context)
+      return handleSIPOCGenerate(prompt, context, scope)
     } else if (action === 'sipoc-analyze') {
       return handleSIPOCAnalyze(context)
     } else if (action === 'sipoc-executive-summary') {
@@ -346,6 +346,69 @@ When generating SIPOC data, think about:
 - Who consumes the outputs and why
 - The end-to-end data flow through the L3 capability`
 
+async function handleSIPOCUseCasesOnly(prompt: string, context?: {
+  capabilityName?: string
+  capabilityDescription?: string
+  capabilityFeatures?: string[]
+  capabilityUseCases?: string[]
+}) {
+  const existingUseCases = context?.capabilityUseCases || []
+  const existingFeatures = context?.capabilityFeatures || []
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1500,
+    system: SIPOC_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Generate use cases ONLY for this L3 capability. Do not return inputs, outputs, or features.
+
+${context?.capabilityName ? `Capability: ${context.capabilityName}` : ''}
+${context?.capabilityDescription ? `Description: ${context.capabilityDescription}` : ''}
+${existingFeatures.length > 0 ? `\nFeatures on this L3 (use as context):\n${existingFeatures.map(f => `- ${f}`).join('\n')}` : ''}
+${existingUseCases.length > 0 ? `\nExisting use cases (DO NOT re-suggest these):\n${existingUseCases.map(u => `- ${u}`).join('\n')}` : ''}
+
+User request: ${prompt}
+
+Return this exact JSON structure:
+{
+  "inputs": [],
+  "outputs": [],
+  "features": [],
+  "use_cases": [
+    "Concrete business scenario where this L3 is exercised end-to-end, phrased as a short user-story-style sentence"
+  ]
+}
+
+Guidelines:
+- USE CASES are concrete scenarios describing how a persona uses this L3 to accomplish a goal (e.g., "Rates Manager develops forward pricing rates for an upcoming IDIQ bid", "Finance locks annual provisional billing rates for DCAA submission").
+- Generate 4-8 distinct, specific use cases.
+- Each use case is a plain string — no objects, no nesting.
+- Do NOT repeat any existing use cases listed above.
+- If the existing set already looks complete, return an empty array rather than padding.
+
+No markdown, no explanation, just the JSON object.`,
+      },
+    ],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  let json
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    json = JSON.parse(cleaned)
+    json.inputs = json.inputs || []
+    json.outputs = json.outputs || []
+    json.features = json.features || []
+    json.use_cases = json.use_cases || []
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse use cases generation', raw: text }, { status: 500 })
+  }
+
+  return NextResponse.json(json)
+}
+
 async function handleSIPOCGenerate(prompt: string, context?: {
   capabilityName?: string
   capabilityDescription?: string
@@ -367,7 +430,10 @@ async function handleSIPOCGenerate(prompt: string, context?: {
     consumerPersonas: string[]
     dimensions: string[]
   }[]
-}) {
+}, scope?: 'full' | 'use-cases') {
+  if (scope === 'use-cases') {
+    return handleSIPOCUseCasesOnly(prompt, context)
+  }
   const hasExistingData = (context?.currentInputs?.length || 0) > 0 || (context?.currentOutputs?.length || 0) > 0
   const existingFeatures = context?.capabilityFeatures || []
   const existingUseCases = context?.capabilityUseCases || []

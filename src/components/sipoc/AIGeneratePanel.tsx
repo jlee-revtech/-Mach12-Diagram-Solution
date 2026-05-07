@@ -31,6 +31,8 @@ interface AISuggestion {
   use_cases?: string[]
 }
 
+type GenerateScope = 'full' | 'use-cases'
+
 // ─── Selection state ────────────────────────────────────
 interface SelectionState {
   inputs: Record<number, {
@@ -120,6 +122,7 @@ export default function AIGeneratePanel({
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null)
   const [selection, setSelection] = useState<SelectionState | null>(null)
   const [applying, setApplying] = useState(false)
+  const [scope, setScope] = useState<GenerateScope>('full')
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return
@@ -138,6 +141,7 @@ export default function AIGeneratePanel({
         body: JSON.stringify({
           action: 'sipoc-generate',
           prompt: prompt.trim(),
+          scope,
           context: {
             capabilityName: capability?.name,
             capabilityFeatures: capability?.features || [],
@@ -175,7 +179,7 @@ export default function AIGeneratePanel({
     } finally {
       setLoading(false)
     }
-  }, [prompt, capability, capabilityId, personas, informationProducts, logicalSystems])
+  }, [prompt, scope, capability, capabilityId, personas, informationProducts, logicalSystems])
 
   const handleApply = useCallback(async () => {
     if (!suggestion || !selection || !capabilityId) return
@@ -459,8 +463,28 @@ export default function AIGeneratePanel({
 
         {/* Prompt input */}
         <div className="px-6 py-4 border-b border-[var(--m12-border)]/20">
-          <div className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-2">
-            Describe the L3 capability or process
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+              Describe the L3 capability or process
+            </div>
+            <div className="flex items-center gap-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg p-0.5">
+              {([
+                { value: 'full', label: 'Full SIPOC' },
+                { value: 'use-cases', label: 'Use cases only' },
+              ] as { value: GenerateScope; label: string }[]).map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setScope(opt.value)}
+                  className={`text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-2 py-1 rounded transition-colors ${
+                    scope === opt.value
+                      ? 'bg-[#2563EB] text-white'
+                      : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex gap-2">
             <textarea
@@ -505,6 +529,7 @@ export default function AIGeneratePanel({
           {suggestion && selection && (
             <div className="space-y-5">
               {/* INPUTS */}
+              {suggestion.inputs.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-5 h-5 rounded bg-[#EAB308]/20 flex items-center justify-center text-[#EAB308] text-[9px] font-bold font-[family-name:var(--font-orbitron)]">I</div>
@@ -597,8 +622,10 @@ export default function AIGeneratePanel({
                   ))}
                 </div>
               </div>
+              )}
 
               {/* OUTPUTS */}
+              {suggestion.outputs.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-5 h-5 rounded bg-[#10B981]/20 flex items-center justify-center text-[#10B981] text-[9px] font-bold font-[family-name:var(--font-orbitron)]">O</div>
@@ -671,6 +698,7 @@ export default function AIGeneratePanel({
                   ))}
                 </div>
               </div>
+              )}
 
               {/* FEATURES */}
               {(suggestion.features && suggestion.features.length > 0) && (
@@ -729,9 +757,12 @@ export default function AIGeneratePanel({
         {suggestion && selection && (
           <div className="px-6 py-3 border-t border-[var(--m12-border)]/30 flex items-center justify-between">
             <div className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-              {Object.values(selection.inputs).filter(i => i.selected).length} inputs, {Object.values(selection.outputs).filter(o => o.selected).length} outputs
-              {(suggestion.features?.length || 0) > 0 && `, ${Object.values(selection.features).filter(Boolean).length} features`}
-              {(suggestion.use_cases?.length || 0) > 0 && `, ${Object.values(selection.useCases).filter(Boolean).length} use cases`} selected
+              {[
+                suggestion.inputs.length > 0 && `${Object.values(selection.inputs).filter(i => i.selected).length} inputs`,
+                suggestion.outputs.length > 0 && `${Object.values(selection.outputs).filter(o => o.selected).length} outputs`,
+                (suggestion.features?.length || 0) > 0 && `${Object.values(selection.features).filter(Boolean).length} features`,
+                (suggestion.use_cases?.length || 0) > 0 && `${Object.values(selection.useCases).filter(Boolean).length} use cases`,
+              ].filter(Boolean).join(', ')} selected
             </div>
             <div className="flex gap-2">
               <button

@@ -16,6 +16,8 @@ interface ProgressEntry {
   useCaseCount?: number
 }
 
+type FillMode = 'full' | 'use-cases'
+
 export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
   orgId: string
   mapTitle: string
@@ -25,19 +27,23 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
   const inputs = useSIPOCStore(s => s.inputs)
   const outputs = useSIPOCStore(s => s.outputs)
 
-  // Blank L3 = level 3 capability with no inputs and no outputs.
+  const [mode, setMode] = useState<FillMode>('full')
+
+  // mode='full': L3 with no inputs and no outputs.
+  // mode='use-cases': L3 with no use cases yet.
   // Includes parent path so users can see context before kicking it off.
   const blankL3s = useMemo(() => {
     const l3s = capabilities.filter(c => c.level === 3)
-    return l3s
-      .filter(l3 => (inputs[l3.id] || []).length === 0 && (outputs[l3.id] || []).length === 0)
-      .map(l3 => {
-        const parent = capabilities.find(c => c.id === l3.parent_id)
-        const grandParent = parent ? capabilities.find(c => c.id === parent.parent_id) : null
-        const parentPath = [grandParent?.name, parent?.name].filter(Boolean).join(' / ') || '(unassigned)'
-        return { id: l3.id, name: l3.name, parentPath, l1Name: grandParent?.name, l2Name: parent?.name }
-      })
-  }, [capabilities, inputs, outputs])
+    const filtered = mode === 'use-cases'
+      ? l3s.filter(l3 => (l3.use_cases || []).length === 0)
+      : l3s.filter(l3 => (inputs[l3.id] || []).length === 0 && (outputs[l3.id] || []).length === 0)
+    return filtered.map(l3 => {
+      const parent = capabilities.find(c => c.id === l3.parent_id)
+      const grandParent = parent ? capabilities.find(c => c.id === parent.parent_id) : null
+      const parentPath = [grandParent?.name, parent?.name].filter(Boolean).join(' / ') || '(unassigned)'
+      return { id: l3.id, name: l3.name, parentPath, l1Name: grandParent?.name, l2Name: parent?.name }
+    })
+  }, [capabilities, inputs, outputs, mode])
 
   const [progress, setProgress] = useState<ProgressEntry[]>([])
   const [running, setRunning] = useState(false)
@@ -80,7 +86,9 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
           l3.l1Name ? `in L1 core area "${l3.l1Name}"` : null,
           mapTitle ? `in capability map "${mapTitle}"` : null,
         ].filter(Boolean)
-        const richPrompt = promptParts.join(' ') + '. Generate the full SIPOC breakdown.'
+        const richPrompt = promptParts.join(' ') + (mode === 'use-cases'
+          ? '. Generate use cases only.'
+          : '. Generate the full SIPOC breakdown.')
 
         const res = await fetch('/api/ai', {
           method: 'POST',
@@ -88,6 +96,7 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
           body: JSON.stringify({
             action: 'sipoc-generate',
             prompt: richPrompt,
+            scope: mode,
             context: {
               capabilityName: cap?.name,
               capabilityFeatures: cap?.features || [],
@@ -129,7 +138,7 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
 
     setRunning(false)
     setDone(true)
-  }, [blankL3s, orgId, mapTitle])
+  }, [blankL3s, orgId, mapTitle, mode])
 
   const handleAbort = useCallback(() => {
     abortRef.current = true
@@ -156,7 +165,9 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
           <div className="flex-1">
             <div className="text-sm font-semibold text-[var(--m12-text)]">AI: Fill Blank L3s</div>
             <div className="text-[10px] text-[var(--m12-text-muted)]">
-              Auto-generate SIPOC for every L3 with no inputs or outputs. Suggestions are applied automatically.
+              {mode === 'use-cases'
+                ? 'Generate use cases for every L3 that has none. Suggestions are applied automatically.'
+                : 'Auto-generate SIPOC for every L3 with no inputs or outputs. Suggestions are applied automatically.'}
             </div>
           </div>
           <button
@@ -172,19 +183,49 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
+          {progress.length === 0 && (
+            <div className="flex items-center gap-2">
+              <div className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+                Scope
+              </div>
+              <div className="flex items-center gap-1 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg p-0.5">
+                {([
+                  { value: 'full', label: 'Full SIPOC (no inputs/outputs)' },
+                  { value: 'use-cases', label: 'Use cases only (no use cases)' },
+                ] as { value: FillMode; label: string }[]).map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setMode(opt.value)}
+                    className={`text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-2 py-1 rounded transition-colors ${
+                      mode === opt.value
+                        ? 'bg-[#2563EB] text-white'
+                        : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {progress.length === 0 ? (
             // Idle: show list of blanks to be processed
             blankL3s.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-sm text-[var(--m12-text)] font-medium mb-1">No blank L3s found</div>
+                <div className="text-sm text-[var(--m12-text)] font-medium mb-1">
+                  {mode === 'use-cases' ? 'No L3s without use cases' : 'No blank L3s found'}
+                </div>
                 <div className="text-[11px] text-[var(--m12-text-muted)]">
-                  Every L3 in this map already has inputs or outputs. Add a new L3 first if you want to use this.
+                  {mode === 'use-cases'
+                    ? 'Every L3 in this map already has at least one use case.'
+                    : 'Every L3 in this map already has inputs or outputs. Add a new L3 first if you want to use this.'}
                 </div>
               </div>
             ) : (
               <>
                 <div className="text-[10px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] font-bold">
-                  {blankL3s.length} blank L3{blankL3s.length === 1 ? '' : 's'} ready to process
+                  {blankL3s.length} L3{blankL3s.length === 1 ? '' : 's'} ready to process
+                  {mode === 'use-cases' ? ' (no use cases)' : ' (blank)'}
                 </div>
                 <div className="space-y-1">
                   {blankL3s.map(l3 => (
