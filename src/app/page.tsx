@@ -337,6 +337,27 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {/* Process: reference-library entry point */}
+        {activeTab === 'process' && (
+          <button
+            onClick={() => router.push('/process/library')}
+            className="w-full mb-4 flex items-center gap-3 bg-[#0EA5E9]/8 border border-[#0EA5E9]/30 hover:border-[#0EA5E9]/60 rounded-xl px-4 py-3 transition-colors group text-left"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#0EA5E9]/15 flex items-center justify-center shrink-0">
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#0EA5E9]">
+                <path d="M3 4.5A1.5 1.5 0 014.5 3H8v12H4.5A1.5 1.5 0 013 13.5v-9zM10 3h3.5A1.5 1.5 0 0115 4.5v9a1.5 1.5 0 01-1.5 1.5H10V3z" stroke="currentColor" strokeWidth="1.3" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-[var(--m12-text)]">Start from a best-practice reference</div>
+              <div className="text-[11px] text-[var(--m12-text-muted)]">Browse the SAP-style A&amp;D process library and instantiate a scenario into an editable model.</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#0EA5E9] group-hover:translate-x-0.5 transition-transform shrink-0">
+              <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+
         {/* Content grid */}
         {loadingDiagrams ? (
           <div className="text-center py-24 text-[var(--m12-text-muted)] text-sm">Loading...</div>

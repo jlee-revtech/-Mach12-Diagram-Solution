@@ -150,6 +150,16 @@ export async function listCapabilities(mapId: string): Promise<Capability[]> {
   return res.json()
 }
 
+export async function getCapability(id: string): Promise<Capability | null> {
+  const res = await fetch(
+    `${URL}/rest/v1/capabilities?id=eq.${id}&select=*`,
+    { headers: headers() }
+  )
+  if (!res.ok) return null
+  const arr = await res.json()
+  return arr.length ? arr[0] : null
+}
+
 export async function createCapability(
   mapId: string,
   name: string,

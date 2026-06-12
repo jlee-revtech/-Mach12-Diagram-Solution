@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { useProcessStore } from '@/lib/process/store'
 import type { ProcessNodeTreeNode } from '@/lib/process/types'
 import { PROCESS_LEVEL_LABEL, PROCESS_LEVEL_COLORS } from '@/lib/process/types'
+import ProcessAIPanel from './ProcessAIPanel'
 
 // Navigable value-chain hierarchy: L1 Scenario → L2 Process Group → L3 Process.
 // Inline add / rename / delete. Selecting a leaf surfaces it for the (Phase 2)
@@ -18,6 +19,7 @@ export default function ProcessTree() {
 
   const [addingUnder, setAddingUnder] = useState<string | 'root' | null>(null)
   const [draftName, setDraftName] = useState('')
+  const [aiOpen, setAiOpen] = useState(false)
 
   const handleAddRoot = useCallback(async () => {
     const name = draftName.trim()
@@ -45,17 +47,30 @@ export default function ProcessTree() {
           Process Hierarchy
         </span>
         {!readOnly && (
-          <button
-            onClick={() => { setAddingUnder('root'); setDraftName('') }}
-            title="Add scenario (L1)"
-            className="text-[var(--m12-border)] hover:text-[#0EA5E9] transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAiOpen(true)}
+              title="Generate hierarchy with AI"
+              className="flex items-center gap-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#0EA5E9] hover:text-[#38BDF8] transition-colors"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1.5l1.3 3.2 3.2 1.3-3.2 1.3L7 10.5 5.7 7.3 2.5 6l3.2-1.3L7 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+              </svg>
+              AI
+            </button>
+            <button
+              onClick={() => { setAddingUnder('root'); setDraftName('') }}
+              title="Add scenario (L1)"
+              className="text-[var(--m12-border)] hover:text-[#0EA5E9] transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
+      {aiOpen && <ProcessAIPanel onClose={() => setAiOpen(false)} />}
 
       <div className="flex-1 overflow-y-auto py-1">
         {tree.length === 0 && addingUnder !== 'root' && (

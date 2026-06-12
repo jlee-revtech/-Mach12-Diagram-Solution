@@ -8,6 +8,7 @@ import ProcessTree from '@/components/process/ProcessTree'
 import ProcessNodeDetail from '@/components/process/ProcessNodeDetail'
 import ProcessLeafView from '@/components/process/ProcessLeafView'
 import ProcessShareDialog from '@/components/process/ProcessShareDialog'
+import ProcessGapAssessment from '@/components/process/ProcessGapAssessment'
 import VersionBadge from '@/components/VersionBadge'
 
 export default function ProcessModelPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,6 +25,7 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
   const [titleInput, setTitleInput] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [gapOpen, setGapOpen] = useState(false)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -107,6 +109,15 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
 
         <div className="flex items-center gap-2 shrink-0">
           <button
+            onClick={() => setGapOpen(true)}
+            className="flex items-center gap-1.5 text-xs text-[#0EA5E9] border border-[#0EA5E9]/40 hover:border-[#0EA5E9]/70 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1.5l1.3 3.2 3.2 1.3-3.2 1.3L7 10.5 5.7 7.3 2.5 6l3.2-1.3L7 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+            </svg>
+            Gap Assessment
+          </button>
+          <button
             onClick={() => setShareOpen(true)}
             className="flex items-center gap-1.5 text-xs text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] border border-[var(--m12-border)]/60 hover:border-[var(--m12-border)] rounded-lg px-3 py-1.5 transition-colors"
           >
@@ -136,7 +147,7 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
         {/* Detail / canvas area */}
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
           {selectedNodeId && selectedNode?.is_leaf ? (
-            <ProcessLeafView nodeId={selectedNodeId} />
+            <ProcessLeafView nodeId={selectedNodeId} orgId={organization?.id} userId={user.id} />
           ) : selectedNodeId ? (
             <div className="flex-1 overflow-y-auto">
               <ProcessNodeDetail nodeId={selectedNodeId} />
@@ -162,6 +173,8 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
           onClose={() => setShareOpen(false)}
         />
       )}
+
+      {gapOpen && <ProcessGapAssessment onClose={() => setGapOpen(false)} />}
     </div>
   )
 }

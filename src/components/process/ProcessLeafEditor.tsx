@@ -119,6 +119,9 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [selection, setSelection] = useState<{ type: 'node' | 'edge' | 'lane'; id: string } | null>(null)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiBusy, setAiBusy] = useState(false)
 
   const loadedForRef = useRef<string | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -262,6 +265,65 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
     setNodes(nds => nds.concat(laneToNode({ id, label: `Lane ${order + 1}`, order }, null)))
   }, [readOnly, nodes, setNodes])
 
+  // ─── AI: draft BPMN flow from text ────────────────────
+  const loadAiGraph = useCallback((data: {
+    lanes?: { id?: string; label?: string; order?: number }[]
+    nodes?: { id?: string; elementType?: string; label?: string; laneId?: string; x?: number; y?: number }[]
+    edges?: { id?: string; source?: string; target?: string; kind?: string; label?: string }[]
+  }) => {
+    const lanes = (data.lanes || []).map((l, i) => ({
+      id: String(l.id || `lane${i}`),
+      label: l.label || `Lane ${i + 1}`,
+      order: typeof l.order === 'number' ? l.order : i,
+    }))
+    const laneNodes = lanes.map(l => laneToNode(l, null))
+    const laneIds = new Set(lanes.map(l => l.id))
+    const elementNodes: Node[] = (data.nodes || []).map((n, i) => ({
+      id: String(n.id || uuid()),
+      type: 'processElement',
+      position: { x: Number.isFinite(n.x) ? Number(n.x) : 90 + i * 60, y: Number.isFinite(n.y) ? Number(n.y) : 50 },
+      data: {
+        label: n.label || 'Step',
+        elementType: (n.elementType || 'task') as ProcessElementData['elementType'],
+        laneId: n.laneId && laneIds.has(String(n.laneId)) ? String(n.laneId) : lanes[0]?.id,
+      } as ProcessElementData,
+    }))
+    const elemIds = new Set(elementNodes.map(n => n.id))
+    const aiEdges: Edge[] = (data.edges || [])
+      .filter(e => e.source && e.target && elemIds.has(String(e.source)) && elemIds.has(String(e.target)))
+      .map((e, i) => ({
+        id: String(e.id || `e${i}`),
+        source: String(e.source),
+        target: String(e.target),
+        type: 'sequenceFlow',
+        data: { kind: (e.kind || 'sequence') as SequenceFlowKind, ...(e.label ? { label: e.label } : {}) },
+      }))
+    setNodes([...laneNodes, ...elementNodes])
+    setEdges(aiEdges)
+  }, [setNodes, setEdges])
+
+  const handleAiDraft = useCallback(async () => {
+    if (!aiPrompt.trim() || aiBusy) return
+    const hasContent = nodes.some(n => n.type === 'processElement')
+    if (hasContent && !confirm('Replace the current flow with the AI draft?')) return
+    setAiBusy(true)
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bpmn-from-text', prompt: aiPrompt, context: { processName: node?.name, systems: logicalSystems.map(s => s.name) } }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.nodes) throw new Error(data.error || 'Draft failed')
+      loadAiGraph(data)
+      setAiOpen(false); setAiPrompt('')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Draft failed')
+    } finally {
+      setAiBusy(false)
+    }
+  }, [aiPrompt, aiBusy, nodes, node?.name, logicalSystems, loadAiGraph])
+
   // Inspector mutators
   const patchNodeData = useCallback((id: string, patch: Record<string, unknown>) => {
     setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, ...patch } } : n))
@@ -287,13 +349,55 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
         <style dangerouslySetInnerHTML={{ __html: LANE_STYLE }} />
         <SequenceFlowMarkerDefs />
 
-        {/* Save status */}
+        {/* Top-right controls */}
         {!readOnly && (
-          <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[var(--m12-border)]/40 rounded-md px-2 py-1">
-            <div className={`w-1.5 h-1.5 rounded-full ${saveStatus === 'saved' ? 'bg-[#10B981]' : saveStatus === 'saving' ? 'bg-[#EAB308] animate-pulse' : 'bg-[var(--m12-text-muted)]'}`} />
-            <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-              {saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving…' : 'Unsaved'}
-            </span>
+          <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+            <button
+              onClick={() => setAiOpen(true)}
+              title="Draft this flow from a text description"
+              className="flex items-center gap-1 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[#0EA5E9]/40 hover:border-[#0EA5E9]/70 rounded-md px-2 py-1 text-[10px] text-[#0EA5E9] transition-colors"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1.5l1.3 3.2 3.2 1.3-3.2 1.3L7 10.5 5.7 7.3 2.5 6l3.2-1.3L7 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+              </svg>
+              AI Draft
+            </button>
+            <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[var(--m12-border)]/40 rounded-md px-2 py-1">
+              <div className={`w-1.5 h-1.5 rounded-full ${saveStatus === 'saved' ? 'bg-[#10B981]' : saveStatus === 'saving' ? 'bg-[#EAB308] animate-pulse' : 'bg-[var(--m12-text-muted)]'}`} />
+              <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+                {saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving…' : 'Unsaved'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* AI draft modal */}
+        {aiOpen && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => setAiOpen(false)}>
+            <div onClick={e => e.stopPropagation()} className="w-[26rem] max-w-[90%] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-[var(--m12-text)]">Draft flow from text</h3>
+                <button onClick={() => setAiOpen(false)} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                </button>
+              </div>
+              <textarea
+                autoFocus
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                rows={4}
+                aria-label="Flow description"
+                placeholder="Describe the process steps, who does each, and the decision points…"
+                className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60 resize-y mb-3"
+              />
+              <button
+                onClick={handleAiDraft}
+                disabled={aiBusy || !aiPrompt.trim()}
+                className="w-full bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                {aiBusy ? 'Drafting…' : 'Generate flow'}
+              </button>
+            </div>
           </div>
         )}
 

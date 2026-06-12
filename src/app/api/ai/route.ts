@@ -95,6 +95,12 @@ export async function POST(req: NextRequest) {
       return handleSIPOCL2Narrative(context)
     } else if (action === 'sipoc-analyze-l3') {
       return handleSIPOCAnalyzeL3(context)
+    } else if (action === 'process-generate') {
+      return handleProcessGenerate(prompt, context)
+    } else if (action === 'bpmn-from-text') {
+      return handleBpmnFromText(prompt, context)
+    } else if (action === 'process-gap-assessment') {
+      return handleProcessGapAssessment(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -1112,5 +1118,174 @@ No markdown, no explanation, just the JSON object.`,
     return NextResponse.json(json)
   } catch {
     return NextResponse.json({ error: 'Failed to parse L3 analysis', raw: text }, { status: 500 })
+  }
+}
+
+// ─── Process Studio AI ──────────────────────────────────
+
+const PROCESS_SYSTEM_PROMPT = `You are an expert Business Process Architect specializing in Aerospace & Defense and Government Contracting, with deep SAP best-practice (Signavio / Solution Manager BPML) knowledge.
+
+You understand:
+- A&D end-to-end scenarios: Bid-to-Win, Contract-to-Closeout, Plan-to-Produce, Source-to-Pay, Design-to-Release, Acquire-to-Retire, Sustainment/MRO, Record-to-Report, Hire-to-Retire
+- Value-chain decomposition: Scenario (L1) → Process Group (L2) → Process (L3, the BPMN leaf)
+- BPMN 2.0: tasks (user/service/manual), gateways (exclusive/parallel/inclusive), start/end/intermediate events, swimlanes (one per system or role), sequence flows
+- A&D compliance overlays: CAS, DCAA, EVMS (EIA-748), FAR/DFARS, CMMC, ITAR, AS9102
+- Enterprise systems: SAP S/4HANA, Costpoint/Deltek, Teamcenter, Windchill, Primavera P6, WAWF`
+
+// Generate a process hierarchy (Scenario→Group→Process) from a prompt.
+async function handleProcessGenerate(prompt: string, context?: {
+  targetName?: string
+  targetLevel?: number    // 1 = scenario, 2 = group, 3 = process; children generated one level below
+  existing?: string[]
+}) {
+  const target = context?.targetName
+  const targetLevel = context?.targetLevel ?? 0
+  const childLevelLabel = targetLevel === 1 ? 'Process Groups (L2) each with Processes (L3)'
+    : targetLevel === 2 ? 'Processes (L3, the BPMN leaves)'
+    : 'Scenarios (L1) each with Process Groups (L2) and Processes (L3)'
+
+  const existingNote = context?.existing?.length
+    ? `\n\nAlready present (DO NOT duplicate):\n${context.existing.map(n => `- ${n}`).join('\n')}`
+    : ''
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: PROCESS_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Generate a process hierarchy ${target ? `under "${target}"` : 'as a set of end-to-end scenarios'}.
+Produce ${childLevelLabel}.
+
+User request: ${prompt}${existingNote}
+
+Return ONLY valid JSON in this exact shape (nest children to represent the levels below the target):
+{
+  "children": [
+    {
+      "name": "Name",
+      "description": "One-line description",
+      "children": [
+        { "name": "Name", "description": "…", "children": [ { "name": "Name", "description": "…" } ] }
+      ]
+    }
+  ]
+}
+
+Guidelines:
+- Be thorough and realistic for A&D / GovCon. Use concise, professional process names.
+- Leaf processes (the deepest level) should be concrete, single-flow processes suitable for a BPMN swimlane diagram (e.g. "Process Contract Modification", "Run Incurred Cost Submission").
+- Do NOT duplicate anything listed as already present.
+- No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    return NextResponse.json(JSON.parse(cleaned))
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse process generation', raw: text }, { status: 500 })
+  }
+}
+
+// Draft a BPMN swimlane graph (lanes/nodes/edges with positions) from text.
+async function handleBpmnFromText(prompt: string, context?: { processName?: string; systems?: string[] }) {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 6000,
+    system: PROCESS_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Draft a BPMN 2.0 swimlane process flow for "${context?.processName || 'this process'}".
+${context?.systems?.length ? `Prefer these systems/roles as swimlanes when relevant: ${context.systems.join(', ')}.` : ''}
+
+User description: ${prompt}
+
+Return ONLY valid JSON matching this exact schema:
+{
+  "lanes": [ { "id": "lane1", "label": "Role or System", "order": 0 } ],
+  "nodes": [
+    { "id": "n1", "elementType": "startEvent|endEvent|intermediateEvent|task|userTask|serviceTask|manualTask|subProcess|exclusiveGateway|parallelGateway|inclusiveGateway", "label": "Step name", "laneId": "lane1", "x": 120, "y": 60 }
+  ],
+  "edges": [ { "id": "e1", "source": "n1", "target": "n2", "kind": "sequence|conditional|default", "label": "" } ]
+}
+
+Layout rules (CRITICAL — produce clean coordinates):
+- One lane per role/system. Lanes stack vertically; lane with order=k occupies the horizontal band y ∈ [k*150, k*150+150).
+- Position each node's y near the vertical center of its lane band: y ≈ order*150 + 50.
+- Lay the flow left-to-right: increase x by ~190 for each sequential step (start at x≈90).
+- When a step happens in a different role, put it in that lane (its y changes accordingly) and continue x to the right.
+- Every flow starts with exactly one startEvent and ends with at least one endEvent.
+- Use gateways for branches; label conditional edges (e.g. "Approved", "Rejected").
+- 8–20 nodes is typical. Give every node a unique id and a laneId that exists in "lanes".
+
+No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    return NextResponse.json(JSON.parse(cleaned))
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse BPMN draft', raw: text }, { status: 500 })
+  }
+}
+
+// As-is vs best-practice fit/gap assessment.
+async function handleProcessGapAssessment(context: {
+  modelTitle: string
+  asIs: { name: string; level: number; parent?: string }[]
+  reference?: { name: string; level: number; parent?: string }[]
+  referenceName?: string
+}) {
+  const refBlock = context.reference?.length
+    ? `BEST-PRACTICE REFERENCE ("${context.referenceName || 'reference'}"):\n${context.reference.map(n => `${'  '.repeat(n.level - 1)}- ${n.name}`).join('\n')}`
+    : 'No explicit reference subtree provided — assess against SAP best-practice + A&D/GovCon norms for this scenario.'
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: PROCESS_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Compare this client's AS-IS process model against best practice and return a fit/gap assessment. Return ONLY valid JSON.
+
+MODEL: "${context.modelTitle}"
+
+AS-IS HIERARCHY:
+${context.asIs.map(n => `${'  '.repeat(Math.max(0, n.level - 1))}- ${n.name}`).join('\n')}
+
+${refBlock}
+
+Return this exact JSON:
+{
+  "overallScore": 0-100,
+  "summary": "2-3 sentence executive summary of fit vs best practice.",
+  "fitGaps": [
+    { "type": "missing_process|missing_group|extra_process|sequence_gap|granularity", "title": "…", "description": "What's missing or misaligned and why it matters", "severity": "high|medium|low" }
+  ],
+  "complianceGaps": [
+    { "framework": "CAS|DCAA|EVMS|FAR|DFARS|CMMC|ITAR|Other", "title": "…", "description": "Control or compliance step that should exist" }
+  ],
+  "recommendations": [ "Specific, actionable recommendation" ]
+}
+
+Guidelines:
+- Score 0-100 on coverage + compliance vs best practice.
+- Identify concrete missing processes/groups by name; flag extra/non-standard items.
+- Surface A&D compliance steps that are absent (e.g. DCAA timekeeping, EVMS variance analysis, FAR property accountability).
+- 3-8 fit gaps, 2-6 compliance gaps, 3-6 recommendations. Reference actual node names.
+- No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    return NextResponse.json(JSON.parse(cleaned))
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse gap assessment', raw: text }, { status: 500 })
   }
 }

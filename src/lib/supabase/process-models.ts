@@ -3,6 +3,9 @@ import type {
   ProcessNode,
   ProcessNodeLane,
   ProcessGraph,
+  ReferenceLibraryRow,
+  ReferenceScenario,
+  ProcessOverlay,
 } from '@/lib/process/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -396,6 +399,162 @@ export async function getProcessShareByCode(code: string): Promise<ProcessModelS
   const share = arr[0] as ProcessModelShare
   if (share.expires_at && new Date(share.expires_at) < new Date()) return null
   return share
+}
+
+// ─── Reference library (shared, global catalog) ───────
+
+export async function listReferenceLibraries(activeOnly = true): Promise<ReferenceLibraryRow[]> {
+  const filter = activeOnly ? '&is_active=eq.true' : ''
+  const res = await fetch(
+    `${URL}/rest/v1/process_reference_libraries?select=*${filter}&order=published_at.desc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function listReferenceScenarios(libraryId: string): Promise<ReferenceScenario[]> {
+  // Full catalog can exceed the 1000-row PostgREST cap — page through.
+  return fetchAllPaginated<ReferenceScenario>(
+    `${URL}/rest/v1/process_reference_scenarios?library_id=eq.${libraryId}&select=*&order=level.asc,sort_order.asc`,
+    headers()
+  )
+}
+
+export async function getReferenceScenario(id: string): Promise<ReferenceScenario | null> {
+  const res = await fetch(`${URL}/rest/v1/process_reference_scenarios?id=eq.${id}&select=*`, { headers: headers() })
+  if (!res.ok) return null
+  const arr = await res.json()
+  return arr.length ? arr[0] : null
+}
+
+export async function listReferenceOverlays(libraryId: string): Promise<ProcessOverlay[]> {
+  // Overlays joined to scenarios of this library. PostgREST embedded filter.
+  const res = await fetch(
+    `${URL}/rest/v1/process_reference_overlays?select=*,process_reference_scenarios!inner(library_id)&process_reference_scenarios.library_id=eq.${libraryId}`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  const rows = await res.json()
+  // Normalize to ProcessOverlay shape (reference_scenario_id stands in for process_node_id)
+  return rows.map((r: { id: string; reference_scenario_id: string; overlay_kind: string; payload: unknown; sort_order: number }) => ({
+    id: r.id,
+    process_node_id: r.reference_scenario_id,
+    overlay_kind: r.overlay_kind,
+    payload: r.payload,
+    sort_order: r.sort_order,
+    created_at: '',
+    updated_at: '',
+  })) as ProcessOverlay[]
+}
+
+/**
+ * Copy a reference scenario subtree into a NEW, editable, org-scoped process
+ * model. Parent-before-child idMap (mirrors duplicateProcessModel). Records
+ * lineage on process_models.source_reference_id.
+ */
+export async function instantiateReferenceScenario(
+  scenarioId: string,
+  orgId: string,
+  userId: string,
+): Promise<ProcessModelRow> {
+  const root = await getReferenceScenario(scenarioId)
+  if (!root) throw new Error('Reference scenario not found')
+
+  const all = await listReferenceScenarios(root.library_id)
+  const byParent = new Map<string | null, ReferenceScenario[]>()
+  for (const s of all) {
+    const key = s.parent_id ?? null
+    if (!byParent.has(key)) byParent.set(key, [])
+    byParent.get(key)!.push(s)
+  }
+  // Collect the subtree rooted at `root` (inclusive)
+  const subtree: ReferenceScenario[] = []
+  const walk = (node: ReferenceScenario) => {
+    subtree.push(node)
+    ;(byParent.get(node.id) || []).forEach(walk)
+  }
+  walk(root)
+
+  const model = await createProcessModel(orgId, userId, root.name)
+  await updateProcessModel(model.id, userId, {
+    source_reference_id: root.id,
+    ...(root.description ? { description: root.description } : {}),
+  })
+
+  // Parents before children
+  subtree.sort((a, b) => a.level - b.level || a.sort_order - b.sort_order)
+  const idMap = new Map<string, string>()
+  for (const s of subtree) {
+    const newParent = s.id === root.id ? null : (idMap.get(s.parent_id || '') || null)
+    const node = await createProcessNode(model.id, s.name, s.sort_order, newParent, s.level, s.node_kind, null)
+    const updates: Record<string, unknown> = {}
+    if (s.description) updates.description = s.description
+    if (s.scope_item_ref) updates.scope_item_ref = s.scope_item_ref
+    if (Object.keys(updates).length) await updateProcessNode(node.id, updates as Partial<ProcessNode>)
+    if (s.graph_data) await saveProcessGraph(node.id, s.graph_data)
+    idMap.set(s.id, node.id)
+  }
+
+  return model
+}
+
+// ─── Cross-pillar links (process_node_links) ───────────
+
+export interface ProcessNodeLink {
+  id: string
+  process_node_id: string
+  link_kind: string
+  target_id: string
+  label: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export async function listProcessNodeLinks(nodeId: string): Promise<ProcessNodeLink[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/process_node_links?process_node_id=eq.${nodeId}&select=*&order=created_at.desc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function createProcessNodeLink(
+  nodeId: string,
+  linkKind: string,
+  targetId: string,
+  userId: string,
+  label?: string | null,
+): Promise<ProcessNodeLink> {
+  const res = await fetch(`${URL}/rest/v1/process_node_links`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ process_node_id: nodeId, link_kind: linkKind, target_id: targetId, label: label ?? null, created_by: userId }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create link')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function deleteProcessNodeLink(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/process_node_links?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to delete link')
+  }
+}
+
+export async function listProcessNodeLinksAnon(nodeId: string): Promise<ProcessNodeLink[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/process_node_links?process_node_id=eq.${nodeId}&select=*&order=created_at.desc`,
+    { headers: anonHeaders() }
+  )
+  if (!res.ok) return []
+  return res.json()
 }
 
 // ─── Anon fetchers (shared read-only views) ────────────
