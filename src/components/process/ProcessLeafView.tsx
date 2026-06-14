@@ -7,6 +7,7 @@ import { PROCESS_LEVEL_LABEL } from '@/lib/process/types'
 import { pushProcessLeafToNewDiagram } from '@/lib/process/pushToDiagram'
 import ProcessLeafEditor from './ProcessLeafEditor'
 import SipocLinkPanel from './SipocLinkPanel'
+import OverlayPanel from './OverlayPanel'
 
 // Leaf process view: a slim header with a collapsible details drawer
 // (description + scope-item ref + SIPOC link) above the full-bleed BPMN editor.
@@ -109,6 +110,7 @@ export default function ProcessLeafView({
               </div>
             </div>
             {orgId && <SipocLinkPanel nodeId={nodeId} orgId={orgId} readOnly={readOnly} />}
+            <OverlayPanel nodeId={nodeId} readOnly={readOnly} />
           </>
         )}
       </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useProcessStore } from '@/lib/process/store'
 import type { ProcessNodeTreeNode } from '@/lib/process/types'
 import { PROCESS_LEVEL_LABEL, PROCESS_LEVEL_COLORS } from '@/lib/process/types'
@@ -10,7 +10,11 @@ import ProcessAIPanel from './ProcessAIPanel'
 // Inline add / rename / delete. Selecting a leaf surfaces it for the (Phase 2)
 // BPMN editor; selecting any node lets you add children one level down.
 export default function ProcessTree() {
-  const tree = useProcessStore(s => s.getProcessTree())
+  // Select the stable `nodes` array and build the tree with useMemo. Selecting
+  // getProcessTree() directly returns a fresh array every render, which makes
+  // zustand's useSyncExternalStore loop forever (React error #185).
+  const nodes = useProcessStore(s => s.nodes)
+  const tree = useMemo(() => useProcessStore.getState().getProcessTree(), [nodes])
   const selectedNodeId = useProcessStore(s => s.selectedNodeId)
   const readOnly = useProcessStore(s => s.readOnly)
 

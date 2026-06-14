@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { listDiagrams, createDiagram, archiveDiagram, restoreDiagram } from '@/lib/supabase/diagrams'
 import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreCapabilityMap, duplicateCapabilityMap } from '@/lib/supabase/capability-maps'
 import { listProcessModels, createProcessModel, archiveProcessModel, restoreProcessModel, duplicateProcessModel } from '@/lib/supabase/process-models'
+import { importBpmnFile, importHierarchyFile } from '@/lib/process/import'
 import type { DiagramRow } from '@/lib/supabase/types'
 import type { CapabilityMapRow } from '@/lib/sipoc/types'
 import type { ProcessModelRow } from '@/lib/process/types'
@@ -63,6 +64,25 @@ export default function Dashboard() {
     if (!organization || !user) return
     const pm = await createProcessModel(organization.id, user.id)
     router.push(`/process/${pm.id}`)
+  }, [organization, user, router])
+
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
+  const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !organization || !user) return
+    setImporting(true)
+    try {
+      const isBpmn = /\.(bpmn|xml)$/i.test(file.name)
+      const modelId = isBpmn
+        ? await importBpmnFile(file, organization.id, user.id)
+        : await importHierarchyFile(file, organization.id, user.id)
+      router.push(`/process/${modelId}`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Import failed')
+      setImporting(false)
+    }
   }, [organization, user, router])
 
   const handleArchiveProcess = useCallback(
@@ -337,11 +357,20 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Process: reference-library entry point */}
+        {/* Process: reference-library + import entry points */}
         {activeTab === 'process' && (
+          <div className="flex items-stretch gap-3 mb-4">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".bpmn,.xml,.xlsx,.xls,.csv"
+            onChange={handleImportFile}
+            className="hidden"
+            aria-label="Import process file"
+          />
           <button
             onClick={() => router.push('/process/library')}
-            className="w-full mb-4 flex items-center gap-3 bg-[#0EA5E9]/8 border border-[#0EA5E9]/30 hover:border-[#0EA5E9]/60 rounded-xl px-4 py-3 transition-colors group text-left"
+            className="flex-1 flex items-center gap-3 bg-[#0EA5E9]/8 border border-[#0EA5E9]/30 hover:border-[#0EA5E9]/60 rounded-xl px-4 py-3 transition-colors group text-left"
           >
             <div className="w-8 h-8 rounded-lg bg-[#0EA5E9]/15 flex items-center justify-center shrink-0">
               <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#0EA5E9]">
@@ -356,6 +385,18 @@ export default function Dashboard() {
               <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
+          <button
+            onClick={() => importInputRef.current?.click()}
+            disabled={importing}
+            title="Import a BPMN (.bpmn/.xml) flow or a Signavio/Solution Manager BPML spreadsheet (.xlsx/.csv)"
+            className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
+          >
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[var(--m12-text-secondary)]">
+              <path d="M9 11.5V3m0 8.5L6 8.5M9 11.5l3-3M3.5 12v2a1 1 0 001 1h9a1 1 0 001-1v-2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-xs font-medium text-[var(--m12-text-secondary)]">{importing ? 'Importing…' : 'Import'}</span>
+          </button>
+          </div>
         )}
 
         {/* Content grid */}

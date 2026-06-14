@@ -9,12 +9,15 @@ import ProcessNodeDetail from '@/components/process/ProcessNodeDetail'
 import ProcessLeafView from '@/components/process/ProcessLeafView'
 import ProcessShareDialog from '@/components/process/ProcessShareDialog'
 import ProcessGapAssessment from '@/components/process/ProcessGapAssessment'
+import ProcessExportMenu from '@/components/process/ProcessExportMenu'
+import ProcessPresence from '@/components/process/ProcessPresence'
+import { useProcessCollab } from '@/lib/collab/useProcessCollab'
 import VersionBadge from '@/components/VersionBadge'
 
 export default function ProcessModelPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const { user, organization, loading: authLoading } = useAuth()
+  const { user, profile, organization, loading: authLoading } = useAuth()
 
   const model = useProcessStore(s => s.model)
   const loading = useProcessStore(s => s.loading)
@@ -28,6 +31,11 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
   const [gapOpen, setGapOpen] = useState(false)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
+
+  // Collaboration presence
+  const collabName = profile?.display_name?.trim() || (user?.email ? user.email.split('@')[0] : '') || 'Anonymous'
+  const collab = useProcessCollab(id, user?.id, collabName)
+  useEffect(() => { collab.setEditingNode(selectedNodeId) }, [selectedNodeId, collab.setEditingNode])
 
   // Auth gating
   useEffect(() => {
@@ -117,6 +125,8 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
             </svg>
             Gap Assessment
           </button>
+          <ProcessExportMenu />
+          <ProcessPresence users={collab.users} myClientId={collab.myClientId} />
           <button
             onClick={() => setShareOpen(true)}
             className="flex items-center gap-1.5 text-xs text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] border border-[var(--m12-border)]/60 hover:border-[var(--m12-border)] rounded-lg px-3 py-1.5 transition-colors"

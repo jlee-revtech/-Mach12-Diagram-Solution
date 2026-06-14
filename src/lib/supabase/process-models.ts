@@ -6,6 +6,8 @@ import type {
   ReferenceLibraryRow,
   ReferenceScenario,
   ProcessOverlay,
+  OverlayKind,
+  OverlayPayload,
 } from '@/lib/process/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -497,6 +499,65 @@ export async function instantiateReferenceScenario(
   }
 
   return model
+}
+
+// ─── Process overlays (org-scoped A&D know-how) ────────
+
+export async function listProcessOverlays(nodeId: string): Promise<ProcessOverlay[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/process_overlays?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function createProcessOverlay(
+  nodeId: string,
+  overlayKind: OverlayKind,
+  payload: OverlayPayload,
+  sortOrder = 0,
+): Promise<ProcessOverlay> {
+  const res = await fetch(`${URL}/rest/v1/process_overlays`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ process_node_id: nodeId, overlay_kind: overlayKind, payload, sort_order: sortOrder }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create overlay')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function updateProcessOverlay(id: string, payload: OverlayPayload): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/process_overlays?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ payload }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to update overlay')
+  }
+}
+
+export async function deleteProcessOverlay(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/process_overlays?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: headers(),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to delete overlay')
+  }
+}
+
+export async function listProcessOverlaysAnon(nodeId: string): Promise<ProcessOverlay[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/process_overlays?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
+    { headers: anonHeaders() }
+  )
+  if (!res.ok) return []
+  return res.json()
 }
 
 // ─── Cross-pillar links (process_node_links) ───────────

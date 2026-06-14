@@ -101,6 +101,10 @@ export async function POST(req: NextRequest) {
       return handleBpmnFromText(prompt, context)
     } else if (action === 'process-gap-assessment') {
       return handleProcessGapAssessment(context)
+    } else if (action === 'process-exec-map') {
+      return handleProcessExecMap(prompt, context)
+    } else if (action === 'process-playbook') {
+      return handleProcessPlaybook(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -1287,5 +1291,121 @@ Guidelines:
     return NextResponse.json(JSON.parse(cleaned))
   } catch {
     return NextResponse.json({ error: 'Failed to parse gap assessment', raw: text }, { status: 500 })
+  }
+}
+
+// Executive process map — a clean leveled value-chain SVG for slides.
+async function handleProcessExecMap(prompt: string, context: {
+  modelTitle: string
+  scenarios: { name: string; groups: { name: string; processes: string[] }[] }[]
+}) {
+  const summary = context.scenarios.map(s =>
+    `SCENARIO: ${s.name}\n` + s.groups.map(g => `  GROUP: ${g.name} — ${g.processes.join(', ')}`).join('\n')
+  ).join('\n')
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 16000,
+    messages: [{
+      role: 'user',
+      content: `Create a world-class executive PROCESS MAP as an SVG for a board/executive presentation.
+
+TITLE: "${context.modelTitle}"
+${prompt ? `USER DIRECTION: ${prompt}` : ''}
+
+PROCESS LANDSCAPE (value chain):
+${summary}
+
+STRICT VISUAL STANDARDS — follow every rule:
+
+CANVAS & BACKGROUND:
+- viewBox="0 0 1400 900" (16:9 slide ratio)
+- Background: clean white (#FFFFFF); subtle 1px #E2E8F0 border around the diagram area.
+
+LAYOUT — a horizontal value chain:
+- Render each L1 SCENARIO as a large chevron/arrow block flowing left-to-right across the top band (like a Porter value chain or SAP end-to-end ribbon). Equal width, joined as a process ribbon.
+- Under each scenario, stack its PROCESS GROUPS as clean rounded rectangles.
+- Inside/under each group, list its processes as small text rows or mini-cards.
+- Generous spacing; no overlaps; minimum 24px between elements.
+
+NODE STYLING:
+- Scenario chevrons: fill="#0EA5E9" with white 14px bold text, or alternating #0EA5E9 / #0C7FB3 for rhythm.
+- Process groups: fill="#EFF6FF" stroke="#2563EB" strokeWidth="1.2" rx="6"; group name 12px bold #1E293B.
+- Processes: 10px #475569 text rows, left-aligned, with a small bullet.
+- Section labels: 9px bold uppercase tracking="2" #94A3B8.
+
+TYPOGRAPHY: font-family="Arial, Helvetica, sans-serif" on ALL text. Title 22px bold #0F172A at top center y=44.
+
+ANTI-PATTERNS — do NOT: use cartoon colors, gradients, heavy shadows, circles/ellipses for blocks, overlapping elements, curved decorative art, or any text outside boxes except labels/title.
+
+BRANDING: bottom-right "Mach12.ai" 8px #94A3B8.
+
+This should look like a McKinsey/Gartner process architecture slide — clean, minimal, precise, A&D-appropriate.
+
+Return ONLY the raw <svg>...</svg> element. No markdown, no code fences, no explanation.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  let svg = text.trim().replace(/```(?:svg|xml|html)?\n?/g, '').replace(/```\n?$/g, '').trim()
+  if (!svg.startsWith('<svg')) {
+    const m = svg.match(/<svg[\s\S]*<\/svg>/i)
+    if (m) svg = m[0]
+    else return NextResponse.json({ error: 'AI did not return valid SVG', raw: text.substring(0, 500) }, { status: 500 })
+  }
+  return new Response(svg, { headers: { 'Content-Type': 'image/svg+xml' } })
+}
+
+// Per-process playbook: narrative, RACI, controls, systems, KPIs, compliance.
+async function handleProcessPlaybook(context: {
+  processName: string
+  modelTitle?: string
+  description?: string
+  scopeItemRef?: string
+  lanes: { label: string; system?: string | null }[]
+  steps: { label: string; elementType: string; lane?: string | null }[]
+  overlays: { kind: string; title: string; framework?: string; code?: string; kpiTarget?: string }[]
+  sipoc?: { suppliers: string[]; inputs: string[]; outputs: string[]; customers: string[] } | null
+}) {
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    system: PROCESS_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Write an executive process playbook for the process below. Return ONLY valid JSON.
+
+PROCESS: "${context.processName}"${context.modelTitle ? ` (model: ${context.modelTitle})` : ''}
+${context.description ? `Description: ${context.description}` : ''}
+${context.scopeItemRef ? `SAP scope item: ${context.scopeItemRef}` : ''}
+Swimlanes (roles/systems): ${context.lanes.map(l => `${l.label}${l.system ? ` [${l.system}]` : ''}`).join('; ') || 'none defined'}
+Steps: ${context.steps.map(s => `${s.label} (${s.elementType}${s.lane ? ` @ ${s.lane}` : ''})`).join(' → ') || 'none defined'}
+Existing overlays: ${context.overlays.map(o => `${o.framework || o.kind}:${o.code || o.title}`).join(', ') || 'none'}
+${context.sipoc ? `SIPOC — Suppliers: ${context.sipoc.suppliers.join(', ')}; Inputs: ${context.sipoc.inputs.join(', ')}; Outputs: ${context.sipoc.outputs.join(', ')}; Customers: ${context.sipoc.customers.join(', ')}` : ''}
+
+Return this exact JSON:
+{
+  "narrative": "2-4 paragraph executive description of the process, its purpose, and value.",
+  "steps": [ { "step": "Step name", "role": "Responsible role/lane", "system": "System or null", "description": "What happens" } ],
+  "raci": [ { "activity": "Activity", "responsible": "R", "accountable": "A", "consulted": "C", "informed": "I" } ],
+  "controls": [ { "framework": "CAS|DCAA|EVMS|FAR|DFARS|CMMC|ITAR|Other", "control": "Control name", "requirement": "What must be true" } ],
+  "systems": [ { "system": "System", "role": "How it's used" } ],
+  "kpis": [ { "kpi": "Metric", "target": "Target", "rationale": "Why it matters" } ],
+  "complianceNotes": [ "A&D compliance note" ]
+}
+
+Guidelines:
+- Be specific and A&D/GovCon-grade. Infer sensible RACI, controls, and KPIs even where not given, but stay consistent with the steps and overlays provided.
+- 4-12 steps, 3-8 RACI rows, 2-6 controls, 2-6 systems, 2-5 KPIs.
+- No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    return NextResponse.json(JSON.parse(cleaned))
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse playbook', raw: text }, { status: 500 })
   }
 }
