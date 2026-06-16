@@ -122,6 +122,14 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
+  const [aiDots, setAiDots] = useState('')
+
+  // Animate the "Drafting…" ellipsis while the model works.
+  useEffect(() => {
+    if (!aiBusy) { setAiDots(''); return }
+    const id = setInterval(() => setAiDots(d => (d.length >= 3 ? '' : d + '.')), 400)
+    return () => clearInterval(id)
+  }, [aiBusy])
 
   const loadedForRef = useRef<string | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -373,30 +381,51 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
 
         {/* AI draft modal */}
         {aiOpen && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => setAiOpen(false)}>
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => { if (!aiBusy) setAiOpen(false) }}>
             <div onClick={e => e.stopPropagation()} className="w-[26rem] max-w-[90%] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl p-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[var(--m12-text)]">Draft flow from text</h3>
-                <button onClick={() => setAiOpen(false)} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
-                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-                </button>
+                {!aiBusy && (
+                  <button onClick={() => setAiOpen(false)} aria-label="Close" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                  </button>
+                )}
               </div>
-              <textarea
-                autoFocus
-                value={aiPrompt}
-                onChange={e => setAiPrompt(e.target.value)}
-                rows={4}
-                aria-label="Flow description"
-                placeholder="Describe the process steps, who does each, and the decision points…"
-                className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60 resize-y mb-3"
-              />
-              <button
-                onClick={handleAiDraft}
-                disabled={aiBusy || !aiPrompt.trim()}
-                className="w-full bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                {aiBusy ? 'Drafting…' : 'Generate flow'}
-              </button>
+
+              {aiBusy ? (
+                <div className="py-8 flex flex-col items-center text-center">
+                  <div className="relative w-12 h-12 mb-4">
+                    <div className="absolute inset-0 rounded-full border-2 border-[#0EA5E9]/20" />
+                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#0EA5E9] animate-spin" />
+                    <svg width="18" height="18" viewBox="0 0 14 14" fill="none" className="absolute inset-0 m-auto text-[#0EA5E9] animate-pulse">
+                      <path d="M7 1.5l1.3 3.2 3.2 1.3-3.2 1.3L7 10.5 5.7 7.3 2.5 6l3.2-1.3L7 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div className="text-sm font-medium text-[var(--m12-text)] mb-1">Drafting your process flow{aiDots}</div>
+                  <div className="text-[11px] text-[var(--m12-text-muted)] max-w-[18rem]">
+                    Designing swimlanes, tasks, gateways and sequence flows. This usually takes 10–20 seconds.
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    autoFocus
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    rows={4}
+                    aria-label="Flow description"
+                    placeholder="Describe the process steps, who does each, and the decision points…"
+                    className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60 resize-y mb-3"
+                  />
+                  <button
+                    onClick={handleAiDraft}
+                    disabled={!aiPrompt.trim()}
+                    className="w-full bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Generate flow
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
