@@ -8,6 +8,10 @@ import type {
   ProcessOverlay,
   OverlayKind,
   OverlayPayload,
+  RicefwItem,
+  RicefwType,
+  RicefwStatus,
+  ProcessInterface,
 } from '@/lib/process/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -181,7 +185,7 @@ export async function createProcessNode(
 
 export async function updateProcessNode(
   id: string,
-  updates: Partial<Pick<ProcessNode, 'name' | 'description' | 'color' | 'parent_id' | 'level' | 'node_kind' | 'sort_order' | 'is_leaf' | 'sipoc_capability_id' | 'scope_item_ref'>>
+  updates: Partial<Pick<ProcessNode, 'name' | 'description' | 'color' | 'parent_id' | 'level' | 'node_kind' | 'sort_order' | 'is_leaf' | 'sipoc_capability_id' | 'scope_item_ref' | 'lifecycle' | 'variant_label'>>
 ): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/process_nodes?id=eq.${id}`, {
     method: 'PATCH',
@@ -493,6 +497,10 @@ export async function instantiateReferenceScenario(
     const updates: Record<string, unknown> = {}
     if (s.description) updates.description = s.description
     if (s.scope_item_ref) updates.scope_item_ref = s.scope_item_ref
+    if (s.lifecycle) updates.lifecycle = s.lifecycle
+    if (s.variant_label) updates.variant_label = s.variant_label
+    // A node with children is not a BPMN leaf, regardless of level.
+    if ((byParent.get(s.id) || []).length > 0) updates.is_leaf = false
     if (Object.keys(updates).length) await updateProcessNode(node.id, updates as Partial<ProcessNode>)
     if (s.graph_data) await saveProcessGraph(node.id, s.graph_data)
     idMap.set(s.id, node.id)
@@ -554,6 +562,86 @@ export async function deleteProcessOverlay(id: string): Promise<void> {
 export async function listProcessOverlaysAnon(nodeId: string): Promise<ProcessOverlay[]> {
   const res = await fetch(
     `${URL}/rest/v1/process_overlays?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
+    { headers: anonHeaders() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+// ─── RICEFW register (org-scoped build-object catalog) ──
+
+export async function listRicefw(orgId: string, nodeId?: string): Promise<RicefwItem[]> {
+  const nodeFilter = nodeId ? `&process_node_id=eq.${nodeId}` : ''
+  return fetchAllPaginated<RicefwItem>(
+    `${URL}/rest/v1/process_ricefw?organization_id=eq.${orgId}${nodeFilter}&select=*&order=code.asc`,
+    headers()
+  )
+}
+
+export async function createRicefw(
+  orgId: string,
+  data: { code: string; ricefw_type: RicefwType; title: string; description?: string; status?: RicefwStatus; complexity?: string; process_node_id?: string | null },
+): Promise<RicefwItem> {
+  const res = await fetch(`${URL}/rest/v1/process_ricefw`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ organization_id: orgId, status: 'identified', ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create RICEFW item')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function updateRicefw(
+  id: string,
+  updates: Partial<Pick<RicefwItem, 'code' | 'ricefw_type' | 'title' | 'description' | 'status' | 'complexity' | 'process_node_id'>>,
+): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/process_ricefw?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Prefer': 'return=minimal' },
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update RICEFW item') }
+}
+
+export async function deleteRicefw(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/process_ricefw?id=eq.${id}`, { method: 'DELETE', headers: headers() })
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to delete RICEFW item') }
+}
+
+// ─── Interface / integration register (per node) ───────
+
+export async function listProcessInterfaces(nodeId: string): Promise<ProcessInterface[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/process_interfaces?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function createProcessInterface(
+  nodeId: string,
+  data: Partial<Pick<ProcessInterface, 'source_system_id' | 'target_system_id' | 'direction' | 'frequency' | 'integration_tech' | 'interface_ref' | 'description' | 'sort_order'>>,
+): Promise<ProcessInterface> {
+  const res = await fetch(`${URL}/rest/v1/process_interfaces`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ process_node_id: nodeId, ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create interface')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function deleteProcessInterface(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/process_interfaces?id=eq.${id}`, { method: 'DELETE', headers: headers() })
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to delete interface') }
+}
+
+export async function listProcessInterfacesAnon(nodeId: string): Promise<ProcessInterface[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/process_interfaces?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
     { headers: anonHeaders() }
   )
   if (!res.ok) return []

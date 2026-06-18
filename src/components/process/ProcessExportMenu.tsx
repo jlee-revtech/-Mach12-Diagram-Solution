@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useProcessStore } from '@/lib/process/store'
-import { listProcessOverlays } from '@/lib/supabase/process-models'
+import { listProcessOverlays, listProcessInterfaces, listRicefw } from '@/lib/supabase/process-models'
 import { generateProcessBpmn } from '@/lib/export/bpmn'
 import { exportPlaybookXlsx, exportPlaybookPdf, exportPlaybookPptx, type ProcessPlaybook } from '@/lib/export/playbook'
 
@@ -74,7 +74,12 @@ export default function ProcessExportMenu() {
     if (!leaf || !model) return null
     if (playbookCache.current && playbookForNode.current === leaf.id) return playbookCache.current
     const graph = leaf.graph_data || { lanes: [], nodes: [], edges: [] }
-    const overlays = await listProcessOverlays(leaf.id)
+    const [overlays, interfaces, ricefw] = await Promise.all([
+      listProcessOverlays(leaf.id),
+      listProcessInterfaces(leaf.id),
+      listRicefw(model.organization_id, leaf.id),
+    ])
+    const namesOf = (ids?: string[]) => (ids || []).map(id => sysName(id)).filter(Boolean) as string[]
     const res = await fetch('/api/ai', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -84,12 +89,25 @@ export default function ProcessExportMenu() {
           modelTitle: model.title,
           description: leaf.description,
           scopeItemRef: leaf.scope_item_ref,
+          lifecycle: leaf.lifecycle,
+          variant: leaf.variant_label,
           lanes: (graph.lanes || []).map(l => ({ label: l.label, system: sysName(l.systemId) })),
-          steps: (graph.nodes || []).map(n => ({
-            label: (n.data as { label?: string }).label || 'Step',
-            elementType: (n.data as { elementType?: string }).elementType || 'task',
-            lane: sysName((graph.lanes || []).find(l => l.id === (n.data as { laneId?: string }).laneId)?.systemId) || null,
-          })),
+          steps: (graph.nodes || []).map(n => {
+            const d = n.data as Record<string, unknown>
+            return {
+              label: (d.label as string) || 'Step',
+              elementType: (d.elementType as string) || 'task',
+              lane: sysName((graph.lanes || []).find(l => l.id === (d.laneId as string))?.systemId) || null,
+              responsibleRole: (d.responsibleRole as string) || null,
+              raci: d.raci || null,
+              systems: namesOf(d.systemIds as string[]),
+              fioriApp: (d.fioriApp as string) || null,
+              tcode: (d.tcode as string) || null,
+              ricefwCodes: (d.ricefwCodes as string[]) || [],
+            }
+          }),
+          interfaces: interfaces.map(i => ({ source: sysName(i.source_system_id), target: sysName(i.target_system_id), direction: i.direction, frequency: i.frequency, tech: i.integration_tech, ref: i.interface_ref })),
+          ricefw: ricefw.map(r => ({ code: r.code, type: r.ricefw_type, title: r.title, status: r.status })),
           overlays: overlays.map(o => ({ kind: o.overlay_kind, title: o.payload.title, framework: o.payload.framework, code: o.payload.code, kpiTarget: o.payload.kpiTarget })),
         },
       }),

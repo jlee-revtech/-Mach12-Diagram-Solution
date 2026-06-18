@@ -1362,11 +1362,32 @@ async function handleProcessPlaybook(context: {
   modelTitle?: string
   description?: string
   scopeItemRef?: string
+  lifecycle?: string | null
+  variant?: string | null
   lanes: { label: string; system?: string | null }[]
-  steps: { label: string; elementType: string; lane?: string | null }[]
+  steps: {
+    label: string; elementType: string; lane?: string | null
+    responsibleRole?: string | null; raci?: unknown; systems?: string[]
+    fioriApp?: string | null; tcode?: string | null; ricefwCodes?: string[]
+  }[]
+  interfaces?: { source?: string | null; target?: string | null; direction?: string | null; frequency?: string | null; tech?: string | null; ref?: string | null }[]
+  ricefw?: { code: string; type: string; title: string; status: string }[]
   overlays: { kind: string; title: string; framework?: string; code?: string; kpiTarget?: string }[]
   sipoc?: { suppliers: string[]; inputs: string[]; outputs: string[]; customers: string[] } | null
 }) {
+  const stepLines = context.steps.map(s => {
+    const bits = [
+      `${s.label} (${s.elementType}${s.lane ? ` @ ${s.lane}` : ''})`,
+      s.responsibleRole ? `R:${s.responsibleRole}` : '',
+      s.systems?.length ? `sys:${s.systems.join('/')}` : '',
+      s.tcode ? `tcode:${s.tcode}` : '',
+      s.fioriApp ? `fiori:${s.fioriApp}` : '',
+      s.ricefwCodes?.length ? `RICEFW:${s.ricefwCodes.join(',')}` : '',
+    ].filter(Boolean)
+    return bits.join(' | ')
+  }).join('\n')
+  const ifaceLines = (context.interfaces || []).map(i => `${i.source || '?'} ${i.direction === 'inbound' ? '<-' : i.direction === 'bidirectional' ? '<->' : '->'} ${i.target || '?'} (${[i.tech, i.frequency, i.ref].filter(Boolean).join(', ')})`).join('; ')
+  const ricefwLines = (context.ricefw || []).map(r => `${r.code} [${r.type}] ${r.title} (${r.status})`).join('; ')
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
@@ -1375,13 +1396,18 @@ async function handleProcessPlaybook(context: {
       role: 'user',
       content: `Write an executive process playbook for the process below. Return ONLY valid JSON.
 
-PROCESS: "${context.processName}"${context.modelTitle ? ` (model: ${context.modelTitle})` : ''}
+PROCESS: "${context.processName}"${context.modelTitle ? ` (model: ${context.modelTitle})` : ''}${context.lifecycle ? ` [${context.lifecycle}]` : ''}${context.variant ? ` variant: ${context.variant}` : ''}
 ${context.description ? `Description: ${context.description}` : ''}
 ${context.scopeItemRef ? `SAP scope item: ${context.scopeItemRef}` : ''}
 Swimlanes (roles/systems): ${context.lanes.map(l => `${l.label}${l.system ? ` [${l.system}]` : ''}`).join('; ') || 'none defined'}
-Steps: ${context.steps.map(s => `${s.label} (${s.elementType}${s.lane ? ` @ ${s.lane}` : ''})`).join(' → ') || 'none defined'}
+Steps (with metadata where known):
+${stepLines || 'none defined'}
+Interfaces: ${ifaceLines || 'none documented'}
+RICEFW build objects: ${ricefwLines || 'none registered'}
 Existing overlays: ${context.overlays.map(o => `${o.framework || o.kind}:${o.code || o.title}`).join(', ') || 'none'}
 ${context.sipoc ? `SIPOC — Suppliers: ${context.sipoc.suppliers.join(', ')}; Inputs: ${context.sipoc.inputs.join(', ')}; Outputs: ${context.sipoc.outputs.join(', ')}; Customers: ${context.sipoc.customers.join(', ')}` : ''}
+
+Use the provided per-step roles, systems, T-codes, and RICEFW where given; only infer what is missing.
 
 Return this exact JSON:
 {

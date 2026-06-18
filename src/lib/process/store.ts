@@ -39,7 +39,7 @@ interface ProcessState {
 
   // ─── Node CRUD ────────────────────────────────────────
   addNode: (name: string, parentId?: string | null, level?: number, color?: string | null) => Promise<string | undefined>
-  updateNode: (id: string, updates: Partial<Pick<ProcessNode, 'name' | 'description' | 'color' | 'parent_id' | 'level' | 'node_kind' | 'sort_order' | 'is_leaf' | 'sipoc_capability_id' | 'scope_item_ref'>>) => Promise<void>
+  updateNode: (id: string, updates: Partial<Pick<ProcessNode, 'name' | 'description' | 'color' | 'parent_id' | 'level' | 'node_kind' | 'sort_order' | 'is_leaf' | 'sipoc_capability_id' | 'scope_item_ref' | 'lifecycle' | 'variant_label'>>) => Promise<void>
   removeNode: (id: string) => Promise<void>
   reorderNode: (id: string, newSortOrder: number) => Promise<void>
   getProcessTree: () => ProcessNodeTreeNode[]
@@ -108,7 +108,14 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
     const siblings = nodes.filter(n => n.parent_id === (parentId || null))
     const sortOrder = siblings.length
     const node = await api.createProcessNode(model.id, name, sortOrder, parentId, lvl, kindForLevel(lvl), color)
-    set({ nodes: [...nodes, node] })
+    // A parent that just gained a child is no longer a BPMN leaf.
+    const parent = parentId ? nodes.find(n => n.id === parentId) : null
+    let next = [...nodes, node]
+    if (parent && parent.is_leaf) {
+      next = next.map(n => (n.id === parent.id ? { ...n, is_leaf: false } : n))
+      api.updateProcessNode(parent.id, { is_leaf: false }).catch(() => {})
+    }
+    set({ nodes: next })
     return node.id
   },
 

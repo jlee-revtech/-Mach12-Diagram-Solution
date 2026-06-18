@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useProcessStore } from '@/lib/process/store'
-import { PROCESS_LEVEL_LABEL } from '@/lib/process/types'
+import { levelLabel, LIFECYCLE_LABEL, type ProcessLifecycle } from '@/lib/process/types'
 
 // Detail panel for the selected process node. For L1/L2 nodes it captures
 // description + SAP scope-item ref. For L3 leaf nodes it also surfaces the
@@ -21,7 +21,6 @@ export default function ProcessNodeDetail({ nodeId }: { nodeId: string }) {
   }, [node?.id, node?.description, node?.scope_item_ref])
 
   if (!node) return null
-  const level = Math.min(Math.max(node.level, 1), 3) as 1 | 2 | 3
 
   const commitDescription = () => {
     const d = description.trim()
@@ -37,12 +36,13 @@ export default function ProcessNodeDetail({ nodeId }: { nodeId: string }) {
       {/* Breadcrumb-ish header */}
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[10px] uppercase tracking-widest text-[#0EA5E9] font-[family-name:var(--font-space-mono)] font-bold">
-          {PROCESS_LEVEL_LABEL[level]} · L{level}
+          {levelLabel(node.level)} · L{node.level}
         </span>
-        {node.is_leaf && (
-          <span className="text-[10px] uppercase tracking-wider text-[#10B981] font-[family-name:var(--font-space-mono)]">
-            BPMN Leaf
-          </span>
+        {node.variant_label && (
+          <span className="text-[10px] uppercase tracking-wider text-[#F59E0B] font-[family-name:var(--font-space-mono)]">{node.variant_label}</span>
+        )}
+        {node.lifecycle && (
+          <span className="text-[10px] uppercase tracking-wider text-[#8B5CF6] font-[family-name:var(--font-space-mono)]">{LIFECYCLE_LABEL[node.lifecycle]}</span>
         )}
       </div>
       <h1 className="text-2xl font-bold text-[var(--m12-text)] mb-6">{node.name}</h1>
@@ -76,6 +76,34 @@ export default function ProcessNodeDetail({ nodeId }: { nodeId: string }) {
           placeholder={readOnly ? '' : 'e.g. BD9, J45 — best-practice scope item this maps to'}
           className="w-full bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60 font-[family-name:var(--font-space-mono)]"
         />
+      </section>
+
+      {/* Lifecycle + variant */}
+      <section className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-2">Lifecycle</label>
+          <select
+            value={node.lifecycle || ''}
+            onChange={e => updateNode(node.id, { lifecycle: (e.target.value || null) as ProcessLifecycle | null })}
+            disabled={readOnly}
+            aria-label="Lifecycle"
+            className="w-full bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60"
+          >
+            <option value="">— not set —</option>
+            {(['as_is', 'interim', 'to_be'] as ProcessLifecycle[]).map(l => <option key={l} value={l}>{LIFECYCLE_LABEL[l]}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-2">Variant</label>
+          <input
+            defaultValue={node.variant_label || ''}
+            onBlur={e => { if (!readOnly && e.target.value.trim() !== (node.variant_label || '')) updateNode(node.id, { variant_label: e.target.value.trim() || null }) }}
+            readOnly={readOnly}
+            aria-label="Variant label"
+            placeholder={readOnly ? '' : 'e.g. Off-Ceiling, Capital'}
+            className="w-full bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60"
+          />
+        </div>
       </section>
 
     </div>

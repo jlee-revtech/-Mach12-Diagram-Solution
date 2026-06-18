@@ -9,6 +9,7 @@ import ProcessNodeDetail from '@/components/process/ProcessNodeDetail'
 import ProcessLeafView from '@/components/process/ProcessLeafView'
 import ProcessShareDialog from '@/components/process/ProcessShareDialog'
 import ProcessGapAssessment from '@/components/process/ProcessGapAssessment'
+import RicefwPanel from '@/components/process/RicefwPanel'
 import ProcessExportMenu from '@/components/process/ProcessExportMenu'
 import ProcessPresence from '@/components/process/ProcessPresence'
 import { useProcessCollab } from '@/lib/collab/useProcessCollab'
@@ -29,6 +30,7 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
   const [editingTitle, setEditingTitle] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [gapOpen, setGapOpen] = useState(false)
+  const [ricefwOpen, setRicefwOpen] = useState(false)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
@@ -125,6 +127,16 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
             </svg>
             Gap Assessment
           </button>
+          <button
+            onClick={() => setRicefwOpen(true)}
+            className="flex items-center gap-1.5 text-xs text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] border border-[var(--m12-border)]/60 hover:border-[var(--m12-border)] rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M4.5 5h5M4.5 7h5M4.5 9h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            RICEFW
+          </button>
           <ProcessExportMenu />
           <ProcessPresence users={collab.users} myClientId={collab.myClientId} />
           <button
@@ -185,6 +197,7 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
       )}
 
       {gapOpen && <ProcessGapAssessment onClose={() => setGapOpen(false)} />}
+      {ricefwOpen && organization && <RicefwPanel orgId={organization.id} onClose={() => setRicefwOpen(false)} />}
     </div>
   )
 }

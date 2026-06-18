@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useProcessStore } from '@/lib/process/store'
 import type { ProcessNodeTreeNode } from '@/lib/process/types'
-import { PROCESS_LEVEL_LABEL, PROCESS_LEVEL_COLORS } from '@/lib/process/types'
+import { levelLabel, levelColor, MAX_PROCESS_LEVEL, LIFECYCLE_LABEL } from '@/lib/process/types'
 import ProcessAIPanel from './ProcessAIPanel'
 
 // Navigable value-chain hierarchy: L1 Scenario → L2 Process Group → L3 Process.
@@ -37,7 +37,7 @@ export default function ProcessTree() {
   const handleAddChild = useCallback(async (parent: ProcessNodeTreeNode) => {
     const name = draftName.trim()
     if (!name) return
-    const childLevel = Math.min(parent.level + 1, 3)
+    const childLevel = Math.min(parent.level + 1, MAX_PROCESS_LEVEL)
     const id = await addNode(name, parent.id, childLevel)
     setDraftName('')
     setAddingUnder(null)
@@ -139,10 +139,9 @@ function TreeRow({
   const removeNode = useProcessStore(s => s.removeNode)
 
   const isSelected = selectedNodeId === node.id
-  const level = Math.min(Math.max(node.level, 1), 3) as 1 | 2 | 3
-  const accent = node.color || PROCESS_LEVEL_COLORS[level - 1]
+  const accent = node.color || levelColor(node.level)
   const hasChildren = node.children.length > 0
-  const canAddChild = node.level < 3
+  const canAddChild = node.level < MAX_PROCESS_LEVEL
 
   const commitRename = async () => {
     const name = nameDraft.trim()
@@ -195,13 +194,23 @@ function TreeRow({
           </span>
         )}
 
-        {node.is_leaf && (
+        {node.variant_label && (
+          <span className="text-[8px] uppercase tracking-wider text-[#F59E0B] font-[family-name:var(--font-space-mono)] shrink-0">
+            {node.variant_label}
+          </span>
+        )}
+        {node.lifecycle && (
+          <span className="text-[8px] uppercase tracking-wider text-[#8B5CF6] font-[family-name:var(--font-space-mono)] shrink-0">
+            {LIFECYCLE_LABEL[node.lifecycle]}
+          </span>
+        )}
+        {node.is_leaf && !hasChildren && (
           <span className="text-[8px] uppercase tracking-wider text-[#10B981] font-[family-name:var(--font-space-mono)] shrink-0">
             BPMN
           </span>
         )}
         <span className="text-[8px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] shrink-0">
-          {PROCESS_LEVEL_LABEL[level]}
+          {levelLabel(node.level)}
         </span>
 
         {!readOnly && (
@@ -209,7 +218,7 @@ function TreeRow({
             {canAddChild && (
               <button
                 onClick={e => { e.stopPropagation(); setAddingUnder(node.id); setDraftName(''); setExpanded(true) }}
-                title={`Add ${PROCESS_LEVEL_LABEL[Math.min(level + 1, 3) as 1 | 2 | 3]}`}
+                title={`Add ${levelLabel(node.level + 1)}`}
                 className="text-[var(--m12-border)] hover:text-[#0EA5E9]"
               >
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
@@ -263,7 +272,7 @@ function TreeRow({
             onChange={e => setDraftName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') onAddChild(node); if (e.key === 'Escape') setAddingUnder(null) }}
             onBlur={() => { if (!draftName.trim()) setAddingUnder(null) }}
-            placeholder={`${PROCESS_LEVEL_LABEL[Math.min(level + 1, 3) as 1 | 2 | 3]} name…`}
+            placeholder={`${levelLabel(node.level + 1)} name…`}
             className="w-full bg-[var(--m12-bg)] border border-[#0EA5E9]/50 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none"
           />
         </div>

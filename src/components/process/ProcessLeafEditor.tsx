@@ -567,10 +567,71 @@ function Inspector({
             </Field>
             <Field label="Description">
               <textarea
-                rows={3}
+                rows={2}
                 value={(selectedNode.data as any).description || ''}
                 onChange={e => onPatchNode(selectedNode.id, { description: e.target.value })}
                 className="ins-input resize-y"
+              />
+            </Field>
+
+            {/* ─── Delivery metadata (from real SAP process docs) ─── */}
+            <div className="pt-1 border-t border-[var(--m12-border)]/30" />
+            <Field label="Responsible role">
+              <input
+                value={(selectedNode.data as any).responsibleRole || ''}
+                onChange={e => onPatchNode(selectedNode.id, { responsibleRole: e.target.value })}
+                className="ins-input" placeholder="e.g. Payroll Analyst"
+              />
+            </Field>
+            <Field label="RACI">
+              <div className="grid grid-cols-2 gap-1.5">
+                {(['r', 'a', 'c', 'i'] as const).map(k => (
+                  <input
+                    key={k}
+                    value={(((selectedNode.data as any).raci?.[k]) || []).join(', ')}
+                    onChange={e => {
+                      const arr = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                      const raci = { ...((selectedNode.data as any).raci || {}), [k]: arr }
+                      onPatchNode(selectedNode.id, { raci })
+                    }}
+                    className="ins-input" placeholder={k.toUpperCase()}
+                    aria-label={`RACI ${k.toUpperCase()}`}
+                  />
+                ))}
+              </div>
+            </Field>
+            <Field label="IT systems">
+              <div className="flex flex-wrap gap-1">
+                {systems.length === 0 && <span className="text-[10px] text-[var(--m12-text-muted)]">No systems defined yet.</span>}
+                {systems.map(s => {
+                  const on = ((selectedNode.data as any).systemIds || []).includes(s.id)
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        const cur: string[] = (selectedNode.data as any).systemIds || []
+                        const next = on ? cur.filter(x => x !== s.id) : [...cur, s.id]
+                        onPatchNode(selectedNode.id, { systemIds: next })
+                      }}
+                      className={`text-[10px] rounded px-1.5 py-0.5 border transition-colors ${on ? 'bg-[#0EA5E9]/15 border-[#0EA5E9]/50 text-[#0EA5E9]' : 'border-[var(--m12-border)]/50 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}
+                    >
+                      {s.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
+            <Field label="Fiori app">
+              <input value={(selectedNode.data as any).fioriApp || ''} onChange={e => onPatchNode(selectedNode.id, { fioriApp: e.target.value })} className="ins-input" placeholder="e.g. Manage Journal Entries" />
+            </Field>
+            <Field label="T-code">
+              <input value={(selectedNode.data as any).tcode || ''} onChange={e => onPatchNode(selectedNode.id, { tcode: e.target.value })} className="ins-input font-[family-name:var(--font-space-mono)]" placeholder="e.g. FB50" />
+            </Field>
+            <Field label="RICEFW codes">
+              <input
+                value={(((selectedNode.data as any).ricefwCodes) || []).join(', ')}
+                onChange={e => onPatchNode(selectedNode.id, { ricefwCodes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                className="ins-input font-[family-name:var(--font-space-mono)]" placeholder="e.g. INT-014, RPT-003"
               />
             </Field>
           </>

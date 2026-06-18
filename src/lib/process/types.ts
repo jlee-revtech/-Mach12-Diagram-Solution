@@ -18,6 +18,17 @@ export const PROCESS_LEVEL_LABEL: Record<ProcessLevel, string> = {
   3: 'Process',
 }
 
+// Levels can go deeper than 3 (L4 sub-process, L5 step) per real SAP docs.
+const LEVEL_LABELS: Record<number, string> = { 1: 'Scenario', 2: 'Process Group', 3: 'Process', 4: 'Sub-Process', 5: 'Step' }
+export const MAX_PROCESS_LEVEL = 5
+export function levelLabel(level: number): string {
+  return LEVEL_LABELS[Math.min(Math.max(level, 1), MAX_PROCESS_LEVEL)] || 'Process'
+}
+const LEVEL_COLORS = ['#0EA5E9', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899']
+export function levelColor(level: number): string {
+  return LEVEL_COLORS[Math.min(Math.max(level, 1), MAX_PROCESS_LEVEL) - 1] || '#64748B'
+}
+
 // ─── Process Model (top-level container) ───────────────
 export interface ProcessModelRow {
   id: string
@@ -33,11 +44,19 @@ export interface ProcessModelRow {
 }
 
 // ─── Process Node (hierarchy element) ──────────────────
+export type ProcessLifecycle = 'as_is' | 'to_be' | 'interim'
+
+export const LIFECYCLE_LABEL: Record<ProcessLifecycle, string> = {
+  as_is: 'As-Is',
+  to_be: 'To-Be',
+  interim: 'Interim',
+}
+
 export interface ProcessNode {
   id: string
   process_model_id: string
   parent_id: string | null
-  level: number               // 1 = Scenario, 2 = Process Group, 3 = Process (leaf)
+  level: number               // 1 = Scenario, 2 = Group, 3 = Process, 4/5 = sub-process / variant
   node_kind: ProcessNodeKind
   name: string
   description?: string
@@ -47,8 +66,50 @@ export interface ProcessNode {
   graph_data?: ProcessGraph | null
   sipoc_capability_id?: string | null
   scope_item_ref?: string | null
+  lifecycle?: ProcessLifecycle | null
+  variant_label?: string | null
   created_at: string
   updated_at: string
+}
+
+// ─── RICEFW build-object register ──────────────────────
+export type RicefwType = 'report' | 'interface' | 'conversion' | 'enhancement' | 'form' | 'workflow'
+export type RicefwStatus = 'identified' | 'in_design' | 'in_build' | 'tested' | 'deployed'
+
+export const RICEFW_TYPE_LABEL: Record<RicefwType, string> = {
+  report: 'Report', interface: 'Interface', conversion: 'Conversion',
+  enhancement: 'Enhancement', form: 'Form', workflow: 'Workflow',
+}
+
+export interface RicefwItem {
+  id: string
+  organization_id: string
+  code: string
+  ricefw_type: RicefwType
+  title: string
+  description?: string | null
+  status: RicefwStatus
+  complexity?: string | null
+  process_node_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ─── Interface / integration register ──────────────────
+export type InterfaceDirection = 'inbound' | 'outbound' | 'bidirectional'
+
+export interface ProcessInterface {
+  id: string
+  process_node_id: string
+  source_system_id: string | null
+  target_system_id: string | null
+  direction: InterfaceDirection | null
+  frequency: string | null
+  integration_tech: string | null
+  interface_ref: string | null
+  description: string | null
+  sort_order: number
+  created_at: string
 }
 
 export interface ProcessNodeTreeNode extends ProcessNode {
@@ -78,6 +139,11 @@ export interface RaciAssignment {
   i?: string[]   // informed
 }
 
+export interface RelatedDoc {
+  label: string
+  url?: string
+}
+
 export interface ProcessElementData extends Record<string, unknown> {
   label: string
   elementType: BpmnElementType
@@ -86,6 +152,13 @@ export interface ProcessElementData extends Record<string, unknown> {
   raci?: RaciAssignment
   systemId?: string
   overlayCodes?: string[]
+  // ─── Rich delivery metadata (from real SAP process docs) ───
+  responsibleRole?: string        // primary Responsible role for the activity
+  systemIds?: string[]            // IT-systems touched (resolve to logical_systems)
+  fioriApp?: string               // Fiori application name
+  tcode?: string                  // SAP transaction code
+  relatedDocs?: RelatedDoc[]      // func/tech spec links
+  ricefwCodes?: string[]          // RICEFW build-object codes referenced
 }
 
 export type ProcessElementNode = Node<ProcessElementData, 'processElement'>
@@ -176,6 +249,8 @@ export interface ReferenceScenario {
   scope_item_ref?: string
   sort_order: number
   graph_data?: ProcessGraph | null
+  lifecycle?: ProcessLifecycle | null
+  variant_label?: string | null
 }
 
 export interface ReferenceScenarioTreeNode extends ReferenceScenario {
@@ -223,6 +298,11 @@ export const BPMN_PALETTE: { type: BpmnElementType; label: string; group: string
 export const COMPLIANCE_FRAMEWORKS: ComplianceFramework[] = [
   'CAS', 'DCAA', 'EVMS', 'FAR', 'DFARS', 'CMMC', 'ITAR', 'Other',
 ]
+
+export const RICEFW_TYPES: RicefwType[] = ['report', 'interface', 'conversion', 'enhancement', 'form', 'workflow']
+export const RICEFW_STATUSES: RicefwStatus[] = ['identified', 'in_design', 'in_build', 'tested', 'deployed']
+export const INTEGRATION_TECHS = ['CPI iFlow', 'OData', 'IDoc', 'SOAP', 'REST API', 'File / SFTP', 'RFC / BAPI', 'Event Mesh', 'Other'] as const
+export const INTERFACE_FREQUENCIES = ['Real-time', 'On demand', 'Hourly', 'Daily', 'Weekly', 'Monthly', 'Batch'] as const
 
 // ─── Node accent colors per level (matches capabilities palette) ─
 export const PROCESS_LEVEL_COLORS = ['#0EA5E9', '#8B5CF6', '#10B981'] as const
