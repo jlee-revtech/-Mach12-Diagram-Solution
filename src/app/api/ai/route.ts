@@ -143,7 +143,7 @@ async function handleGenerate(prompt: string, image?: string) {
   content.push({ type: 'text', text: textPrompt })
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content }],
@@ -171,7 +171,7 @@ async function handleSuggest(context: {
   processContext?: string
 }) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 2048,
     system: SYSTEM_PROMPT,
     messages: [
@@ -216,7 +216,7 @@ async function handleAnalyze(context: {
   processContext?: string
 }) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 2048,
     system: SYSTEM_PROMPT,
     messages: [
@@ -267,7 +267,7 @@ async function handleImplement(context: {
   }
 }) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: SYSTEM_PROMPT,
     messages: [
@@ -366,7 +366,7 @@ async function handleSIPOCUseCasesOnly(prompt: string, context?: {
   const existingFeatures = context?.capabilityFeatures || []
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1500,
     system: SIPOC_SYSTEM_PROMPT,
     messages: [
@@ -480,7 +480,7 @@ ${JSON.stringify(context!.currentOutputs, null, 2)}` : ''
 - Mark all items with "status": "new"`
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 8192,
     system: SIPOC_SYSTEM_PROMPT,
     messages: [
@@ -591,7 +591,7 @@ async function handleSIPOCAnalyze(context: {
   }[]
 }) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: SIPOC_SYSTEM_PROMPT,
     messages: [
@@ -689,7 +689,7 @@ async function handleSIPOCExecutiveSummary(context: {
   }[]
 }) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: SIPOC_SYSTEM_PROMPT,
     messages: [
@@ -826,7 +826,7 @@ INPUT DATA DOMAINS: ${[...inputCats.entries()].map(([cat, d]) => `${cat} (${d.co
 OUTPUT DATA DOMAINS: ${[...outputCats.entries()].map(([cat, d]) => `${cat} (${d.count} products, e.g. ${d.examples.join(', ')})`).join(' | ')}`
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 16000,
     messages: [
       {
@@ -984,7 +984,7 @@ Return ONLY the JSON. No markdown, no explanation.`
   content.push({ type: 'text', text: textPrompt })
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     messages: [{ role: 'user', content }],
   })
@@ -1013,7 +1013,7 @@ async function handleSIPOCL2Narrative(context: {
   destinationSystems?: string[]
 }) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 600,
     system: 'You are an expert business and data architect. Generate concise, executive-ready capability descriptions for enterprise SIPOC models.',
     messages: [{
@@ -1059,7 +1059,7 @@ async function handleSIPOCAnalyzeL3(context: {
   }[]
 }) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 3000,
     system: 'You are an expert SAP data architect and business process analyst specializing in Aerospace, Defense, and Government Contracting. You provide clear, executive-ready analysis of SIPOC capability definitions.',
     messages: [{
@@ -1153,7 +1153,7 @@ async function handleProcessGenerate(prompt: string, context?: {
     : ''
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: PROCESS_SYSTEM_PROMPT,
     messages: [{
@@ -1196,7 +1196,7 @@ Guidelines:
 // Draft a BPMN swimlane graph (lanes/nodes/edges with positions) from text.
 async function handleBpmnFromText(prompt: string, context?: { processName?: string; systems?: string[] }) {
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 6000,
     system: PROCESS_SYSTEM_PROMPT,
     messages: [{
@@ -1249,7 +1249,7 @@ async function handleProcessGapAssessment(context: {
     : 'No explicit reference subtree provided — assess against SAP best-practice + A&D/GovCon norms for this scenario.'
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: PROCESS_SYSTEM_PROMPT,
     messages: [{
@@ -1304,7 +1304,7 @@ async function handleProcessExecMap(prompt: string, context: {
   ).join('\n')
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 16000,
     messages: [{
       role: 'user',
@@ -1389,7 +1389,7 @@ async function handleProcessPlaybook(context: {
   const ifaceLines = (context.interfaces || []).map(i => `${i.source || '?'} ${i.direction === 'inbound' ? '<-' : i.direction === 'bidirectional' ? '<->' : '->'} ${i.target || '?'} (${[i.tech, i.frequency, i.ref].filter(Boolean).join(', ')})`).join('; ')
   const ricefwLines = (context.ricefw || []).map(r => `${r.code} [${r.type}] ${r.title} (${r.status})`).join('; ')
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: PROCESS_SYSTEM_PROMPT,
     messages: [{
