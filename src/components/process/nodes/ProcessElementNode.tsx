@@ -7,20 +7,20 @@ import type { ProcessElementData, BpmnElementType } from '@/lib/process/types'
 // One component handles every BPMN element type, switching shape by elementType.
 // Tasks/sub-processes = rounded rects; events = circles; gateways = diamonds.
 
+// Connectors float to the optimal point on the perimeter, so the bound handle
+// id is irrelevant to rendering. Under ConnectionMode.Loose a single source
+// handle per side acts as both source and target, so four large, easy-to-grab
+// points let the user connect from/to any side of the shape.
 const handleClass =
-  '!border-2 !rounded-full !w-2.5 !h-2.5 !bg-[var(--m12-handle-bg)] !border-[var(--m12-handle-border)] hover:!bg-[#0EA5E9] hover:!border-[#0EA5E9] hover:!w-3.5 hover:!h-3.5 transition-all duration-150 opacity-0 group-hover:opacity-100'
+  '!border-2 !rounded-full !w-3.5 !h-3.5 !bg-[var(--m12-handle-bg)] !border-[#0EA5E9] hover:!bg-[#0EA5E9] hover:!w-4 hover:!h-4 transition-all duration-150 opacity-0 group-hover:opacity-100'
 
 function FourSideHandles() {
   return (
     <>
-      <Handle type="source" position={Position.Top} id="t-s" className={handleClass} />
-      <Handle type="target" position={Position.Top} id="t-t" className={handleClass} style={{ left: '40%' }} />
-      <Handle type="source" position={Position.Right} id="r-s" className={handleClass} />
-      <Handle type="target" position={Position.Right} id="r-t" className={handleClass} style={{ top: '40%' }} />
-      <Handle type="source" position={Position.Bottom} id="b-s" className={handleClass} />
-      <Handle type="target" position={Position.Bottom} id="b-t" className={handleClass} style={{ left: '40%' }} />
-      <Handle type="source" position={Position.Left} id="l-s" className={handleClass} />
-      <Handle type="target" position={Position.Left} id="l-t" className={handleClass} style={{ top: '40%' }} />
+      <Handle type="source" position={Position.Top} id="t" className={handleClass} />
+      <Handle type="source" position={Position.Right} id="r" className={handleClass} />
+      <Handle type="source" position={Position.Bottom} id="b" className={handleClass} />
+      <Handle type="source" position={Position.Left} id="l" className={handleClass} />
     </>
   )
 }

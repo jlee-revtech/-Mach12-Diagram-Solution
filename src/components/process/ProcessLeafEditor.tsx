@@ -13,6 +13,7 @@ import {
   useEdgesState,
   useReactFlow,
   addEdge,
+  reconnectEdge,
   type Node,
   type Edge,
   type Connection,
@@ -140,14 +141,17 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const graphRef = useRef<{ nodes: Node[]; edges: Edge[] }>({ nodes: [], edges: [] })
   graphRef.current = { nodes, edges }
 
-  // Load the leaf graph once per node
+  // Load the leaf graph once per node. Strip any stored handle bindings so
+  // connectors render purely as floating edges (attach to the perimeter),
+  // regardless of which handle id an older connection recorded.
   useEffect(() => {
     if (!node || loadedForRef.current === nodeId) return
     loadedForRef.current = nodeId
     const init = buildInitialNodes(node.graph_data, systemName)
+    const loadedEdges = ((node.graph_data?.edges || []) as Edge[]).map(e => ({ ...e, sourceHandle: undefined, targetHandle: undefined }))
     setNodes(init)
-    setEdges(((node.graph_data?.edges || []) as Edge[]))
-    lastSavedRef.current = JSON.stringify(extractGraph(init, (node.graph_data?.edges || []) as Edge[]))
+    setEdges(loadedEdges)
+    lastSavedRef.current = JSON.stringify(extractGraph(init, loadedEdges))
     dirtyRef.current = false
     setSaveStatus('saved')
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,6 +224,20 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const onConnect = useCallback((c: Connection) => {
     if (readOnly) return
     setEdges(eds => addEdge({ ...c, type: 'sequenceFlow', data: { kind: 'sequence' as SequenceFlowKind } }, eds))
+  }, [readOnly, setEdges])
+
+  // Reconnect (drag an arrow endpoint onto another task). Dropping on empty
+  // canvas removes the connector. Reconnecting preserves the flow's data.
+  const reconnectOkRef = useRef(true)
+  const onReconnectStart = useCallback(() => { reconnectOkRef.current = false }, [])
+  const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
+    if (readOnly) return
+    reconnectOkRef.current = true
+    setEdges(eds => reconnectEdge(oldEdge, newConnection, eds))
+  }, [readOnly, setEdges])
+  const onReconnectEnd = useCallback((_: unknown, edge: Edge) => {
+    if (!reconnectOkRef.current && !readOnly) setEdges(eds => eds.filter(e => e.id !== edge.id))
+    reconnectOkRef.current = true
   }, [readOnly, setEdges])
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -436,14 +454,19 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onReconnect={onReconnect}
+          onReconnectStart={onReconnectStart}
+          onReconnectEnd={onReconnectEnd}
+          reconnectRadius={22}
           onDrop={onDrop}
           onDragOver={onDragOver}
           onNodeDragStop={onNodeDragStop}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          defaultEdgeOptions={{ type: 'sequenceFlow', data: { kind: 'sequence' } }}
+          defaultEdgeOptions={{ type: 'sequenceFlow', data: { kind: 'sequence' }, reconnectable: true }}
           connectionMode={ConnectionMode.Loose}
+          connectionRadius={40}
           connectionLineStyle={{ stroke: '#0EA5E9', strokeWidth: 2, strokeDasharray: '6 3' }}
           fitView
           minZoom={0.2}
