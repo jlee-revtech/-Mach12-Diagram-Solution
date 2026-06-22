@@ -144,6 +144,20 @@ export interface RelatedDoc {
   url?: string
 }
 
+// Reference to a Fiori tile (or Dassian tile) chosen from the seeded catalog.
+export interface FioriTileRef {
+  id: string
+  title: string
+  source: 'fiori' | 'dassian'
+  appId?: string   // SAP Fiori app id (e.g. F0842) where known
+}
+
+// Common SAP S/4HANA application areas (modules) for step assignment.
+export const SAP_MODULES = [
+  'FI', 'CO', 'FI-AA', 'TR', 'PS', 'MM', 'SD', 'PP', 'PM', 'QM', 'PP-MRP',
+  'EWM', 'PPM', 'HCM', 'CATS', 'BPC', 'SAC', 'Dassian', 'Cross-App',
+] as const
+
 export interface ProcessElementData extends Record<string, unknown> {
   label: string
   elementType: BpmnElementType
@@ -155,7 +169,9 @@ export interface ProcessElementData extends Record<string, unknown> {
   // ─── Rich delivery metadata (from real SAP process docs) ───
   responsibleRole?: string        // primary Responsible role for the activity
   systemIds?: string[]            // IT-systems touched (resolve to logical_systems)
-  fioriApp?: string               // Fiori application name
+  fioriApp?: string               // Fiori application name (free text, legacy)
+  fioriTile?: FioriTileRef        // structured Fiori/Dassian tile from the catalog
+  module?: string                 // SAP module/application area (FI, CO, PS, MM…)
   tcode?: string                  // SAP transaction code
   relatedDocs?: RelatedDoc[]      // func/tech spec links
   ricefwCodes?: string[]          // RICEFW build-object codes referenced

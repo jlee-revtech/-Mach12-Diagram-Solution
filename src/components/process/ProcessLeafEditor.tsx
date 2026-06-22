@@ -29,7 +29,8 @@ import * as api from '@/lib/supabase/process-models'
 import type {
   ProcessGraph, ProcessLane, ProcessElementData, BpmnElementType, SequenceFlowKind,
 } from '@/lib/process/types'
-import { BPMN_PALETTE } from '@/lib/process/types'
+import { BPMN_PALETTE, SAP_MODULES } from '@/lib/process/types'
+import FioriTilePicker from './FioriTilePicker'
 import ProcessElementNode from './nodes/ProcessElementNode'
 import LaneNode from './nodes/LaneNode'
 import SequenceFlowEdge, { SequenceFlowMarkerDefs } from './edges/SequenceFlowEdge'
@@ -785,8 +786,23 @@ function Inspector({
                 })}
               </div>
             </Field>
-            <Field label="Fiori app">
-              <input value={(selectedNode.data as any).fioriApp || ''} onChange={e => onPatchNode(selectedNode.id, { fioriApp: e.target.value })} className="ins-input" placeholder="e.g. Manage Journal Entries" />
+            <Field label="Module">
+              <input
+                value={(selectedNode.data as any).module || ''}
+                onChange={e => onPatchNode(selectedNode.id, { module: e.target.value })}
+                className="ins-input font-[family-name:var(--font-space-mono)]"
+                placeholder="e.g. FI, CO, PS, MM"
+                list="sap-module-list"
+              />
+              <datalist id="sap-module-list">
+                {SAP_MODULES.map(m => <option key={m} value={m} />)}
+              </datalist>
+            </Field>
+            <Field label="Fiori / Dassian tile">
+              <FioriTilePicker
+                value={(selectedNode.data as any).fioriTile}
+                onChange={t => onPatchNode(selectedNode.id, { fioriTile: t })}
+              />
             </Field>
             <Field label="T-code">
               <input value={(selectedNode.data as any).tcode || ''} onChange={e => onPatchNode(selectedNode.id, { tcode: e.target.value })} className="ins-input font-[family-name:var(--font-space-mono)]" placeholder="e.g. FB50" />

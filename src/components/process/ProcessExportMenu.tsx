@@ -101,7 +101,8 @@ export default function ProcessExportMenu() {
               responsibleRole: (d.responsibleRole as string) || null,
               raci: d.raci || null,
               systems: namesOf(d.systemIds as string[]),
-              fioriApp: (d.fioriApp as string) || null,
+              module: (d.module as string) || null,
+              fioriApp: ((d.fioriTile as { title?: string } | undefined)?.title) || (d.fioriApp as string) || null,
               tcode: (d.tcode as string) || null,
               ricefwCodes: (d.ricefwCodes as string[]) || [],
             }

@@ -1368,7 +1368,7 @@ async function handleProcessPlaybook(context: {
   steps: {
     label: string; elementType: string; lane?: string | null
     responsibleRole?: string | null; raci?: unknown; systems?: string[]
-    fioriApp?: string | null; tcode?: string | null; ricefwCodes?: string[]
+    module?: string | null; fioriApp?: string | null; tcode?: string | null; ricefwCodes?: string[]
   }[]
   interfaces?: { source?: string | null; target?: string | null; direction?: string | null; frequency?: string | null; tech?: string | null; ref?: string | null }[]
   ricefw?: { code: string; type: string; title: string; status: string }[]
@@ -1380,6 +1380,7 @@ async function handleProcessPlaybook(context: {
       `${s.label} (${s.elementType}${s.lane ? ` @ ${s.lane}` : ''})`,
       s.responsibleRole ? `R:${s.responsibleRole}` : '',
       s.systems?.length ? `sys:${s.systems.join('/')}` : '',
+      s.module ? `module:${s.module}` : '',
       s.tcode ? `tcode:${s.tcode}` : '',
       s.fioriApp ? `fiori:${s.fioriApp}` : '',
       s.ricefwCodes?.length ? `RICEFW:${s.ricefwCodes.join(',')}` : '',
