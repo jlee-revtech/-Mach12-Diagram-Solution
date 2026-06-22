@@ -109,6 +109,8 @@ export async function POST(req: NextRequest) {
       return handleBedrockIntegrations(context)
     } else if (action === 'capability-map-draft') {
       return handleCapabilityMapDraft(prompt, context)
+    } else if (action === 'capability-map-align') {
+      return handleCapabilityMapAlign(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -1544,30 +1546,38 @@ Guidelines:
 }
 
 // ─── Capability Map draft ──────────────────────────────
-const CAPABILITY_MAP_SYSTEM_PROMPT = `You are an expert enterprise & business architect specializing in Aerospace & Defense and Government Contracting. You build business/application capability maps and map each capability to the enterprise systems that realize it.
+const CAPABILITY_MAP_SYSTEM_PROMPT = `You are an expert enterprise & business architect specializing in Aerospace & Defense and Government Contracting. You build business/application capability maps, align each capability to an end-to-end value stream, and map it to the enterprise systems that realize it.
 
 You understand:
-- Business capability modeling: concise capability names (noun phrases like "Demand Planning", "Contract Cost Management", "Earned Value Management", "Talent Acquisition"), grouped into domains (Finance, Supply Chain, Engineering, Manufacturing, Program Management, Human Capital, Quality, Sales & Contracts, Compliance, IT).
+- Business capability modeling: concise capability names (noun phrases like "Demand Planning", "Contract Cost Management", "Earned Value Management", "Talent Acquisition").
+- A&D/GovCon end-to-end value streams (workstreams): Bid-to-Win, Contract-to-Closeout, Plan-to-Produce, Source-to-Pay, Design-to-Release, Acquire-to-Retire, Sustainment/MRO, Plan-to-Perform (Program & Portfolio), Record-to-Report, Hire-to-Retire. Every capability belongs to exactly one value stream.
 - A&D/GovCon enterprise systems and which capabilities they realize (ERP=SAP S/4HANA, PLM=Teamcenter/Windchill, IMS=Primavera P6, HCM=SuccessFactors/Workday/Costpoint, CLM=Dassian/Icertis, MES=SAP DM/Opcenter, FP&A=SAC/Anaplan, etc.).
 
-You map each capability to the LOGICAL bedrock system categories that typically realize it, using ONLY the systemType slugs provided in the catalog.`
+You assign each capability to one value stream (by code) and map it to the LOGICAL bedrock system categories that typically realize it, using ONLY the systemType slugs and value-stream codes provided.`
 
 async function handleCapabilityMapDraft(prompt: string, context?: {
   catalog?: { systemType: string; label: string; physicals?: string[] }[]
   existing?: string[]
-  focusDomain?: string
+  workstreams?: { code: string; name: string; description?: string }[]
+  focusWorkstream?: string
 }) {
   const catalog = context?.catalog || []
   if (catalog.length === 0) {
     return NextResponse.json({ error: 'Missing bedrock catalog' }, { status: 400 })
   }
+  const workstreams = context?.workstreams || []
   const catalogLines = catalog
     .map(c => `- ${c.systemType} = ${c.label}${c.physicals?.length ? ` (${c.physicals.join(', ')})` : ''}`)
     .join('\n')
+  const wsLines = workstreams.length
+    ? workstreams.map(w => `- ${w.code} = ${w.name}${w.description ? ` — ${w.description}` : ''}`).join('\n')
+    : '(no value streams defined)'
   const existingNote = context?.existing?.length
     ? `\n\nAlready present (DO NOT duplicate these):\n${context.existing.map(n => `- ${n}`).join('\n')}`
     : ''
-  const focusNote = context?.focusDomain ? `\nFocus on the "${context.focusDomain}" domain.` : ''
+  const focusNote = context?.focusWorkstream
+    ? `\nFocus ONLY on capabilities for the "${context.focusWorkstream}" value stream.`
+    : ''
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
@@ -1575,9 +1585,12 @@ async function handleCapabilityMapDraft(prompt: string, context?: {
     system: CAPABILITY_MAP_SYSTEM_PROMPT,
     messages: [{
       role: 'user',
-      content: `Draft a business/application capability map for this organization and map each capability to the logical bedrock systems that realize it.
+      content: `Draft a business/application capability map for this organization. Align each capability to one value stream and map it to the logical bedrock systems that realize it.
 
 ${prompt ? `Organization context / request: ${prompt}` : 'Assume a typical Aerospace & Defense / Government Contracting manufacturer.'}${focusNote}
+
+VALUE STREAMS (assign each capability to exactly one, by code):
+${wsLines}
 
 BEDROCK SYSTEM CATALOG (use ONLY these systemType slugs):
 ${catalogLines}${existingNote}
@@ -1587,7 +1600,8 @@ Return ONLY valid JSON in this exact shape:
   "capabilities": [
     {
       "name": "Capability name (concise noun phrase)",
-      "domain": "Domain grouping (e.g. Finance, Supply Chain, Engineering, Program Management, Human Capital, Quality, Sales & Contracts, Compliance)",
+      "workstream": "value stream code from the list above",
+      "domain": "Optional finer grouping (e.g. Finance, Supply Chain, Engineering)",
       "description": "One-line description of the capability",
       "systems": ["systemType slugs from the catalog that realize this capability"]
     }
@@ -1595,9 +1609,10 @@ Return ONLY valid JSON in this exact shape:
 }
 
 Guidelines:
-- Produce a thorough, well-rounded capability map: roughly 25-45 capabilities spanning the major domains relevant to the organization.
-- Each capability should map to 1-3 logical systemType slugs (the systems that typically realize it). Use ONLY slugs present in the catalog.
-- Be A&D/GovCon-grade and concrete. Group sensibly by domain. Order by domain.
+- Produce a thorough capability map${context?.focusWorkstream ? ' for the focused value stream (roughly 6-15 capabilities)' : ': roughly 25-45 capabilities spanning all the value streams'}.
+- "workstream" MUST be one of the value-stream codes listed above. Every capability gets exactly one.
+- Each capability maps to 1-3 logical systemType slugs. Use ONLY slugs present in the catalog.
+- Be A&D/GovCon-grade and concrete. Order by value stream.
 - Do NOT duplicate anything listed as already present.
 - No markdown, just the JSON object.`,
     }],
@@ -1609,5 +1624,56 @@ Guidelines:
     return NextResponse.json(JSON.parse(cleaned))
   } catch {
     return NextResponse.json({ error: 'Failed to parse capability map draft', raw: text }, { status: 500 })
+  }
+}
+
+// Align existing capabilities to value streams (workstreams). Returns the
+// best-fit value-stream code for each capability name.
+async function handleCapabilityMapAlign(context?: {
+  capabilities?: { name: string; domain?: string | null; description?: string | null }[]
+  workstreams?: { code: string; name: string; description?: string }[]
+}) {
+  const caps = context?.capabilities || []
+  const workstreams = context?.workstreams || []
+  if (caps.length === 0 || workstreams.length === 0) {
+    return NextResponse.json({ error: 'Missing capabilities or value streams' }, { status: 400 })
+  }
+  const wsLines = workstreams.map(w => `- ${w.code} = ${w.name}${w.description ? ` — ${w.description}` : ''}`).join('\n')
+  const capLines = caps.map(c => `- ${c.name}${c.domain ? ` [${c.domain}]` : ''}${c.description ? ` — ${c.description}` : ''}`).join('\n')
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    temperature: 0,
+    system: CAPABILITY_MAP_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Assign each capability below to the single best-fit value stream.
+
+VALUE STREAMS (use these codes):
+${wsLines}
+
+CAPABILITIES:
+${capLines}
+
+Return ONLY valid JSON in this exact shape:
+{
+  "assignments": [
+    { "name": "exact capability name", "workstream": "value stream code" }
+  ]
+}
+
+Guidelines:
+- Echo each capability name EXACTLY as given. Assign exactly one value-stream code from the list to each.
+- No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    return NextResponse.json(JSON.parse(cleaned))
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse capability alignment', raw: text }, { status: 500 })
   }
 }

@@ -8,6 +8,7 @@ export interface Capability {
   name: string
   description: string | null
   domain: string | null
+  workstream_id: string | null   // value stream (workstream) alignment
   color: string | null
   sort_order: number
   source: string            // 'manual' | 'ai'

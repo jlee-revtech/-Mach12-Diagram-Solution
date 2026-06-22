@@ -71,7 +71,7 @@ export async function listCapabilityMap(orgId: string): Promise<CapabilityWithSy
 export async function createCapability(
   orgId: string,
   userId: string,
-  data: { name: string; description?: string; domain?: string; color?: string; sort_order?: number; source?: string }
+  data: { name: string; description?: string; domain?: string; workstream_id?: string | null; color?: string; sort_order?: number; source?: string }
 ): Promise<Capability> {
   const res = await fetch(`${URL}/rest/v1/cm_capabilities`, {
     method: 'POST',
@@ -85,7 +85,7 @@ export async function createCapability(
 
 export async function updateCapability(
   id: string,
-  updates: Partial<Pick<Capability, 'name' | 'description' | 'domain' | 'color' | 'sort_order' | 'archived_at'>>
+  updates: Partial<Pick<Capability, 'name' | 'description' | 'domain' | 'workstream_id' | 'color' | 'sort_order' | 'archived_at'>>
 ): Promise<void> {
   await fetch(`${URL}/rest/v1/cm_capabilities?id=eq.${id}`, {
     method: 'PATCH',
@@ -137,7 +137,7 @@ export async function removeCapabilityPhysicalSystem(capabilityId: string, physi
 export async function bulkCreateCapabilities(
   orgId: string,
   userId: string,
-  items: { name: string; description?: string; domain?: string; bedrockSystemIds: string[] }[]
+  items: { name: string; description?: string; domain?: string; workstream_id?: string | null; bedrockSystemIds: string[] }[]
 ): Promise<Capability[]> {
   if (items.length === 0) return []
   const rows = items.map((it, i) => ({
@@ -146,6 +146,7 @@ export async function bulkCreateCapabilities(
     name: it.name,
     description: it.description,
     domain: it.domain,
+    workstream_id: it.workstream_id ?? null,
     source: 'ai',
     sort_order: i,
   }))

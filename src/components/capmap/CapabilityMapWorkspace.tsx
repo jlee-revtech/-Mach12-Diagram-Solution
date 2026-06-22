@@ -7,37 +7,51 @@ import {
   addCapabilityPhysicalSystem, removeCapabilityPhysicalSystem, bulkCreateCapabilities,
 } from '@/lib/supabase/capmap'
 import { listBedrockCatalog, seedBedrockSystems } from '@/lib/supabase/bedrock-systems'
+import { listWorkstreams, seedStandardWorkstreams } from '@/lib/supabase/workstreams'
+import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
+import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
+import type { Workstream } from '@/lib/workstream/types'
 
-const UNCATEGORIZED = 'Uncategorized'
+const UNALIGNED = '__unaligned__'
 
-interface DraftCap { name: string; domain: string; description: string; systems: string[]; selected: boolean }
+interface DraftCap { name: string; workstreamCode: string; domain: string; description: string; systems: string[]; selected: boolean }
 
 export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: string; userId: string }) {
   const [catalog, setCatalog] = useState<BedrockSystemWithPhysicals[]>([])
   const [caps, setCaps] = useState<CapabilityWithSystems[]>([])
+  const [workstreams, setWorkstreams] = useState<Workstream[]>([])
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
+  const [aligning, setAligning] = useState(false)
   const [view, setView] = useState<'board' | 'matrix'>('board')
   const [search, setSearch] = useState('')
-  const [domainFilter, setDomainFilter] = useState<string | null>(null)
+  const [wsFilter, setWsFilter] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   // AI draft modal
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
-  const [aiFocus, setAiFocus] = useState('')
+  const [aiFocusWs, setAiFocusWs] = useState('')   // workstream id, '' = all
   const [aiBusy, setAiBusy] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiResults, setAiResults] = useState<DraftCap[] | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [c, m] = await Promise.all([listBedrockCatalog(orgId), listCapabilityMap(orgId)])
-    setCatalog(c); setCaps(m); setLoading(false)
+    const [c, m, w] = await Promise.all([listBedrockCatalog(orgId), listCapabilityMap(orgId), listWorkstreams(orgId)])
+    setCatalog(c); setCaps(m); setWorkstreams(w); setLoading(false)
   }, [orgId])
   useEffect(() => { load() }, [load])
+
+  // Ensure the standard value streams exist (seed if the org has none yet).
+  const ensureWorkstreams = useCallback(async (): Promise<Workstream[]> => {
+    if (workstreams.length) return workstreams
+    const w = await seedStandardWorkstreams(orgId, userId)
+    setWorkstreams(w)
+    return w
+  }, [workstreams, orgId, userId])
 
   // ─── Lookups ───
   const catById = useMemo(() => new Map(catalog.map(c => [c.id, c])), [catalog])
@@ -47,32 +61,47 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     for (const c of catalog) for (const p of c.physicals) m.set(p.id, { name: p.name, parentId: c.id })
     return m
   }, [catalog])
+  const wsById = useMemo(() => new Map(workstreams.map(w => [w.id, w])), [workstreams])
+  const wsByCode = useMemo(() => new Map(workstreams.map(w => [w.code, w])), [workstreams])
 
-  const domains = useMemo(() => {
-    const set = new Set<string>()
-    for (const c of caps) set.add(c.domain?.trim() || UNCATEGORIZED)
-    return [...set].sort((a, b) => (a === UNCATEGORIZED ? 1 : b === UNCATEGORIZED ? -1 : a.localeCompare(b)))
-  }, [caps])
+  const wsName = (id: string | null) => (id && wsById.get(id)?.name) || 'Unaligned'
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return caps.filter(c => {
-      if (domainFilter && (c.domain?.trim() || UNCATEGORIZED) !== domainFilter) return false
-      if (q && !(`${c.name} ${c.description || ''} ${c.domain || ''}`.toLowerCase().includes(q))) return false
+      if (wsFilter) {
+        if (wsFilter === UNALIGNED ? !!c.workstream_id : c.workstream_id !== wsFilter) return false
+      }
+      if (q && !(`${c.name} ${c.description || ''} ${c.domain || ''} ${wsName(c.workstream_id)}`.toLowerCase().includes(q))) return false
       return true
     })
-  }, [caps, search, domainFilter])
+  }, [caps, search, wsFilter, wsById])
 
-  const byDomain = useMemo(() => {
-    const m = new Map<string, CapabilityWithSystems[]>()
+  // Board groups ordered by workstream sort order, Unaligned last.
+  const groups = useMemo(() => {
+    const byWs = new Map<string, CapabilityWithSystems[]>()
     for (const c of filtered) {
-      const d = c.domain?.trim() || UNCATEGORIZED
-      if (!m.has(d)) m.set(d, [])
-      m.get(d)!.push(c)
+      const key = c.workstream_id && wsById.has(c.workstream_id) ? c.workstream_id : UNALIGNED
+      if (!byWs.has(key)) byWs.set(key, [])
+      byWs.get(key)!.push(c)
     }
-    return [...m.entries()].sort((a, b) => (a[0] === UNCATEGORIZED ? 1 : b[0] === UNCATEGORIZED ? -1 : a[0].localeCompare(b[0])))
-  }, [filtered])
+    const ordered: { key: string; ws: Workstream | null; list: CapabilityWithSystems[] }[] = []
+    for (const w of workstreams) if (byWs.has(w.id)) ordered.push({ key: w.id, ws: w, list: byWs.get(w.id)! })
+    if (byWs.has(UNALIGNED)) ordered.push({ key: UNALIGNED, ws: null, list: byWs.get(UNALIGNED)! })
+    return ordered
+  }, [filtered, workstreams, wsById])
 
+  // Matrix rows ordered by workstream then name.
+  const matrixRows = useMemo(() => {
+    const order = new Map(workstreams.map((w, i) => [w.id, i]))
+    return [...filtered].sort((a, b) => {
+      const ai = a.workstream_id ? (order.get(a.workstream_id) ?? 998) : 999
+      const bi = b.workstream_id ? (order.get(b.workstream_id) ?? 998) : 999
+      return ai - bi || a.name.localeCompare(b.name)
+    })
+  }, [filtered, workstreams])
+
+  const unalignedCount = useMemo(() => caps.filter(c => !c.workstream_id || !wsById.has(c.workstream_id)).length, [caps, wsById])
   const selected = caps.find(c => c.id === selectedId) || null
 
   // ─── Optimistic mutators ───
@@ -81,7 +110,8 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
 
   const handleAddCapability = async () => {
     try {
-      const cap = await createCapability(orgId, userId, { name: 'New capability', domain: domainFilter && domainFilter !== UNCATEGORIZED ? domainFilter : undefined, sort_order: caps.length })
+      const ws = wsFilter && wsFilter !== UNALIGNED ? wsFilter : undefined
+      const cap = await createCapability(orgId, userId, { name: 'New capability', workstream_id: ws, sort_order: caps.length })
       setCaps(x => [...x, { ...cap, logicalSystemIds: [], physicalSystemIds: [] }])
       setSelectedId(cap.id)
     } catch { load() }
@@ -90,6 +120,11 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const handleUpdateCap = async (id: string, updates: { name?: string; domain?: string; description?: string }) => {
     patchCap(id, c => ({ ...c, ...updates }))
     await updateCapability(id, updates).catch(() => load())
+  }
+
+  const handleSetWorkstream = async (id: string, wsId: string | null) => {
+    patchCap(id, c => ({ ...c, workstream_id: wsId }))
+    await updateCapability(id, { workstream_id: wsId }).catch(() => load())
   }
 
   const handleDeleteCap = async (id: string) => {
@@ -104,7 +139,6 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     if (!cap) return
     const has = cap.logicalSystemIds.includes(sysId)
     if (has) {
-      // Remove the logical system and any physical mappings beneath it.
       const childPhys = cap.physicalSystemIds.filter(pid => physById.get(pid)?.parentId === sysId)
       patchCap(capId, c => ({ ...c, logicalSystemIds: c.logicalSystemIds.filter(s => s !== sysId), physicalSystemIds: c.physicalSystemIds.filter(p => !childPhys.includes(p)) }))
       await removeCapabilityLogicalSystem(capId, sysId).catch(() => load())
@@ -123,7 +157,6 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       patchCap(capId, c => ({ ...c, physicalSystemIds: c.physicalSystemIds.filter(p => p !== physId) }))
       await removeCapabilityPhysicalSystem(capId, physId).catch(() => load())
     } else {
-      // Assigning a physical implies its logical system is realized.
       const needLogical = !cap.logicalSystemIds.includes(parentId)
       patchCap(capId, c => ({ ...c, physicalSystemIds: [...c.physicalSystemIds, physId], logicalSystemIds: needLogical ? [...c.logicalSystemIds, parentId] : c.logicalSystemIds }))
       if (needLogical) await addCapabilityLogicalSystem(orgId, userId, capId, parentId).catch(() => load())
@@ -131,10 +164,56 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     }
   }
 
+  // ─── Align existing capabilities to value streams ───
+  const handleAlign = async () => {
+    if (aligning) return
+    const ws = await ensureWorkstreams()
+    if (ws.length === 0) { alert('No value streams are defined yet.'); return }
+    let targets = caps.filter(c => !c.workstream_id || !wsById.has(c.workstream_id))
+    if (targets.length === 0) {
+      if (!confirm('All capabilities are already aligned. Re-align every capability to its best-fit value stream?')) return
+      targets = caps
+    }
+    setAligning(true)
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'capability-map-align',
+          context: {
+            capabilities: targets.map(c => ({ name: c.name, domain: c.domain, description: c.description })),
+            workstreams: ws.map(w => ({ code: w.code, name: w.name, description: w.description })),
+          },
+        }),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Alignment failed') }
+      const data = await res.json() as { assignments?: { name: string; workstream: string }[] }
+      const byName = new Map(targets.map(c => [c.name.toLowerCase(), c]))
+      const codeToId = new Map(ws.map(w => [w.code, w.id]))
+      for (const a of data.assignments || []) {
+        const cap = byName.get((a.name || '').toLowerCase())
+        const wsId = codeToId.get(a.workstream)
+        if (cap && wsId) {
+          patchCap(cap.id, c => ({ ...c, workstream_id: wsId }))
+          await updateCapability(cap.id, { workstream_id: wsId }).catch(() => {})
+        }
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Alignment failed')
+    } finally {
+      setAligning(false)
+    }
+  }
+
   // ─── AI draft ───
+  const openAi = async () => { setAiOpen(true); setAiError(null); setAiResults(null); await ensureWorkstreams() }
+
   const runAiDraft = async () => {
     setAiBusy(true); setAiError(null)
     try {
+      const ws = await ensureWorkstreams()
+      const focus = aiFocusWs ? ws.find(w => w.id === aiFocusWs) : null
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,16 +223,17 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           context: {
             catalog: catalog.map(c => ({ systemType: c.system_type, label: c.label, physicals: c.physicals.map(p => p.name) })),
             existing: caps.map(c => c.name),
-            focusDomain: aiFocus.trim() || undefined,
+            workstreams: ws.map(w => ({ code: w.code, name: w.name, description: w.description })),
+            focusWorkstream: focus?.name,
           },
         }),
       })
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Draft failed') }
-      const data = await res.json() as { capabilities?: { name: string; domain?: string; description?: string; systems?: string[] }[] }
+      const data = await res.json() as { capabilities?: { name: string; workstream?: string; domain?: string; description?: string; systems?: string[] }[] }
       const existing = new Set(caps.map(c => c.name.toLowerCase()))
       const drafts: DraftCap[] = (data.capabilities || [])
         .filter(d => d.name && !existing.has(d.name.toLowerCase()))
-        .map(d => ({ name: d.name, domain: d.domain || UNCATEGORIZED, description: d.description || '', systems: (d.systems || []).filter(s => catByType.has(s)), selected: true }))
+        .map(d => ({ name: d.name, workstreamCode: d.workstream && wsByCode.has(d.workstream) ? d.workstream : '', domain: d.domain || '', description: d.description || '', systems: (d.systems || []).filter(s => catByType.has(s)), selected: true }))
       setAiResults(drafts)
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Draft failed')
@@ -171,10 +251,11 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       await bulkCreateCapabilities(orgId, userId, chosen.map(d => ({
         name: d.name,
         description: d.description || undefined,
-        domain: d.domain === UNCATEGORIZED ? undefined : d.domain,
+        domain: d.domain || undefined,
+        workstream_id: d.workstreamCode ? wsByCode.get(d.workstreamCode)?.id ?? null : null,
         bedrockSystemIds: d.systems.map(s => catByType.get(s)?.id).filter((x): x is string => !!x),
       })))
-      setAiOpen(false); setAiResults(null); setAiPrompt(''); setAiFocus('')
+      setAiOpen(false); setAiResults(null); setAiPrompt(''); setAiFocusWs('')
       await load()
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Failed to add capabilities')
@@ -203,6 +284,8 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     )
   }
 
+  const wsChips = workstreams.filter(w => caps.some(c => c.workstream_id === w.id))
+
   return (
     <div>
       {/* Toolbar */}
@@ -218,7 +301,13 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           aria-label="Search capabilities"
           className="flex-1 min-w-[160px] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] placeholder:text-[var(--m12-text-muted)] focus:outline-none focus:border-[#10B981]/60"
         />
-        <button type="button" onClick={() => { setAiOpen(true); setAiError(null); setAiResults(null) }} className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+        {caps.length > 0 && (
+          <button type="button" onClick={handleAlign} disabled={aligning} title="Use AI to align capabilities to their best-fit value stream" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 disabled:opacity-50 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 4h7M2.5 8h11M2.5 12h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M12 3.5l1.8 1.8M13.8 3.5L12 5.3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+            {aligning ? 'Aligning…' : `Align to value streams${unalignedCount ? ` (${unalignedCount})` : ''}`}
+          </button>
+        )}
+        <button type="button" onClick={openAi} className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.6 3.4 3.7.5-2.7 2.6.6 3.7L8 9.9 4.8 11.7l.6-3.7L2.7 5.4l3.7-.5L8 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
           AI Draft
         </button>
@@ -228,33 +317,43 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
         </button>
       </div>
 
-      {/* Domain filter chips */}
-      {domains.length > 0 && (
+      {/* Value stream filter chips */}
+      {(wsChips.length > 0 || unalignedCount > 0) && (
         <div className="flex flex-wrap items-center gap-1.5 mb-5">
-          <button type="button" onClick={() => setDomainFilter(null)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${!domainFilter ? 'border-[#10B981]/60 bg-[#10B981]/12 text-[#34D399]' : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>All ({caps.length})</button>
-          {domains.map(d => {
-            const n = caps.filter(c => (c.domain?.trim() || UNCATEGORIZED) === d).length
-            return <button key={d} type="button" onClick={() => setDomainFilter(d)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${domainFilter === d ? 'border-[#10B981]/60 bg-[#10B981]/12 text-[#34D399]' : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>{d} ({n})</button>
+          <button type="button" onClick={() => setWsFilter(null)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${!wsFilter ? 'border-[#10B981]/60 bg-[#10B981]/12 text-[#34D399]' : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>All ({caps.length})</button>
+          {wsChips.map(w => {
+            const n = caps.filter(c => c.workstream_id === w.id).length
+            const on = wsFilter === w.id
+            return (
+              <button key={w.id} type="button" onClick={() => setWsFilter(w.id)} className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2.5 py-1 border transition-colors ${on ? 'text-white' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`} style={on ? { background: w.color || '#10B981', borderColor: w.color || '#10B981' } : { borderColor: `${w.color || '#64748B'}66` }}>
+                <span style={{ color: on ? '#fff' : (w.color || '#10B981') }}><WorkstreamIcon icon={w.icon} size={11} /></span>
+                {w.name} ({n})
+              </button>
+            )
           })}
+          {unalignedCount > 0 && (
+            <button type="button" onClick={() => setWsFilter(UNALIGNED)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${wsFilter === UNALIGNED ? 'border-[#F59E0B]/70 bg-[#F59E0B]/15 text-[#FBBF24]' : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>Unaligned ({unalignedCount})</button>
+          )}
         </div>
       )}
 
       {caps.length === 0 ? (
         <div className="text-center py-20 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
           <h2 className="text-base font-semibold text-[var(--m12-text-secondary)] mb-2">No capabilities yet</h2>
-          <p className="text-sm text-[var(--m12-text-muted)] mb-6">Let AI draft a capability map for your organization, or add capabilities manually and map them to your systems.</p>
+          <p className="text-sm text-[var(--m12-text-muted)] mb-6">Let AI draft a capability map aligned to your value streams, or add capabilities manually and map them to your systems.</p>
           <div className="flex items-center justify-center gap-2">
-            <button type="button" onClick={() => { setAiOpen(true); setAiError(null); setAiResults(null) }} className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#34D399] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">AI Draft capabilities</button>
+            <button type="button" onClick={openAi} className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#34D399] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">AI Draft capabilities</button>
             <button type="button" onClick={handleAddCapability} className="inline-flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">Add manually</button>
           </div>
         </div>
       ) : view === 'board' ? (
-        /* ─── Board ─── */
+        /* ─── Board (grouped by value stream) ─── */
         <div className="space-y-6">
-          {byDomain.map(([domain, list]) => (
-            <div key={domain}>
+          {groups.map(({ key, ws, list }) => (
+            <div key={key}>
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)]">{domain}</h3>
+                {ws ? <span style={{ color: ws.color || '#10B981' }}><WorkstreamIcon icon={ws.icon} size={14} /></span> : <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />}
+                <h3 className="text-[12px] font-semibold tracking-wide" style={{ color: ws?.color || '#FBBF24' }}>{ws ? ws.name : 'Unaligned'}</h3>
                 <span className="text-[10px] text-[var(--m12-text-muted)]">{list.length}</span>
                 <div className="flex-1 h-px bg-[var(--m12-border)]/30" />
               </div>
@@ -268,6 +367,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                   >
                     <div className="flex items-start gap-2 mb-2">
                       <h4 className="text-sm font-semibold text-[var(--m12-text)] flex-1">{c.name}</h4>
+                      {c.domain && <span className="text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] shrink-0">{c.domain}</span>}
                       {c.source === 'ai' && <span className="text-[8px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#34D399] border border-[#10B981]/40 rounded px-1 py-0.5 shrink-0">AI</span>}
                     </div>
                     {c.description && <p className="text-[11px] text-[var(--m12-text-muted)] mb-2 line-clamp-2">{c.description}</p>}
@@ -299,7 +399,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           <table className="border-collapse text-[11px]">
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 bg-[var(--m12-bg-card)] text-left font-semibold text-[var(--m12-text-secondary)] px-3 py-2 border-b border-r border-[var(--m12-border)]/40 min-w-[200px]">Capability</th>
+                <th className="sticky left-0 z-10 bg-[var(--m12-bg-card)] text-left font-semibold text-[var(--m12-text-secondary)] px-3 py-2 border-b border-r border-[var(--m12-border)]/40 min-w-[220px]">Capability</th>
                 {catalog.map(s => (
                   <th key={s.id} className="px-1.5 py-2 border-b border-[var(--m12-border)]/40 align-bottom" title={s.label}>
                     <div className="flex flex-col items-center gap-1">
@@ -311,12 +411,12 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
               </tr>
             </thead>
             <tbody>
-              {filtered.map(c => (
+              {matrixRows.map(c => (
                 <tr key={c.id} className="hover:bg-[var(--m12-bg-card)]/50">
                   <td className="sticky left-0 z-10 bg-[var(--m12-bg)] px-3 py-1.5 border-b border-r border-[var(--m12-border)]/30">
                     <button type="button" onClick={() => setSelectedId(c.id)} className="text-left text-[var(--m12-text)] hover:text-[#34D399] transition-colors">
                       {c.name}
-                      <span className="block text-[9px] text-[var(--m12-text-muted)]">{c.domain || UNCATEGORIZED}</span>
+                      <span className="block text-[9px]" style={{ color: c.workstream_id ? (wsById.get(c.workstream_id)?.color || 'var(--m12-text-muted)') : 'var(--m12-text-muted)' }}>{wsName(c.workstream_id)}</span>
                     </button>
                   </td>
                   {catalog.map(s => {
@@ -324,12 +424,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                     const physCount = c.physicalSystemIds.filter(p => physById.get(p)?.parentId === s.id).length
                     return (
                       <td key={s.id} className="text-center border-b border-[var(--m12-border)]/20 px-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleLogical(c.id, s.id)}
-                          title={`${c.name} ↔ ${s.label}`}
-                          className="w-7 h-7 inline-flex items-center justify-center rounded transition-colors hover:bg-[var(--m12-bg-card)]"
-                        >
+                        <button type="button" onClick={() => toggleLogical(c.id, s.id)} title={`${c.name} ↔ ${s.label}`} className="w-7 h-7 inline-flex items-center justify-center rounded transition-colors hover:bg-[var(--m12-bg-card)]">
                           {on ? (
                             <span className="inline-flex items-center justify-center rounded-full text-white text-[8px] font-bold" style={{ background: s.color || '#10B981', width: physCount > 0 ? 16 : 12, height: physCount > 0 ? 16 : 12 }}>{physCount > 0 ? physCount : ''}</span>
                           ) : (
@@ -364,7 +459,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                   value={selected.domain || ''}
                   onChange={e => patchCap(selected.id, c => ({ ...c, domain: e.target.value }))}
                   onBlur={e => handleUpdateCap(selected.id, { domain: e.target.value.trim() })}
-                  placeholder="Domain (e.g. Finance)"
+                  placeholder="Domain (optional, e.g. Finance)"
                   aria-label="Domain"
                   className="w-full bg-transparent text-[11px] text-[var(--m12-text-muted)] mt-1 focus:outline-none placeholder:text-[var(--m12-text-muted)]"
                 />
@@ -378,6 +473,11 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             </div>
 
             <div className="p-5 overflow-y-auto flex-1">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)] mb-2">Value stream</h4>
+              <div className="mb-5">
+                <WorkstreamPicker orgId={orgId} value={selected.workstream_id} workstreams={workstreams} onChange={(wsId) => handleSetWorkstream(selected.id, wsId)} />
+              </div>
+
               <textarea
                 value={selected.description || ''}
                 onChange={e => patchCap(selected.id, c => ({ ...c, description: e.target.value }))}
@@ -429,15 +529,18 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           <div className="w-full max-w-lg bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
             <div className="p-6 pb-3">
               <h2 className="text-base font-semibold text-[var(--m12-text)] mb-1">AI Draft capability map</h2>
-              <p className="text-xs text-[var(--m12-text-muted)]">Draft a business capability map mapped to your bedrock systems. Review, deselect any, and add.</p>
+              <p className="text-xs text-[var(--m12-text-muted)]">Draft a capability map aligned to your value streams and mapped to your bedrock systems. Review, deselect any, and add.</p>
             </div>
 
             {!aiResults ? (
               <div className="px-6 pb-6 overflow-y-auto">
                 <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mb-1">Organization context (optional)</label>
                 <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={3} placeholder="e.g. Tier-1 aerospace structures manufacturer, mixed cost-plus and FFP contracts, SAP S/4HANA + Teamcenter + Costpoint…" className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] placeholder:text-[var(--m12-text-muted)] focus:outline-none focus:border-[#10B981]/60 mb-3 resize-none" />
-                <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mb-1">Focus domain (optional)</label>
-                <input value={aiFocus} onChange={e => setAiFocus(e.target.value)} placeholder="e.g. Program Management" className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] placeholder:text-[var(--m12-text-muted)] focus:outline-none focus:border-[#10B981]/60 mb-3" />
+                <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mb-1">Value stream</label>
+                <select value={aiFocusWs} onChange={e => setAiFocusWs(e.target.value)} aria-label="Focus value stream" className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#10B981]/60 mb-3">
+                  <option value="">All value streams</option>
+                  {workstreams.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
                 {aiError && <div className="text-[11px] text-red-400 mb-3">{aiError}</div>}
                 <div className="flex justify-end gap-2">
                   <button type="button" onClick={() => setAiOpen(false)} disabled={aiBusy} className="px-4 py-2 rounded-lg text-sm text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] disabled:opacity-50">Cancel</button>
@@ -458,21 +561,24 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                           <button type="button" onClick={() => setAiResults(r => r!.map(d => ({ ...d, selected: false })))} className="text-[10px] text-[var(--m12-text-muted)] hover:underline">None</button>
                         </div>
                       </div>
-                      {aiResults.map((d, i) => (
-                        <label key={i} className="flex items-start gap-2 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 cursor-pointer">
-                          <input type="checkbox" checked={d.selected} onChange={e => setAiResults(r => r!.map((x, j) => j === i ? { ...x, selected: e.target.checked } : x))} className="mt-0.5 accent-[#10B981]" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-[var(--m12-text)]">{d.name}</span>
-                              <span className="text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)]">{d.domain}</span>
+                      {aiResults.map((d, i) => {
+                        const ws = d.workstreamCode ? wsByCode.get(d.workstreamCode) : null
+                        return (
+                          <label key={i} className="flex items-start gap-2 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 cursor-pointer">
+                            <input type="checkbox" checked={d.selected} onChange={e => setAiResults(r => r!.map((x, j) => j === i ? { ...x, selected: e.target.checked } : x))} className="mt-0.5 accent-[#10B981]" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-[var(--m12-text)]">{d.name}</span>
+                                {ws && <span className="text-[9px] rounded px-1 py-0.5" style={{ color: ws.color || '#10B981', background: `${ws.color || '#10B981'}18` }}>{ws.name}</span>}
+                              </div>
+                              {d.description && <div className="text-[10px] text-[var(--m12-text-muted)] line-clamp-1">{d.description}</div>}
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {d.systems.map(st => { const s = catByType.get(st); return s ? <span key={st} className="text-[9px] rounded px-1 py-0.5 border" style={{ color: s.color || '#10B981', borderColor: `${s.color || '#10B981'}55` }}>{s.label}</span> : null })}
+                              </div>
                             </div>
-                            {d.description && <div className="text-[10px] text-[var(--m12-text-muted)] line-clamp-1">{d.description}</div>}
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {d.systems.map(st => { const s = catByType.get(st); return s ? <span key={st} className="text-[9px] rounded px-1 py-0.5 border" style={{ color: s.color || '#10B981', borderColor: `${s.color || '#10B981'}55` }}>{s.label}</span> : null })}
-                            </div>
-                          </div>
-                        </label>
-                      ))}
+                          </label>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
