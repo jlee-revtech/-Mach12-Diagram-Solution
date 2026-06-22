@@ -8,6 +8,7 @@ export interface Persona {
   role?: string
   description?: string
   color: string
+  workstream_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -20,6 +21,7 @@ export interface InformationProduct {
   description?: string
   category?: string
   data_element_ids?: string[]
+  workstream_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -30,6 +32,7 @@ export interface SystemDataElement {
   organization_id: string
   name: string
   description?: string
+  workstream_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -42,6 +45,7 @@ export interface LogicalSystem {
   system_type?: SystemType
   description?: string
   color?: string
+  workstream_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -54,6 +58,7 @@ export interface CapabilityMapRow {
   description: string | null
   created_by: string | null
   updated_by: string | null
+  workstream_id?: string | null
   created_at: string
   updated_at: string
   archived_at: string | null
@@ -72,6 +77,7 @@ export interface Capability {
   depends_on_capability_ids?: string[]
   color?: string | null        // accent color for L1/L2 groupings
   system_id?: string | null
+  workstream_id?: string | null
   sort_order: number
   created_at: string
   updated_at: string

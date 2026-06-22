@@ -105,6 +105,8 @@ export async function POST(req: NextRequest) {
       return handleProcessExecMap(prompt, context)
     } else if (action === 'process-playbook') {
       return handleProcessPlaybook(context)
+    } else if (action === 'bedrock-integrations') {
+      return handleBedrockIntegrations(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -1434,5 +1436,107 @@ Guidelines:
     return NextResponse.json(JSON.parse(cleaned))
   } catch {
     return NextResponse.json({ error: 'Failed to parse playbook', raw: text }, { status: 500 })
+  }
+}
+
+// ─── Bedrock Data Integrations ─────────────────────────
+const BEDROCK_SYSTEM_PROMPT = `You are an expert enterprise data-integration architect specializing in Aerospace & Defense and Government Contracting on SAP-centric landscapes. You map the INFORMATION PASSED BETWEEN SYSTEMS for each business process.
+
+You understand:
+- The BPML hierarchy: Scenario (L1) → Process Group (L2) → Process (L3).
+- Enterprise system categories and their physical platforms (ERP=SAP S/4HANA, PLM=Teamcenter/Windchill, IMS=Primavera P6, HCM=SuccessFactors/Costpoint, MES=SAP DM/Opcenter, etc.).
+- Real A&D integration patterns: IDoc, OData, CDS view, ALE/RFC/BAPI, SOAP, REST API, CPI iFlow, Event Mesh, file/SFTP, DB link.
+- A&D data objects: Material Master, BOM, Routing, Purchase Order, Sales Order/Contract (CLIN/SLIN), Production Order, Cost Estimate, Forward Rates, Timesheet/CATS, Journal Entry, CDRL, DD250/Delivery, Earned Value (BCWS/BCWP/ACWP), Project/WBS, Funding/ACRN.
+
+For each L3 process you identify the specific inter-system integrations: which bedrock system SENDS which data object to which bedrock system, in which direction, at what frequency, via what integration pattern, and what triggers it. Stay at a LOW level of detail — name concrete data objects, not vague categories.
+
+You MUST ground every system reference in the provided bedrock catalog: use ONLY the systemType slugs given in the catalog as source/target. Never invent a system category that is not in the catalog.`
+
+// Deterministically map one L1 scenario's processes to inter-system data
+// integrations grounded in the org's bedrock catalog. temperature 0 + caller's
+// stable input ordering make re-runs reproducible.
+async function handleBedrockIntegrations(context?: {
+  modelTitle?: string
+  scenario?: {
+    name: string
+    description?: string
+    workstream?: string | null
+    groups: { name: string; description?: string; processes: { name: string; description?: string; scopeItemRef?: string | null; boundSystems?: { systemType: string; name: string }[] }[] }[]
+  }
+  catalog?: { systemType: string; label: string; primaryPhysical?: string; physicals: string[] }[]
+}) {
+  const scenario = context?.scenario
+  const catalog = context?.catalog || []
+  if (!scenario || catalog.length === 0) {
+    return NextResponse.json({ error: 'Missing scenario or bedrock catalog' }, { status: 400 })
+  }
+
+  const catalogLines = catalog
+    .map(c => `- ${c.systemType} = ${c.label}${c.primaryPhysical ? ` (primary: ${c.primaryPhysical})` : ''}${c.physicals.length ? `; also: ${c.physicals.join(', ')}` : ''}`)
+    .join('\n')
+
+  const hierarchyLines = scenario.groups
+    .map(g => {
+      const procs = g.processes
+        .map(p => `- ${p.name}${p.scopeItemRef ? ` <${p.scopeItemRef}>` : ''}${p.boundSystems?.length ? ` [systems: ${p.boundSystems.map(s => s.systemType).join(', ')}]` : ''}${p.description ? ` — ${p.description}` : ''}`)
+        .join('\n')
+      return `## ${g.name}${g.description ? ` — ${g.description}` : ''}\n${procs}`
+    })
+    .join('\n\n')
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    temperature: 0,
+    system: BEDROCK_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Map the inter-system data integrations for this L1 scenario, process by process. Return ONLY valid JSON.
+
+MODEL: "${context?.modelTitle || ''}"
+SCENARIO (L1): "${scenario.name}"${scenario.workstream ? ` [workstream: ${scenario.workstream}]` : ''}
+${scenario.description || ''}
+
+BEDROCK SYSTEM CATALOG (use ONLY these systemType slugs as source/target):
+${catalogLines}
+
+PROCESS HIERARCHY (L2 groups → L3 processes; bound systems are hints from the BPMN swimlanes):
+${hierarchyLines}
+
+Return this exact JSON structure:
+{
+  "scenario": "${scenario.name}",
+  "integrations": [
+    {
+      "l2": "Process Group name (exact, from the hierarchy above)",
+      "l3": "Process name (exact, from the hierarchy above)",
+      "sourceSystemType": "one of the catalog systemType slugs",
+      "targetSystemType": "one of the catalog systemType slugs",
+      "direction": "forward|bidirectional",
+      "dataObjects": [
+        { "name": "Specific data object (e.g. 'Purchase Order IDoc')", "elementType": "transaction|master_data|document|event|data_object", "description": "what it carries" }
+      ],
+      "frequency": "Real-time|On demand|Hourly|Daily|Weekly|Monthly|Batch",
+      "integrationPattern": "IDoc|OData|CDS view|RFC/BAPI|SOAP|REST API|CPI iFlow|Event Mesh|File/SFTP|DB link",
+      "trigger": "What initiates this flow (e.g. 'PO release')"
+    }
+  ]
+}
+
+Guidelines:
+- One integration object per distinct (l3, source, target, primary data direction). Group multiple data objects flowing the same direction between the same two systems into one integration's dataObjects array.
+- Be concrete and A&D/GovCon-grade. Prefer real SAP object names where source/target is an SAP system.
+- sourceSystemType and targetSystemType MUST be slugs present in the catalog. Skip flows you cannot ground in the catalog. Do not emit self-loops (source equals target).
+- Order integrations by L2 then L3 as listed above. Within a process, order by source then target systemType alphabetically.
+- No markdown, no explanation, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    return NextResponse.json(JSON.parse(cleaned))
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse bedrock integrations', raw: text }, { status: 500 })
   }
 }

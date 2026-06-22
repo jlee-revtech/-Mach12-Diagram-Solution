@@ -7,6 +7,8 @@ import { listDiagrams, createDiagram, archiveDiagram, restoreDiagram } from '@/l
 import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreCapabilityMap, duplicateCapabilityMap } from '@/lib/supabase/capability-maps'
 import { listProcessModels, createProcessModel, archiveProcessModel, restoreProcessModel, duplicateProcessModel } from '@/lib/supabase/process-models'
 import { importBpmnFile, importHierarchyFile } from '@/lib/process/import'
+import { generateBedrockIntegrationDiagram } from '@/lib/bedrock/generate'
+import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import type { DiagramRow } from '@/lib/supabase/types'
 import type { CapabilityMapRow } from '@/lib/sipoc/types'
 import type { ProcessModelRow } from '@/lib/process/types'
@@ -22,6 +24,14 @@ export default function Dashboard() {
   const router = useRouter()
   const { user, profile, organization, organizations, loading, signOut, switchOrg } = useAuth()
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
+
+  // Bedrock Data Integration generation
+  const [bedrockOpen, setBedrockOpen] = useState(false)
+  const [bedrockModelId, setBedrockModelId] = useState('')
+  const [bedrockWorkstreamId, setBedrockWorkstreamId] = useState<string | null>(null)
+  const [bedrockBusy, setBedrockBusy] = useState(false)
+  const [bedrockError, setBedrockError] = useState<string | null>(null)
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
 
   // Auth gating
   useEffect(() => {
@@ -84,6 +94,37 @@ export default function Dashboard() {
       setImporting(false)
     }
   }, [organization, user, router])
+
+  const handleGenerateBedrock = useCallback(async () => {
+    if (!organization || !user || !bedrockModelId) return
+    setBedrockBusy(true)
+    setBedrockError(null)
+    try {
+      const id = await generateBedrockIntegrationDiagram(bedrockModelId, organization.id, user.id, { workstreamId: bedrockWorkstreamId })
+      router.push(`/diagram/${id}`)
+    } catch (err) {
+      setBedrockError(err instanceof Error ? err.message : 'Generation failed')
+      setBedrockBusy(false)
+    }
+  }, [organization, user, bedrockModelId, bedrockWorkstreamId, router])
+
+  const handleRegenerateBedrock = useCallback(
+    async (d: DiagramRow, e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (!organization || !user || !d.source_process_model_id) return
+      if (!confirm('Regenerate replaces this diagram’s contents from the current process model. Manual edits will be lost. Continue?')) return
+      setRegeneratingId(d.id)
+      try {
+        await generateBedrockIntegrationDiagram(d.source_process_model_id, organization.id, user.id, { existingDiagramId: d.id, workstreamId: d.workstream_id ?? null })
+        await loadAll()
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Regeneration failed')
+      } finally {
+        setRegeneratingId(null)
+      }
+    },
+    [organization, user, loadAll]
+  )
 
   const handleArchiveProcess = useCallback(
     async (id: string, e: React.MouseEvent) => {
@@ -277,6 +318,18 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => router.push('/workstreams')}
+              title="Workstreams — value-stream alignment & consultant agents"
+              className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+                <rect x="2.5" y="9" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
+                <rect x="7.5" y="5.5" width="3" height="9.5" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
+                <rect x="12.5" y="2.5" width="3" height="12.5" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
+              </svg>
+              Workstreams
+            </button>
+            <button
               onClick={handleNew}
               className="flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-[#2563EB]/20"
             >
@@ -434,6 +487,43 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Diagrams: bedrock data integration entry points */}
+        {activeTab === 'diagrams' && (
+          <div className="flex items-stretch gap-3 mb-4">
+            <button
+              onClick={() => { setBedrockOpen(true); setBedrockError(null) }}
+              className="flex-1 flex items-center gap-3 bg-[#2563EB]/8 border border-[#2563EB]/30 hover:border-[#2563EB]/60 rounded-xl px-4 py-3 transition-colors group text-left"
+            >
+              <div className="w-8 h-8 rounded-lg bg-[#2563EB]/15 flex items-center justify-center shrink-0">
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#2563EB]">
+                  <rect x="2" y="2.5" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                  <rect x="11" y="2.5" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                  <rect x="6.5" y="11.5" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M4.5 6.5v2.5a1 1 0 001 1H9m4.5-3.5v2.5a1 1 0 01-1 1H9m0 0v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-[var(--m12-text)]">Generate a Bedrock Data Integration</div>
+                <div className="text-[11px] text-[var(--m12-text-muted)]">Map the data passed between systems for a process model&apos;s L1/L2/L3 processes, grounded in your bedrock systems.</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#2563EB] group-hover:translate-x-0.5 transition-transform shrink-0">
+                <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              onClick={() => router.push('/data/bedrock')}
+              title="Bedrock Systems — logical platform categories and their physical systems"
+              className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
+            >
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#2563EB]">
+                <ellipse cx="9" cy="4" rx="6" ry="2.2" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M3 4v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4M3 9v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V9" stroke="currentColor" strokeWidth="1.3" />
+              </svg>
+              <span className="text-xs font-medium text-[var(--m12-text-secondary)]">Bedrock Systems</span>
+            </button>
+          </div>
+        )}
+
         {/* Content grid */}
         {loadingDiagrams ? (
           <div className="text-center py-24 text-[var(--m12-text-muted)] text-sm">Loading...</div>
@@ -478,24 +568,43 @@ export default function Dashboard() {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">{d.title}</h3>
-                      <button
-                        onClick={(e) => handleArchive(d.id, e)}
-                        title="Archive diagram"
-                        className="text-[var(--m12-border)] hover:text-[#EAB308] transition-colors ml-2 shrink-0"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                          <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-                          <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
-                          <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                    {d.process_context && (
-                      <div className="inline-flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-0.5 mb-3">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-                        <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider">{d.process_context}</span>
+                      <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                        {d.diagram_kind === 'bedrock_integration' && d.source_process_model_id && (
+                          <button
+                            onClick={(e) => handleRegenerateBedrock(d, e)}
+                            title="Regenerate from the source process model"
+                            disabled={regeneratingId === d.id}
+                            className="text-[var(--m12-border)] hover:text-[#2563EB] transition-colors disabled:opacity-50"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={regeneratingId === d.id ? 'animate-spin' : ''}>
+                              <path d="M13 8a5 5 0 11-1.5-3.5M13 2.5V5h-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => handleArchive(d.id, e)}
+                          title="Archive diagram"
+                          className="text-[var(--m12-border)] hover:text-[#EAB308] transition-colors"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                            <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                            <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
+                            <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          </svg>
+                        </button>
                       </div>
-                    )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mb-3 empty:hidden">
+                      {d.diagram_kind === 'bedrock_integration' && (
+                        <span className="inline-flex items-center bg-[#2563EB]/15 border border-[#2563EB]/40 rounded px-2 py-0.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[#93C5FD] uppercase tracking-wider">Bedrock</span>
+                      )}
+                      {d.process_context && (
+                        <span className="inline-flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
+                          <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider">{d.process_context}</span>
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
                       Updated {new Date(d.updated_at).toLocaleDateString()}
                     </div>
@@ -815,6 +924,44 @@ export default function Dashboard() {
           )
         )}
       </div>
+
+      {/* Generate Bedrock Data Integration dialog */}
+      {bedrockOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !bedrockBusy && setBedrockOpen(false)}>
+          <div className="w-full max-w-md bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-[var(--m12-text)] mb-1">Generate a Bedrock Data Integration</h2>
+            <p className="text-xs text-[var(--m12-text-muted)] mb-4">Maps the data passed between systems for each L1/L2/L3 process in a model, grounded in your Bedrock Systems catalog. Creates an editable data-architecture diagram.</p>
+
+            <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mb-1">Process model</label>
+            <select
+              value={bedrockModelId}
+              onChange={(e) => setBedrockModelId(e.target.value)}
+              aria-label="Process model"
+              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60 mb-1"
+            >
+              <option value="">Select a process model…</option>
+              {activeProcesses.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+            {activeProcesses.length === 0 && (
+              <div className="text-[11px] text-[var(--m12-text-muted)] mb-3">No process models yet — create one in Process Studio first.</div>
+            )}
+
+            <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mt-3 mb-1">Workstream (optional)</label>
+            <div className="mb-4">
+              <WorkstreamPicker orgId={organization.id} value={bedrockWorkstreamId} onChange={setBedrockWorkstreamId} />
+            </div>
+
+            {bedrockError && <div className="text-[11px] text-red-400 mb-3">{bedrockError}</div>}
+
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setBedrockOpen(false)} disabled={bedrockBusy} className="px-4 py-2 rounded-lg text-sm text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] disabled:opacity-50 transition-colors">Cancel</button>
+              <button type="button" onClick={handleGenerateBedrock} disabled={bedrockBusy || !bedrockModelId} className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white transition-colors">
+                {bedrockBusy ? 'Generating…' : 'Generate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

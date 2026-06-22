@@ -38,6 +38,7 @@ export interface ProcessModelRow {
   source_reference_id: string | null
   created_by: string | null
   updated_by: string | null
+  workstream_id?: string | null
   created_at: string
   updated_at: string
   archived_at: string | null
@@ -68,6 +69,7 @@ export interface ProcessNode {
   scope_item_ref?: string | null
   lifecycle?: ProcessLifecycle | null
   variant_label?: string | null
+  workstream_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -207,6 +209,7 @@ export interface ProcessRole {
   name: string
   description?: string | null
   color?: string | null
+  workstream_id?: string | null
   created_at: string
   updated_at: string
 }

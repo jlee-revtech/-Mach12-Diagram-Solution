@@ -6,8 +6,11 @@ import {
   listProcessRoles, createProcessRole, deleteProcessRole,
   listPersonaRoleLinks, addPersonaRole, removePersonaRole,
 } from '@/lib/supabase/process-models'
+import { listWorkstreams, setEntityWorkstream } from '@/lib/supabase/workstreams'
+import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import type { Persona } from '@/lib/sipoc/types'
 import type { ProcessRole, PersonaRoleLink } from '@/lib/process/types'
+import type { Workstream } from '@/lib/workstream/types'
 
 // Persona Catalog: Persona → Roles (many-to-many). A persona is made up of
 // multiple roles; a role can belong to multiple personas; and a role can be
@@ -16,6 +19,7 @@ export default function PersonaCatalog({ orgId }: { orgId: string }) {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [roles, setRoles] = useState<ProcessRole[]>([])
   const [links, setLinks] = useState<PersonaRoleLink[]>([])
+  const [workstreams, setWorkstreams] = useState<Workstream[]>([])
   const [loading, setLoading] = useState(true)
   const [newPersona, setNewPersona] = useState('')
   const [newRole, setNewRole] = useState('')
@@ -23,10 +27,15 @@ export default function PersonaCatalog({ orgId }: { orgId: string }) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [p, r, l] = await Promise.all([listPersonas(orgId), listProcessRoles(orgId), listPersonaRoleLinks(orgId)])
-    setPersonas(p); setRoles(r); setLinks(l); setLoading(false)
+    const [p, r, l, w] = await Promise.all([listPersonas(orgId), listProcessRoles(orgId), listPersonaRoleLinks(orgId), listWorkstreams(orgId)])
+    setPersonas(p); setRoles(r); setLinks(l); setWorkstreams(w); setLoading(false)
   }, [orgId])
   useEffect(() => { load() }, [load])
+
+  const handleSetPersonaWorkstream = async (personaId: string, wsId: string | null) => {
+    setPersonas(x => x.map(p => p.id === personaId ? { ...p, workstream_id: wsId } : p))
+    await setEntityWorkstream('persona', personaId, wsId).catch(() => load())
+  }
 
   const rolesFor = (personaId: string) =>
     links.filter(l => l.persona_id === personaId).map(l => roles.find(r => r.id === l.role_id)).filter((r): r is ProcessRole => !!r)
@@ -90,9 +99,12 @@ export default function PersonaCatalog({ orgId }: { orgId: string }) {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color || '#6366F1' }} />
                   <span className="text-sm font-semibold text-[var(--m12-text)]">{p.name}</span>
-                  <button onClick={() => handleDeletePersona(p.id)} title="Delete persona" className="ml-auto text-[var(--m12-border)] hover:text-red-400">
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5.5 4V3a1 1 0 011-1h1a1 1 0 011 1v1M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  </button>
+                  <div className="ml-auto flex items-center gap-2">
+                    <WorkstreamPicker orgId={orgId} value={p.workstream_id} workstreams={workstreams} onChange={(wsId) => handleSetPersonaWorkstream(p.id, wsId)} className="w-48" />
+                    <button onClick={() => handleDeletePersona(p.id)} title="Delete persona" className="text-[var(--m12-border)] hover:text-red-400">
+                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5.5 4V3a1 1 0 011-1h1a1 1 0 011 1v1M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {assigned.length === 0 && <span className="text-[10px] text-[var(--m12-text-muted)]">No roles assigned.</span>}

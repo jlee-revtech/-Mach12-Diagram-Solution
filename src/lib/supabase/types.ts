@@ -23,6 +23,9 @@ export interface DiagramRow {
   canvas_data: { nodes: unknown[]; edges: unknown[] }
   created_by: string | null
   updated_by: string | null
+  workstream_id?: string | null
+  diagram_kind?: string
+  source_process_model_id?: string | null
   created_at: string
   updated_at: string
   archived_at: string | null
