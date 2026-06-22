@@ -195,8 +195,27 @@ export interface ProcessLane {
   label: string
   systemId?: string | null
   personaId?: string | null
+  roleId?: string | null
   order: number
   color?: string
+}
+
+// ─── Persona Catalog: Persona → Roles (many-to-many) ───
+export interface ProcessRole {
+  id: string
+  organization_id: string
+  name: string
+  description?: string | null
+  color?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PersonaRoleLink {
+  id: string
+  persona_id: string
+  role_id: string
+  created_at: string
 }
 
 export interface ProcessGraph {
@@ -213,6 +232,7 @@ export interface ProcessNodeLane {
   lane_key: string
   logical_system_id: string | null
   persona_id: string | null
+  role_id: string | null
   label: string | null
   sort_order: number
   created_at: string

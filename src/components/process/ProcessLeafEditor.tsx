@@ -68,6 +68,7 @@ function laneToNode(lane: ProcessLane, systemLabel: string | null): Node {
       laneColor: lane.color || LANE_COLORS[lane.order % LANE_COLORS.length],
       systemId: lane.systemId ?? null,
       personaId: lane.personaId ?? null,
+      roleId: lane.roleId ?? null,
       systemLabel,
       order: lane.order,
     },
@@ -103,6 +104,7 @@ function extractGraph(nodes: Node[], edges: Edge[], viewport?: { x: number; y: n
     label: (n.data as any).label,
     systemId: (n.data as any).systemId ?? null,
     personaId: (n.data as any).personaId ?? null,
+    roleId: (n.data as any).roleId ?? null,
     order: i,
     color: (n.data as any).laneColor,
   }))
@@ -132,6 +134,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const node = useProcessStore(s => s.nodes.find(n => n.id === nodeId))
   const logicalSystems = useProcessStore(s => s.logicalSystems)
   const personas = useProcessStore(s => s.personas)
+  const roles = useProcessStore(s => s.roles)
   const saveLeafGraph = useProcessStore(s => s.saveLeafGraph)
 
   const systemName = useCallback(
@@ -248,6 +251,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
         api.upsertProcessNodeLane(nodeId, l.id, {
           logical_system_id: l.systemId ?? null,
           persona_id: l.personaId ?? null,
+          role_id: l.roleId ?? null,
           label: l.label,
           sort_order: l.order,
         })
@@ -640,6 +644,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
           isLane={selection.type === 'lane'}
           systems={logicalSystems}
           personas={personas}
+          roles={roles}
           systemName={systemName}
           onPatchNode={patchNodeData}
           onPatchEdge={patchEdgeData}
@@ -653,7 +658,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
 
 // ─── Inspector panel ───────────────────────────────────
 function Inspector({
-  selectedNode, selectedEdge, isLane, systems, personas, systemName,
+  selectedNode, selectedEdge, isLane, systems, personas, roles, systemName,
   onPatchNode, onPatchEdge, onDelete, onClose,
 }: {
   selectedNode: Node | null | undefined
@@ -661,6 +666,7 @@ function Inspector({
   isLane: boolean
   systems: { id: string; name: string }[]
   personas: { id: string; name: string }[]
+  roles: { id: string; name: string }[]
   systemName: (id?: string | null) => string | null
   onPatchNode: (id: string, patch: Record<string, unknown>) => void
   onPatchEdge: (id: string, patch: Record<string, unknown>) => void
@@ -702,7 +708,17 @@ function Inspector({
                 {systems.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </Field>
-            <Field label="Owner role">
+            <Field label="Role (swimlane)">
+              <select
+                value={(selectedNode.data as any).roleId || ''}
+                onChange={e => onPatchNode(selectedNode.id, { roleId: e.target.value || null })}
+                className="ins-input"
+              >
+                <option value="">— none —</option>
+                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Persona">
               <select
                 value={(selectedNode.data as any).personaId || ''}
                 onChange={e => onPatchNode(selectedNode.id, { personaId: e.target.value || null })}

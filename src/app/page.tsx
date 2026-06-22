@@ -396,6 +396,18 @@ export default function Dashboard() {
             </svg>
             <span className="text-xs font-medium text-[var(--m12-text-secondary)]">{importing ? 'Importing…' : 'Import'}</span>
           </button>
+          <button
+            onClick={() => router.push('/process/personas')}
+            title="Persona Catalog — personas, roles, and role-as-swimlane"
+            className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
+          >
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#8B5CF6]">
+              <circle cx="6.5" cy="6" r="2.2" stroke="currentColor" strokeWidth="1.3" />
+              <circle cx="12" cy="7" r="1.8" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M2.5 14c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5M11 14c0-1.6 1-2.8 2.6-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            <span className="text-xs font-medium text-[var(--m12-text-secondary)]">Personas</span>
+          </button>
           </div>
         )}
 

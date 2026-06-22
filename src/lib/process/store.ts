@@ -7,6 +7,7 @@ import type {
   ProcessNodeKind,
 } from './types'
 import type { LogicalSystem, Persona, InformationProduct } from '@/lib/sipoc/types'
+import type { ProcessRole } from './types'
 import * as api from '@/lib/supabase/process-models'
 import * as sipocApi from '@/lib/supabase/capability-maps'
 
@@ -22,6 +23,7 @@ interface ProcessState {
   logicalSystems: LogicalSystem[]
   personas: Persona[]
   informationProducts: InformationProduct[]
+  roles: ProcessRole[]
 
   // UI state
   readOnly: boolean
@@ -58,6 +60,7 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   logicalSystems: [],
   personas: [],
   informationProducts: [],
+  roles: [],
   readOnly: false,
   setReadOnly: (v) => set({ readOnly: v }),
   selectedNodeId: null,
@@ -75,12 +78,13 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   },
 
   loadOrgEntities: async (orgId, anon) => {
-    const [systems, personas, ips] = await Promise.all([
+    const [systems, personas, ips, roles] = await Promise.all([
       anon ? sipocApi.listLogicalSystemsAnon(orgId) : sipocApi.listLogicalSystems(orgId),
       anon ? sipocApi.listPersonasAnon(orgId) : sipocApi.listPersonas(orgId),
       anon ? sipocApi.listInformationProductsAnon(orgId) : sipocApi.listInformationProducts(orgId),
+      anon ? api.listProcessRolesAnon(orgId) : api.listProcessRoles(orgId),
     ])
-    set({ logicalSystems: systems, personas, informationProducts: ips })
+    set({ logicalSystems: systems, personas, informationProducts: ips, roles })
   },
 
   // ─── Model meta ───────────────────────────────────────

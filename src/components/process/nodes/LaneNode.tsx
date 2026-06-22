@@ -2,20 +2,24 @@
 
 import { memo } from 'react'
 import type { NodeProps } from '@xyflow/react'
+import { useProcessStore } from '@/lib/process/store'
 
 // Swimlane = a non-interactive, full-width horizontal band rendered behind the
 // BPMN elements. Same approach as the diagram's SystemGroupNode: pointer-events
 // are disabled on the lane body (re-enabled only on the label gutter), so clicks
 // pass through to elements and edges. Lane geometry/label live in graph_data;
-// the label gutter selects the lane for system binding in the inspector.
+// the label gutter selects the lane for system/role binding in the inspector.
 export interface LaneNodeData extends Record<string, unknown> {
   label: string
   laneColor?: string
   systemLabel?: string | null
+  roleId?: string | null
 }
 
 function LaneNodeComponent({ data, selected }: NodeProps & { data: LaneNodeData }) {
   const color = data.laneColor || 'var(--m12-border)'
+  const roleName = useProcessStore(s => (data.roleId ? s.roles.find(r => r.id === data.roleId)?.name : null))
+  const sub = roleName || data.systemLabel || null
   return (
     <div
       className="relative h-full w-full"
@@ -37,7 +41,7 @@ function LaneNodeComponent({ data, selected }: NodeProps & { data: LaneNodeData 
           style={{ transform: 'rotate(180deg)', writingMode: 'vertical-rl' }}
         >
           {data.label}
-          {data.systemLabel ? ` · ${data.systemLabel}` : ''}
+          {sub ? ` · ${sub}` : ''}
         </span>
       </div>
     </div>

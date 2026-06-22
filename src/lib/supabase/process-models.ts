@@ -12,6 +12,8 @@ import type {
   RicefwType,
   RicefwStatus,
   ProcessInterface,
+  ProcessRole,
+  PersonaRoleLink,
 } from '@/lib/process/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -237,7 +239,7 @@ export async function listProcessNodeLanes(nodeId: string): Promise<ProcessNodeL
 export async function upsertProcessNodeLane(
   nodeId: string,
   laneKey: string,
-  data: { logical_system_id?: string | null; persona_id?: string | null; label?: string | null; sort_order?: number }
+  data: { logical_system_id?: string | null; persona_id?: string | null; role_id?: string | null; label?: string | null; sort_order?: number }
 ): Promise<ProcessNodeLane> {
   // PostgREST upsert keyed on (process_node_id, lane_key) requires a unique
   // constraint; we keep it simple — delete-then-insert on the (node, key) pair.
@@ -324,6 +326,7 @@ export async function duplicateProcessModel(
       await upsertProcessNodeLane(newNodeId, lane.lane_key, {
         logical_system_id: lane.logical_system_id,
         persona_id: lane.persona_id,
+        role_id: lane.role_id,
         label: lane.label,
         sort_order: lane.sort_order,
       })
@@ -566,6 +569,74 @@ export async function listProcessOverlaysAnon(nodeId: string): Promise<ProcessOv
   )
   if (!res.ok) return []
   return res.json()
+}
+
+// ─── Persona Catalog: roles + persona↔role links ──────
+
+export async function listProcessRoles(orgId: string): Promise<ProcessRole[]> {
+  return fetchAllPaginated<ProcessRole>(
+    `${URL}/rest/v1/process_roles?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    headers()
+  )
+}
+
+export async function listProcessRolesAnon(orgId: string): Promise<ProcessRole[]> {
+  return fetchAllPaginated<ProcessRole>(
+    `${URL}/rest/v1/process_roles?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    anonHeaders()
+  )
+}
+
+export async function createProcessRole(orgId: string, data: { name: string; description?: string; color?: string }): Promise<ProcessRole> {
+  const res = await fetch(`${URL}/rest/v1/process_roles`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ organization_id: orgId, ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create role')
+  return Array.isArray(arr) ? arr[0] : arr
+}
+
+export async function updateProcessRole(id: string, updates: Partial<Pick<ProcessRole, 'name' | 'description' | 'color'>>): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/process_roles?id=eq.${id}`, {
+    method: 'PATCH', headers: { ...headers(), 'Prefer': 'return=minimal' }, body: JSON.stringify(updates),
+  })
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update role') }
+}
+
+export async function deleteProcessRole(id: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/process_roles?id=eq.${id}`, { method: 'DELETE', headers: headers() })
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to delete role') }
+}
+
+export async function listPersonaRoleLinks(orgId: string): Promise<PersonaRoleLink[]> {
+  // Links for personas in this org (filter via embedded persona).
+  const res = await fetch(
+    `${URL}/rest/v1/persona_roles?select=*,personas!inner(organization_id)&personas.organization_id=eq.${orgId}`,
+    { headers: headers() }
+  )
+  if (!res.ok) return []
+  const rows = await res.json()
+  return rows.map((r: { id: string; persona_id: string; role_id: string; created_at: string }) => ({
+    id: r.id, persona_id: r.persona_id, role_id: r.role_id, created_at: r.created_at,
+  }))
+}
+
+export async function addPersonaRole(personaId: string, roleId: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/persona_roles`, {
+    method: 'POST',
+    headers: { ...headers(), 'Prefer': 'return=minimal,resolution=ignore-duplicates' },
+    body: JSON.stringify({ persona_id: personaId, role_id: roleId }),
+  })
+  if (!res.ok && res.status !== 409) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to link role') }
+}
+
+export async function removePersonaRole(personaId: string, roleId: string): Promise<void> {
+  const res = await fetch(`${URL}/rest/v1/persona_roles?persona_id=eq.${personaId}&role_id=eq.${roleId}`, {
+    method: 'DELETE', headers: headers(),
+  })
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to unlink role') }
 }
 
 // ─── RICEFW register (org-scoped build-object catalog) ──
