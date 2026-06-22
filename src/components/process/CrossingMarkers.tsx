@@ -8,7 +8,7 @@ import {
   ViewportPortal,
   type ReactFlowState,
 } from '@xyflow/react'
-import { getFloatingParams } from './edges/floating'
+import { getAnchorParams } from './edges/floating'
 
 interface Pt { x: number; y: number }
 
@@ -56,7 +56,7 @@ export default function CrossingMarkers() {
       const sn = getInternalNode(e.source)
       const tn = getInternalNode(e.target)
       if (!sn || !tn) continue
-      const p = getFloatingParams(sn, tn)
+      const p = getAnchorParams(sn, tn)
       const [d] = getSmoothStepPath({
         sourceX: p.sx, sourceY: p.sy, targetX: p.tx, targetY: p.ty,
         sourcePosition: p.sPos, targetPosition: p.tPos, borderRadius: 0,

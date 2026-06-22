@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -33,6 +33,7 @@ import { BPMN_PALETTE } from '@/lib/process/types'
 import ProcessElementNode from './nodes/ProcessElementNode'
 import LaneNode from './nodes/LaneNode'
 import SequenceFlowEdge, { SequenceFlowMarkerDefs } from './edges/SequenceFlowEdge'
+import { anchorHandles } from './edges/floating'
 import ProcessPalette from './ProcessPalette'
 import CrossingMarkers from './CrossingMarkers'
 import { autoLayoutProcess } from '@/lib/process/autoLayout'
@@ -137,7 +138,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
     [logicalSystems]
   )
 
-  const { screenToFlowPosition, getViewport, fitView } = useReactFlow()
+  const { screenToFlowPosition, getViewport, fitView, getInternalNode } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [selection, setSelection] = useState<{ type: 'node' | 'edge' | 'lane'; id: string } | null>(null)
@@ -309,7 +310,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   // Reconnect (drag an arrow endpoint onto another task). Dropping on empty
   // canvas removes the connector. Reconnecting preserves the flow's data.
   const reconnectOkRef = useRef(true)
-  const onReconnectStart = useCallback(() => { reconnectOkRef.current = false }, [])
+  const onReconnectStart = useCallback(() => { reconnectOkRef.current = false; setConnecting(true) }, [])
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
     if (readOnly) return
     reconnectOkRef.current = true
@@ -319,6 +320,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const onReconnectEnd = useCallback((_: unknown, edge: Edge) => {
     if (!reconnectOkRef.current && !readOnly) { takeSnapshot(); setEdges(eds => eds.filter(e => e.id !== edge.id)) }
     reconnectOkRef.current = true
+    setConnecting(false)
   }, [readOnly, setEdges, takeSnapshot])
 
   // Connection in progress → enable the full-node drop target so an arrow can
@@ -466,6 +468,17 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const selectedNode = selection && selection.type !== 'edge' ? nodes.find(n => n.id === selection.id) : null
   const selectedEdge = selection?.type === 'edge' ? edges.find(e => e.id === selection.id) : null
 
+  // Bind each connector to the side handle facing the other task. This keeps
+  // endpoints on the box, makes reconnect handles grabbable at the visible
+  // arrow ends, and re-snaps the side as tasks move. Recomputes on node moves.
+  const displayEdges = useMemo(() => edges.map(e => {
+    const s = getInternalNode(e.source)
+    const t = getInternalNode(e.target)
+    if (!s || !t) return { ...e, reconnectable: true }
+    const { sourceHandle, targetHandle } = anchorHandles(s, t)
+    return { ...e, sourceHandle, targetHandle, reconnectable: true }
+  }), [edges, nodes, getInternalNode])
+
   return (
     <div className="flex h-full min-h-0">
       {!readOnly && <ProcessPalette onAddLane={addLane} />}
@@ -573,7 +586,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
 
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={displayEdges}
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onConnect={onConnect}

@@ -10,7 +10,7 @@ import {
   type EdgeProps,
 } from '@xyflow/react'
 import type { SequenceFlowData } from '@/lib/process/types'
-import { getFloatingParams } from './floating'
+import { getAnchorParams } from './floating'
 
 // Next.js client-routing fix for url(#id) marker references.
 function markerUrl(markerId: string) {
@@ -43,7 +43,7 @@ function SequenceFlowEdgeComponent({
   let sx = sourceX, sy = sourceY, tx = targetX, ty = targetY
   let sPos = sourcePosition, tPos = targetPosition
   if (sourceNode && targetNode) {
-    const p = getFloatingParams(sourceNode, targetNode)
+    const p = getAnchorParams(sourceNode, targetNode)
     sx = p.sx; sy = p.sy; sPos = p.sPos
     tx = p.tx; ty = p.ty; tPos = p.tPos
   }

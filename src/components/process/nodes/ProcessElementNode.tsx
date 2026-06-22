@@ -39,14 +39,12 @@ function FourSideHandles() {
 const EVENT_TYPES: BpmnElementType[] = ['startEvent', 'endEvent', 'intermediateEvent', 'boundaryEvent']
 const GATEWAY_TYPES: BpmnElementType[] = ['exclusiveGateway', 'parallelGateway', 'inclusiveGateway', 'eventBasedGateway']
 
-function gatewaySymbol(t: BpmnElementType): string {
-  switch (t) {
-    case 'exclusiveGateway': return '✕'
-    case 'parallelGateway': return '＋'
-    case 'inclusiveGateway': return '◯'
-    case 'eventBasedGateway': return '◈'
-    default: return ''
-  }
+// Each gateway type gets a distinct color + symbol so they read at a glance.
+const GATEWAY_STYLE: Record<string, { color: string; symbol: string; label: string }> = {
+  exclusiveGateway: { color: '#EAB308', symbol: '✕', label: 'XOR' },       // amber
+  parallelGateway: { color: '#10B981', symbol: '＋', label: 'AND' },       // green
+  inclusiveGateway: { color: '#2563EB', symbol: '◯', label: 'OR' },        // blue
+  eventBasedGateway: { color: '#8B5CF6', symbol: '◈', label: 'EVENT' },    // violet
 }
 
 function taskIcon(t: BpmnElementType) {
@@ -107,25 +105,34 @@ function ProcessElementNodeComponent({ id, data, selected }: NodeProps & { data:
     )
   }
 
-  // ─── Gateways: diamond ───
+  // ─── Gateways: diamond, color + symbol per type ───
   if (isGateway) {
+    const gw = GATEWAY_STYLE[data.elementType] || GATEWAY_STYLE.exclusiveGateway
     return (
       <div className="group relative" style={{ width: 52, height: 52 }}>
         <FourSideHandles />
         <div
-          className="flex items-center justify-center bg-[var(--m12-bg-card)]"
+          className="flex items-center justify-center"
           style={{
             width: 38, height: 38, margin: 7,
             transform: 'rotate(45deg)',
-            border: `1.5px solid #EAB308`,
+            border: `2px solid ${gw.color}`,
+            background: `${gw.color}1A`,
             borderRadius: 4,
             boxShadow: selected ? `0 0 0 2px ${ring}55` : 'none',
           }}
         >
-          <span className="text-[14px] text-[#EAB308]" style={{ transform: 'rotate(-45deg)' }}>
-            {gatewaySymbol(data.elementType)}
+          <span className="text-[15px] font-bold" style={{ transform: 'rotate(-45deg)', color: gw.color }}>
+            {gw.symbol}
           </span>
         </div>
+        {/* type tag so XOR/AND/OR/Event are unambiguous */}
+        <span
+          className="absolute left-1/2 -translate-x-1/2 text-[7px] font-bold uppercase tracking-wider font-[family-name:var(--font-space-mono)] px-1 rounded-sm"
+          style={{ top: -8, color: gw.color, background: `${gw.color}1A` }}
+        >
+          {gw.label}
+        </span>
         <NodeLabel value={data.label} below />
       </div>
     )
