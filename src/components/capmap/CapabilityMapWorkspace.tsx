@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   listCapabilityMap, createCapability, updateCapability, deleteCapability,
+  archiveCapability, restoreCapability,
   addCapabilityLogicalSystem, removeCapabilityLogicalSystem,
   addCapabilityPhysicalSystem, removeCapabilityPhysicalSystem, bulkCreateCapabilities,
 } from '@/lib/supabase/capmap'
@@ -21,14 +22,17 @@ interface DraftCap { name: string; workstreamCode: string; domain: string; descr
 export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: string; userId: string }) {
   const [catalog, setCatalog] = useState<BedrockSystemWithPhysicals[]>([])
   const [caps, setCaps] = useState<CapabilityWithSystems[]>([])
+  const [archivedCaps, setArchivedCaps] = useState<CapabilityWithSystems[]>([])
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
   const [aligning, setAligning] = useState(false)
-  const [view, setView] = useState<'board' | 'matrix'>('board')
+  const [view, setView] = useState<'board' | 'pivot'>('board')
+  const [slice, setSlice] = useState<'workstream' | 'logical' | 'physical'>('workstream')
   const [search, setSearch] = useState('')
   const [wsFilter, setWsFilter] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   // AI draft modal
   const [aiOpen, setAiOpen] = useState(false)
@@ -40,8 +44,11 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [c, m, w] = await Promise.all([listBedrockCatalog(orgId), listCapabilityMap(orgId), listWorkstreams(orgId)])
-    setCatalog(c); setCaps(m); setWorkstreams(w); setLoading(false)
+    const [c, m, w] = await Promise.all([listBedrockCatalog(orgId), listCapabilityMap(orgId, true), listWorkstreams(orgId)])
+    setCatalog(c)
+    setCaps(m.filter(x => !x.archived_at))
+    setArchivedCaps(m.filter(x => x.archived_at))
+    setWorkstreams(w); setLoading(false)
   }, [orgId])
   useEffect(() => { load() }, [load])
 
@@ -91,15 +98,36 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     return ordered
   }, [filtered, workstreams, wsById])
 
-  // Matrix rows ordered by workstream then name.
-  const matrixRows = useMemo(() => {
-    const order = new Map(workstreams.map((w, i) => [w.id, i]))
-    return [...filtered].sort((a, b) => {
-      const ai = a.workstream_id ? (order.get(a.workstream_id) ?? 998) : 999
-      const bi = b.workstream_id ? (order.get(b.workstream_id) ?? 998) : 999
-      return ai - bi || a.name.localeCompare(b.name)
-    })
-  }, [filtered, workstreams])
+  // Pivot columns by the chosen slice dimension (value stream / logical / physical).
+  const pivotColumns = useMemo(() => {
+    type Col = { key: string; label: string; color: string; icon?: string | null; caps: CapabilityWithSystems[] }
+    const cols: Col[] = []
+    if (slice === 'workstream') {
+      const byWs = new Map<string, CapabilityWithSystems[]>()
+      for (const c of filtered) {
+        const key = c.workstream_id && wsById.has(c.workstream_id) ? c.workstream_id : UNALIGNED
+        if (!byWs.has(key)) byWs.set(key, [])
+        byWs.get(key)!.push(c)
+      }
+      for (const w of workstreams) if (byWs.has(w.id)) cols.push({ key: w.id, label: w.name, color: w.color || '#10B981', icon: w.icon, caps: byWs.get(w.id)! })
+      if (byWs.has(UNALIGNED)) cols.push({ key: UNALIGNED, label: 'Unaligned', color: '#F59E0B', caps: byWs.get(UNALIGNED)! })
+    } else if (slice === 'logical') {
+      for (const s of catalog) {
+        const list = filtered.filter(c => c.logicalSystemIds.includes(s.id))
+        if (list.length) cols.push({ key: s.id, label: s.label, color: s.color || '#10B981', caps: list })
+      }
+      const unmapped = filtered.filter(c => c.logicalSystemIds.length === 0)
+      if (unmapped.length) cols.push({ key: UNALIGNED, label: 'Unmapped', color: '#F59E0B', caps: unmapped })
+    } else {
+      for (const s of catalog) for (const p of s.physicals) {
+        const list = filtered.filter(c => c.physicalSystemIds.includes(p.id))
+        if (list.length) cols.push({ key: p.id, label: p.name, color: s.color || '#10B981', caps: list })
+      }
+      const unmapped = filtered.filter(c => c.physicalSystemIds.length === 0)
+      if (unmapped.length) cols.push({ key: UNALIGNED, label: 'No physical system', color: '#F59E0B', caps: unmapped })
+    }
+    return cols
+  }, [slice, filtered, catalog, workstreams, wsById])
 
   const unalignedCount = useMemo(() => caps.filter(c => !c.workstream_id || !wsById.has(c.workstream_id)).length, [caps, wsById])
   const selected = caps.find(c => c.id === selectedId) || null
@@ -128,10 +156,27 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   }
 
   const handleDeleteCap = async (id: string) => {
-    if (!confirm('Delete this capability and its system mappings?')) return
+    if (!confirm('Permanently delete this capability and its system mappings? This cannot be undone.')) return
     setCaps(x => x.filter(c => c.id !== id))
+    setArchivedCaps(x => x.filter(c => c.id !== id))
     if (selectedId === id) setSelectedId(null)
     await deleteCapability(id).catch(() => load())
+  }
+
+  const handleArchiveCap = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const cap = caps.find(c => c.id === id)
+    setCaps(x => x.filter(c => c.id !== id))
+    if (cap) setArchivedCaps(x => [{ ...cap, archived_at: new Date().toISOString() }, ...x])
+    if (selectedId === id) setSelectedId(null)
+    await archiveCapability(id).catch(() => load())
+  }
+
+  const handleRestoreCap = async (id: string) => {
+    const cap = archivedCaps.find(c => c.id === id)
+    setArchivedCaps(x => x.filter(c => c.id !== id))
+    if (cap) setCaps(x => [...x, { ...cap, archived_at: null }])
+    await restoreCapability(id).catch(() => load())
   }
 
   const toggleLogical = async (capId: string, sysId: string) => {
@@ -292,8 +337,18 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="flex gap-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-1">
           <button type="button" onClick={() => setView('board')} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${view === 'board' ? 'bg-[#10B981]/12 text-[#34D399]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>Board</button>
-          <button type="button" onClick={() => setView('matrix')} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${view === 'matrix' ? 'bg-[#10B981]/12 text-[#34D399]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>Matrix</button>
+          <button type="button" onClick={() => setView('pivot')} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${view === 'pivot' ? 'bg-[#10B981]/12 text-[#34D399]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>Pivot</button>
         </div>
+        {view === 'pivot' && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)]">Slice by</span>
+            <div className="flex gap-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-1">
+              {([['workstream', 'Value Stream'], ['logical', 'Logical System'], ['physical', 'Physical System']] as const).map(([k, label]) => (
+                <button key={k} type="button" onClick={() => setSlice(k)} className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${slice === k ? 'bg-[#10B981]/12 text-[#34D399]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>{label}</button>
+              ))}
+            </div>
+          </div>
+        )}
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -359,16 +414,18 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {list.map(c => (
-                  <button
+                  <div
                     key={c.id}
-                    type="button"
                     onClick={() => setSelectedId(c.id)}
-                    className={`text-left bg-[var(--m12-bg-card)] border rounded-xl p-4 transition-all card-glow ${selectedId === c.id ? 'border-[#10B981]/70' : 'border-[var(--m12-border)]/40 hover:border-[var(--m12-border)]'}`}
+                    className={`group text-left bg-[var(--m12-bg-card)] border rounded-xl p-4 transition-all card-glow cursor-pointer ${selectedId === c.id ? 'border-[#10B981]/70' : 'border-[var(--m12-border)]/40 hover:border-[var(--m12-border)]'}`}
                   >
                     <div className="flex items-start gap-2 mb-2">
                       <h4 className="text-sm font-semibold text-[var(--m12-text)] flex-1">{c.name}</h4>
                       {c.domain && <span className="text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] shrink-0">{c.domain}</span>}
                       {c.source === 'ai' && <span className="text-[8px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#34D399] border border-[#10B981]/40 rounded px-1 py-0.5 shrink-0">AI</span>}
+                      <button type="button" onClick={(e) => handleArchiveCap(c.id, e)} title="Archive capability" className="text-[var(--m12-border)] hover:text-[#EAB308] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                      </button>
                     </div>
                     {c.description && <p className="text-[11px] text-[var(--m12-text-muted)] mb-2 line-clamp-2">{c.description}</p>}
                     <div className="flex flex-wrap gap-1">
@@ -387,57 +444,75 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                         )
                       })}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        /* ─── Matrix ─── */
-        <div className="overflow-x-auto border border-[var(--m12-border)]/40 rounded-xl">
-          <table className="border-collapse text-[11px]">
-            <thead>
-              <tr>
-                <th className="sticky left-0 z-10 bg-[var(--m12-bg-card)] text-left font-semibold text-[var(--m12-text-secondary)] px-3 py-2 border-b border-r border-[var(--m12-border)]/40 min-w-[220px]">Capability</th>
-                {catalog.map(s => (
-                  <th key={s.id} className="px-1.5 py-2 border-b border-[var(--m12-border)]/40 align-bottom" title={s.label}>
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="w-2 h-2 rounded-sm" style={{ background: s.color || '#10B981' }} />
-                      <span className="text-[9px] uppercase tracking-wide font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', maxHeight: 90 }}>{s.label}</span>
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {matrixRows.map(c => (
-                <tr key={c.id} className="hover:bg-[var(--m12-bg-card)]/50">
-                  <td className="sticky left-0 z-10 bg-[var(--m12-bg)] px-3 py-1.5 border-b border-r border-[var(--m12-border)]/30">
-                    <button type="button" onClick={() => setSelectedId(c.id)} className="text-left text-[var(--m12-text)] hover:text-[#34D399] transition-colors">
-                      {c.name}
-                      <span className="block text-[9px]" style={{ color: c.workstream_id ? (wsById.get(c.workstream_id)?.color || 'var(--m12-text-muted)') : 'var(--m12-text-muted)' }}>{wsName(c.workstream_id)}</span>
-                    </button>
-                  </td>
-                  {catalog.map(s => {
-                    const on = c.logicalSystemIds.includes(s.id)
-                    const physCount = c.physicalSystemIds.filter(p => physById.get(p)?.parentId === s.id).length
+        /* ─── Pivot (slice into columns by the chosen dimension) ─── */
+        pivotColumns.length === 0 ? (
+          <div className="text-sm text-[var(--m12-text-muted)] py-12 text-center border border-dashed border-[var(--m12-border)]/50 rounded-xl">No capabilities match this slice.</div>
+        ) : (
+          <div className="flex gap-3 overflow-x-auto pb-3">
+            {pivotColumns.map(col => (
+              <div key={col.key} className="w-64 shrink-0 bg-[var(--m12-bg-card)]/30 border border-[var(--m12-border)]/30 rounded-xl flex flex-col">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--m12-border)]/30">
+                  {slice === 'workstream' && col.icon !== undefined && col.key !== UNALIGNED
+                    ? <span style={{ color: col.color }}><WorkstreamIcon icon={col.icon} size={13} /></span>
+                    : <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: col.color }} />}
+                  <span className="text-[12px] font-semibold flex-1 truncate" style={{ color: col.color }}>{col.label}</span>
+                  <span className="text-[10px] text-[var(--m12-text-muted)] shrink-0">{col.caps.length}</span>
+                </div>
+                <div className="p-2 space-y-1.5 overflow-y-auto" style={{ maxHeight: 560 }}>
+                  {col.caps.map(c => {
+                    const ws = c.workstream_id ? wsById.get(c.workstream_id) : null
                     return (
-                      <td key={s.id} className="text-center border-b border-[var(--m12-border)]/20 px-1">
-                        <button type="button" onClick={() => toggleLogical(c.id, s.id)} title={`${c.name} ↔ ${s.label}`} className="w-7 h-7 inline-flex items-center justify-center rounded transition-colors hover:bg-[var(--m12-bg-card)]">
-                          {on ? (
-                            <span className="inline-flex items-center justify-center rounded-full text-white text-[8px] font-bold" style={{ background: s.color || '#10B981', width: physCount > 0 ? 16 : 12, height: physCount > 0 ? 16 : 12 }}>{physCount > 0 ? physCount : ''}</span>
-                          ) : (
-                            <span className="w-2.5 h-2.5 rounded-full border border-[var(--m12-border)]/40" />
+                      <button key={c.id} type="button" onClick={() => setSelectedId(c.id)} className="w-full text-left bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[#10B981]/50 rounded-lg px-2.5 py-2 transition-colors">
+                        <div className="text-xs font-medium text-[var(--m12-text)] mb-1">{c.name}</div>
+                        <div className="flex flex-wrap gap-1">
+                          {slice !== 'workstream' && ws && (
+                            <span className="text-[9px] rounded px-1 py-0.5" style={{ color: ws.color || '#10B981', background: `${ws.color || '#10B981'}18` }}>{ws.name}</span>
                           )}
-                        </button>
-                      </td>
+                          {slice === 'workstream' && c.logicalSystemIds.map(sid => { const s = catById.get(sid); return s ? <span key={sid} className="text-[9px] rounded px-1 py-0.5 border" style={{ color: s.color || '#10B981', borderColor: `${s.color || '#10B981'}55` }}>{s.label}</span> : null })}
+                        </div>
+                      </button>
                     )
                   })}
-                </tr>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ─── Archived ─── */}
+      {archivedCaps.length > 0 && (
+        <div className="mt-8">
+          <button type="button" onClick={() => setShowArchived(!showArchived)} className="flex items-center gap-2 text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors mb-3">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${showArchived ? 'rotate-90' : ''}`}><path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="opacity-60"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            Archived ({archivedCaps.length})
+          </button>
+          {showArchived && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {archivedCaps.map(c => (
+                <div key={c.id} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/20 rounded-xl p-4 opacity-70 hover:opacity-100 transition-opacity">
+                  <div className="flex items-start gap-2 mb-1">
+                    <h4 className="text-sm font-semibold text-[var(--m12-text)] flex-1">{c.name}</h4>
+                    <button type="button" onClick={() => handleRestoreCap(c.id)} title="Restore capability" className="text-[var(--m12-border)] hover:text-[#10B981] transition-colors shrink-0">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 3L4 6l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <button type="button" onClick={() => handleDeleteCap(c.id)} title="Delete permanently" className="text-[var(--m12-border)] hover:text-red-400 transition-colors shrink-0">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5.5 4V3a1 1 0 011-1h1a1 1 0 011 1v1M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                  </div>
+                  <div className="text-[10px]" style={{ color: c.workstream_id ? (wsById.get(c.workstream_id)?.color || 'var(--m12-text-muted)') : 'var(--m12-text-muted)' }}>{wsName(c.workstream_id)}</div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       )}
 

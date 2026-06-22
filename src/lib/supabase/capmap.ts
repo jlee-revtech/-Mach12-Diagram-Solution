@@ -48,8 +48,8 @@ export async function listCapabilitySystems(orgId: string): Promise<CapabilitySy
 }
 
 // Capabilities merged with their logical + physical system ids.
-export async function listCapabilityMap(orgId: string): Promise<CapabilityWithSystems[]> {
-  const [caps, links] = await Promise.all([listCapabilities(orgId), listCapabilitySystems(orgId)])
+export async function listCapabilityMap(orgId: string, includeArchived = false): Promise<CapabilityWithSystems[]> {
+  const [caps, links] = await Promise.all([listCapabilities(orgId, includeArchived), listCapabilitySystems(orgId)])
   const logicalBy = new Map<string, string[]>()
   const physicalBy = new Map<string, string[]>()
   for (const l of links) {
@@ -99,6 +99,14 @@ export async function deleteCapability(id: string): Promise<void> {
     method: 'DELETE',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
   })
+}
+
+export async function archiveCapability(id: string): Promise<void> {
+  return updateCapability(id, { archived_at: new Date().toISOString() })
+}
+
+export async function restoreCapability(id: string): Promise<void> {
+  return updateCapability(id, { archived_at: null })
 }
 
 // ─── Capability ↔ System mappings ──────────────────────
