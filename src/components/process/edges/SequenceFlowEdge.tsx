@@ -5,13 +5,11 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
-  Position,
   useInternalNode,
   type EdgeProps,
-  type InternalNode,
-  type Node,
 } from '@xyflow/react'
 import type { SequenceFlowData } from '@/lib/process/types'
+import { getFloatingParams } from './floating'
 
 // Next.js client-routing fix for url(#id) marker references.
 function markerUrl(markerId: string) {
@@ -32,38 +30,6 @@ export function SequenceFlowMarkerDefs() {
   )
 }
 
-// ─── Floating attachment geometry ──────────────────────
-// The connector attaches to the point on each task's perimeter that faces the
-// other task, and picks the facing side so the path stays orthogonal (elbow).
-// As tasks move, the attachment point slides along the shape automatically.
-interface Rect { x: number; y: number; w: number; h: number; cx: number; cy: number }
-
-function rectOf(node: InternalNode<Node>): Rect {
-  const w = node.measured?.width ?? 120
-  const h = node.measured?.height ?? 64
-  const x = node.internals.positionAbsolute.x
-  const y = node.internals.positionAbsolute.y
-  return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 }
-}
-
-function borderPoint(r: Rect, toward: { x: number; y: number }): { x: number; y: number; pos: Position } {
-  const dx = toward.x - r.cx
-  const dy = toward.y - r.cy
-  if (dx === 0 && dy === 0) return { x: r.cx, y: r.y, pos: Position.Top }
-  const w2 = r.w / 2
-  const h2 = r.h / 2
-  const scale = 1 / Math.max(Math.abs(dx) / w2, Math.abs(dy) / h2)
-  const x = r.cx + dx * scale
-  const y = r.cy + dy * scale
-  const eps = 0.5
-  let pos: Position
-  if (Math.abs(x - r.x) <= eps) pos = Position.Left
-  else if (Math.abs(x - (r.x + r.w)) <= eps) pos = Position.Right
-  else if (Math.abs(y - r.y) <= eps) pos = Position.Top
-  else pos = Position.Bottom
-  return { x, y, pos }
-}
-
 function SequenceFlowEdgeComponent({
   id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected,
 }: EdgeProps & { data?: SequenceFlowData }) {
@@ -75,12 +41,9 @@ function SequenceFlowEdgeComponent({
   let sx = sourceX, sy = sourceY, tx = targetX, ty = targetY
   let sPos = sourcePosition, tPos = targetPosition
   if (sourceNode && targetNode) {
-    const sr = rectOf(sourceNode)
-    const tr = rectOf(targetNode)
-    const sp = borderPoint(sr, { x: tr.cx, y: tr.cy })
-    const tp = borderPoint(tr, { x: sr.cx, y: sr.cy })
-    sx = sp.x; sy = sp.y; sPos = sp.pos
-    tx = tp.x; ty = tp.y; tPos = tp.pos
+    const p = getFloatingParams(sourceNode, targetNode)
+    sx = p.sx; sy = p.sy; sPos = p.sPos
+    tx = p.tx; ty = p.ty; tPos = p.tPos
   }
 
   const [path, labelX, labelY] = getSmoothStepPath({

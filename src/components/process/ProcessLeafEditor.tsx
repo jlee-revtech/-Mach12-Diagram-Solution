@@ -32,6 +32,8 @@ import ProcessElementNode from './nodes/ProcessElementNode'
 import LaneNode from './nodes/LaneNode'
 import SequenceFlowEdge, { SequenceFlowMarkerDefs } from './edges/SequenceFlowEdge'
 import ProcessPalette from './ProcessPalette'
+import CrossingMarkers from './CrossingMarkers'
+import { autoLayoutProcess } from '@/lib/process/autoLayout'
 
 const LANE_H = 150
 const LANE_W = 2400
@@ -40,7 +42,14 @@ const LANE_COLORS = ['#0EA5E9', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#63
 const nodeTypes = { processElement: ProcessElementNode, processLane: LaneNode }
 const edgeTypes = { sequenceFlow: SequenceFlowEdge }
 
-const LANE_STYLE = `.react-flow__node-processLane { pointer-events: none !important; } .react-flow__node-processLane [data-lane-gutter] { pointer-events: auto !important; }`
+const LANE_STYLE = `
+.react-flow__node-processLane { pointer-events: none !important; }
+.react-flow__node-processLane [data-lane-gutter] { pointer-events: auto !important; }
+/* Full-node connection drop target: inert until a connection is in progress,
+   then active so an arrow can be dropped onto any portion of a task. */
+.pm-cover { pointer-events: none !important; }
+.pm-flow.pm-connecting .pm-cover { pointer-events: all !important; }
+`
 
 const paletteLabel = (t: BpmnElementType) => BPMN_PALETTE.find(p => p.type === t)?.label || 'Task'
 
@@ -99,8 +108,19 @@ function extractGraph(nodes: Node[], edges: Edge[], viewport?: { x: number; y: n
   return { lanes, nodes: elementNodes, edges: edges as any, viewport }
 }
 
-function laneIndexForY(centerY: number, laneCount: number): number {
-  return Math.max(0, Math.min(laneCount - 1, Math.floor(centerY / LANE_H)))
+// Resolve which lane band a y-coordinate falls in, using the lanes' ACTUAL
+// positions/heights (they can vary after auto-layout), not a fixed band size.
+function laneBareIdForY(laneNodes: Node[], centerY: number): string | undefined {
+  const sorted = [...laneNodes].sort((a, b) => a.position.y - b.position.y)
+  for (const ln of sorted) {
+    const top = ln.position.y
+    const h = (ln.height ?? (ln.style?.height as number) ?? LANE_H)
+    if (centerY >= top && centerY < top + h) return ln.id.replace(/^lane-/, '')
+  }
+  // above first / below last → clamp to nearest
+  if (sorted.length && centerY < sorted[0].position.y) return sorted[0].id.replace(/^lane-/, '')
+  const last = sorted[sorted.length - 1]
+  return last ? last.id.replace(/^lane-/, '') : undefined
 }
 
 // ─── Editor inner (inside provider) ────────────────────
@@ -115,11 +135,12 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
     [logicalSystems]
   )
 
-  const { screenToFlowPosition, getViewport } = useReactFlow()
+  const { screenToFlowPosition, getViewport, fitView } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [selection, setSelection] = useState<{ type: 'node' | 'edge' | 'lane'; id: string } | null>(null)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
+  const [connecting, setConnecting] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
@@ -240,15 +261,26 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
     reconnectOkRef.current = true
   }, [readOnly, setEdges])
 
+  // Connection in progress → enable the full-node drop target so an arrow can
+  // be dropped onto any portion of a task (matches the data-architecture editor).
+  const onConnectStart = useCallback(() => setConnecting(true), [])
+  const onConnectEnd = useCallback(() => setConnecting(false), [])
+
+  // Clean, swimlane-aware auto-layout.
+  const handleAutoLayout = useCallback(() => {
+    if (readOnly) return
+    setNodes(nds => autoLayoutProcess(nds, graphRef.current.edges))
+    setTimeout(() => fitView({ padding: 0.18, duration: 450 }), 60)
+  }, [readOnly, setNodes, fitView])
+
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     if (readOnly) return
     const type = e.dataTransfer.getData('application/bpmn-element') as BpmnElementType
     if (!type) return
     const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
-    const lanes = nodes.filter(n => n.type === 'processLane').sort((a, b) => a.position.y - b.position.y)
-    const laneIdx = laneIndexForY(pos.y, lanes.length)
-    const laneId = lanes[laneIdx]?.id.replace(/^lane-/, '')
+    const laneNodes = nodes.filter(n => n.type === 'processLane')
+    const laneId = laneBareIdForY(laneNodes, pos.y)
     setNodes(nds => nds.concat({
       id: uuid(),
       type: 'processElement',
@@ -263,12 +295,14 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
     e.dataTransfer.dropEffect = 'move'
   }, [])
 
-  // Reassign laneId when an element is dropped into a different band
+  // Reassign laneId when an element is dropped into a different band (using the
+  // lanes' real positions/heights, which vary after auto-layout).
   const onNodeDragStop = useCallback((_: unknown, dragged: Node) => {
     if (dragged.type !== 'processElement') return
-    const lanes = nodes.filter(n => n.type === 'processLane').sort((a, b) => a.position.y - b.position.y)
+    const laneNodes = nodes.filter(n => n.type === 'processLane')
     const centerY = dragged.position.y + (dragged.height ?? 64) / 2
-    const laneId = lanes[laneIndexForY(centerY, lanes.length)]?.id.replace(/^lane-/, '')
+    const laneId = laneBareIdForY(laneNodes, centerY)
+    if (!laneId) return
     setNodes(nds => nds.map(n => n.id === dragged.id ? { ...n, data: { ...n.data, laneId } } : n))
   }, [nodes, setNodes])
 
@@ -371,13 +405,26 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
     <div className="flex h-full min-h-0">
       {!readOnly && <ProcessPalette onAddLane={addLane} />}
 
-      <div className="flex-1 relative min-w-0">
+      <div className={`flex-1 relative min-w-0 pm-flow${connecting ? ' pm-connecting' : ''}`}>
         <style dangerouslySetInnerHTML={{ __html: LANE_STYLE }} />
         <SequenceFlowMarkerDefs />
 
         {/* Top-right controls */}
         {!readOnly && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+            <button
+              onClick={handleAutoLayout}
+              title="Auto Layout — tidy the flow into clean swimlane columns"
+              className="flex items-center gap-1 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] rounded-md px-2 py-1 text-[10px] text-[var(--m12-text-secondary)] transition-colors"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="2" width="4" height="3" rx="0.6" stroke="currentColor" strokeWidth="1.1" />
+                <rect x="9" y="2" width="4" height="3" rx="0.6" stroke="currentColor" strokeWidth="1.1" />
+                <rect x="5" y="9" width="4" height="3" rx="0.6" stroke="currentColor" strokeWidth="1.1" />
+                <path d="M3 5v2.5h4V9M11 5v2.5H7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+              </svg>
+              Auto Layout
+            </button>
             <button
               onClick={() => setAiOpen(true)}
               title="Draft this flow from a text description"
@@ -454,6 +501,8 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
           onReconnect={onReconnect}
           onReconnectStart={onReconnectStart}
           onReconnectEnd={onReconnectEnd}
@@ -480,6 +529,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
           style={{ backgroundColor: 'var(--m12-bg)' }}
         >
           <Background variant={BackgroundVariant.Dots} gap={24} size={1} style={{ color: 'var(--m12-canvas-dot)' } as any} />
+          <CrossingMarkers />
           <Controls showInteractive={false} />
           <MiniMap
             nodeStrokeColor="var(--m12-minimap-stroke)"

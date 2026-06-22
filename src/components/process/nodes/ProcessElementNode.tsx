@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState, useCallback, useEffect } from 'react'
+import { memo, useState, useCallback, useEffect, type CSSProperties } from 'react'
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
 import type { ProcessElementData, BpmnElementType } from '@/lib/process/types'
 
@@ -14,9 +14,20 @@ import type { ProcessElementData, BpmnElementType } from '@/lib/process/types'
 const handleClass =
   '!border-2 !rounded-full !w-3.5 !h-3.5 !bg-[var(--m12-handle-bg)] !border-[#0EA5E9] hover:!bg-[#0EA5E9] hover:!w-4 hover:!h-4 transition-all duration-150 opacity-0 group-hover:opacity-100'
 
+// Full-node target handle: while a connection is in progress (the editor adds
+// `.pm-connecting` to the canvas wrapper), this becomes active so an arrow can
+// be dropped onto ANY portion of the block. Otherwise pointer-events are off so
+// it never blocks node dragging or the side handles.
+const coverHandleStyle: CSSProperties = {
+  position: 'absolute', inset: 0, width: '100%', height: '100%',
+  transform: 'none', borderRadius: 9, background: 'transparent',
+  border: 'none', minWidth: 0, minHeight: 0, zIndex: 1,
+}
+
 function FourSideHandles() {
   return (
     <>
+      <Handle type="target" position={Position.Top} id="cover" className="pm-cover" style={coverHandleStyle} />
       <Handle type="source" position={Position.Top} id="t" className={handleClass} />
       <Handle type="source" position={Position.Right} id="r" className={handleClass} />
       <Handle type="source" position={Position.Bottom} id="b" className={handleClass} />
