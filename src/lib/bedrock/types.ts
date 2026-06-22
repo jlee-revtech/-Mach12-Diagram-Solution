@@ -45,6 +45,7 @@ export const DEFAULT_PHYSICAL_SYSTEMS: Record<SystemType, { name: string; vendor
     { name: 'SAP ECC', vendor: 'SAP' },
     { name: 'Oracle E-Business Suite', vendor: 'Oracle' },
     { name: 'Deltek Costpoint', vendor: 'Deltek' },
+    { name: 'Dassian', vendor: 'Dassian' },
   ],
   crm: [
     { name: 'Salesforce', vendor: 'Salesforce' },
@@ -90,6 +91,7 @@ export const DEFAULT_PHYSICAL_SYSTEMS: Record<SystemType, { name: string; vendor
     { name: 'Rockwell FactoryTalk', vendor: 'Rockwell Automation' },
   ],
   clm: [
+    { name: 'Dassian', vendor: 'Dassian' },
     { name: 'Icertis', vendor: 'Icertis' },
     { name: 'SAP CLM', vendor: 'SAP' },
     { name: 'Conga CLM', vendor: 'Conga' },

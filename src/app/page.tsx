@@ -9,6 +9,7 @@ import { listProcessModels, createProcessModel, archiveProcessModel, restoreProc
 import { importBpmnFile, importHierarchyFile } from '@/lib/process/import'
 import { generateBedrockIntegrationDiagram } from '@/lib/bedrock/generate'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
+import CapabilityMapWorkspace from '@/components/capmap/CapabilityMapWorkspace'
 import type { DiagramRow } from '@/lib/supabase/types'
 import type { CapabilityMapRow } from '@/lib/sipoc/types'
 import type { ProcessModelRow } from '@/lib/process/types'
@@ -20,7 +21,7 @@ export default function Dashboard() {
   const [processModels, setProcessModels] = useState<ProcessModelRow[]>([])
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
   const [showArchived, setShowArchived] = useState(false)
-  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process'>('process')
+  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process' | 'capmap'>('process')
   const router = useRouter()
   const { user, profile, organization, organizations, loading, signOut, switchOrg } = useAuth()
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
@@ -392,6 +393,22 @@ export default function Dashboard() {
               <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
             </svg>
             Data Architecture ({activeDiagrams.length + activeMaps.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('capmap')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
+              activeTab === 'capmap'
+                ? 'bg-[#10B981]/10 text-[#10B981] shadow-sm'
+                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              <rect x="8" y="1.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              <rect x="1.5" y="8" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M10.25 8v4.5M8 10.25h4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            Capability Map
           </button>
         </div>
 
@@ -792,6 +809,9 @@ export default function Dashboard() {
               )}
             </>
           )
+        ) : activeTab === 'capmap' ? (
+          /* ─── Capability Map Tab ───────────────────────── */
+          <CapabilityMapWorkspace orgId={organization.id} userId={user.id} />
         ) : (
           /* ─── Process Studio Tab ───────────────────────── */
           activeProcesses.length === 0 && archivedProcesses.length === 0 ? (

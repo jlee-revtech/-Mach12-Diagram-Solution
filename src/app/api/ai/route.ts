@@ -107,6 +107,8 @@ export async function POST(req: NextRequest) {
       return handleProcessPlaybook(context)
     } else if (action === 'bedrock-integrations') {
       return handleBedrockIntegrations(context)
+    } else if (action === 'capability-map-draft') {
+      return handleCapabilityMapDraft(prompt, context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -1538,5 +1540,74 @@ Guidelines:
     return NextResponse.json(JSON.parse(cleaned))
   } catch {
     return NextResponse.json({ error: 'Failed to parse bedrock integrations', raw: text }, { status: 500 })
+  }
+}
+
+// ─── Capability Map draft ──────────────────────────────
+const CAPABILITY_MAP_SYSTEM_PROMPT = `You are an expert enterprise & business architect specializing in Aerospace & Defense and Government Contracting. You build business/application capability maps and map each capability to the enterprise systems that realize it.
+
+You understand:
+- Business capability modeling: concise capability names (noun phrases like "Demand Planning", "Contract Cost Management", "Earned Value Management", "Talent Acquisition"), grouped into domains (Finance, Supply Chain, Engineering, Manufacturing, Program Management, Human Capital, Quality, Sales & Contracts, Compliance, IT).
+- A&D/GovCon enterprise systems and which capabilities they realize (ERP=SAP S/4HANA, PLM=Teamcenter/Windchill, IMS=Primavera P6, HCM=SuccessFactors/Workday/Costpoint, CLM=Dassian/Icertis, MES=SAP DM/Opcenter, FP&A=SAC/Anaplan, etc.).
+
+You map each capability to the LOGICAL bedrock system categories that typically realize it, using ONLY the systemType slugs provided in the catalog.`
+
+async function handleCapabilityMapDraft(prompt: string, context?: {
+  catalog?: { systemType: string; label: string; physicals?: string[] }[]
+  existing?: string[]
+  focusDomain?: string
+}) {
+  const catalog = context?.catalog || []
+  if (catalog.length === 0) {
+    return NextResponse.json({ error: 'Missing bedrock catalog' }, { status: 400 })
+  }
+  const catalogLines = catalog
+    .map(c => `- ${c.systemType} = ${c.label}${c.physicals?.length ? ` (${c.physicals.join(', ')})` : ''}`)
+    .join('\n')
+  const existingNote = context?.existing?.length
+    ? `\n\nAlready present (DO NOT duplicate these):\n${context.existing.map(n => `- ${n}`).join('\n')}`
+    : ''
+  const focusNote = context?.focusDomain ? `\nFocus on the "${context.focusDomain}" domain.` : ''
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    system: CAPABILITY_MAP_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Draft a business/application capability map for this organization and map each capability to the logical bedrock systems that realize it.
+
+${prompt ? `Organization context / request: ${prompt}` : 'Assume a typical Aerospace & Defense / Government Contracting manufacturer.'}${focusNote}
+
+BEDROCK SYSTEM CATALOG (use ONLY these systemType slugs):
+${catalogLines}${existingNote}
+
+Return ONLY valid JSON in this exact shape:
+{
+  "capabilities": [
+    {
+      "name": "Capability name (concise noun phrase)",
+      "domain": "Domain grouping (e.g. Finance, Supply Chain, Engineering, Program Management, Human Capital, Quality, Sales & Contracts, Compliance)",
+      "description": "One-line description of the capability",
+      "systems": ["systemType slugs from the catalog that realize this capability"]
+    }
+  ]
+}
+
+Guidelines:
+- Produce a thorough, well-rounded capability map: roughly 25-45 capabilities spanning the major domains relevant to the organization.
+- Each capability should map to 1-3 logical systemType slugs (the systems that typically realize it). Use ONLY slugs present in the catalog.
+- Be A&D/GovCon-grade and concrete. Group sensibly by domain. Order by domain.
+- Do NOT duplicate anything listed as already present.
+- No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    return NextResponse.json(JSON.parse(cleaned))
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse capability map draft', raw: text }, { status: 500 })
   }
 }
