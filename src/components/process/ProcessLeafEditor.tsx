@@ -517,6 +517,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
           connectionMode={ConnectionMode.Loose}
           connectionRadius={40}
           connectionLineStyle={{ stroke: '#0EA5E9', strokeWidth: 2, strokeDasharray: '6 3' }}
+          deleteKeyCode={readOnly ? null : ['Delete', 'Backspace']}
           fitView
           minZoom={0.2}
           maxZoom={2.5}

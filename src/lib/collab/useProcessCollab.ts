@@ -31,6 +31,10 @@ export function useProcessCollab(modelId: string | undefined, userId: string | u
   const wsUrl = process.env.NEXT_PUBLIC_WS_URL
 
   useEffect(() => {
+    // Presence is opt-in: only connect when a collaboration WS server is
+    // explicitly enabled. Otherwise a missing/down server floods the console
+    // with reconnect errors (the data-architecture editor disables collab too).
+    if (process.env.NEXT_PUBLIC_ENABLE_COLLAB !== 'true') return
     if (!modelId || !userId || !wsUrl) return
 
     const doc = new Y.Doc()

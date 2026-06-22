@@ -6,6 +6,7 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath,
   useInternalNode,
+  useReactFlow,
   type EdgeProps,
 } from '@xyflow/react'
 import type { SequenceFlowData } from '@/lib/process/types'
@@ -35,6 +36,7 @@ function SequenceFlowEdgeComponent({
 }: EdgeProps & { data?: SequenceFlowData }) {
   const sourceNode = useInternalNode(source)
   const targetNode = useInternalNode(target)
+  const { deleteElements } = useReactFlow()
 
   // Floating params when both nodes are available; otherwise fall back to the
   // handle-anchored coordinates React Flow provides (e.g. while connecting).
@@ -69,6 +71,26 @@ function SequenceFlowEdgeComponent({
           strokeDasharray: isDefault ? '6 3' : undefined,
         }}
       />
+      {/* Delete control on a selected connector */}
+      {selected && (
+        <EdgeLabelRenderer>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); deleteElements({ edges: [{ id }] }) }}
+            title="Delete connector"
+            className="nodrag nopan flex items-center justify-center"
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%,-50%) translate(${labelX}px,${labelY - 14}px)`,
+              width: 18, height: 18, borderRadius: '50%',
+              background: 'var(--m12-bg-card)', border: '1.5px solid #EF4444', color: '#EF4444',
+              fontSize: 12, lineHeight: 1, cursor: 'pointer', pointerEvents: 'all', zIndex: 10,
+            }}
+          >
+            ×
+          </button>
+        </EdgeLabelRenderer>
+      )}
       {isDefault && (
         <EdgeLabelRenderer>
           <div

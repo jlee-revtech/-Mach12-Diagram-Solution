@@ -18,7 +18,7 @@ export default function Dashboard() {
   const [processModels, setProcessModels] = useState<ProcessModelRow[]>([])
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
   const [showArchived, setShowArchived] = useState(false)
-  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process'>('diagrams')
+  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process'>('process')
   const router = useRouter()
   const { user, profile, organization, organizations, loading, signOut, switchOrg } = useAuth()
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
@@ -309,6 +309,22 @@ export default function Dashboard() {
         {/* Tab switcher */}
         <div className="flex gap-1 mb-6 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-1 w-fit">
           <button
+            onClick={() => setActiveTab('process')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
+              activeTab === 'process'
+                ? 'bg-[#0EA5E9]/10 text-[#0EA5E9] shadow-sm'
+                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="1" y="2.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
+              <rect x="9" y="2.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
+              <rect x="5" y="8.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M5 4h2.5a1 1 0 011 1v3M9 4H6.5a1 1 0 00-1 1v3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+            </svg>
+            Process Studio ({activeProcesses.length})
+          </button>
+          <button
             onClick={() => setActiveTab('diagrams')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
               activeTab === 'diagrams'
@@ -338,22 +354,6 @@ export default function Dashboard() {
               <path d="M8.5 5L10 7l-1.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             SIPOC Maps ({activeMaps.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('process')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              activeTab === 'process'
-                ? 'bg-[#0EA5E9]/10 text-[#0EA5E9] shadow-sm'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect x="1" y="2.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="9" y="2.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="5" y="8.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
-              <path d="M5 4h2.5a1 1 0 011 1v3M9 4H6.5a1 1 0 00-1 1v3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-            </svg>
-            Process Studio ({activeProcesses.length})
           </button>
         </div>
 
