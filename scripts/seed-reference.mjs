@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const NS = '6f5a1c00-1b2c-4d3e-9f80-mach12reflib'.replace(/[^0-9a-f-]/g, '0')
-const LIB = { code: 'mach12-ad-core', title: 'Mach12 A&D Core Process Reference', version: '1.1.0', source: 'curated' }
+const LIB = { code: 'mach12-ad-core', title: 'Mach12 A&D Core Process Reference', version: '1.2.0', source: 'curated' }
 const libId = uuidv5(LIB.code, NS)
 const id = (path) => uuidv5(path, NS)
 
@@ -40,6 +40,7 @@ function flow(laneDefs, steps, explicitEdges) {
       label: s.label,
       elementType: s.type || 'task',
       laneId: s.lane,
+      ...(s.desc ? { description: s.desc } : {}),
       ...(s.role ? { responsibleRole: s.role } : {}),
       ...(s.tcode ? { tcode: s.tcode } : {}),
       ...(s.fiori ? { fioriApp: s.fiori } : {}),
@@ -92,6 +93,208 @@ const GRAPH_NETPAYROLL = flow(
     { id: 'e', type: 'endEvent', label: 'Payroll posted', lane: 'l3' },
   ],
   [['s', 'a1'], ['a1', 'a2'], ['a2', 'g'], ['g', 'a3', 'conditional', 'Approved'], ['a3', 'a4'], ['a4', 'e'], ['g', 'a2', 'conditional', 'Rework']],
+)
+
+// ─── Direct-procurement stream graphs (S/4HANA + Ariba) ──
+// Generalized from real A&D direct-procurement functional specs. Per-node
+// `desc` is tagged with the owning system to preserve the source legend:
+//   "S/4HANA ·"  "Ariba ·"  "Customization ·"  "Outside S/4 / Ariba ·"
+// All client identifiers (org names, people, custom tool/system names) removed.
+
+const GRAPH_SOURCING_REQUEST = flow(
+  [
+    { id: 'l1', label: 'Requestor' },
+    { id: 'l2', label: 'Sourcing Web App' },
+    { id: 'l3', label: 'Procurement System (SAP S/4HANA)' },
+    { id: 'l4', label: 'Manager / Buyer' },
+    { id: 'l5', label: 'SAP Ariba (Guided Buying)' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'Sourcing need identified', lane: 'l1' },
+    { id: 'a1', type: 'userTask', label: 'Enter WBS Element', lane: 'l2', role: 'Requestor', desc: 'Customization · Sourcing web app, refreshed daily with the WBS extract from S/4.' },
+    { id: 'a2', type: 'userTask', label: 'Submit Request (Next)', lane: 'l2', role: 'Requestor', desc: 'Customization · Web app posts the request to S/4.' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'Direct or Indirect WBS?', lane: 'l3', desc: 'S/4HANA · System derives Direct vs Indirect from the WBS.' },
+    { id: 'a3', type: 'userTask', label: 'Open Guided Buying', lane: 'l5', role: 'Requestor', desc: 'Ariba · Indirect spend routed to Guided Buying via SSO.' },
+    { id: 'e1', type: 'endEvent', label: 'Indirect handled in Guided Buying', lane: 'l5' },
+    { id: 'g2', type: 'exclusiveGateway', label: 'PR or Sourcing Request?', lane: 'l3', desc: 'S/4HANA · For Direct spend the requestor chooses a PR or an SR.' },
+    { id: 'a4', type: 'userTask', label: 'Create Direct PR', lane: 'l3', role: 'Requestor', desc: 'Customization · SSO to the S/4 Create PR app with the Direct PR document type and the WBS in account assignment.' },
+    { id: 'e2', type: 'endEvent', label: 'Hand off to Direct Procurement', lane: 'l3' },
+    { id: 'a5', type: 'userTask', label: 'Create Sourcing Request', lane: 'l1', role: 'Requestor', desc: 'Customization · SSO to the S/4 Create PR app with the Sourcing Request document type.' },
+    { id: 'a6', type: 'userTask', label: 'Enter SR Detail & Attachments', lane: 'l1', role: 'Requestor', desc: 'S/4HANA · Add the data needed to create the SR, including attachments.' },
+    { id: 'a7', type: 'serviceTask', label: 'Save Sourcing Request', lane: 'l3', desc: 'S/4HANA · SR saved against the WBS.' },
+    { id: 'g3', type: 'exclusiveGateway', label: 'Supplier exists?', lane: 'l4', role: 'Buyer' },
+    { id: 'a8', type: 'userTask', label: 'Onboard Supplier', lane: 'l4', role: 'Buyer', desc: 'Outside S/4 / Ariba · Supplier onboarding for a new source.' },
+    { id: 'a9', type: 'userTask', label: 'Update Contract', lane: 'l4', role: 'Buyer', desc: 'Ariba · Edit the supplier contract for an existing source.' },
+    { id: 'a10', type: 'userTask', label: 'Run Sourcing Event / RFQ (optional)', lane: 'l4', role: 'Buyer', desc: 'Ariba · Optional sourcing event when an RFQ is required.' },
+    { id: 'g4', type: 'exclusiveGateway', label: 'SR approved?', lane: 'l4', role: 'Buyer', desc: 'S/4HANA · Manager verifies the buyer code, then buyer and requestor iterate until both agree and the buyer gives final approval.' },
+    { id: 'a11', type: 'manualTask', label: 'Mark SR Closed', lane: 'l1', role: 'Requestor', desc: 'S/4HANA · If the SR will not produce a Direct PR, close it so the auto-convert job skips it.' },
+    { id: 'e3', type: 'endEvent', label: 'SR closed', lane: 'l1' },
+    { id: 'a12', type: 'serviceTask', label: 'Auto-Convert SR to Direct PR', lane: 'l3', desc: 'Customization · Scheduled job converts an approved SR into a Direct PR.' },
+    { id: 'e4', type: 'endEvent', label: 'Direct PR created', lane: 'l3' },
+  ],
+  [
+    ['s', 'a1'], ['a1', 'a2'], ['a2', 'g1'],
+    ['g1', 'a3', 'conditional', 'Indirect'], ['a3', 'e1'],
+    ['g1', 'g2', 'conditional', 'Direct'],
+    ['g2', 'a4', 'conditional', 'PR'], ['a4', 'e2'],
+    ['g2', 'a5', 'conditional', 'Sourcing Request'],
+    ['a5', 'a6'], ['a6', 'a7'], ['a7', 'g3'],
+    ['g3', 'a8', 'conditional', 'No - new supplier'], ['g3', 'a9', 'conditional', 'Yes - existing'],
+    ['a8', 'a10'], ['a9', 'a10'], ['a10', 'g4'],
+    ['g4', 'a12', 'conditional', 'Approved'], ['a12', 'e4'],
+    ['g4', 'a11', 'conditional', 'Rejected'], ['a11', 'e3'],
+  ],
+)
+
+const GRAPH_PR_RELEASE = flow(
+  [
+    { id: 'l1', label: 'Requestor' },
+    { id: 'l2', label: 'PR Release Workflow' },
+    { id: 'l3', label: 'Conditional Approvers' },
+    { id: 'l4', label: 'Supply Chain' },
+    { id: 'l5', label: 'Procurement System (SAP S/4HANA)' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'PR released into workflow', lane: 'l1' },
+    { id: 'a1', type: 'userTask', label: 'Add Watcher (optional)', lane: 'l1', role: 'Requestor', desc: 'Customization · The Watcher is notified after each node is approved or rejected.' },
+    { id: 'a2', type: 'serviceTask', label: 'Assemble Approval Workflow', lane: 'l2', desc: 'Customization · Each approver node is added only if its predefined conditions are met; nodes are independent. A split account assignment adds the WBS owner for each WBS.' },
+    { id: 'a3', type: 'userTask', label: 'Approver Business Review', lane: 'l3', role: 'Conditional Approver (WBS Owner, Finance, Program Finance, PM, Business Development, CFO, Contracts, Quality)', desc: 'S/4HANA · Each conditionally-added approver reviews. The Contract Administrator adds a Contract Review and the Quality Manager adds a Quality Review.' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'Approved within DOA?', lane: 'l3', desc: 'S/4HANA · Delegation of Authority is checked; if the approver cannot approve the full amount, the next DOA level is added to the workflow.' },
+    { id: 'a4', type: 'userTask', label: 'Provide Comments', lane: 'l3', role: 'Conditional Approver', desc: 'S/4HANA · Rejection returns the PR for rework.' },
+    { id: 'a5', type: 'serviceTask', label: 'S/4 PR Creation / Edit', lane: 'l5', desc: 'S/4HANA · PR updated per feedback, then re-enters the workflow.' },
+    { id: 'g2', type: 'exclusiveGateway', label: 'More approver nodes?', lane: 'l2', desc: 'Customization · Loop until every conditionally-added node has approved.' },
+    { id: 'a6', type: 'userTask', label: 'Review Purchase Request', lane: 'l4', role: 'Supply Chain Strategic Buyer', desc: 'S/4HANA · Strategic buyer reviews the released PR.' },
+    { id: 'g3', type: 'exclusiveGateway', label: 'Sourcing event needed?', lane: 'l4', desc: 'S/4HANA · Decide whether a sourcing event is required.' },
+    { id: 'e2', type: 'endEvent', label: 'Sourcing event / project planning', lane: 'l4', desc: 'Ariba · Hand off to a sourcing event.' },
+    { id: 'a7', type: 'userTask', label: 'Assign Buyer & Verify Supplier', lane: 'l4', role: 'Supply Chain Manager', desc: 'S/4HANA · Supply Chain Manager assigns the buyer and verifies the supplier.' },
+    { id: 'a8', type: 'serviceTask', label: 'Auto-Convert PR to PO', lane: 'l5', desc: 'Customization · Nightly job: if the PR is released, a contract exists, the total is under the auto-convert threshold, and master data is present, it converts to a PO; otherwise it is converted manually.' },
+    { id: 'e1', type: 'endEvent', label: 'PR released for PO conversion', lane: 'l5' },
+  ],
+  [
+    ['s', 'a1'], ['a1', 'a2'], ['a2', 'a3'], ['a3', 'g1'],
+    ['g1', 'a4', 'conditional', 'Rejected'], ['a4', 'a5'], ['a5', 'a3', 'sequence', 'Resubmit'],
+    ['g1', 'g2', 'conditional', 'Approved'],
+    ['g2', 'a3', 'conditional', 'Yes - next node'],
+    ['g2', 'a6', 'conditional', 'No - all approved'],
+    ['a6', 'g3'],
+    ['g3', 'e2', 'conditional', 'Yes'],
+    ['g3', 'a7', 'conditional', 'No'],
+    ['a7', 'a8'], ['a8', 'e1'],
+  ],
+)
+
+const GRAPH_DIRECT_PROCUREMENT = flow(
+  [
+    { id: 'l1', label: 'Requestor' },
+    { id: 'l2', label: 'Supply Chain Buyer' },
+    { id: 'l3', label: 'Procurement System (SAP S/4HANA)' },
+    { id: 'l4', label: 'SAP Ariba' },
+    { id: 'l5', label: 'Suppliers' },
+    { id: 'l6', label: 'Intake & Integration' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'PR request (ITSM intake)', lane: 'l6', desc: 'Outside S/4 / Ariba · Service-management tool raises the request via API.' },
+    { id: 'a1', type: 'userTask', label: 'Create PR', lane: 'l1', role: 'Requestor', desc: 'S/4HANA · Assign desired vendor (optional), buyer code, WBS element, and the correct price.' },
+    { id: 'a2', type: 'userTask', label: 'Validate Contract Flowdowns', lane: 'l1', role: 'Requestor', desc: 'Customization · Clause rules auto-populate onto the PR from the clause catalogue (Dassian Clause Library).' },
+    { id: 'a3', type: 'userTask', label: 'Add / Edit Attachments', lane: 'l1', role: 'Requestor', desc: 'S/4HANA · Attach supporting documents.' },
+    { id: 'a4', type: 'serviceTask', label: 'Save PR', lane: 'l3', desc: 'S/4HANA.' },
+    { id: 'a5', type: 'userTask', label: 'Release PR', lane: 'l3', role: 'PR Release Workflow', desc: 'Customization · Handled by the PR Release Procedure flow.' },
+    { id: 'a6', type: 'serviceTask', label: 'Sync to eBinder', lane: 'l6', desc: 'Outside S/4 / Ariba · Integration calls S/4 and updates the external eBinder (system of record); a scheduled job keeps it in sync.' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'RFQ needed?', lane: 'l2', desc: 'S/4HANA · Buyer decides whether to run an RFQ or convert directly.' },
+    { id: 'a7', type: 'userTask', label: 'Create RFQs', lane: 'l2', role: 'Supply Chain Buyer', desc: 'S/4HANA · RFQ output can be emailed or saved as PDF to send to suppliers.' },
+    { id: 'a8', type: 'userTask', label: 'Send RFQ to Suppliers', lane: 'l2', role: 'Supply Chain Buyer', desc: 'S/4HANA.' },
+    { id: 'a9', type: 'userTask', label: 'Receive RFQ & Respond', lane: 'l5', role: 'Supplier', desc: 'Outside S/4 / Ariba · Supplier collaboration is manual (calls, email).' },
+    { id: 'a10', type: 'userTask', label: 'Enter & Analyze Responses', lane: 'l2', role: 'Supply Chain Buyer', desc: 'S/4HANA · Responses entered into S/4 and analyzed against business must-haves.' },
+    { id: 'a11', type: 'userTask', label: 'Select Winning RFQ', lane: 'l2', role: 'Supply Chain Buyer', desc: 'S/4HANA.' },
+    { id: 'a12', type: 'userTask', label: 'Convert PR to PO', lane: 'l2', role: 'Supply Chain Buyer', desc: 'S/4HANA · Convert from the released Direct PR (or from the winning RFQ / SR).' },
+    { id: 'g2', type: 'exclusiveGateway', label: 'Price change vs PR?', lane: 'l2', desc: 'S/4HANA · Compare the total PO price to the PR (total, not line item).' },
+    { id: 'g3', type: 'exclusiveGateway', label: 'Difference over threshold?', lane: 'l2', desc: 'S/4HANA · Threshold check (for example, $5K).' },
+    { id: 'a13', type: 'manualTask', label: 'Delete PO / Do Not Save PR', lane: 'l2', role: 'Supply Chain Buyer', desc: 'S/4HANA · Over threshold: cancel and correct the PR before reconverting.' },
+    { id: 'a14', type: 'userTask', label: 'Update PR', lane: 'l1', role: 'Requestor', desc: 'S/4HANA · Correct the PR, then reconvert.' },
+    { id: 'a15', type: 'userTask', label: 'Modify PO / Finish Conversion', lane: 'l2', role: 'Supply Chain Buyer', desc: 'S/4HANA.' },
+    { id: 'a16', type: 'userTask', label: 'Add Clauses & Attachments', lane: 'l2', role: 'Supply Chain Buyer', desc: 'Customization · Clauses stored in the clause library (Dassian).' },
+    { id: 'a17', type: 'serviceTask', label: 'Save PO', lane: 'l3', desc: 'S/4HANA.' },
+    { id: 'a18', type: 'serviceTask', label: 'Release PO & Output', lane: 'l3', desc: 'S/4HANA · PO output issued.' },
+    { id: 'a19', type: 'serviceTask', label: 'Copy PO to Ariba', lane: 'l4', desc: 'Ariba · PO copied to Ariba and made available to suppliers via the Supplier Network (reference and invoicing only).' },
+    { id: 'a20', type: 'serviceTask', label: 'PO Status Update', lane: 'l6', desc: 'Outside S/4 / Ariba · PO status returned to the service-management tool / eBinder.' },
+    { id: 'e1', type: 'endEvent', label: 'PO issued', lane: 'l4', desc: 'Ariba · Supplier invoices against the PO.' },
+  ],
+  [
+    ['s', 'a1'], ['a1', 'a2'], ['a2', 'a3'], ['a3', 'a4'], ['a4', 'a5'], ['a5', 'a6'], ['a6', 'g1'],
+    ['g1', 'a7', 'conditional', 'RFQ'], ['a7', 'a8'], ['a8', 'a9'], ['a9', 'a10'], ['a10', 'a11'], ['a11', 'a12'],
+    ['g1', 'a12', 'conditional', 'Direct convert'],
+    ['a12', 'g2'],
+    ['g2', 'a15', 'conditional', 'No change'],
+    ['g2', 'g3', 'conditional', 'Price changed'],
+    ['g3', 'a15', 'conditional', 'Under threshold'],
+    ['g3', 'a13', 'conditional', 'Over threshold'],
+    ['a13', 'a14'], ['a14', 'a1', 'sequence', 'Reconvert after correction'],
+    ['a15', 'a16'], ['a16', 'a17'], ['a17', 'a18'], ['a18', 'a19'], ['a19', 'a20'], ['a20', 'e1'],
+  ],
+)
+
+const GRAPH_SUPPLIER_CONTRACT = flow(
+  [
+    { id: 'l1', label: 'Buyer / Manager' },
+    { id: 'l2', label: 'Supplier' },
+    { id: 'l3', label: 'Contract System (SAP S/4HANA / Dassian)' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'Contract need', lane: 'l1', desc: 'S/4HANA · Triggered by a sourcing request or a direct PR.' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'Amend existing contract?', lane: 'l1', role: 'Buyer / Manager' },
+    { id: 'a1', type: 'userTask', label: 'Amend Supplier Contract', lane: 'l1', role: 'Buyer / Manager', desc: 'S/4HANA · Driven by an SR or Direct PR. If the contract was updated due to a Direct PR, close that Direct PR.' },
+    { id: 'a2', type: 'userTask', label: 'Create Contract Draft', lane: 'l1', role: 'Buyer / Manager', desc: 'S/4HANA · Driven by an SR or Direct PR. If the contract was created due to a Direct PR, close that Direct PR.' },
+    { id: 'a3', type: 'userTask', label: 'Negotiate & Approve Contract', lane: 'l1', role: 'Buyer / Manager', desc: 'Outside S/4 / Ariba · Negotiation happens outside the system (calls, email).' },
+    { id: 'a4', type: 'userTask', label: 'Execute Supplier Contract', lane: 'l1', role: 'Buyer / Manager', desc: 'S/4HANA.' },
+    { id: 'a5', type: 'userTask', label: 'Digital Signoff', lane: 'l2', role: 'Supplier', desc: 'Outside S/4 / Ariba · Supplier signs; e-signature is a nice-to-have, not required.' },
+    { id: 'a6', type: 'userTask', label: 'Finalize & Publish Contract', lane: 'l1', role: 'Buyer / Manager', desc: 'S/4HANA.' },
+    { id: 'a7', type: 'serviceTask', label: 'Release Contract', lane: 'l3', desc: 'S/4HANA · Simple one-step release on contracts.' },
+    { id: 'e2', type: 'endEvent', label: 'Perform Direct Procurement', lane: 'l1', desc: 'S/4HANA · Released contract enables direct procurement against it.' },
+    { id: 'a8', type: 'userTask', label: 'Closeout Supplier Contract', lane: 'l1', role: 'Buyer / Manager', desc: 'S/4HANA.' },
+    { id: 'e1', type: 'endEvent', label: 'Contract closed', lane: 'l3' },
+  ],
+  [
+    ['s', 'g1'],
+    ['g1', 'a1', 'conditional', 'Yes - amend'], ['a1', 'a3'],
+    ['g1', 'a2', 'conditional', 'No - new'], ['a2', 'a3'],
+    ['a3', 'a4'], ['a4', 'a5'], ['a5', 'a6'], ['a6', 'a7'],
+    ['a7', 'e2', 'sequence', 'Enables'],
+    ['a7', 'a8'], ['a8', 'e1'],
+  ],
+)
+
+const GRAPH_INVOICE_PROCESSING = flow(
+  [
+    { id: 'l1', label: 'AP Function' },
+    { id: 'l2', label: 'Buyer' },
+    { id: 'l3', label: 'SAP Ariba' },
+    { id: 'l4', label: 'Procurement System (SAP S/4HANA)' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'Supplier invoice received', lane: 'l3', desc: 'Ariba · Invoice arrives against the PO on the Supplier Network.' },
+    { id: 'a1', type: 'serviceTask', label: 'Invoice Match & Evaluation', lane: 'l3', desc: 'Ariba · Automated match against the PO and goods receipt.' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'Match result?', lane: 'l1', role: 'AP Function' },
+    { id: 'a2', type: 'manualTask', label: 'Manual Reconciliation', lane: 'l1', role: 'AP Function', desc: 'Ariba · Needs review; any PO change must be made in S/4.' },
+    { id: 'a3', type: 'userTask', label: 'Edit PO in S/4', lane: 'l2', role: 'Buyer', desc: 'S/4HANA · Exception processing: buyer edits the PO.' },
+    { id: 'a4', type: 'serviceTask', label: 'Wait for Changes to Sync to Ariba', lane: 'l2', role: 'Buyer', desc: 'Ariba · Updated PO flows back to Ariba; reconciliation resumes.' },
+    { id: 'g2', type: 'exclusiveGateway', label: 'Reconciliation outcome?', lane: 'l1', role: 'AP Function' },
+    { id: 'a5', type: 'serviceTask', label: 'Send Invoice for Payment', lane: 'l1', role: 'AP Function', desc: 'S/4HANA · Accepted invoice released to payment.' },
+    { id: 'a6', type: 'manualTask', label: 'Reject Invoice', lane: 'l1', role: 'AP Function', desc: 'Ariba · Invoice rejected back to the supplier.' },
+    { id: 'e1', type: 'endEvent', label: 'Invoice paid', lane: 'l4', desc: 'S/4HANA.' },
+    { id: 'e2', type: 'endEvent', label: 'Invoice rejected', lane: 'l3' },
+  ],
+  [
+    ['s', 'a1'], ['a1', 'g1'],
+    ['g1', 'a5', 'conditional', 'Matched'],
+    ['g1', 'a2', 'conditional', 'Needs review'],
+    ['g1', 'a6', 'conditional', 'Invalid'],
+    ['a2', 'a3', 'conditional', 'PO correction needed'],
+    ['a3', 'a4'], ['a4', 'a2', 'sequence', 'Resume reconciliation'],
+    ['a2', 'g2', 'conditional', 'Reconciled'],
+    ['g2', 'a5', 'conditional', 'Accepted'],
+    ['g2', 'a6', 'conditional', 'Rejected'],
+    ['a5', 'e1'], ['a6', 'e2'],
+  ],
 )
 
 // ─── The catalog ───────────────────────────────────────
@@ -186,6 +389,13 @@ const SCENARIOS = [
         { name: 'Issue Purchase Order', description: 'Convert PR to PO with terms and clauses.' },
         { name: 'Perform 3-Way Match', description: 'Match PO, goods receipt, and invoice.' },
         { name: 'Process Supplier Payment', description: 'Approve and pay supplier invoices.' },
+      ]},
+      { name: 'Direct Procurement & Sourcing', processes: [
+        { name: 'Sourcing Request & Early Engagement', description: 'WBS-driven intake that routes indirect spend to Guided Buying and direct spend to a PR or a Sourcing Request, then auto-converts an approved SR into a Direct PR.', graph: GRAPH_SOURCING_REQUEST, overlays: [acc('Guided Buying SSO Intake', 'guided-buying-intake')] },
+        { name: 'PR Release Procedure', description: 'Conditional, DOA-driven PR release workflow with independent approver nodes, comment/edit loop, supply-chain buyer assignment, and nightly PR-to-PO auto-conversion.', graph: GRAPH_PR_RELEASE, overlays: [ctrl('DCAA', 'DOA', 'Delegation of authority', 'Approvals enforced against the DOA matrix; escalate to the next level until the full amount is covered.'), ctrl('FAR', '52.244-2', 'Consent / purchasing controls', 'Purchase approvals support a CPSR-adequate purchasing system.')] },
+        { name: 'Direct Procurement Execution', description: 'End-to-end direct buy: PR with clause flowdowns, optional RFQ and supplier collaboration, PR-to-PO conversion with a price-change threshold gate, clause/attachment handling, and PO copy to Ariba.', graph: GRAPH_DIRECT_PROCUREMENT, overlays: [ctrl('DFARS', '252.244-7001', 'CPSR-adequate purchasing', 'Direct-procurement controls support purchasing-system adequacy for CPSR.'), ctrl('FAR', '52.244-2', 'Contract flowdowns', 'Mandatory FAR/DFARS clauses flow down to the PR/PO via the clause library.'), acc('Ariba Supplier Network', 'ariba-supplier-network')] },
+        { name: 'Supplier Contract Management', description: 'Supplier contract lifecycle: draft or amend, negotiate, execute with digital signoff, finalize and publish, one-step release that enables direct procurement, and closeout.', graph: GRAPH_SUPPLIER_CONTRACT, overlays: [ctrl('FAR', '52.244-2', 'Clause flowdowns', 'Required FAR/DFARS clauses flow down via the contract clause library.'), acc('Dassian Clause Library', 'dassian-clauses')] },
+        { name: 'Invoice Processing & Exception Handling', description: 'Automated PO/GR/invoice match with manual reconciliation, S/4 PO-edit exception loop that syncs back to Ariba, and accept/reject to payment.', graph: GRAPH_INVOICE_PROCESSING, overlays: [ctrl('FAR', '52.232-25', 'Prompt payment', 'Valid invoices paid within prompt-payment terms.'), kpi('Touchless match rate', '>= 80%')] },
       ]},
     ],
   },
