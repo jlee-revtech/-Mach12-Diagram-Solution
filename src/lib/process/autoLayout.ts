@@ -51,19 +51,50 @@ export function autoLayoutProcess(nodes: Node[], edges: Edge[]): Node[] {
     return idx ?? 0
   }
 
-  // ── Adjacency (element → element) ──
+  // ── Adjacency (element → element), with back-edges removed ──
+  // Rework loops (e.g. a "Rejected"/"Rework" gateway branch pointing back to an
+  // earlier task) are cycles. Longest-path layering on a cyclic graph inflates
+  // the column count and blows the flow across the canvas. So we first drop
+  // back-edges (edges to an ancestor on the DFS stack) and layer the resulting
+  // DAG; the back-edges still render, they just don't drive the layout.
   const ids = new Set(elements.map(n => n.id))
+  const rawOut = new Map<string, string[]>()
+  elements.forEach(n => rawOut.set(n.id, []))
+  for (const e of edges) {
+    if (ids.has(e.source) && ids.has(e.target) && e.source !== e.target) {
+      rawOut.get(e.source)!.push(e.target)
+    }
+  }
+  const STATE = new Map<string, 0 | 1 | 2>() // 0 unseen, 1 on-stack, 2 done
+  const backEdges = new Set<string>()
+  const dfs = (root: string) => {
+    const stack: { id: string; i: number }[] = [{ id: root, i: 0 }]
+    STATE.set(root, 1)
+    while (stack.length) {
+      const top = stack[stack.length - 1]
+      const kids = rawOut.get(top.id) || []
+      if (top.i < kids.length) {
+        const v = kids[top.i++]
+        const st = STATE.get(v) ?? 0
+        if (st === 1) backEdges.add(`${top.id}->${v}`)        // edge to ancestor → cycle
+        else if (st === 0) { STATE.set(v, 1); stack.push({ id: v, i: 0 }) }
+      } else { STATE.set(top.id, 2); stack.pop() }
+    }
+  }
+  for (const n of elements) if ((STATE.get(n.id) ?? 0) === 0) dfs(n.id)
+
   const outE = new Map<string, string[]>()
   const inE = new Map<string, string[]>()
   elements.forEach(n => { outE.set(n.id, []); inE.set(n.id, []) })
-  for (const e of edges) {
-    if (ids.has(e.source) && ids.has(e.target) && e.source !== e.target) {
-      outE.get(e.source)!.push(e.target)
-      inE.get(e.target)!.push(e.source)
+  for (const [s, tgts] of rawOut) {
+    for (const t of tgts) {
+      if (backEdges.has(`${s}->${t}`)) continue
+      outE.get(s)!.push(t)
+      inE.get(t)!.push(s)
     }
   }
 
-  // ── Longest-path layering (columns), cycle-safe ──
+  // ── Longest-path layering (columns) on the DAG ──
   const layer = new Map<string, number>()
   const queue: string[] = []
   for (const n of elements) if (inE.get(n.id)!.length === 0) { layer.set(n.id, 0); queue.push(n.id) }

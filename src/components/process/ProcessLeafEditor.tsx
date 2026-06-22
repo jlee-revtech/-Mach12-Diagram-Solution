@@ -17,6 +17,8 @@ import {
   type Node,
   type Edge,
   type Connection,
+  type NodeChange,
+  type EdgeChange,
   type OnSelectionChangeParams,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -162,6 +164,62 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const graphRef = useRef<{ nodes: Node[]; edges: Edge[] }>({ nodes: [], edges: [] })
   graphRef.current = { nodes, edges }
 
+  // ─── Undo history (up to 20 actions) ──────────────────
+  const UNDO_LIMIT = 20
+  const undoStackRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([])
+  const [undoDepth, setUndoDepth] = useState(0)
+  const lastSnapRef = useRef(0)
+  const cloneGraph = (g: { nodes: Node[]; edges: Edge[] }) => ({
+    nodes: g.nodes.map(n => ({ ...n, position: { ...n.position }, data: { ...(n.data as object) }, style: n.style ? { ...n.style } : undefined })),
+    edges: g.edges.map(e => ({ ...e, data: e.data ? { ...e.data } : undefined })),
+  })
+  // Snapshot the current graph before a mutating action. Rapid multi-change
+  // actions (e.g. deleting a node + its edges) are coalesced into one step.
+  const takeSnapshot = useCallback(() => {
+    if (readOnly) return
+    const now = Date.now()
+    if (now - lastSnapRef.current < 60) return
+    lastSnapRef.current = now
+    const stack = undoStackRef.current
+    stack.push(cloneGraph(graphRef.current))
+    if (stack.length > UNDO_LIMIT) stack.shift()
+    setUndoDepth(stack.length)
+  }, [readOnly])
+  const undo = useCallback(() => {
+    const stack = undoStackRef.current
+    const snap = stack.pop()
+    if (!snap) return
+    setNodes(snap.nodes)
+    setEdges(snap.edges)
+    setUndoDepth(stack.length)
+  }, [setNodes, setEdges])
+
+  // Snapshot before removals (keyboard delete, the edge × button, deleteElements).
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    if (changes.some(c => c.type === 'remove')) takeSnapshot()
+    onNodesChange(changes)
+  }, [onNodesChange, takeSnapshot])
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    if (changes.some(c => c.type === 'remove')) takeSnapshot()
+    onEdgesChange(changes)
+  }, [onEdgesChange, takeSnapshot])
+  const onNodeDragStart = useCallback(() => takeSnapshot(), [takeSnapshot])
+
+  // Ctrl/Cmd+Z → undo (ignored while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (readOnly) return
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+        const t = e.target as HTMLElement | null
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
+        e.preventDefault()
+        undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, readOnly])
+
   // Load the leaf graph once per node. Strip any stored handle bindings so
   // connectors render purely as floating edges (attach to the perimeter),
   // regardless of which handle id an older connection recorded.
@@ -244,8 +302,9 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   // ─── Interactions ─────────────────────────────────────
   const onConnect = useCallback((c: Connection) => {
     if (readOnly) return
+    takeSnapshot()
     setEdges(eds => addEdge({ ...c, type: 'sequenceFlow', data: { kind: 'sequence' as SequenceFlowKind } }, eds))
-  }, [readOnly, setEdges])
+  }, [readOnly, setEdges, takeSnapshot])
 
   // Reconnect (drag an arrow endpoint onto another task). Dropping on empty
   // canvas removes the connector. Reconnecting preserves the flow's data.
@@ -254,12 +313,13 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
     if (readOnly) return
     reconnectOkRef.current = true
+    takeSnapshot()
     setEdges(eds => reconnectEdge(oldEdge, newConnection, eds))
-  }, [readOnly, setEdges])
+  }, [readOnly, setEdges, takeSnapshot])
   const onReconnectEnd = useCallback((_: unknown, edge: Edge) => {
-    if (!reconnectOkRef.current && !readOnly) setEdges(eds => eds.filter(e => e.id !== edge.id))
+    if (!reconnectOkRef.current && !readOnly) { takeSnapshot(); setEdges(eds => eds.filter(e => e.id !== edge.id)) }
     reconnectOkRef.current = true
-  }, [readOnly, setEdges])
+  }, [readOnly, setEdges, takeSnapshot])
 
   // Connection in progress → enable the full-node drop target so an arrow can
   // be dropped onto any portion of a task (matches the data-architecture editor).
@@ -269,9 +329,10 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   // Clean, swimlane-aware auto-layout.
   const handleAutoLayout = useCallback(() => {
     if (readOnly) return
+    takeSnapshot()
     setNodes(nds => autoLayoutProcess(nds, graphRef.current.edges))
     setTimeout(() => fitView({ padding: 0.18, duration: 450 }), 60)
-  }, [readOnly, setNodes, fitView])
+  }, [readOnly, setNodes, fitView, takeSnapshot])
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -281,6 +342,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
     const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const laneNodes = nodes.filter(n => n.type === 'processLane')
     const laneId = laneBareIdForY(laneNodes, pos.y)
+    takeSnapshot()
     setNodes(nds => nds.concat({
       id: uuid(),
       type: 'processElement',
@@ -288,7 +350,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
       data: { label: paletteLabel(type), elementType: type, laneId } as ProcessElementData,
       selected: true,
     }))
-  }, [readOnly, screenToFlowPosition, nodes, setNodes])
+  }, [readOnly, screenToFlowPosition, nodes, setNodes, takeSnapshot])
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -322,8 +384,9 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
     const lanes = nodes.filter(n => n.type === 'processLane')
     const order = lanes.length
     const id = uuid()
+    takeSnapshot()
     setNodes(nds => nds.concat(laneToNode({ id, label: `Lane ${order + 1}`, order }, null)))
-  }, [readOnly, nodes, setNodes])
+  }, [readOnly, nodes, setNodes, takeSnapshot])
 
   // ─── AI: draft BPMN flow from text ────────────────────
   const loadAiGraph = useCallback((data: {
@@ -358,9 +421,10 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
         type: 'sequenceFlow',
         data: { kind: (e.kind || 'sequence') as SequenceFlowKind, ...(e.label ? { label: e.label } : {}) },
       }))
+    takeSnapshot()
     setNodes([...laneNodes, ...elementNodes])
     setEdges(aiEdges)
-  }, [setNodes, setEdges])
+  }, [setNodes, setEdges, takeSnapshot])
 
   const handleAiDraft = useCallback(async () => {
     if (!aiPrompt.trim() || aiBusy) return
@@ -393,10 +457,11 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
   }, [setEdges])
   const deleteSelected = useCallback(() => {
     if (!selection || readOnly) return
+    takeSnapshot()
     if (selection.type === 'edge') setEdges(eds => eds.filter(e => e.id !== selection.id))
     else setNodes(nds => nds.filter(n => n.id !== selection.id))
     setSelection(null)
-  }, [selection, readOnly, setEdges, setNodes])
+  }, [selection, readOnly, setEdges, setNodes, takeSnapshot])
 
   const selectedNode = selection && selection.type !== 'edge' ? nodes.find(n => n.id === selection.id) : null
   const selectedEdge = selection?.type === 'edge' ? edges.find(e => e.id === selection.id) : null
@@ -412,6 +477,17 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
         {/* Top-right controls */}
         {!readOnly && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+            <button
+              onClick={undo}
+              disabled={undoDepth === 0}
+              title={`Undo${undoDepth ? ` (${undoDepth})` : ''}  ·  Ctrl+Z`}
+              className="flex items-center gap-1 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] disabled:opacity-40 disabled:cursor-not-allowed rounded-md px-2 py-1 text-[10px] text-[var(--m12-text-secondary)] transition-colors"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <path d="M5 3.5L2.5 6 5 8.5M2.5 6h6.5a2.5 2.5 0 010 5H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Undo
+            </button>
             <button
               onClick={handleAutoLayout}
               title="Auto Layout — tidy the flow into clean swimlane columns"
@@ -498,8 +574,8 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           onConnectStart={onConnectStart}
           onConnectEnd={onConnectEnd}
@@ -509,6 +585,7 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
           reconnectRadius={22}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onNodeDragStart={onNodeDragStart}
           onNodeDragStop={onNodeDragStop}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
