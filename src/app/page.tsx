@@ -306,8 +306,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex gap-1 mb-6 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-1 w-fit">
+        {/* Tab switcher — top level: Process Studio, Data Architecture (which contains SIPOC) */}
+        <div className="flex gap-1 mb-3 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-1 w-fit">
           <button
             onClick={() => setActiveTab('process')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
@@ -325,9 +325,9 @@ export default function Dashboard() {
             Process Studio ({activeProcesses.length})
           </button>
           <button
-            onClick={() => setActiveTab('diagrams')}
+            onClick={() => setActiveTab(t => (t === 'sipoc' ? 'sipoc' : 'diagrams'))}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              activeTab === 'diagrams'
+              activeTab === 'diagrams' || activeTab === 'sipoc'
                 ? 'bg-[#2563EB]/10 text-[#2563EB] shadow-sm'
                 : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
             }`}
@@ -338,24 +338,47 @@ export default function Dashboard() {
               <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
               <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
             </svg>
-            Data Architecture ({activeDiagrams.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('sipoc')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              activeTab === 'sipoc'
-                ? 'bg-[#8B5CF6]/10 text-[#8B5CF6] shadow-sm'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1 7h3M10 7h3M5.5 7h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M4 5l1.5 2L4 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M8.5 5L10 7l-1.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            SIPOC Maps ({activeMaps.length})
+            Data Architecture ({activeDiagrams.length + activeMaps.length})
           </button>
         </div>
+
+        {/* Sub-tabs under Data Architecture: Diagrams + SIPOC Maps */}
+        {(activeTab === 'diagrams' || activeTab === 'sipoc') && (
+          <div className="flex items-center gap-1 mb-6 ml-1">
+            <button
+              onClick={() => setActiveTab('diagrams')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                activeTab === 'diagrams'
+                  ? 'bg-[#2563EB]/10 text-[#2563EB]'
+                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+              }`}
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+                <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+                <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+                <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              </svg>
+              Diagrams ({activeDiagrams.length})
+            </button>
+            <span className="text-[var(--m12-border)]/60">/</span>
+            <button
+              onClick={() => setActiveTab('sipoc')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                activeTab === 'sipoc'
+                  ? 'bg-[#8B5CF6]/10 text-[#8B5CF6]'
+                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+              }`}
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M1 7h3M10 7h3M5.5 7h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <path d="M4 5l1.5 2L4 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M8.5 5L10 7l-1.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              SIPOC Maps ({activeMaps.length})
+            </button>
+          </div>
+        )}
 
         {/* Process: reference-library + import entry points */}
         {activeTab === 'process' && (
