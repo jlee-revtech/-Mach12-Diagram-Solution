@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@/lib/diagram/store'
 import {
   buildTechSpecContext,
@@ -32,6 +33,9 @@ export default function TechSpecDialog({ open, onClose }: TechSpecDialogProps) {
   const nodes = useDiagramStore((s) => s.nodes)
   const edges = useDiagramStore((s) => s.edges)
   const groups = useDiagramStore((s) => s.groups)
+
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   const [step, setStep] = useState<Step>('scope')
   const [scopeKey, setScopeKey] = useState<string>('__diagram__')
@@ -134,9 +138,9 @@ export default function TechSpecDialog({ open, onClose }: TechSpecDialogProps) {
     } catch { /* clipboard blocked — ignore */ }
   }, [markdown])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0" style={{ zIndex: 9999 }} onClick={close}>
       <div className="absolute inset-0 bg-black/60" />
       <div className="absolute inset-0 overflow-y-auto flex items-start justify-center py-8 px-4">
@@ -334,7 +338,8 @@ export default function TechSpecDialog({ open, onClose }: TechSpecDialogProps) {
         .tech-spec-doc ul, .tech-spec-doc ol { margin: 5px 0 5px 2px; padding-left: 20px; }
         .tech-spec-doc a { color: #2563EB; }
       `}</style>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
