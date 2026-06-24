@@ -111,6 +111,10 @@ export async function POST(req: NextRequest) {
       return handleCapabilityMapDraft(prompt, context)
     } else if (action === 'capability-map-align') {
       return handleCapabilityMapAlign(context)
+    } else if (action === 'tech-spec-questions') {
+      return handleTechSpecQuestions(context)
+    } else if (action === 'tech-spec-generate') {
+      return handleTechSpecGenerate(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -1676,4 +1680,227 @@ Guidelines:
   } catch {
     return NextResponse.json({ error: 'Failed to parse capability alignment', raw: text }, { status: 500 })
   }
+}
+
+// ─── Integration Technical Spec ────────────────────────
+// Two-step, deterministic (temperature 0) generation of a data-integration
+// functional + technical specification for a data diagram or a single group.
+//   1. tech-spec-questions: examine the systems/integrations in scope and return
+//      targeted clarifying questions (tooling, versions, security, NFRs, …).
+//   2. tech-spec-generate: with the user's answers, produce the full spec doc.
+
+interface TechSpecDataObject {
+  name: string
+  elementType?: string
+  description?: string
+  sapObject?: string
+  processContext?: string
+  attributes?: string[]
+  technicalProperties?: { key: string; value: string }[]
+}
+interface TechSpecSystem {
+  label: string
+  systemType: string
+  physicalSystem?: string
+  description?: string
+  modules?: { name: string; description?: string }[]
+  inScope: boolean
+}
+interface TechSpecIntegration {
+  id: string
+  sourceLabel: string
+  sourceType: string
+  sourcePhysical?: string
+  targetLabel: string
+  targetType: string
+  targetPhysical?: string
+  direction: string
+  processContext?: string
+  boundary: boolean
+  dataObjects: TechSpecDataObject[]
+}
+interface TechSpecSpec {
+  diagramTitle: string
+  scopeLabel: string
+  processContext?: string
+  description?: string
+  notes?: string
+  systems: TechSpecSystem[]
+  integrations: TechSpecIntegration[]
+}
+interface TechSpecAnswer {
+  questionId: string
+  question: string
+  category: string
+  answer: string
+}
+
+const TECH_SPEC_SYSTEM_PROMPT = `You are a principal enterprise integration architect specializing in Aerospace & Defense and Government Contracting on SAP-centric landscapes. You author development-grade data-integration FUNCTIONAL and TECHNICAL specifications that two audiences rely on:
+  1. Technical architects and developers who will build the integrations.
+  2. Functional architects who must confirm the business and functional outcomes are met.
+
+You understand: the BPML hierarchy (Scenario L1 → Process Group L2 → Process L3); enterprise system categories and their physical platforms (ERP=SAP S/4HANA, PLM=Teamcenter/Windchill, IMS=Primavera P6, HCM=SuccessFactors/Costpoint, MES=SAP DM/Opcenter, CLM=Dassian/Icertis, FP&A=SAC/Anaplan, etc.); real A&D integration patterns and their trade-offs (IDoc/ALE, OData V2/V4, CDS views, RFC/BAPI, SOAP, REST API, SAP Integration Suite/CPI iFlow, Event Mesh/AEM, file/SFTP, DB link, replication via SLT/SDI); A&D data objects (Material Master, BOM, Routing, Purchase Order, Sales Order/Contract with CLIN/SLIN/ACRN, Production Order, Cost Estimate, Forward Rates, Timesheet/CATS, Journal Entry, CDRL, DD250/Delivery, Earned Value BCWS/BCWP/ACWP, Project/WBS, Funding); and the governance regime (ITAR/EAR, CUI, CMMC/NIST 800-171, DCMA/DCAA) that constrains how data may move.
+
+You are precise, grounded only in the systems and data objects provided, and you never invent systems that are not in the supplied scope. When a needed detail was not provided, you state an explicit assumption and flag it as an open item rather than guessing silently.`
+
+function renderTechSpecContext(spec: TechSpecSpec): string {
+  const sys = spec.systems
+    .map((s) => {
+      const mods = s.modules?.length ? ` | modules: ${s.modules.map((m) => m.name).join(', ')}` : ''
+      return `- ${s.label} [${s.systemType}]${s.physicalSystem ? ` = ${s.physicalSystem}` : ''}${s.inScope ? '' : ' (EXTERNAL to this scope)'}${s.description ? ` — ${s.description}` : ''}${mods}`
+    })
+    .join('\n')
+
+  const ints = spec.integrations
+    .map((it) => {
+      const objs = it.dataObjects
+        .map((o) => {
+          const attrs = o.attributes?.length ? ` {fields: ${o.attributes.join(', ')}}` : ''
+          const tech = o.technicalProperties?.length ? ` {tech: ${o.technicalProperties.map((p) => `${p.key}=${p.value}`).join('; ')}}` : ''
+          return `    • ${o.name} [${o.elementType || 'data_object'}]${o.sapObject ? ` (SAP: ${o.sapObject})` : ''}${o.description ? ` — ${o.description}` : ''}${attrs}${tech}`
+        })
+        .join('\n')
+      const dir = it.direction === 'bidirectional' ? '<->' : '->'
+      return `${it.id}: ${it.sourceLabel} [${it.sourceType}] ${dir} ${it.targetLabel} [${it.targetType}]${it.boundary ? ' (BOUNDARY/cross-scope)' : ''}${it.processContext ? ` | process: ${it.processContext}` : ''}\n${objs || '    • (no data objects catalogued)'}`
+    })
+    .join('\n\n')
+
+  return `DIAGRAM: "${spec.diagramTitle}"
+SPEC SCOPE: ${spec.scopeLabel}${spec.processContext ? `\nPROCESS CONTEXT: ${spec.processContext}` : ''}${spec.description ? `\nDESCRIPTION: ${spec.description}` : ''}${spec.notes ? `\nAUTHOR NOTES: ${spec.notes}` : ''}
+
+SYSTEMS IN SCOPE:
+${sys || '(none)'}
+
+INTEGRATIONS (source -> target, with data objects):
+${ints || '(none catalogued — infer the likely flows from the systems above and flag them as assumptions)'}`
+}
+
+async function handleTechSpecQuestions(context?: { spec?: TechSpecSpec }) {
+  const spec = context?.spec
+  if (!spec || (!spec.systems?.length && !spec.integrations?.length)) {
+    return NextResponse.json({ error: 'Missing diagram scope for technical spec' }, { status: 400 })
+  }
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 3000,
+    temperature: 0,
+    system: TECH_SPEC_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Before writing the integration specification below, identify the clarifying questions whose answers would MATERIALLY change the technical design. Examine the systems and integrations in play and return ONLY valid JSON.
+
+${renderTechSpecContext(spec)}
+
+Return this exact JSON structure:
+{
+  "questions": [
+    {
+      "id": "kebab-case-id",
+      "category": "Integration Tooling | Software Versions | Connectivity & Environments | Security & Authentication | Data Volume & Performance | Error Handling & Monitoring | Orchestration & Sequencing | Data Governance & Compliance | Deployment & Cutover",
+      "question": "the question, addressed to the architect",
+      "why": "one sentence on why the answer changes the design",
+      "suggestions": ["concrete option 1", "concrete option 2", "..."],
+      "allowMultiple": false
+    }
+  ]
+}
+
+Guidelines:
+- Ask 5 to 9 questions, ordered by impact. Cover at least: the integration middleware/iPaaS in play, relevant software versions/releases, target environments & connectivity, authentication/security, and data volume / latency expectations. Add governance (ITAR/CUI/CMMC) when the data objects warrant it.
+- Do NOT ask anything already answered by the provided context. Make every "suggestions" array concrete and selectable (e.g. middleware: "SAP Integration Suite (CPI)", "SAP PI/PO", "MuleSoft", "Dell Boomi", "Point-to-point / custom"). The user may also answer freeform or mark unknown.
+- No markdown, no prose outside the JSON.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    return NextResponse.json(JSON.parse(cleaned))
+  } catch {
+    return NextResponse.json({ error: 'Failed to parse technical spec questions', raw: text }, { status: 500 })
+  }
+}
+
+async function handleTechSpecGenerate(context?: { spec?: TechSpecSpec; answers?: TechSpecAnswer[] }) {
+  const spec = context?.spec
+  if (!spec || (!spec.systems?.length && !spec.integrations?.length)) {
+    return NextResponse.json({ error: 'Missing diagram scope for technical spec' }, { status: 400 })
+  }
+  const answers = context?.answers || []
+  const answerBlock = answers.length
+    ? answers.map((a) => `- [${a.category}] ${a.question}\n  → ${a.answer?.trim() ? a.answer.trim() : 'Not provided / unknown'}`).join('\n')
+    : '(No clarifying answers were provided — make and clearly flag conservative assumptions for every unknown.)'
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 16000,
+    temperature: 0,
+    system: TECH_SPEC_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Write a thorough, precise data-integration FUNCTIONAL & TECHNICAL SPECIFICATION for the scope below. Output ONLY GitHub-flavored Markdown (no code fences around the whole document, no preamble). Use ## / ### headings and Markdown tables.
+
+${renderTechSpecContext(spec)}
+
+CLARIFYING ANSWERS FROM THE ARCHITECT (authoritative — honor these; for any "Not provided / unknown", state an explicit assumption and add it to the open-items list):
+${answerBlock}
+
+Produce the document with EXACTLY these top-level sections, in order:
+
+# ${spec.diagramTitle} — Integration Technical Specification${spec.scopeLabel && spec.scopeLabel !== 'Entire Diagram' ? ` (${spec.scopeLabel})` : ''}
+
+## 1. Document Control
+A table: Field / Value rows for Title, Scope, Version (1.0), Status (Draft), Date (today), Primary Audiences (Technical Architects & Developers; Functional Architects), Source (Mach12.ai data diagram).
+
+## 2. Executive Summary
+Two short paragraphs. First speaks to functional architects (business/functional outcomes, value streams). Second speaks to technical architects (overall integration approach and key decisions).
+
+## 3. Business & Functional Context
+Business process context and the functional outcomes each integration must deliver; success criteria; the in-scope systems table (System | Type | Physical Platform | Role in this scope).
+
+## 4. Integration Inventory
+One table of every integration: ID | Source | Target | Direction | Trigger | Frequency | Pattern (recommended) | Key Data Objects. Use the INT-### IDs given.
+
+## 5. Detailed Integration Specifications
+One ### sub-section per integration (use its INT-### id and a descriptive name). Each covers: Functional purpose & outcome; Source endpoint & extraction; Target endpoint & posting; Data objects with field/mapping notes (a small table: Source Field | Target Field | Transformation/Notes when fields are known, else describe the object); Direction, Trigger, Frequency; Recommended integration pattern with a one-line justification; Error handling & idempotency; Sequencing/dependencies; Volume & performance; Security/authorization.
+
+## 6. Integration Pattern Options Analysis
+For the principal patterns relevant here (e.g. IDoc/ALE, OData V2/V4, CDS view consumption, RFC/BAPI, SOAP, REST, CPI iFlow, Event Mesh, file/SFTP, SLT/SDI replication), a comparison table: Pattern | Best fit for | Pros | Cons | Recommendation in this landscape. Then a short paragraph recommending the pattern(s) for this scope and why, honoring the chosen middleware.
+
+## 7. Target Integration Architecture
+Middleware/iPaaS, connectivity (Cloud Connector, SFTP, API gateways), environments (DEV/QA/PRD), and the high-level runtime flow. Reference the answers about tooling/versions/connectivity.
+
+## 8. Data Governance, Security & Compliance
+Authentication & authorization, transport security/encryption, data classification and any ITAR/EAR/CUI/CMMC/NIST 800-171 handling implications, auditability and data residency. If not applicable, say so explicitly.
+
+## 9. Non-Functional Requirements
+A table: Category | Requirement | Notes — covering performance/throughput, latency, availability/SLA, monitoring & alerting, logging, retry & idempotency, scalability.
+
+## 10. Development & Delivery Approach
+Recommended build sequence honoring dependencies; environment strategy; testing strategy (unit, SIT, UAT, regression, performance); data migration/cutover considerations; rollback.
+
+## 11. Development Best Practices
+Concrete, A&D/SAP-grade practices: naming conventions, idempotency & reprocessing, error handling & dead-letter, observability/correlation IDs, reusable iFlow/interface design, interface versioning & contracts, secrets management, CI/CD & transport management, documentation.
+
+## 12. Assumptions, Open Questions & Risks
+Bullet lists. Surface EVERY unknown from the clarifying answers as an open question, plus risks (with likelihood/impact) and mitigations.
+
+## Appendix A — Data Object Catalog
+A table of every distinct data object across the integrations: Object | Element Type | SAP Object | Description | Key Fields.
+
+Rules:
+- Be concrete and development-grade; prefer real SAP object names (IDoc message types, BAPIs, CDS views, OData services) where the system is SAP. No filler.
+- Ground everything in the systems and data objects provided; do not introduce systems not listed (except clearly-labelled assumptions).
+- Keep it readable for both audiences: functional architects must be able to confirm outcomes; developers must be able to build from it.
+- Output the Markdown document only.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const markdown = text.replace(/^```(?:markdown|md)?\n?/i, '').replace(/\n?```\s*$/i, '').trim()
+  if (!markdown) {
+    return NextResponse.json({ error: 'Failed to generate technical spec' }, { status: 500 })
+  }
+  return NextResponse.json({ markdown })
 }

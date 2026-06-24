@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useDiagramStore } from '@/lib/diagram/store'
 import { exportPng, exportSvg, exportPdf, exportJson, exportBpmn } from '@/lib/export'
+import TechSpecDialog from './TechSpecDialog'
 
 const EXPORT_OPTIONS = [
   { key: 'png', label: 'PNG Image', desc: 'High-res raster image', icon: '🖼' },
@@ -15,6 +16,7 @@ const EXPORT_OPTIONS = [
 export default function ExportMenu() {
   const [open, setOpen] = useState(false)
   const [exporting, setExporting] = useState<string | null>(null)
+  const [techSpecOpen, setTechSpecOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const meta = useDiagramStore((s) => s.meta)
@@ -76,6 +78,28 @@ export default function ExportMenu() {
       {open && (
         <div className="absolute top-full right-0 mt-2 w-56 bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl py-1.5 z-50">
           <div className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+            Generate
+          </div>
+          <button
+            type="button"
+            onClick={() => { setOpen(false); setTechSpecOpen(true) }}
+            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--m12-border)]/30 transition-colors text-left group"
+          >
+            <span className="text-sm w-5 text-center text-[#06B6D4]">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" className="inline"><path d="M9 1.5H4a1 1 0 00-1 1v11a1 1 0 001 1h8a1 1 0 001-1V5.5L9 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M9 1.5V5.5h4M5.5 8.5h5M5.5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium text-[var(--m12-text-secondary)] group-hover:text-[var(--m12-text)]">
+                Technical Spec
+                <span className="ml-1.5 text-[8px] font-bold text-[#06B6D4] align-middle font-[family-name:var(--font-space-mono)]">AI</span>
+              </div>
+              <div className="text-[10px] text-[#374A5E] group-hover:text-[var(--m12-text-muted)]">
+                Integration functional &amp; technical doc
+              </div>
+            </div>
+          </button>
+          <div className="my-1 mx-3 border-t border-[var(--m12-border)]/40" />
+          <div className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
             Export As
           </div>
           {EXPORT_OPTIONS.map((opt) => (
@@ -103,6 +127,8 @@ export default function ExportMenu() {
           ))}
         </div>
       )}
+
+      <TechSpecDialog open={techSpecOpen} onClose={() => setTechSpecOpen(false)} />
     </div>
   )
 }
