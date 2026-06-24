@@ -3,6 +3,19 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+// Tolerant JSON extraction: strips code fences, then falls back to slicing the
+// outermost {...} so stray prose around the JSON doesn't break parsing.
+function looseParseJson(text: string): unknown | null {
+  const cleaned = text.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim()
+  try { return JSON.parse(cleaned) } catch { /* fall through */ }
+  const first = cleaned.indexOf('{')
+  const last = cleaned.lastIndexOf('}')
+  if (first !== -1 && last > first) {
+    try { return JSON.parse(cleaned.slice(first, last + 1)) } catch { /* fall through */ }
+  }
+  return null
+}
+
 const SYSTEM_PROMPT = `You are an expert data architect specializing in enterprise systems integration for Aerospace & Defense and Government Contracting organizations. You help users create data architecture diagrams.
 
 When generating diagrams, you return structured JSON matching this exact schema:
@@ -1743,16 +1756,26 @@ You understand: the BPML hierarchy (Scenario L1 → Process Group L2 → Process
 
 You are precise, grounded only in the systems and data objects provided, and you never invent systems that are not in the supplied scope. When a needed detail was not provided, you state an explicit assumption and flag it as an open item rather than guessing silently.`
 
-function renderTechSpecContext(spec: TechSpecSpec): string {
+function renderTechSpecContext(spec: TechSpecSpec, opts?: { compact?: boolean }): string {
+  const compact = opts?.compact === true
   const sys = spec.systems
     .map((s) => {
-      const mods = s.modules?.length ? ` | modules: ${s.modules.map((m) => m.name).join(', ')}` : ''
-      return `- ${s.label} [${s.systemType}]${s.physicalSystem ? ` = ${s.physicalSystem}` : ''}${s.inScope ? '' : ' (EXTERNAL to this scope)'}${s.description ? ` — ${s.description}` : ''}${mods}`
+      const mods = !compact && s.modules?.length ? ` | modules: ${s.modules.map((m) => m.name).join(', ')}` : ''
+      const desc = !compact && s.description ? ` — ${s.description}` : ''
+      return `- ${s.label} [${s.systemType}]${s.physicalSystem ? ` = ${s.physicalSystem}` : ''}${s.inScope ? '' : ' (EXTERNAL to this scope)'}${desc}${mods}`
     })
     .join('\n')
 
   const ints = spec.integrations
     .map((it) => {
+      const dir = it.direction === 'bidirectional' ? '<->' : '->'
+      const head = `${it.id}: ${it.sourceLabel} [${it.sourceType}] ${dir} ${it.targetLabel} [${it.targetType}]${it.boundary ? ' (BOUNDARY/cross-scope)' : ''}${it.processContext ? ` | process: ${it.processContext}` : ''}`
+      if (compact) {
+        // Names only — enough to reason about integrations without flooding the
+        // questions call with every field-level attribute.
+        const names = it.dataObjects.map((o) => o.name).filter(Boolean).join(', ')
+        return `${head}\n    objects: ${names || '(none catalogued)'}`
+      }
       const objs = it.dataObjects
         .map((o) => {
           const attrs = o.attributes?.length ? ` {fields: ${o.attributes.join(', ')}}` : ''
@@ -1760,8 +1783,7 @@ function renderTechSpecContext(spec: TechSpecSpec): string {
           return `    • ${o.name} [${o.elementType || 'data_object'}]${o.sapObject ? ` (SAP: ${o.sapObject})` : ''}${o.description ? ` — ${o.description}` : ''}${attrs}${tech}`
         })
         .join('\n')
-      const dir = it.direction === 'bidirectional' ? '<->' : '->'
-      return `${it.id}: ${it.sourceLabel} [${it.sourceType}] ${dir} ${it.targetLabel} [${it.targetType}]${it.boundary ? ' (BOUNDARY/cross-scope)' : ''}${it.processContext ? ` | process: ${it.processContext}` : ''}\n${objs || '    • (no data objects catalogued)'}`
+      return `${head}\n${objs || '    • (no data objects catalogued)'}`
     })
     .join('\n\n')
 
@@ -1783,14 +1805,14 @@ async function handleTechSpecQuestions(context?: { spec?: TechSpecSpec }) {
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 3000,
+    max_tokens: 4096,
     temperature: 0,
     system: TECH_SPEC_SYSTEM_PROMPT,
     messages: [{
       role: 'user',
       content: `Before writing the integration specification below, identify the clarifying questions whose answers would MATERIALLY change the technical design. Examine the systems and integrations in play and return ONLY valid JSON.
 
-${renderTechSpecContext(spec)}
+${renderTechSpecContext(spec, { compact: true })}
 
 Return this exact JSON structure:
 {
@@ -1814,12 +1836,14 @@ Guidelines:
   })
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  try {
-    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    return NextResponse.json(JSON.parse(cleaned))
-  } catch {
-    return NextResponse.json({ error: 'Failed to parse technical spec questions', raw: text }, { status: 500 })
+  const parsed = looseParseJson(text) as { questions?: unknown } | null
+  if (parsed && Array.isArray(parsed.questions)) {
+    return NextResponse.json(parsed)
   }
+  // No usable questions — let the client proceed straight to generation rather
+  // than dead-ending. (An empty set is a valid "nothing to ask" outcome.)
+  console.error('tech-spec-questions: unparseable model output (first 600 chars):', text.slice(0, 600))
+  return NextResponse.json({ questions: [] })
 }
 
 async function handleTechSpecGenerate(context?: { spec?: TechSpecSpec; answers?: TechSpecAnswer[] }) {
