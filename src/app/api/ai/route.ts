@@ -16,6 +16,39 @@ function looseParseJson(text: string): unknown | null {
   return null
 }
 
+// Salvage an array of objects under `key` from possibly-truncated JSON. Walks the
+// array character-by-character collecting complete {...} elements and silently
+// drops a trailing partial one — so an output cut off mid-array still yields
+// every fully-formed item rather than failing outright.
+function salvageObjectArray(text: string, key: string): Record<string, unknown>[] {
+  const cleaned = text.replace(/```json\n?/gi, '').replace(/```\n?/g, '')
+  const keyIdx = cleaned.indexOf(`"${key}"`)
+  if (keyIdx === -1) return []
+  const arrStart = cleaned.indexOf('[', keyIdx)
+  if (arrStart === -1) return []
+  const out: Record<string, unknown>[] = []
+  let depth = 0, inStr = false, esc = false, objStart = -1
+  for (let i = arrStart + 1; i < cleaned.length; i++) {
+    const c = cleaned[i]
+    if (inStr) {
+      if (esc) esc = false
+      else if (c === '\\') esc = true
+      else if (c === '"') inStr = false
+      continue
+    }
+    if (c === '"') { inStr = true; continue }
+    if (c === '{') { if (depth === 0) objStart = i; depth++ }
+    else if (c === '}') {
+      depth--
+      if (depth === 0 && objStart !== -1) {
+        try { out.push(JSON.parse(cleaned.slice(objStart, i + 1))) } catch { /* skip malformed */ }
+        objStart = -1
+      }
+    } else if (c === ']' && depth === 0) break
+  }
+  return out
+}
+
 const SYSTEM_PROMPT = `You are an expert data architect specializing in enterprise systems integration for Aerospace & Defense and Government Contracting organizations. You help users create data architecture diagrams.
 
 When generating diagrams, you return structured JSON matching this exact schema:
@@ -1507,7 +1540,7 @@ async function handleBedrockIntegrations(context?: {
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 8192,
+    max_tokens: 16000,
     temperature: 0,
     system: BEDROCK_SYSTEM_PROMPT,
     messages: [{
@@ -1554,12 +1587,20 @@ Guidelines:
   })
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
-  try {
-    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    return NextResponse.json(JSON.parse(cleaned))
-  } catch {
-    return NextResponse.json({ error: 'Failed to parse bedrock integrations', raw: text }, { status: 500 })
+  const parsed = looseParseJson(text) as { scenario?: string; integrations?: unknown } | null
+  if (parsed && Array.isArray(parsed.integrations)) {
+    return NextResponse.json(parsed)
   }
+  // Strict parse failed (stray prose or output truncated mid-array on a large
+  // model). Salvage every complete integration object so the diagram still gets
+  // built from what came back.
+  const salvaged = salvageObjectArray(text, 'integrations')
+  if (salvaged.length > 0) {
+    console.error(`bedrock-integrations: salvaged ${salvaged.length} integrations from unparseable output`)
+    return NextResponse.json({ scenario: scenario.name, integrations: salvaged })
+  }
+  console.error('bedrock-integrations: unparseable model output (first 600 chars):', text.slice(0, 600))
+  return NextResponse.json({ error: 'Failed to parse bedrock integrations', raw: text }, { status: 500 })
 }
 
 // ─── Capability Map draft ──────────────────────────────
