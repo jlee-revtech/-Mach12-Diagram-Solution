@@ -230,11 +230,144 @@ export async function pushL3ToNewDiagram(
   return diagram.id
 }
 
+// ─── Whole-map (deduplicated, layered) data-architecture build ───
+// Sizing/spacing tuned for the SystemNode (min-w 180, ~72-92px tall) and the wide
+// data-element edge labels that sit between columns. Generous, consistent gaps.
+const MAP_SYSTEM_W = 180
+const MAP_SYSTEM_H = 92
+const MAP_LAYER_GAP = 240 // horizontal gap between layers — room for edge labels
+const MAP_ROW_GAP = 64
+const MAP_BASE_X = 120
+const MAP_BASE_Y = 120
+
 /**
- * Create ONE new diagram seeded from every L3 SIPOC (leaf capability) in a map.
- * Each L3 becomes its own group, stacked vertically so groups never overlap, giving
- * a full data-architecture view of the whole SIPOC in a single canvas.
- * Returns the new diagram's id for navigation.
+ * Build ONE clean data-architecture canvas from every L3 SIPOC (leaf capability)
+ * in a map. Unlike a per-L3 stack, systems are deduplicated to a single node each
+ * and laid out left → right by their role in the flow (sources → feeding → hosts)
+ * via longest-path layering, so the diagram reads as a proper system-integration
+ * lineage with orthogonal (smoothstep) edges and no overlaps.
+ *
+ *   - One SystemNode per distinct logical system (deduped by id).
+ *   - One DataFlowEdge per (source, target) pair, carrying every information
+ *     product that flows between them as DataElements (deduped by name).
+ *   - Columns assigned by longest path from the pure-source systems; each column
+ *     is vertically centered for a balanced, designed look.
+ */
+export function buildSipocSystemDiagram(
+  leaves: HydratedCapability[],
+  systemDataElements: SystemDataElement[] = [],
+): { nodes: SystemNode[]; edges: DataFlowEdge[] } {
+  const sdesById = new Map(systemDataElements.map(s => [s.id, s] as const))
+  const systems = new Map<string, LogicalSystem>()
+  const reg = (s?: LogicalSystem | null) => { if (s) systems.set(s.id, s) }
+
+  const buildDataElement = (ip: InformationProduct): DataElement => {
+    const attributes = (ip.data_element_ids || [])
+      .map(sid => sdesById.get(sid))
+      .filter((s): s is SystemDataElement => !!s)
+      .map(s => ({ id: uuid(), name: s.name, description: s.description }))
+    return {
+      id: uuid(),
+      name: ip.name,
+      elementType: 'data_object',
+      ...(ip.description ? { description: ip.description } : {}),
+      ...(attributes.length > 0 ? { attributes } : {}),
+    }
+  }
+
+  // Coalesce edges per (source → target) system pair across the whole map.
+  type E = { source: string; target: string; els: DataElement[]; ctx: Set<string> }
+  const edgeMap = new Map<string, E>()
+  const addFlow = (src: LogicalSystem, tgt: LogicalSystem, ip: InformationProduct, l3: string) => {
+    if (src.id === tgt.id) return
+    reg(src); reg(tgt)
+    const key = `${src.id}->${tgt.id}`
+    let e = edgeMap.get(key)
+    if (!e) { e = { source: src.id, target: tgt.id, els: [], ctx: new Set() }; edgeMap.set(key, e) }
+    e.ctx.add(l3)
+    if (!e.els.some(d => d.name.trim().toLowerCase() === ip.name.trim().toLowerCase())) e.els.push(buildDataElement(ip))
+  }
+
+  for (const leaf of leaves) {
+    reg(leaf.system)
+    for (const input of leaf.inputs.filter(i => !i.archived_at)) {
+      const ip = input.informationProduct
+      const feeding = input.feedingSystem
+      const host = leaf.system
+      for (const src of input.sourceSystems) {
+        if (feeding) addFlow(src, feeding, ip, leaf.name)
+        else if (host) addFlow(src, host, ip, leaf.name)
+      }
+      if (feeding && host) addFlow(feeding, host, ip, leaf.name)
+    }
+  }
+
+  const sysIds = [...systems.keys()]
+  const edgesArr = [...edgeMap.values()]
+
+  // Longest-path layering (left → right). Iteration-capped so cycles can't hang.
+  const layer = new Map<string, number>(sysIds.map(id => [id, 0]))
+  for (let iter = 0; iter < sysIds.length; iter++) {
+    let changed = false
+    for (const e of edgesArr) {
+      const nl = (layer.get(e.source) ?? 0) + 1
+      if (nl > (layer.get(e.target) ?? 0)) { layer.set(e.target, nl); changed = true }
+    }
+    if (!changed) break
+  }
+
+  // Bucket by layer, order within a layer by system name (stable, deterministic).
+  const byLayer = new Map<number, string[]>()
+  for (const id of sysIds) {
+    const l = layer.get(id) ?? 0
+    if (!byLayer.has(l)) byLayer.set(l, [])
+    byLayer.get(l)!.push(id)
+  }
+  for (const arr of byLayer.values()) arr.sort((a, b) => systems.get(a)!.name.localeCompare(systems.get(b)!.name))
+
+  const layers = [...byLayer.keys()].sort((a, b) => a - b)
+  const colHeight = (n: number) => Math.max(0, n * MAP_SYSTEM_H + (n - 1) * MAP_ROW_GAP)
+  const maxH = Math.max(MAP_SYSTEM_H, ...layers.map(l => colHeight(byLayer.get(l)!.length)))
+
+  const nodes: SystemNode[] = []
+  for (const l of layers) {
+    const col = byLayer.get(l)!
+    const startY = MAP_BASE_Y + (maxH - colHeight(col.length)) / 2
+    col.forEach((id, row) => {
+      const sys = systems.get(id)!
+      nodes.push({
+        id: `system-${id}`,
+        type: 'system',
+        position: { x: MAP_BASE_X + l * (MAP_SYSTEM_W + MAP_LAYER_GAP), y: startY + row * (MAP_SYSTEM_H + MAP_ROW_GAP) },
+        data: { label: sys.name, systemType: sys.system_type ?? 'custom' },
+      })
+    })
+  }
+
+  const edges: DataFlowEdge[] = []
+  for (const key of [...edgeMap.keys()].sort()) {
+    const e = edgeMap.get(key)!
+    const ctx = [...e.ctx].sort()
+    edges.push({
+      id: `edge-${key}`,
+      source: `system-${e.source}`,
+      target: `system-${e.target}`,
+      type: 'dataFlow',
+      data: {
+        label: e.els.length === 1 ? e.els[0].name : `${e.els.length} data objects`,
+        dataElements: e.els,
+        direction: 'forward',
+        ...(ctx.length ? { processContext: ctx.join(', ') } : {}),
+      },
+    })
+  }
+
+  return { nodes, edges }
+}
+
+/**
+ * Create ONE new diagram seeded from a whole SIPOC map (all L3 leaves), laid out as
+ * a clean left → right system-integration lineage. Returns the new diagram's id.
  */
 export async function pushMapToNewDiagram(
   leaves: HydratedCapability[],
@@ -243,25 +376,11 @@ export async function pushMapToNewDiagram(
   mapTitle: string | undefined,
   systemDataElements?: SystemDataElement[],
 ): Promise<string> {
-  const nodes: SystemNode[] = []
-  const edges: DataFlowEdge[] = []
-  const groups: SystemGroupNode[] = []
-
-  const GAP = 60
-  let cursorY = 100
-  for (const h of leaves) {
-    const seed = buildL3GroupCanvasData(h, { baseX: 100, baseY: cursorY, systemDataElements })
-    nodes.push(...seed.nodes)
-    edges.push(...seed.edges)
-    groups.push(...seed.groups)
-    const gh = Number((seed.groups[0]?.style as { height?: number } | undefined)?.height ?? 240)
-    cursorY += gh + GAP
-  }
-
+  const { nodes, edges } = buildSipocSystemDiagram(leaves, systemDataElements ?? [])
   const title = mapTitle ? `${mapTitle} — Data Architecture` : 'SIPOC Data Architecture'
   const diagram = await createDiagram(orgId, userId, title)
   await saveDiagram(diagram.id, userId, {
-    canvas_data: { nodes, edges, groups, artifacts: [] },
+    canvas_data: { nodes, edges, groups: [], artifacts: [] },
   })
   return diagram.id
 }
