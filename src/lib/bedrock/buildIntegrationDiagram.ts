@@ -86,7 +86,10 @@ export function buildIntegrationDiagram(
     return sa - sb
   })
   for (const t of typesSorted) {
-    const wsId = catalogByType.get(t)!.workstream_id || SHARED
+    const sys = catalogByType.get(t)!
+    // Place each system in one band by its PRIMARY value stream (workstream_id),
+    // falling back to the first of workstream_ids for multi-aligned systems.
+    const wsId = sys.workstream_id || sys.workstream_ids?.[0] || SHARED
     const key = wsById.has(wsId) ? wsId : SHARED
     if (!bands.has(key)) bands.set(key, [])
     bands.get(key)!.push(t)

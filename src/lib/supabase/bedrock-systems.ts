@@ -92,13 +92,19 @@ export async function createBedrockSystem(
 
 export async function updateBedrockSystem(
   id: string,
-  updates: Partial<Pick<BedrockSystem, 'label' | 'description' | 'color' | 'sort_order' | 'workstream_id' | 'archived_at'>>
+  updates: Partial<Pick<BedrockSystem, 'label' | 'description' | 'color' | 'sort_order' | 'workstream_id' | 'workstream_ids' | 'archived_at'>>
 ): Promise<void> {
   await fetch(`${URL}/rest/v1/bedrock_systems?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
   })
+}
+
+// Assign the full set of value streams to a logical system. The first id is
+// kept in workstream_id as the primary (used by the banded integration layout).
+export async function setBedrockWorkstreams(id: string, workstreamIds: string[]): Promise<void> {
+  await updateBedrockSystem(id, { workstream_ids: workstreamIds, workstream_id: workstreamIds[0] ?? null })
 }
 
 export async function deleteBedrockSystem(id: string): Promise<void> {

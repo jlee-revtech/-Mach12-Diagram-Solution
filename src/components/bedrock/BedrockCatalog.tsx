@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import {
-  listBedrockCatalog, seedBedrockSystems, createBedrockSystem, updateBedrockSystem, deleteBedrockSystem,
+  listBedrockCatalog, seedBedrockSystems, createBedrockSystem, deleteBedrockSystem, setBedrockWorkstreams,
   createPhysicalSystem, deletePhysicalSystem, setPrimaryPhysicalSystem,
 } from '@/lib/supabase/bedrock-systems'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
-import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
+import WorkstreamMultiPicker from '@/components/workstream/WorkstreamMultiPicker'
 import { SYSTEM_TEMPLATES, type SystemType } from '@/lib/diagram/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import type { Workstream } from '@/lib/workstream/types'
@@ -58,9 +58,9 @@ export default function BedrockCatalog({ orgId, userId }: { orgId: string; userI
     await deleteBedrockSystem(id).catch(() => load())
   }
 
-  const handleSetWorkstream = async (id: string, wsId: string | null) => {
-    setCatalog(x => x.map(s => s.id === id ? { ...s, workstream_id: wsId } : s))
-    await updateBedrockSystem(id, { workstream_id: wsId }).catch(() => load())
+  const handleSetWorkstreams = async (id: string, ids: string[]) => {
+    setCatalog(x => x.map(s => s.id === id ? { ...s, workstream_ids: ids, workstream_id: ids[0] ?? null } : s))
+    await setBedrockWorkstreams(id, ids).catch(() => load())
   }
 
   const handleAddPhysical = async (sysId: string) => {
@@ -117,7 +117,7 @@ export default function BedrockCatalog({ orgId, userId }: { orgId: string; userI
                 <span className="text-sm font-semibold text-[var(--m12-text)]">{s.label}</span>
                 <span className="text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-1.5 py-0.5">{s.system_type}</span>
                 <div className="ml-auto flex items-center gap-2">
-                  <WorkstreamPicker orgId={orgId} value={s.workstream_id} workstreams={workstreams} onChange={(wsId) => handleSetWorkstream(s.id, wsId)} className="w-48" />
+                  <WorkstreamMultiPicker orgId={orgId} value={s.workstream_ids ?? (s.workstream_id ? [s.workstream_id] : [])} workstreams={workstreams} onChange={(ids) => handleSetWorkstreams(s.id, ids)} className="w-56" />
                   <button onClick={() => handleDeleteSystem(s.id)} title="Remove logical system" className="text-[var(--m12-border)] hover:text-red-400">
                     <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5.5 4V3a1 1 0 011-1h1a1 1 0 011 1v1M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </button>

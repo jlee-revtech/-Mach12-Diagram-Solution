@@ -14,7 +14,10 @@ export interface BedrockSystem {
   description: string | null
   color: string | null
   sort_order: number
+  // Primary value stream (first of workstream_ids) — drives the banded layout.
   workstream_id?: string | null
+  // All value streams this logical system is aligned to (036).
+  workstream_ids?: string[] | null
   is_standard: boolean
   archived_at: string | null
   created_at: string
