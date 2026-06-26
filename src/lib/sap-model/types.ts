@@ -110,6 +110,10 @@ export interface SapEnterpriseModel {
   raByCompanyCode: RaByCompanyCode[]
   raProjects: RaProject[]
   assignments: AssignmentRow[]
+  // Drill-down detail: the actual values behind each aggregate count.
+  profitCentersByCompanyCode: Record<string, { prctr: string; name: string }[]>
+  costCentersByCompanyCode: Record<string, { kostl: string; name: string; prctr: string }[]>
+  wbsRa: { posid: string; name: string; bukrs: string; level: string; raKey: string; project: string }[]
 }
 
 // ── Diagram model (org-structure entity graph) ──────────────────────────────
@@ -126,6 +130,27 @@ export type OrgEntityKind =
   | 'business_area'
   | 'wbs_ra'
 
+// Drill-down payload attached to aggregate ("number") nodes.
+export interface DrillItem {
+  code: string
+  label?: string
+  meta?: string
+}
+export interface DrillGroup {
+  name: string
+  caption?: string
+  items: DrillItem[]
+}
+export interface DrillData {
+  kind: OrgEntityKind
+  title: string
+  subtitle?: string
+  count: number
+  columns?: string[]
+  groups?: DrillGroup[]
+  items?: DrillItem[]
+}
+
 export interface OrgNodeData {
   kind: OrgEntityKind
   code: string
@@ -133,5 +158,6 @@ export interface OrgNodeData {
   subtitle?: string
   meta?: string[]
   badge?: string
+  drill?: DrillData
   [key: string]: unknown
 }

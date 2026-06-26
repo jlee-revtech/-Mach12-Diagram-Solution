@@ -1,6 +1,10 @@
 import { MarkerType, type Edge, type Node } from '@xyflow/react'
 import type { OrgNodeData, SapEnterpriseModel } from './types'
 import { ENTITY_META } from './entityMeta'
+import {
+  drillBusinessAreas, drillCompanyCodes, drillCostCenters, drillPlants,
+  drillProfitCenters, drillPurchOrgs, drillSalesOrgs, drillStorageLocations, drillWbs,
+} from './drill'
 
 export type OrgNode = Node<OrgNodeData, 'org'>
 export type OrgGraph = { nodes: OrgNode[]; edges: Edge[] }
@@ -25,22 +29,23 @@ function edge(source: string, target: string, label?: string, dashed = false): E
   }
 }
 
-// ── Estimated node height (for overlap-free rank spacing) ──
+// Estimated node height (for overlap-free rank spacing).
 function estHeight(d: OrgNodeData): number {
   let h = 58
   if (d.subtitle) h += 14
   if (d.meta) h += d.meta.length * 14
-  if (d.badge) h += 4
+  if (d.drill) h += 16
   return h
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCHEMA VIEW — one node per org-structure entity TYPE, real counts, edges
-// labeled by the SAP config object that wires each assignment.
+// labeled by the SAP config object. Profit & cost centers hang off the company
+// code (their company-code alignment via CEPC_BUKRS / CSKS-BUKRS).
 // ─────────────────────────────────────────────────────────────────────────────
 export function buildSchemaGraph(m: SapEnterpriseModel): OrgGraph {
   const totalSloc = m.plants.reduce((n, p) => n + p.storageLocations.length, 0)
-  const wbsTotal = m.raByCompanyCode.reduce((n, r) => n + r.count, 0)
+  const wbsTotal = m.wbsRa.length
 
   const N = (id: string, data: OrgNodeData, x: number, y: number): OrgNode => ({
     id, type: 'org', position: { x, y }, data, width: NODE_W,
@@ -48,35 +53,32 @@ export function buildSchemaGraph(m: SapEnterpriseModel): OrgGraph {
 
   const nodes: OrgNode[] = [
     N('s_ca', { kind: 'controlling_area', code: m.controllingArea.kokrs, title: m.controllingArea.name,
-      subtitle: `${m.controllingArea.currency} · chart ${m.controllingArea.chart}`, badge: '1 area' }, 420, 0),
+      subtitle: `${m.controllingArea.currency} · chart ${m.controllingArea.chart}`, badge: '1 area' }, 745, 0),
 
     N('s_cc', { kind: 'company_code', code: `${m.companyCodes.length}`, title: 'Company Codes',
-      subtitle: 'legal / financial entity', meta: m.companyCodes.map(c => `${c.bukrs} · ${c.currency}`) }, 780, 200),
-    N('s_pc', { kind: 'profit_center', code: `${m.profitCenters.total}`, title: 'Profit Centers',
-      subtitle: 'CO-area scoped', badge: 'CEPC_BUKRS' }, 40, 200),
-    N('s_ks', { kind: 'cost_center', code: `${m.costCenters.total}`, title: 'Cost Centers',
-      subtitle: 'carries CC + profit center', badge: 'CSKS' }, 290, 200),
+      subtitle: 'legal / financial entity', drill: drillCompanyCodes(m) }, 745, 210),
     N('s_ba', { kind: 'business_area', code: m.businessAreas[0]?.gsber ?? '—', title: 'Business Area',
-      subtitle: 'client-wide (cross-company)', badge: m.businessAreas.every(b => !b.used) ? 'configured · unused' : 'in use' }, 540, 200),
+      subtitle: 'client-wide (cross-company)', badge: m.businessAreas.every((b) => !b.used) ? 'unused' : 'in use', drill: drillBusinessAreas(m) }, 120, 210),
 
-    N('s_pl', { kind: 'plant', code: `${m.plants.length}`, title: 'Plants',
-      subtitle: 'logistics / valuation', badge: 'T001K' }, 470, 420),
-    N('s_vk', { kind: 'sales_org', code: `${m.salesOrgs.length}`, title: 'Sales Orgs', badge: 'TVKO' }, 700, 420),
-    N('s_ek', { kind: 'purchasing_org', code: `${m.purchasingOrgs.length}`, title: 'Purchasing Orgs', badge: 'T024E' }, 930, 420),
+    N('s_pl', { kind: 'plant', code: `${m.plants.length}`, title: 'Plants', badge: 'T001K', drill: drillPlants(m) }, 120, 440),
+    N('s_vk', { kind: 'sales_org', code: `${m.salesOrgs.length}`, title: 'Sales Orgs', badge: 'TVKO', drill: drillSalesOrgs(m) }, 370, 440),
+    N('s_ek', { kind: 'purchasing_org', code: `${m.purchasingOrgs.length}`, title: 'Purchasing Orgs', badge: 'T024E', drill: drillPurchOrgs(m) }, 620, 440),
+    N('s_pc', { kind: 'profit_center', code: `${m.profitCenters.total}`, title: 'Profit Centers', badge: 'CEPC_BUKRS', drill: drillProfitCenters(m) }, 870, 440),
+    N('s_ks', { kind: 'cost_center', code: `${m.costCenters.total}`, title: 'Cost Centers', badge: 'CSKS', drill: drillCostCenters(m) }, 1120, 440),
     N('s_wbs', { kind: 'wbs_ra', code: `${wbsTotal}`, title: 'Projects / WBS (RA)',
-      subtitle: `${m.raProjects.length} projects`, badge: 'PRPS-ABGSL' }, 1160, 420),
+      subtitle: `${m.raProjects.length} projects`, badge: 'PRPS-ABGSL', drill: drillWbs(m) }, 1370, 440),
 
-    N('s_sl', { kind: 'storage_location', code: `${totalSloc}`, title: 'Storage Locations', badge: 'T001L' }, 470, 620),
+    N('s_sl', { kind: 'storage_location', code: `${totalSloc}`, title: 'Storage Locations', badge: 'T001L', drill: drillStorageLocations(m) }, 120, 650),
   ]
 
   const edges: Edge[] = [
     edge('s_ca', 's_cc', 'TKA02'),
-    edge('s_ca', 's_pc', 'CEPC'),
-    edge('s_ca', 's_ks', 'CSKS'),
     edge('s_ca', 's_ba', 'TGSB'),
     edge('s_cc', 's_pl', 'T001K'),
     edge('s_cc', 's_vk', 'TVKO'),
     edge('s_cc', 's_ek', 'T024E'),
+    edge('s_cc', 's_pc', 'CEPC_BUKRS'),
+    edge('s_cc', 's_ks', 'CSKS'),
     edge('s_cc', 's_wbs', 'PROJ / PRPS'),
     edge('s_pl', 's_sl', 'T001L'),
     // cross-assignment (dashed = "carries", not a hierarchy edge)
@@ -89,15 +91,15 @@ export function buildSchemaGraph(m: SapEnterpriseModel): OrgGraph {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INSTANCE VIEW — the real A000 tree: controlling area → company codes →
-// plants / storage locations / sales orgs / purchasing orgs / RA-keyed WBS.
+// INSTANCE VIEW — the real A000 tree. Profit & cost centers are nested inside
+// each company code; aggregate nodes carry a drill payload of their values.
 // ─────────────────────────────────────────────────────────────────────────────
 type Tree = { id: string; data: OrgNodeData; children: Tree[] }
 
 export function buildInstanceGraph(m: SapEnterpriseModel): OrgGraph {
-  const salesByCode = new Map(m.salesOrgs.map(s => [s.vkorg, s]))
-  const purchByCode = new Map(m.purchasingOrgs.map(p => [p.ekorg, p]))
-  const raByCc = new Map(m.raByCompanyCode.map(r => [r.bukrs, r]))
+  const salesByCode = new Map(m.salesOrgs.map((s) => [s.vkorg, s]))
+  const purchByCode = new Map(m.purchasingOrgs.map((p) => [p.ekorg, p]))
+  const raByCc = new Map(m.raByCompanyCode.map((r) => [r.bukrs, r]))
 
   const root: Tree = {
     id: 't_ca',
@@ -109,26 +111,17 @@ export function buildInstanceGraph(m: SapEnterpriseModel): OrgGraph {
   for (const cc of m.companyCodes) {
     const ccNode: Tree = {
       id: `t_cc_${cc.bukrs}`,
-      data: { kind: 'company_code', code: cc.bukrs, title: cc.name,
-        subtitle: `${cc.country} · ${cc.currency} · ${cc.chart}`,
-        meta: [`${cc.profitCenterCount} PC · ${cc.costCenterCount} cost ctr`] },
+      data: { kind: 'company_code', code: cc.bukrs, title: cc.name, subtitle: `${cc.country} · ${cc.currency} · ${cc.chart}` },
       children: [],
     }
 
     // plants (with storage-location children)
-    for (const p of m.plants.filter(x => x.bukrs === cc.bukrs)) {
-      const plantNode: Tree = {
-        id: `t_pl_${p.werks}`,
-        data: { kind: 'plant', code: p.werks, title: p.name },
-        children: [],
-      }
+    for (const p of m.plants.filter((x) => x.bukrs === cc.bukrs)) {
+      const plantNode: Tree = { id: `t_pl_${p.werks}`, data: { kind: 'plant', code: p.werks, title: p.name }, children: [] }
       if (p.storageLocations.length) {
-        const shown = p.storageLocations.slice(0, 6)
-        const extra = p.storageLocations.length - shown.length
         plantNode.children.push({
           id: `t_sl_${p.werks}`,
-          data: { kind: 'storage_location', code: `${p.storageLocations.length}`, title: 'Storage locations',
-            meta: [shown.join(', ') + (extra > 0 ? ` +${extra}` : '')] },
+          data: { kind: 'storage_location', code: `${p.storageLocations.length}`, title: 'Storage locations', drill: drillStorageLocations(m, p.werks) },
           children: [],
         })
       }
@@ -138,16 +131,25 @@ export function buildInstanceGraph(m: SapEnterpriseModel): OrgGraph {
     // sales orgs
     for (const code of cc.salesOrgs) {
       const so = salesByCode.get(code)
-      ccNode.children.push({ id: `t_vk_${cc.bukrs}_${code}`,
-        data: { kind: 'sales_org', code, title: so?.name ?? 'Sales org' }, children: [] })
+      ccNode.children.push({ id: `t_vk_${cc.bukrs}_${code}`, data: { kind: 'sales_org', code, title: so?.name ?? 'Sales org' }, children: [] })
     }
 
     // purchasing orgs
     for (const code of cc.purchasingOrgs) {
       const po = purchByCode.get(code)
       ccNode.children.push({ id: `t_ek_${cc.bukrs}_${code}`,
-        data: { kind: 'purchasing_org', code, title: po?.name ?? 'Purch. org',
-          subtitle: po?.plants.length ? `plants ${po.plants.join(', ')}` : undefined }, children: [] })
+        data: { kind: 'purchasing_org', code, title: po?.name ?? 'Purch. org', subtitle: po?.plants.length ? `plants ${po.plants.join(', ')}` : undefined }, children: [] })
+    }
+
+    // profit centers — nested in the company code (CEPC_BUKRS alignment)
+    if (cc.profitCenterCount) {
+      ccNode.children.push({ id: `t_pc_${cc.bukrs}`,
+        data: { kind: 'profit_center', code: `${cc.profitCenterCount}`, title: 'Profit Centers', subtitle: 'CEPC_BUKRS', drill: drillProfitCenters(m, cc.bukrs) }, children: [] })
+    }
+    // cost centers — nested in the company code (CSKS-BUKRS)
+    if (cc.costCenterCount) {
+      ccNode.children.push({ id: `t_ks_${cc.bukrs}`,
+        data: { kind: 'cost_center', code: `${cc.costCenterCount}`, title: 'Cost Centers', subtitle: 'CSKS', drill: drillCostCenters(m, cc.bukrs) }, children: [] })
     }
 
     // RA-keyed WBS rollup for this company code
@@ -157,8 +159,7 @@ export function buildInstanceGraph(m: SapEnterpriseModel): OrgGraph {
       const levels = Object.entries(ra.levels).sort().map(([l, n]) => `${l}:${n}`).join('  ')
       ccNode.children.push({
         id: `t_wbs_${cc.bukrs}`,
-        data: { kind: 'wbs_ra', code: `${ra.count} WBS`, title: 'Projects / WBS (RA)',
-          subtitle: 'PRPS-ABGSL set', meta: [`keys ${keys}`, `levels ${levels}`] },
+        data: { kind: 'wbs_ra', code: `${ra.count} WBS`, title: 'Projects / WBS (RA)', subtitle: 'PRPS-ABGSL set', meta: [`keys ${keys}`, `levels ${levels}`], drill: drillWbs(m, cc.bukrs) },
         children: [],
       })
     }
@@ -166,27 +167,12 @@ export function buildInstanceGraph(m: SapEnterpriseModel): OrgGraph {
     root.children.push(ccNode)
   }
 
-  // CO-area-wide controlling objects (shared across all company codes)
-  root.children.push({
-    id: 't_pc',
-    data: { kind: 'profit_center', code: `${m.profitCenters.total}`, title: 'Profit Centers',
-      subtitle: 'CEPC · assigned via CEPC_BUKRS',
-      meta: m.companyCodes.map((c) => `${c.bukrs}: ${m.profitCenters.byCompanyCode[c.bukrs] ?? 0}`) },
-    children: [],
-  })
-  root.children.push({
-    id: 't_ks',
-    data: { kind: 'cost_center', code: `${m.costCenters.total}`, title: 'Cost Centers',
-      subtitle: 'CSKS · per company code',
-      meta: m.companyCodes.map((c) => `${c.bukrs}: ${m.costCenters.byCompanyCode[c.bukrs] ?? 0}`) },
-    children: [],
-  })
+  // Business area is client-wide (cross-company) — keep it at controlling-area level.
   const ba0 = m.businessAreas[0]
   if (ba0) {
     root.children.push({
       id: 't_ba',
-      data: { kind: 'business_area', code: ba0.gsber, title: ba0.name,
-        subtitle: 'client-wide (cross-company)', badge: ba0.used ? 'in use' : 'configured · unused' },
+      data: { kind: 'business_area', code: ba0.gsber, title: ba0.name, subtitle: 'client-wide (cross-company)', badge: ba0.used ? 'in use' : 'configured · unused', drill: drillBusinessAreas(m) },
       children: [],
     })
   }

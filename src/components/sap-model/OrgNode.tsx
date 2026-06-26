@@ -10,6 +10,7 @@ const handleCls = '!w-1.5 !h-1.5 !bg-[var(--m12-border)] !border-0 opacity-0'
 function OrgNodeComponent({ data, selected }: NodeProps & { data: OrgNodeData }) {
   const meta = ENTITY_META[data.kind]
   const color = meta.color
+  const hasDrill = !!data.drill
 
   return (
     <div
@@ -18,8 +19,21 @@ function OrgNodeComponent({ data, selected }: NodeProps & { data: OrgNodeData })
         borderColor: selected ? color : color + '55',
         boxShadow: selected ? `0 0 0 1px ${color}, 0 0 18px ${color}33` : 'var(--m12-node-shadow)',
       }}
-      className="relative rounded-xl border w-[220px] px-3.5 py-2.5 transition-all"
+      className={`group relative rounded-xl border w-[220px] px-3.5 py-2.5 transition-all ${hasDrill ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
     >
+      {hasDrill && (
+        <div
+          style={{ backgroundColor: color + '1a', color }}
+          className="absolute -top-2 -right-2 z-10 flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[8px] font-bold font-[family-name:var(--font-space-mono)] uppercase tracking-wide shadow-sm"
+          title={`Click to drill into ${data.drill!.count} values`}
+        >
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+            <circle cx="5" cy="5" r="3.2" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+          drill
+        </div>
+      )}
       <Handle id="in" type="target" position={Position.Top} className={handleCls} />
       <Handle id="lin" type="target" position={Position.Left} className={handleCls} />
       <Handle id="out" type="source" position={Position.Bottom} className={handleCls} />

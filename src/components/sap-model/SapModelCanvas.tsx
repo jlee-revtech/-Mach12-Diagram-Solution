@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -8,13 +8,15 @@ import {
   Controls,
   MiniMap,
   ReactFlowProvider,
+  type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
 import OrgNodeComponent from './OrgNode'
+import DrillDrawer from './DrillDrawer'
 import { buildSchemaGraph, buildInstanceGraph } from '@/lib/sap-model/buildModelDiagram'
 import { ENTITY_META } from '@/lib/sap-model/entityMeta'
-import type { SapEnterpriseModel } from '@/lib/sap-model/types'
+import type { DrillData, OrgNodeData, SapEnterpriseModel } from '@/lib/sap-model/types'
 
 const nodeTypes = { org: OrgNodeComponent }
 
@@ -37,6 +39,12 @@ function CanvasInner({ model, mode }: { model: SapEnterpriseModel; mode: 'schema
     () => (mode === 'schema' ? buildSchemaGraph(model) : buildInstanceGraph(model)),
     [model, mode]
   )
+  const [drill, setDrill] = useState<DrillData | null>(null)
+
+  const onNodeClick = useCallback((_e: React.MouseEvent, node: Node) => {
+    const d = (node.data as OrgNodeData).drill
+    setDrill(d ?? null)
+  }, [])
 
   return (
     <div className="relative w-full h-full">
@@ -51,6 +59,8 @@ function CanvasInner({ model, mode }: { model: SapEnterpriseModel; mode: 'schema
         nodesDraggable
         nodesConnectable={false}
         elementsSelectable
+        onNodeClick={onNodeClick}
+        onPaneClick={() => setDrill(null)}
         proOptions={{ hideAttribution: true }}
         style={{ backgroundColor: 'var(--m12-bg)' }}
       >
@@ -69,6 +79,7 @@ function CanvasInner({ model, mode }: { model: SapEnterpriseModel; mode: 'schema
         />
       </ReactFlow>
       <Legend />
+      {drill && <DrillDrawer data={drill} onClose={() => setDrill(null)} />}
     </div>
   )
 }

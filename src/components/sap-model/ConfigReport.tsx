@@ -202,30 +202,57 @@ export default function ConfigReport({ model: m }: { model: SapEnterpriseModel }
         </div>
       </Section>
 
-      {/* Controlling objects samples */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Section title={`Profit Centers — sample of ${m.profitCenters.total}`} hint="CEPC at controlling-area level; assigned to company codes via CEPC_BUKRS.">
-          <div className="space-y-1">
-            {m.profitCenters.sample.map((p) => (
-              <div key={p.prctr} className="flex items-center gap-2 text-[11px]">
-                <span className={`${mono} font-semibold`} style={{ color: ENTITY_META.profit_center.color }}>{p.prctr}</span>
-                <span className="text-[var(--m12-text-secondary)] truncate">{p.name}</span>
+      {/* Profit centers by company code (alignment) */}
+      <Section title={`Profit Centers by Company Code — ${m.profitCenters.total} total`} hint="Profit centers live at controlling-area level but are aligned to company codes via CEPC_BUKRS. Here they are grouped within each company code.">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {m.companyCodes.filter((c) => (m.profitCentersByCompanyCode[c.bukrs] ?? []).length).map((c) => (
+            <div key={c.bukrs} className="rounded-lg border border-[var(--m12-border)]/30 p-2.5">
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <span className={`${mono} text-[12px] font-bold text-[var(--m12-text)]`}>{c.bukrs}</span>
+                <span className="text-[10px] text-[var(--m12-text-muted)] truncate">{c.name}</span>
+                <span className={`${mono} text-[10px] ml-auto`} style={{ color: ENTITY_META.profit_center.color }}>{(m.profitCentersByCompanyCode[c.bukrs] ?? []).length}</span>
               </div>
-            ))}
-          </div>
-        </Section>
-        <Section title={`Cost Centers — sample of ${m.costCenters.total}`} hint="CSKS — each carries its company code and a profit center.">
-          <div className="space-y-1">
-            {m.costCenters.sample.map((c) => (
-              <div key={c.kostl + c.bukrs} className="flex items-center gap-2 text-[11px]">
-                <span className={`${mono} font-semibold`} style={{ color: ENTITY_META.cost_center.color }}>{c.kostl}</span>
-                <span className="text-[var(--m12-text-secondary)] truncate">{c.name}</span>
-                <span className={`${mono} text-[10px] text-[var(--m12-text-muted)] ml-auto`}>{c.bukrs} · {c.prctr}</span>
+              <div className="space-y-0.5">
+                {(m.profitCentersByCompanyCode[c.bukrs] ?? []).map((p) => (
+                  <div key={p.prctr} className="flex items-center gap-2 text-[10px]">
+                    <span className={`${mono} font-semibold`} style={{ color: ENTITY_META.profit_center.color }}>{p.prctr}</span>
+                    <span className="text-[var(--m12-text-secondary)] truncate">{p.name}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Section>
-      </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* Cost centers by company code */}
+      <Section title={`Cost Centers by Company Code — ${m.costCenters.total} total`} hint="CSKS — each cost center carries exactly one company code and one profit center. Showing the first few per company code; use the diagram drill-in for the full list.">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {m.companyCodes.filter((c) => (m.costCentersByCompanyCode[c.bukrs] ?? []).length).map((c) => {
+            const list = m.costCentersByCompanyCode[c.bukrs] ?? []
+            const shown = list.slice(0, 8)
+            return (
+              <div key={c.bukrs} className="rounded-lg border border-[var(--m12-border)]/30 p-2.5">
+                <div className="flex items-baseline gap-2 mb-1.5">
+                  <span className={`${mono} text-[12px] font-bold text-[var(--m12-text)]`}>{c.bukrs}</span>
+                  <span className="text-[10px] text-[var(--m12-text-muted)] truncate">{c.name}</span>
+                  <span className={`${mono} text-[10px] ml-auto`} style={{ color: ENTITY_META.cost_center.color }}>{list.length}</span>
+                </div>
+                <div className="space-y-0.5">
+                  {shown.map((x) => (
+                    <div key={x.kostl} className="flex items-center gap-2 text-[10px]">
+                      <span className={`${mono} font-semibold`} style={{ color: ENTITY_META.cost_center.color }}>{x.kostl}</span>
+                      <span className="text-[var(--m12-text-secondary)] truncate">{x.name}</span>
+                      <span className={`${mono} text-[9px] text-[var(--m12-text-muted)] ml-auto shrink-0`}>{x.prctr}</span>
+                    </div>
+                  ))}
+                  {list.length > shown.length && <div className="text-[9px] text-[var(--m12-text-muted)] pt-0.5">+{list.length - shown.length} more</div>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </Section>
     </div>
   )
 }

@@ -64,7 +64,7 @@ export default function SapModelExplorer() {
         <ConfigReport model={M} />
       ) : (
         <div className="rounded-xl border border-[var(--m12-border)]/40 overflow-hidden h-[74vh] min-h-[500px] bg-[var(--m12-bg)]">
-          <SapModelCanvas model={M} mode={view} />
+          <SapModelCanvas key={view} model={M} mode={view} />
         </div>
       )}
     </div>
