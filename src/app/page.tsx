@@ -8,6 +8,8 @@ import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreC
 import { listProcessModels, createProcessModel, archiveProcessModel, restoreProcessModel, duplicateProcessModel } from '@/lib/supabase/process-models'
 import { importBpmnFile, importHierarchyFile } from '@/lib/process/import'
 import { generateBedrockIntegrationDiagram } from '@/lib/bedrock/generate'
+import { pushMapToNewDiagram } from '@/lib/sipoc/pushToDiagram'
+import { useSIPOCStore } from '@/lib/sipoc/store'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import CapabilityMapWorkspace from '@/components/capmap/CapabilityMapWorkspace'
 import type { DiagramRow } from '@/lib/supabase/types'
@@ -21,7 +23,7 @@ export default function Dashboard() {
   const [processModels, setProcessModels] = useState<ProcessModelRow[]>([])
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
   const [showArchived, setShowArchived] = useState(false)
-  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process' | 'capmap'>('process')
+  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process' | 'capmap'>('sipoc')
   const router = useRouter()
   const { user, profile, organization, organizations, loading, signOut, switchOrg } = useAuth()
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
@@ -33,6 +35,12 @@ export default function Dashboard() {
   const [bedrockBusy, setBedrockBusy] = useState(false)
   const [bedrockError, setBedrockError] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
+
+  // Generate a data diagram from a SIPOC map
+  const [sipocOpen, setSipocOpen] = useState(false)
+  const [sipocMapId, setSipocMapId] = useState('')
+  const [sipocBusy, setSipocBusy] = useState(false)
+  const [sipocError, setSipocError] = useState<string | null>(null)
 
   // Auth gating
   useEffect(() => {
@@ -108,6 +116,31 @@ export default function Dashboard() {
       setBedrockBusy(false)
     }
   }, [organization, user, bedrockModelId, bedrockWorkstreamId, router])
+
+  const handleGenerateFromSipoc = useCallback(async () => {
+    if (!organization || !user || !sipocMapId) return
+    setSipocBusy(true)
+    setSipocError(null)
+    try {
+      const store = useSIPOCStore.getState()
+      const ok = await store.loadMap(sipocMapId)
+      if (!ok) throw new Error('Could not load that SIPOC map.')
+      await store.loadOrgEntities(organization.id)
+      const s = useSIPOCStore.getState()
+      const raw = s.capabilities
+      // Leaves = L3 SIPOCs (capabilities with no children) that have something to draw.
+      const leaves = s.getHydratedCapabilities().filter(
+        (h) => !raw.some((c) => c.parent_id === h.id) && (h.inputs.some((i) => !i.archived_at) || !!h.system)
+      )
+      if (leaves.length === 0) throw new Error('This SIPOC has no L3 capabilities with inputs or a host system to diagram yet.')
+      const mapTitle = capabilityMaps.find((m) => m.id === sipocMapId)?.title
+      const id = await pushMapToNewDiagram(leaves, organization.id, user.id, mapTitle, s.systemDataElements)
+      router.push(`/diagram/${id}`)
+    } catch (err) {
+      setSipocError(err instanceof Error ? err.message : 'Generation failed')
+      setSipocBusy(false)
+    }
+  }, [organization, user, sipocMapId, capabilityMaps, router])
 
   const handleRegenerateBedrock = useCallback(
     async (d: DiagramRow, e: React.MouseEvent) => {
@@ -379,7 +412,7 @@ export default function Dashboard() {
             Process Studio ({activeProcesses.length})
           </button>
           <button
-            onClick={() => setActiveTab(t => (t === 'sipoc' ? 'sipoc' : 'diagrams'))}
+            onClick={() => setActiveTab(t => (t === 'diagrams' || t === 'sipoc') ? t : 'sipoc')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
               activeTab === 'diagrams' || activeTab === 'sipoc'
                 ? 'bg-[#2563EB]/10 text-[#2563EB] shadow-sm'
@@ -528,6 +561,25 @@ export default function Dashboard() {
               </svg>
             </button>
             <button
+              onClick={() => { setSipocOpen(true); setSipocError(null) }}
+              className="flex-1 flex items-center gap-3 bg-[#8B5CF6]/8 border border-[#8B5CF6]/30 hover:border-[#8B5CF6]/60 rounded-xl px-4 py-3 transition-colors group text-left"
+            >
+              <div className="w-8 h-8 rounded-lg bg-[#8B5CF6]/15 flex items-center justify-center shrink-0">
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#8B5CF6]">
+                  <path d="M2 9h3M13 9h3M7 9h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  <path d="M5 6.5L7 9l-2 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M11 6.5L13 9l-2 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-[var(--m12-text)]">Generate a diagram from a SIPOC</div>
+                <div className="text-[11px] text-[var(--m12-text-muted)]">Turn a SIPOC capability map into a data-architecture diagram — one system flow per L3 capability, with information products on the wires.</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#8B5CF6] group-hover:translate-x-0.5 transition-transform shrink-0">
+                <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
               onClick={() => router.push('/data/bedrock')}
               title="Bedrock Systems — logical platform categories and their physical systems"
               className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
@@ -537,6 +589,20 @@ export default function Dashboard() {
                 <path d="M3 4v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4M3 9v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V9" stroke="currentColor" strokeWidth="1.3" />
               </svg>
               <span className="text-xs font-medium text-[var(--m12-text-secondary)]">Bedrock Systems</span>
+            </button>
+            <button
+              onClick={() => router.push('/data/sap-model')}
+              title="SAP Enterprise Data Model — controlling area, company codes, plants, org units and RA-keyed WBS, pulled live from S/4HANA"
+              className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
+            >
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#10B981]">
+                <rect x="6.5" y="1.5" width="5" height="3.2" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
+                <rect x="1.5" y="9" width="4.2" height="3.2" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
+                <rect x="7" y="9" width="4.2" height="3.2" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
+                <rect x="12.5" y="9" width="4.2" height="3.2" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M9 4.7v2.1M9 6.8H3.6V9M9 6.8v2.2M9 6.8h5.6V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-xs font-medium text-[var(--m12-text-secondary)]">SAP Data Model</span>
             </button>
           </div>
         )}
@@ -977,6 +1043,39 @@ export default function Dashboard() {
               <button type="button" onClick={() => setBedrockOpen(false)} disabled={bedrockBusy} className="px-4 py-2 rounded-lg text-sm text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] disabled:opacity-50 transition-colors">Cancel</button>
               <button type="button" onClick={handleGenerateBedrock} disabled={bedrockBusy || !bedrockModelId} className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white transition-colors">
                 {bedrockBusy ? 'Generating…' : 'Generate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate a diagram from a SIPOC dialog */}
+      {sipocOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !sipocBusy && setSipocOpen(false)}>
+          <div className="w-full max-w-md bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-[var(--m12-text)] mb-1">Generate a diagram from a SIPOC</h2>
+            <p className="text-xs text-[var(--m12-text-muted)] mb-4">Builds a data-architecture diagram from a SIPOC capability map. Each L3 capability becomes a source → feeding → host system flow, with its information products on the wires.</p>
+
+            <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mb-1">SIPOC map</label>
+            <select
+              value={sipocMapId}
+              onChange={(e) => setSipocMapId(e.target.value)}
+              aria-label="SIPOC map"
+              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#8B5CF6]/60 mb-1"
+            >
+              <option value="">Select a SIPOC map…</option>
+              {activeMaps.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </select>
+            {activeMaps.length === 0 && (
+              <div className="text-[11px] text-[var(--m12-text-muted)] mb-3">No SIPOC maps yet — create one first.</div>
+            )}
+
+            {sipocError && <div className="text-[11px] text-red-400 mt-3 mb-1">{sipocError}</div>}
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" onClick={() => setSipocOpen(false)} disabled={sipocBusy} className="px-4 py-2 rounded-lg text-sm text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] disabled:opacity-50 transition-colors">Cancel</button>
+              <button type="button" onClick={handleGenerateFromSipoc} disabled={sipocBusy || !sipocMapId} className="px-4 py-2 rounded-lg text-sm font-medium bg-[#8B5CF6] hover:bg-[#A78BFA] disabled:opacity-50 text-white transition-colors">
+                {sipocBusy ? 'Generating…' : 'Generate'}
               </button>
             </div>
           </div>

@@ -229,3 +229,39 @@ export async function pushL3ToNewDiagram(
   })
   return diagram.id
 }
+
+/**
+ * Create ONE new diagram seeded from every L3 SIPOC (leaf capability) in a map.
+ * Each L3 becomes its own group, stacked vertically so groups never overlap, giving
+ * a full data-architecture view of the whole SIPOC in a single canvas.
+ * Returns the new diagram's id for navigation.
+ */
+export async function pushMapToNewDiagram(
+  leaves: HydratedCapability[],
+  orgId: string,
+  userId: string,
+  mapTitle: string | undefined,
+  systemDataElements?: SystemDataElement[],
+): Promise<string> {
+  const nodes: SystemNode[] = []
+  const edges: DataFlowEdge[] = []
+  const groups: SystemGroupNode[] = []
+
+  const GAP = 60
+  let cursorY = 100
+  for (const h of leaves) {
+    const seed = buildL3GroupCanvasData(h, { baseX: 100, baseY: cursorY, systemDataElements })
+    nodes.push(...seed.nodes)
+    edges.push(...seed.edges)
+    groups.push(...seed.groups)
+    const gh = Number((seed.groups[0]?.style as { height?: number } | undefined)?.height ?? 240)
+    cursorY += gh + GAP
+  }
+
+  const title = mapTitle ? `${mapTitle} — Data Architecture` : 'SIPOC Data Architecture'
+  const diagram = await createDiagram(orgId, userId, title)
+  await saveDiagram(diagram.id, userId, {
+    canvas_data: { nodes, edges, groups, artifacts: [] },
+  })
+  return diagram.id
+}
