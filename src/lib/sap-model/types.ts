@@ -114,6 +114,8 @@ export interface SapEnterpriseModel {
   profitCentersByCompanyCode: Record<string, { prctr: string; name: string }[]>
   costCentersByCompanyCode: Record<string, { kostl: string; name: string; prctr: string }[]>
   wbsRa: { posid: string; name: string; bukrs: string; level: string; raKey: string; project: string }[]
+  // Profit center standard hierarchy (set class 0106) rooted at "All profit centers".
+  profitCenterHierarchy: DrillTreeNode
 }
 
 // ── Diagram model (org-structure entity graph) ──────────────────────────────
@@ -141,6 +143,14 @@ export interface DrillGroup {
   caption?: string
   items: DrillItem[]
 }
+// A node in a drill-down hierarchy (e.g. the profit center standard hierarchy).
+export interface DrillTreeNode {
+  code: string
+  label?: string
+  kind: 'group' | 'leaf'
+  meta?: string
+  children?: DrillTreeNode[]
+}
 export interface DrillData {
   kind: OrgEntityKind
   title: string
@@ -149,6 +159,8 @@ export interface DrillData {
   columns?: string[]
   groups?: DrillGroup[]
   items?: DrillItem[]
+  // Hierarchical drill output (takes precedence over groups/items when present).
+  tree?: DrillTreeNode[]
 }
 
 export interface OrgNodeData {

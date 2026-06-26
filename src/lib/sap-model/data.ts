@@ -1,7 +1,7 @@
 // AUTO-GENERATED SNAPSHOT — SAP Enterprise Data Model (controlling area A000)
 // Source: live pull from the connected S/4HANA sandbox (vhcals4hcs, client 100) via the
-// SAP-Vibe MCP server, class ZCL_M12_ORG_MODEL_DUMP, on 2026-06-26.
-// This is real configuration data, not mock data. Regenerate by re-running the dump class.
+// SAP-Vibe MCP server (ZCL_M12_ORG_MODEL_DUMP + ZCL_M12_PC_HIER_DUMP), on 2026-06-26.
+// This is real configuration data, not mock data. Regenerate by re-running the dump classes.
 import type { SapEnterpriseModel } from './types'
 
 export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
@@ -3320,5 +3320,1121 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "raKey": "Y00001",
       "project": "U1CM"
     }
-  ]
+  ],
+  "profitCenterHierarchy": {
+    "code": "YBPH",
+    "label": "All profit centers",
+    "kind": "group",
+    "children": [
+      {
+        "code": "YBH16",
+        "label": "Value Added",
+        "kind": "group",
+        "children": [
+          {
+            "code": "YBH111",
+            "label": "Product",
+            "kind": "group",
+            "children": [
+              {
+                "code": "0000099999",
+                "label": "Dummy Profit Center",
+                "kind": "leaf"
+              },
+              {
+                "code": "SAP-DUMMY",
+                "label": "Dummy Profit Center",
+                "kind": "leaf"
+              },
+              {
+                "code": "T-PCB98",
+                "label": "Production Logistics",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB110",
+                "label": "Product A",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB111",
+                "label": "Product B",
+                "kind": "leaf"
+              }
+            ]
+          },
+          {
+            "code": "YBH110",
+            "label": "Services and Consulting",
+            "kind": "group",
+            "children": [
+              {
+                "code": "YB101",
+                "label": "Consulting Unit A",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB102",
+                "label": "Consulting Unit B",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB103",
+                "label": "Customer Development",
+                "kind": "leaf"
+              }
+            ]
+          },
+          {
+            "code": "YBH112",
+            "label": "Trading Goods",
+            "kind": "group",
+            "children": [
+              {
+                "code": "YB700",
+                "label": "Trading Goods",
+                "kind": "leaf"
+              }
+            ]
+          },
+          {
+            "code": "YBH119",
+            "label": "Shared Services, Default",
+            "kind": "group",
+            "children": [
+              {
+                "code": "YB600",
+                "label": "Shared Services",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB900",
+                "label": "Dummy",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB901",
+                "label": "New Profit Center",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB902",
+                "label": "Dummy Text",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB903",
+                "label": "Profit center",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB904",
+                "label": "External Services",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB905",
+                "label": "Finance CAL",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB906",
+                "label": "Finance CAL 2",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB907",
+                "label": "Profit Center 7",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB908",
+                "label": "Profit Center 8",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB909",
+                "label": "Profit Center 9",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB911",
+                "label": "Profit Center 11",
+                "kind": "leaf"
+              },
+              {
+                "code": "YB912",
+                "label": "Profit Center 12",
+                "kind": "leaf"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "YBH18",
+        "label": "Allocation",
+        "kind": "group",
+        "children": [
+          {
+            "code": "YB800",
+            "label": "Allocation",
+            "kind": "leaf"
+          }
+        ]
+      },
+      {
+        "code": "ZUS",
+        "label": "US Holding Company",
+        "kind": "group",
+        "children": [
+          {
+            "code": "ZUS_PC110",
+            "label": "All Profit Centers",
+            "kind": "group",
+            "children": [
+              {
+                "code": "ZUS10_P1",
+                "label": "Best Run US",
+                "kind": "group",
+                "children": [
+                  {
+                    "code": "ZUS10_P11",
+                    "label": "Cycles",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "ZUS10_P_R",
+                        "label": "Racing",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "ZUS10_P_RL",
+                            "label": "Racing Cycles - Large",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PCR1L",
+                                "label": "MZ-R300L",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCR2L",
+                                "label": "MZ-R200L",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCR3L",
+                                "label": "MZ-R100L",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_RS",
+                            "label": "Racing Cycles - Speciality",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PCR1S",
+                                "label": "MZ-R300S",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCR2S",
+                                "label": "MZ-R200S",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCR3S",
+                                "label": "MZ-R100S",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_RP",
+                            "label": "Racing Cycles - Production",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PLR",
+                                "label": "ProdLine_Racing",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_R1",
+                            "label": "Finance and Administration",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_R1_1",
+                                "label": "Corporate Services",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_R1_2",
+                                "label": "General Accounting",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_R1_3",
+                                "label": "Inventory Management",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_R2",
+                            "label": "Human Resources",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_R2_1",
+                                "label": "Comp. and Benefits",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_R2_2",
+                                "label": "Dev. and Training",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_R3",
+                            "label": "Information Technology",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_R3_1",
+                                "label": "Systems Design/Dev.",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_R3_2",
+                                "label": "Systems Hardware/Op.",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_R4",
+                            "label": "Marketing",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_R4_1",
+                                "label": "Direct Sales",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_R4_2",
+                                "label": "Internet",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_R5",
+                            "label": "Plant Operations",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_R5_1",
+                                "label": "Facilities/WM",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_R5_2",
+                                "label": "Quality Assurance",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_R6",
+                            "label": "Research & Development",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_R6_1",
+                                "label": "Product Design",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_R6_2",
+                                "label": "Trials",
+                                "kind": "leaf"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "code": "ZUS10_P_M",
+                        "label": "Mountain",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "ZUS10_P_ML",
+                            "label": "Mountain Cycles - Large",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PCM1L",
+                                "label": "MZ-M550L",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCM2L",
+                                "label": "MZ-M525L",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCM3L",
+                                "label": "MZ-M500L",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_MS",
+                            "label": "Mountain Cycles - Specialty",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PCM1S",
+                                "label": "MZ-M550S",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCM2S",
+                                "label": "MZ-M525S",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCM3S",
+                                "label": "MZ-M500S",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_MP",
+                            "label": "Mountain Cycles - Production",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PLM",
+                                "label": "ProdLine_Mountain",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_M1",
+                            "label": "Finance and Administration",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_M1_1",
+                                "label": "Corporate Services",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_M1_2",
+                                "label": "General Accounting",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_M1_3",
+                                "label": "Inventory Management",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_M2",
+                            "label": "Human Resources",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_M2_1",
+                                "label": "Comp. and Benefits",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_M2_2",
+                                "label": "Dev. and Training",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_M3",
+                            "label": "Information Technology",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_M3_1",
+                                "label": "Systems Design/Dev.",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_M3_2",
+                                "label": "Systems Hardware/Op.",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_M4",
+                            "label": "Marketing",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_M4_1",
+                                "label": "Direct Sales",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_M4_2",
+                                "label": "Internet",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_M5",
+                            "label": "Plant Operations",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_M5_1",
+                                "label": "Facilities/WM",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_M5_2",
+                                "label": "Quality Assurance",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_M6",
+                            "label": "Research & Development",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_M6_1",
+                                "label": "Product Design",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_M6_2",
+                                "label": "Trials",
+                                "kind": "leaf"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "code": "ZUS10_P_C",
+                        "label": "Cruise",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "ZUS10_P_CL",
+                            "label": "Cruise Cycles - Large",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PCC1L",
+                                "label": "MZ-C990L",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCC2L",
+                                "label": "MZ-C950L",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCC3L",
+                                "label": "MZ-C900L",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_CS",
+                            "label": "Cruise Cycles - Specialty",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PCC1S",
+                                "label": "MZ-C990S",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCC2S",
+                                "label": "MZ-C950S",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCC3S",
+                                "label": "MZ-C900S",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_CP",
+                            "label": "Cruise Cycles - Production",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PLC",
+                                "label": "ProdLine_Cruise",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_C1",
+                            "label": "Finance and Administration",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_C1_1",
+                                "label": "Corporate Services",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_C1_2",
+                                "label": "General Accounting",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_C1_3",
+                                "label": "Inventory Management",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_C2",
+                            "label": "Human Resources",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_C2_1",
+                                "label": "Comp. and Benefits",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_C2_2",
+                                "label": "Dev. and Training",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_C3",
+                            "label": "Information Technology",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_C3_1",
+                                "label": "Systems Design/Dev.",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_C3_2",
+                                "label": "Systems Hardware/Op.",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_C4",
+                            "label": "Marketing",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_C4_1",
+                                "label": "Direct Sales",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_C4_2",
+                                "label": "Internet",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_C5",
+                            "label": "Plant Operations",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_C5_1",
+                                "label": "Facilities/WM",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_C5_2",
+                                "label": "Quality Assurance",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_C6",
+                            "label": "Research & Development",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_C6_1",
+                                "label": "Product Design",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_C6_2",
+                                "label": "Trials",
+                                "kind": "leaf"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "code": "ZUS10_P_Y",
+                        "label": "Youth",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "ZUS10_P_YL",
+                            "label": "Youth Cycles - Large",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PCY1L",
+                                "label": "MZ-Y120L",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCY2L",
+                                "label": "MZ-Y200L",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCY3L",
+                                "label": "MZ-Y240L",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_YS",
+                            "label": "Youth Cycles - Specialty",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_PCY1S",
+                                "label": "MZ-Y120S",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCY2S",
+                                "label": "MZ-Y200S",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_PCY3S",
+                                "label": "MZ-Y240S",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_YP",
+                            "label": "Youth Cycles - Production",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_TGY1",
+                                "label": "Trading Good_Youth",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_TGY2",
+                                "label": "Transportation In_Yo",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_Y1",
+                            "label": "Finance and Administration",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_Y1_1",
+                                "label": "Corporate Services",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_Y1_2",
+                                "label": "General Accounting",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_Y1_3",
+                                "label": "Inventory Management",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_Y2",
+                            "label": "Human Resources",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_Y2_1",
+                                "label": "Comp. and Benefits",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_Y2_2",
+                                "label": "Dev. and Training",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_Y3",
+                            "label": "Information Technology",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_Y3_1",
+                                "label": "Systems Design/Dev.",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_Y3_2",
+                                "label": "Systems Hardware/Op.",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_Y4",
+                            "label": "Marketing",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_Y4_1",
+                                "label": "Direct Sales",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_Y4_2",
+                                "label": "Internet",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_Y5",
+                            "label": "Plant Operations",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_Y5_1",
+                                "label": "Facilities/WM",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_Y5_2",
+                                "label": "Quality Assurance",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "ZUS10_P_Y6",
+                            "label": "Research & Development",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "US10_Y6_1",
+                                "label": "Product Design",
+                                "kind": "leaf"
+                              },
+                              {
+                                "code": "US10_Y6_2",
+                                "label": "Trials",
+                                "kind": "leaf"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "code": "ZUS10_P12",
+                    "label": "Accessories",
+                    "kind": "group"
+                  },
+                  {
+                    "code": "US10_PC11",
+                    "label": "Corporate",
+                    "kind": "leaf"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "DEMO",
+        "label": "New Demo Group",
+        "kind": "group",
+        "children": [
+          {
+            "code": "HOME",
+            "label": "The Boeing Corporation",
+            "kind": "group",
+            "children": [
+              {
+                "code": "BCA",
+                "label": "BCA",
+                "kind": "group",
+                "children": [
+                  {
+                    "code": "737_PROG",
+                    "label": "737 Program",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "0110000001",
+                        "label": "737 Profit Center",
+                        "kind": "leaf"
+                      }
+                    ]
+                  },
+                  {
+                    "code": "787_PROG",
+                    "label": "787 Program",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "0110000002",
+                        "label": "787 Profit Center",
+                        "kind": "leaf"
+                      }
+                    ]
+                  },
+                  {
+                    "code": "BCA-GRP",
+                    "label": "BCA Group Office",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "0111000001",
+                        "label": "BCA Group Office",
+                        "kind": "leaf"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "code": "BDS",
+                "label": "BDS",
+                "kind": "group",
+                "children": [
+                  {
+                    "code": "BDS_GRP",
+                    "label": "BDS Group Office",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "0120000001",
+                        "label": "BDS Group Office",
+                        "kind": "leaf"
+                      }
+                    ]
+                  },
+                  {
+                    "code": "BDS_DIV1",
+                    "label": "BDS Division 1",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "BDS_DIV1GR",
+                        "label": "BDS Division 1 Group Office",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "0121000001",
+                            "label": "BDS DIV1 Group Off",
+                            "kind": "leaf"
+                          }
+                        ]
+                      },
+                      {
+                        "code": "BDS_D1_PRA",
+                        "label": "BDS Divison 1 Program A",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "0121000002",
+                            "label": "Program A PC",
+                            "kind": "leaf"
+                          }
+                        ]
+                      },
+                      {
+                        "code": "BDS_D1_PRB",
+                        "label": "BDS Divison 1 Program B",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "0121000003",
+                            "label": "Program B PC",
+                            "kind": "leaf"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "code": "BDS_DIV2",
+                    "label": "BDS Division 2",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "BDS_DIV2GR",
+                        "label": "BDS Division 2 Group Office",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "0122000001",
+                            "label": "BDS DIV2 Group Off",
+                            "kind": "leaf"
+                          }
+                        ]
+                      },
+                      {
+                        "code": "BDS_D2_PRC",
+                        "label": "BDS Division 2 Program C",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "0122000002",
+                            "label": "Program C PC",
+                            "kind": "leaf"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "code": "BGS",
+                "label": "BGS",
+                "kind": "group",
+                "children": [
+                  {
+                    "code": "BGS_COMM",
+                    "label": "BGS Commerial",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "0131000001",
+                        "label": "BGS Commercial",
+                        "kind": "leaf"
+                      }
+                    ]
+                  },
+                  {
+                    "code": "BGS_DEF",
+                    "label": "BGS Defense",
+                    "kind": "group",
+                    "children": [
+                      {
+                        "code": "BGS_DEF_GR",
+                        "label": "BGS Defense Group Office",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "0132000001",
+                            "label": "BGS Def Group Off",
+                            "kind": "leaf"
+                          }
+                        ]
+                      },
+                      {
+                        "code": "BGSDEF_D1",
+                        "label": "BGS Defense Division 1",
+                        "kind": "group",
+                        "children": [
+                          {
+                            "code": "BGSDFD1_GR",
+                            "label": "BGS Defense Division 1 Group Office",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "0133000001",
+                                "label": "BGS Def Div1 Grp",
+                                "kind": "leaf"
+                              }
+                            ]
+                          },
+                          {
+                            "code": "BGSDD1_PRA",
+                            "label": "BGS Defense Division 1 Program A",
+                            "kind": "group",
+                            "children": [
+                              {
+                                "code": "0133000002",
+                                "label": "Program C PC",
+                                "kind": "leaf"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "code": "0100000001",
+                "label": "Home Office",
+                "kind": "leaf"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "QCHECK",
+        "label": "Quality Check",
+        "kind": "leaf"
+      }
+    ]
+  }
 } as const

@@ -1,4 +1,13 @@
-import type { DrillData, DrillGroup, SapEnterpriseModel } from './types'
+import type { DrillData, DrillGroup, DrillTreeNode, SapEnterpriseModel } from './types'
+
+// Keep only the branches of a profit center hierarchy that contain an allowed
+// profit center (used to scope the standard hierarchy to one company code).
+function pruneTree(node: DrillTreeNode, allowed: Set<string>): DrillTreeNode | null {
+  if (node.kind === 'leaf') return allowed.has(node.code) ? node : null
+  const kids = (node.children ?? []).map((c) => pruneTree(c, allowed)).filter(Boolean) as DrillTreeNode[]
+  if (kids.length === 0) return null
+  return { ...node, children: kids }
+}
 
 // Builders that turn an aggregate count into the actual list of values behind it.
 // Pass a company code (or plant) to scope to one parent; omit for the full set
@@ -15,15 +24,22 @@ export function drillCompanyCodes(m: SapEnterpriseModel): DrillData {
 }
 
 export function drillProfitCenters(m: SapEnterpriseModel, cc?: string): DrillData {
+  const hier = m.profitCenterHierarchy
   if (cc) {
-    const list = m.profitCentersByCompanyCode[cc] ?? []
-    return { kind: 'profit_center', title: 'Profit Centers', subtitle: `company code ${cc} · CEPC_BUKRS`, count: list.length,
-      items: list.map((p) => ({ code: p.prctr, label: p.name })) }
+    // Scope the standard hierarchy to the profit centers assigned to this company code.
+    const allowed = new Set((m.profitCentersByCompanyCode[cc] ?? []).map((p) => p.prctr))
+    const pruned = pruneTree(hier, allowed)
+    return {
+      kind: 'profit_center', title: 'Profit Centers',
+      subtitle: `company code ${cc} · within the standard hierarchy (CEPC_BUKRS)`,
+      count: allowed.size, tree: pruned ? [pruned] : [],
+    }
   }
-  const groups: DrillGroup[] = m.companyCodes
-    .map((c) => ({ name: `CC ${c.bukrs}`, caption: c.name, items: (m.profitCentersByCompanyCode[c.bukrs] ?? []).map((p) => ({ code: p.prctr, label: p.name })) }))
-    .filter((g) => g.items.length)
-  return { kind: 'profit_center', title: 'Profit Centers', subtitle: 'CEPC · assigned to company codes via CEPC_BUKRS', count: m.profitCenters.total, groups }
+  return {
+    kind: 'profit_center', title: 'Profit Centers',
+    subtitle: `standard hierarchy "${hier.label}" (set ${hier.code}) · class 0106`,
+    count: m.profitCenters.total, tree: [hier],
+  }
 }
 
 export function drillCostCenters(m: SapEnterpriseModel, cc?: string): DrillData {
