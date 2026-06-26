@@ -141,11 +141,12 @@ export async function removeCapabilityPhysicalSystem(capabilityId: string, physi
   )
 }
 
-// Bulk-create AI-drafted capabilities and their logical-system mappings.
+// Bulk-create capabilities (AI-drafted or standard) and their logical-system mappings.
 export async function bulkCreateCapabilities(
   orgId: string,
   userId: string,
-  items: { name: string; description?: string; domain?: string; workstream_id?: string | null; bedrockSystemIds: string[] }[]
+  items: { name: string; description?: string; domain?: string; workstream_id?: string | null; bedrockSystemIds: string[] }[],
+  source = 'ai'
 ): Promise<Capability[]> {
   if (items.length === 0) return []
   const rows = items.map((it, i) => ({
@@ -155,7 +156,7 @@ export async function bulkCreateCapabilities(
     description: it.description,
     domain: it.domain,
     workstream_id: it.workstream_id ?? null,
-    source: 'ai',
+    source,
     sort_order: i,
   }))
   const res = await fetch(`${URL}/rest/v1/cm_capabilities`, {

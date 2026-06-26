@@ -9,6 +9,8 @@ import {
 } from '@/lib/supabase/capmap'
 import { listBedrockCatalog, seedBedrockSystems } from '@/lib/supabase/bedrock-systems'
 import { listWorkstreams, seedStandardWorkstreams } from '@/lib/supabase/workstreams'
+import { STANDARD_WORKSTREAMS } from '@/lib/workstream/catalog'
+import { STANDARD_CAPABILITIES } from '@/lib/capmap/standardCapabilities'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
@@ -26,6 +28,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
+  const [seedingStd, setSeedingStd] = useState(false)
   const [aligning, setAligning] = useState(false)
   const [view, setView] = useState<'board' | 'pivot'>('board')
   const [slice, setSlice] = useState<'workstream' | 'logical' | 'physical'>('workstream')
@@ -251,6 +254,34 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     }
   }
 
+  // ─── Seed the standard capability map (one curated set per value stream) ───
+  const handleSeedStandard = async () => {
+    if (seedingStd) return
+    setSeedingStd(true)
+    try {
+      const ws = await ensureWorkstreams()
+      const codeToId = new Map(ws.map(w => [w.code, w.id]))
+      const existing = new Set(caps.map(c => c.name.trim().toLowerCase()))
+      const items: { name: string; description?: string; domain?: string; workstream_id?: string | null; bedrockSystemIds: string[] }[] = []
+      for (const def of STANDARD_WORKSTREAMS) {
+        const wsId = codeToId.get(def.code) ?? null
+        for (const cap of STANDARD_CAPABILITIES[def.code] ?? []) {
+          const key = cap.name.trim().toLowerCase()
+          if (existing.has(key)) continue
+          existing.add(key)
+          items.push({ name: cap.name, description: cap.description, domain: cap.domain, workstream_id: wsId, bedrockSystemIds: [] })
+        }
+      }
+      if (items.length === 0) { alert('The standard capability map is already seeded for every value stream.'); return }
+      await bulkCreateCapabilities(orgId, userId, items, 'standard')
+      await load()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to seed the standard capability map')
+    } finally {
+      setSeedingStd(false)
+    }
+  }
+
   // ─── AI draft ───
   const openAi = async () => { setAiOpen(true); setAiError(null); setAiResults(null); await ensureWorkstreams() }
 
@@ -362,6 +393,10 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             {aligning ? 'Aligning…' : `Align to value streams${unalignedCount ? ` (${unalignedCount})` : ''}`}
           </button>
         )}
+        <button type="button" onClick={handleSeedStandard} disabled={seedingStd} title="Seed a standard A&D capability map across every value stream" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 disabled:opacity-50 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="9" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="2" y="8.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M11.5 9v4.5M9.25 11.25h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+          {seedingStd ? 'Seeding…' : 'Seed standard'}
+        </button>
         <button type="button" onClick={openAi} className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.6 3.4 3.7.5-2.7 2.6.6 3.7L8 9.9 4.8 11.7l.6-3.7L2.7 5.4l3.7-.5L8 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
           AI Draft
@@ -395,9 +430,10 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       {caps.length === 0 ? (
         <div className="text-center py-20 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
           <h2 className="text-base font-semibold text-[var(--m12-text-secondary)] mb-2">No capabilities yet</h2>
-          <p className="text-sm text-[var(--m12-text-muted)] mb-6">Let AI draft a capability map aligned to your value streams, or add capabilities manually and map them to your systems.</p>
+          <p className="text-sm text-[var(--m12-text-muted)] mb-6">Seed the standard A&amp;D capability map (one curated set per value stream), let AI draft one, or add capabilities manually.</p>
           <div className="flex items-center justify-center gap-2">
-            <button type="button" onClick={openAi} className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#34D399] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">AI Draft capabilities</button>
+            <button type="button" onClick={handleSeedStandard} disabled={seedingStd} className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#34D399] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">{seedingStd ? 'Seeding…' : 'Seed standard map'}</button>
+            <button type="button" onClick={openAi} className="inline-flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">AI Draft</button>
             <button type="button" onClick={handleAddCapability} className="inline-flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">Add manually</button>
           </div>
         </div>
