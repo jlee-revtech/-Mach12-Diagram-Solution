@@ -161,6 +161,10 @@ export async function POST(req: NextRequest) {
       return handleTechSpecQuestions(context)
     } else if (action === 'tech-spec-generate') {
       return handleTechSpecGenerate(context)
+    } else if (action === 'process-test-plan') {
+      return handleProcessTestPlan(context)
+    } else if (action === 'fiori-mockup') {
+      return handleFioriMockup(context)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -1491,6 +1495,161 @@ Guidelines:
   } catch {
     return NextResponse.json({ error: 'Failed to parse playbook', raw: text }, { status: 500 })
   }
+}
+
+// ─── Process Test Plan ─────────────────────────────────
+const TEST_PLAN_SYSTEM_PROMPT = `You are a senior SAP S/4HANA test lead writing functional test scripts (SIT/UAT) for Aerospace & Defense and Government Contracting programs.
+
+You understand:
+- How to turn a business process step into an executable, repeatable test case: preconditions, concrete test data, ordered tester actions, and an objectively verifiable expected result per action.
+- The SAP S/4HANA Fiori launchpad and classic GUI: real Fiori tiles, their app ids (e.g. F0842 Manage Purchase Orders), and transaction codes (e.g. ME21N, VA01, CJ20N).
+- The Dassian Aerospace & Defense add-on apps (PPC Workbench, Contract Workbench, ABS, Forward Rate engine, etc.) vs. standard SAP vs. customer custom (RICEFW / Z transactions).
+- A&D test rigor: traceability to the process step, positive + negative/edge coverage, and compliance-aware checks (CAS/DCAA/EVMS/FAR/DFARS where relevant).
+
+Rules:
+- Use the system, Fiori tile, app id, and T-code GIVEN for each step. Only infer what is missing, and when you do, prefer tiles from the provided catalog so app ids are real. If you cannot determine a real tile/app id, leave it blank rather than inventing one.
+- "systemKind" must be exactly one of: standard_sap, dassian, custom, non_sap, manual.
+- Make test data specific and realistic (real-looking part numbers, PO numbers, WBS, amounts), never "TBD".`
+
+async function handleProcessTestPlan(context: {
+  processName: string
+  modelTitle?: string
+  description?: string
+  scopeItemRef?: string
+  lifecycle?: string | null
+  variant?: string | null
+  lanes?: { label: string; system?: string | null }[]
+  steps: {
+    label: string; elementType: string; description?: string; lane?: string | null; role?: string | null
+    systemKind: string; systemLabel: string; fioriTile?: string; fioriAppId?: string; tcode?: string
+  }[]
+  overlays?: { kind: string; title: string; framework?: string; code?: string }[]
+  catalogTiles?: { title: string; appId?: string; area: string; source: string }[]
+}) {
+  const stepLines = (context.steps || []).map((s, i) => {
+    const bits = [
+      `${i + 1}. ${s.label} (${s.elementType}${s.lane ? ` @ ${s.lane}` : ''})`,
+      `system=${s.systemKind}`,
+      `where=${s.systemLabel}`,
+      s.fioriTile ? `tile=${s.fioriTile}` : '',
+      s.fioriAppId ? `appId=${s.fioriAppId}` : '',
+      s.tcode ? `tcode=${s.tcode}` : '',
+      s.role ? `role=${s.role}` : '',
+      s.description ? `desc=${s.description}` : '',
+    ].filter(Boolean)
+    return bits.join(' | ')
+  }).join('\n')
+
+  const catalogLines = (context.catalogTiles || [])
+    .map(t => `- ${t.title}${t.appId ? ` (${t.appId})` : ''} [${t.source === 'dassian' ? 'Dassian' : 'SAP'} · ${t.area}]`)
+    .join('\n')
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    system: TEST_PLAN_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Write a functional test plan (SIT/UAT) for the process below. Return ONLY valid JSON.
+
+PROCESS: "${context.processName}"${context.modelTitle ? ` (model: ${context.modelTitle})` : ''}${context.lifecycle ? ` [${context.lifecycle}]` : ''}${context.variant ? ` variant: ${context.variant}` : ''}
+${context.description ? `Description: ${context.description}` : ''}
+${context.scopeItemRef ? `SAP scope item: ${context.scopeItemRef}` : ''}
+Swimlanes: ${(context.lanes || []).map(l => `${l.label}${l.system ? ` [${l.system}]` : ''}`).join('; ') || 'none'}
+Compliance overlays: ${(context.overlays || []).map(o => `${o.framework || o.kind}:${o.code || o.title}`).join(', ') || 'none'}
+
+PROCESS STEPS (with their pre-resolved system / tile / tcode — use these, do not override):
+${stepLines || 'none defined'}
+
+CATALOG OF KNOWN FIORI / DASSIAN TILES (use these app ids when you must fill a gap):
+${catalogLines || 'none provided'}
+
+Produce one primary test case per testable step, in order, plus 1-3 high-value negative/edge cases where the process warrants it (authorization, validation, compliance gates). Carry each case's systemKind/systemLabel/tile/appId/tcode from the matching step.
+
+Return this exact JSON:
+{
+  "objective": "1-2 sentence test objective for this process",
+  "scope": ["what is covered"],
+  "outOfScope": ["what is not covered"],
+  "prerequisites": ["global preconditions: master data, roles/auth, config, test client"],
+  "testCases": [
+    {
+      "id": "TC-01",
+      "title": "Short imperative title",
+      "processStep": "Source process step label",
+      "systemKind": "standard_sap|dassian|custom|non_sap|manual",
+      "systemLabel": "e.g. SAP S/4HANA, Dassian PPC Workbench, Custom (RICEFW E-012)",
+      "fioriTile": "Tile title or empty",
+      "fioriAppId": "F0842 or empty",
+      "tcode": "ME21N or empty",
+      "role": "Tester role/persona",
+      "type": "Positive|Negative|Edge",
+      "priority": "High|Medium|Low",
+      "preconditions": ["case-specific preconditions"],
+      "testData": [ { "field": "Field name", "value": "Concrete value" } ],
+      "steps": [ { "no": 1, "action": "What the tester does", "expected": "Objectively verifiable result", "testData": "optional inline value" } ],
+      "expectedResult": "Overall pass criterion for the case"
+    }
+  ]
+}
+
+Guidelines:
+- 4-20 test cases total; 3-8 actions per case; 2-6 test-data rows per case.
+- Every action's "expected" must be checkable (a message, status, document number, value).
+- No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const parsed = looseParseJson(text)
+  if (parsed && typeof parsed === 'object') return NextResponse.json(parsed)
+  // Salvage at least the test cases from a truncated response.
+  const testCases = salvageObjectArray(text, 'testCases')
+  if (testCases.length) return NextResponse.json({ objective: '', scope: [], outOfScope: [], prerequisites: [], testCases })
+  return NextResponse.json({ error: 'Failed to parse test plan', raw: text }, { status: 500 })
+}
+
+// ─── Fiori screen mockup (rendered client-side to a PNG for Word) ──────────
+const MOCKUP_SYSTEM_PROMPT = `You generate a single, self-contained HTML fragment that visually approximates an SAP S/4HANA Fiori (or Dassian A&D add-on) application screen, for use as an illustrative screenshot in a test script.
+
+Hard requirements:
+- Output ONLY the HTML fragment. No markdown, no code fences, no commentary, no <html>/<head>/<body> wrapper.
+- A single root <div> with an explicit inline width and height in px equal to the requested size. Everything must be positioned with INLINE styles only.
+- Use ONLY inline CSS and system fonts (font-family: Arial, Helvetica, sans-serif). NO external resources: no <img src>, no web fonts, no <link>, no <script>, no background-image URLs. Icons must be inline SVG or unicode glyphs.
+- Reproduce the Fiori 3 / Quartz Light look: a dark shell bar (background #354a5f, white text) with the app title, an action button strip, and a content area that is either a List Report table or an Object Page form, matching the app. Use the SAP action-blue #0a6ed1 for primary buttons and #ffffff page background, #edeff0 separators, #32363a text.
+- Populate the screen with the provided test data so the screenshot looks like the tester's actual entry. Make it look real and tidy; align columns; show realistic values.`
+
+async function handleFioriMockup(context: {
+  systemLabel?: string; systemKind?: string
+  fioriTile?: string; fioriAppId?: string; tcode?: string
+  processStep?: string; caseTitle?: string
+  testData?: { field: string; value: string }[]
+  width?: number; height?: number
+}) {
+  const width = Math.min(Math.max(context.width || 1000, 600), 1400)
+  const height = Math.min(Math.max(context.height || 620, 400), 900)
+  const td = (context.testData || []).map(t => `${t.field}: ${t.value}`).join('\n') || '(no specific values)'
+  const isDassian = context.systemKind === 'dassian'
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 3000,
+    system: MOCKUP_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Render a ${width}x${height}px mockup of this screen.
+
+App: ${context.fioriTile || context.caseTitle || 'SAP application'}${context.fioriAppId ? ` (${context.fioriAppId})` : ''}${context.tcode ? ` / T-code ${context.tcode}` : ''}
+System: ${context.systemLabel || (isDassian ? 'Dassian A&D' : 'SAP S/4HANA')}${isDassian ? ' — Dassian Aerospace & Defense add-on UI' : ''}
+Process step / test case: ${context.processStep || context.caseTitle || ''}
+Show these entries on screen:
+${td}
+
+Root element must be exactly: <div style="width:${width}px;height:${height}px;...">. Output only that HTML.`,
+    }],
+  })
+  const raw = response.content[0].type === 'text' ? response.content[0].text : ''
+  const html = raw.replace(/```html\n?/gi, '').replace(/```\n?/g, '').trim()
+  return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
 }
 
 // ─── Bedrock Data Integrations ─────────────────────────

@@ -9,6 +9,7 @@ import ProcessLeafEditor from './ProcessLeafEditor'
 import SipocLinkPanel from './SipocLinkPanel'
 import OverlayPanel from './OverlayPanel'
 import InterfacePanel from './InterfacePanel'
+import TestPlanDialog from './TestPlanDialog'
 
 // Leaf process view: a slim header with a collapsible details drawer
 // (description + scope-item ref + SIPOC link) above the full-bleed BPMN editor.
@@ -27,6 +28,7 @@ export default function ProcessLeafView({
   const updateNode = useProcessStore(s => s.updateNode)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [scaffolding, setScaffolding] = useState(false)
+  const [testPlanOpen, setTestPlanOpen] = useState(false)
 
   if (!node) return null
 
@@ -58,6 +60,18 @@ export default function ProcessLeafView({
             </span>
           )}
           <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setTestPlanOpen(true)}
+              title="Generate an executable test plan (Excel / Word) from this process flow"
+              className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#0EA5E9] hover:text-[#38BDF8] flex items-center gap-1"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <path d="M4 1.5h6a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1v-9a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M5 5l1.2 1.2L8.5 4M5 8.5l1.2 1.2L8.5 7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Create Test Plan
+            </button>
             {canScaffold && (
               <button
                 onClick={handleScaffold}
@@ -121,6 +135,8 @@ export default function ProcessLeafView({
       <div className="flex-1 min-h-0">
         <ProcessLeafEditor nodeId={nodeId} readOnly={readOnly} />
       </div>
+
+      {testPlanOpen && <TestPlanDialog nodeId={nodeId} onClose={() => setTestPlanOpen(false)} />}
     </div>
   )
 }
