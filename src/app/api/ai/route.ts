@@ -157,6 +157,10 @@ export async function POST(req: NextRequest) {
       return handleCapabilityMapDraft(prompt, context)
     } else if (action === 'capability-map-align') {
       return handleCapabilityMapAlign(context)
+    } else if (action === 'capability-map-consistency') {
+      return handleCapabilityMapConsistency(context)
+    } else if (action === 'capability-map-suggest') {
+      return handleCapabilityMapSuggest(prompt, context)
     } else if (action === 'tech-spec-questions') {
       return handleTechSpecQuestions(context)
     } else if (action === 'tech-spec-generate') {
@@ -1893,6 +1897,213 @@ Guidelines:
   } catch {
     return NextResponse.json({ error: 'Failed to parse capability alignment', raw: text }, { status: 500 })
   }
+}
+
+// ─── Capability Map: shared serialization + apply-action schema ──
+// Both the Consistency Checker and Suggest Updates return findings whose
+// `action` carries everything the workspace needs to apply the change directly.
+
+interface CapForAi { id: string; name: string; group?: string | null; workstream?: string | null; description?: string | null }
+
+function serializeCapsByStream(
+  caps: CapForAi[],
+  workstreams: { code: string; name: string; description?: string }[],
+): string {
+  const byWs = new Map<string, CapForAi[]>()
+  for (const c of caps) {
+    const k = c.workstream || '(unaligned)'
+    if (!byWs.has(k)) byWs.set(k, [])
+    byWs.get(k)!.push(c)
+  }
+  const wsName = new Map(workstreams.map(w => [w.code, w.name]))
+  const order = [...workstreams.map(w => w.code), '(unaligned)']
+  const lines: string[] = []
+  for (const code of order) {
+    const list = byWs.get(code)
+    if (!list?.length) continue
+    lines.push(`\n## VALUE STREAM: ${code}${wsName.has(code) ? ` (${wsName.get(code)})` : ''}`)
+    // group within stream by capability group (domain)
+    const byGrp = new Map<string, CapForAi[]>()
+    for (const c of list) {
+      const g = (c.group && c.group.trim()) || '(no group)'
+      if (!byGrp.has(g)) byGrp.set(g, [])
+      byGrp.get(g)!.push(c)
+    }
+    for (const [g, gl] of byGrp) {
+      lines.push(`  GROUP: ${g}`)
+      for (const c of gl) {
+        lines.push(`    - id=${c.id} | ${c.name}${c.description ? ` — ${c.description}` : ''}`)
+      }
+    }
+  }
+  return lines.join('\n')
+}
+
+const CAPMAP_ACTION_SCHEMA = `"action": {
+    "kind": "archive | rename | rehome | regroup | merge | add | none",
+    "targetId": "id of the capability to rename/rehome/regroup (single)",
+    "newName": "new capability name (for rename)",
+    "newGroup": "new capability group / L2 (for rename or regroup)",
+    "workstream": "value-stream code (for rehome or add)",
+    "keepId": "id of the capability to keep (for merge)",
+    "archiveIds": ["ids to archive (for merge or archive)"],
+    "name": "name of the capability to create (for add)",
+    "group": "capability group / L2 for the new capability (for add)",
+    "description": "one-line description (for add)"
+  }`
+
+// ─── Consistency Checker ────────────────────────────────
+// Reviews the whole capability list for duplicates, overlap, unclear value-stream
+// ownership, and inconsistent levels of detail; returns applyable findings.
+async function handleCapabilityMapConsistency(context?: {
+  capabilities?: CapForAi[]
+  workstreams?: { code: string; name: string; description?: string }[]
+}) {
+  const caps = context?.capabilities || []
+  const workstreams = context?.workstreams || []
+  if (caps.length === 0) {
+    return NextResponse.json({ error: 'No capabilities to check' }, { status: 400 })
+  }
+  const wsLines = workstreams.map(w => `- ${w.code} = ${w.name}${w.description ? ` — ${w.description}` : ''}`).join('\n')
+  const capBlock = serializeCapsByStream(caps, workstreams)
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    temperature: 0,
+    system: CAPABILITY_MAP_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Perform a CONSISTENCY REVIEW of the capability map below. Each capability has a stable id you MUST echo exactly in your findings.
+
+VALUE STREAMS:
+${wsLines}
+
+CAPABILITY MAP (grouped by value stream, then by capability group):
+${capBlock}
+
+Check for these issues and return one finding per concrete problem:
+1. DUPLICATE — two or more capabilities that mean the same thing (e.g. "Accounts Payable & 3-Way Match" vs "Verify Invoices and 3-Way Match"). Propose a merge (keep the best-named one, archive the rest).
+2. OVERLAP — capabilities whose scope substantially overlaps without being exact duplicates; propose how to delineate or merge.
+3. OWNERSHIP — a capability that sits in the wrong value stream, or a capability whose ownership is ambiguous (could plausibly live in two streams). Propose a rehome to the single best-fit stream, or note the ambiguity.
+4. GRANULARITY — capabilities specified at an inconsistent level of detail (a high-level umbrella capability sitting beside fine-grained sibling tasks). Propose splitting the umbrella or rolling the fine ones up.
+5. GROUPING — capabilities whose group (L2) is inconsistent with siblings, or near-duplicate group names (e.g. "Procurement Operations" vs "Requisition & Order"); propose a regroup.
+6. NAMING — capabilities not following the action-verb-led convention used by the rest of the map; propose a rename.
+
+Return ONLY valid JSON in this exact shape:
+{
+  "score": 0-100,
+  "summary": "2-3 sentence overall assessment of the map's internal consistency.",
+  "findings": [
+    {
+      "type": "duplicate | overlap | ownership | granularity | grouping | naming",
+      "severity": "high | medium | low",
+      "title": "Short title of the issue",
+      "detail": "What is inconsistent and why it matters, naming the specific capabilities.",
+      "capabilityIds": ["ids involved in this finding"],
+      ${CAPMAP_ACTION_SCHEMA}
+    }
+  ]
+}
+
+Rules:
+- The score reflects overall consistency (100 = clean, no duplicates/overlap, clear ownership, uniform detail).
+- Only include fields of "action" that apply to its "kind"; use "none" when there is no safe automatic fix.
+- Echo ids EXACTLY as given (the "id=" value). Never invent ids.
+- Prefer merges for true duplicates: keepId = the better capability, archiveIds = the rest.
+- Be specific and conservative: only flag genuine issues. If the map is clean, return an empty findings array.
+- Order findings by severity (high first). No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const parsed = looseParseJson(text) as { score?: number; summary?: string; findings?: unknown[] } | null
+  if (parsed && Array.isArray(parsed.findings)) {
+    return NextResponse.json(parsed)
+  }
+  const findings = salvageObjectArray(text, 'findings')
+  if (findings.length) {
+    return NextResponse.json({ score: parsed?.score ?? null, summary: parsed?.summary ?? '', findings })
+  }
+  return NextResponse.json({ error: 'Failed to parse consistency review', raw: text.slice(0, 500) }, { status: 500 })
+}
+
+// ─── Suggest Updates ────────────────────────────────────
+// Prompt-driven: analyzes the capability list against the user's request plus the
+// standing quality bars (consistency, non-overlap, uniform detail) and returns
+// applyable suggestions (add / rename / rehome / regroup / merge / archive).
+async function handleCapabilityMapSuggest(prompt: string, context?: {
+  capabilities?: CapForAi[]
+  workstreams?: { code: string; name: string; description?: string }[]
+}) {
+  const caps = context?.capabilities || []
+  const workstreams = context?.workstreams || []
+  if (caps.length === 0) {
+    return NextResponse.json({ error: 'No capabilities to analyze' }, { status: 400 })
+  }
+  const wsLines = workstreams.map(w => `- ${w.code} = ${w.name}${w.description ? ` — ${w.description}` : ''}`).join('\n')
+  const capBlock = serializeCapsByStream(caps, workstreams)
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    temperature: 0.2,
+    system: CAPABILITY_MAP_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Analyze the capability map below and SUGGEST UPDATES. Each capability has a stable id you MUST echo exactly when your suggestion targets an existing capability.
+
+USER REQUEST: ${prompt?.trim() ? prompt.trim() : 'No specific focus — do a general improvement pass.'}
+
+Apply these standing quality bars in addition to the user request:
+- Consistency: capabilities follow the action-verb-led naming convention and a uniform structure.
+- No overlap / no duplicates: each capability is distinct and owned by exactly one value stream.
+- Consistent level of detail: capabilities within a stream sit at a comparable granularity.
+- Completeness: surface genuinely missing capabilities relevant to the request.
+
+VALUE STREAMS:
+${wsLines}
+
+CAPABILITY MAP (grouped by value stream, then by capability group):
+${capBlock}
+
+Return ONLY valid JSON in this exact shape:
+{
+  "summary": "2-3 sentence summary of what you recommend and why.",
+  "suggestions": [
+    {
+      "type": "add | rename | rehome | regroup | merge | archive | split",
+      "impact": "high | medium | low",
+      "title": "Short title of the suggested change",
+      "rationale": "Why this change improves the map (tie back to the request and quality bars).",
+      "capabilityIds": ["ids of existing capabilities involved (empty for pure additions)"],
+      ${CAPMAP_ACTION_SCHEMA}
+    }
+  ]
+}
+
+Rules:
+- For "add", fill action.name, action.group, action.workstream (a code from the list), and action.description; leave capabilityIds empty.
+- For "rename"/"regroup", set action.targetId plus action.newName and/or action.newGroup.
+- For "rehome", set action.targetId and action.workstream.
+- For "merge", set action.keepId and action.archiveIds.
+- For "archive", set action.archiveIds.
+- For "split", describe it in the detail and use action.kind "add" entries in follow-up — keep one suggestion per new capability.
+- Echo ids EXACTLY. Never invent ids. Use ONLY value-stream codes from the list.
+- Be specific and concrete; aim for the highest-impact 5-15 suggestions. No markdown, just the JSON object.`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const parsed = looseParseJson(text) as { summary?: string; suggestions?: unknown[] } | null
+  if (parsed && Array.isArray(parsed.suggestions)) {
+    return NextResponse.json(parsed)
+  }
+  const suggestions = salvageObjectArray(text, 'suggestions')
+  if (suggestions.length) {
+    return NextResponse.json({ summary: parsed?.summary ?? '', suggestions })
+  }
+  return NextResponse.json({ error: 'Failed to parse update suggestions', raw: text.slice(0, 500) }, { status: 500 })
 }
 
 // ─── Integration Technical Spec ────────────────────────

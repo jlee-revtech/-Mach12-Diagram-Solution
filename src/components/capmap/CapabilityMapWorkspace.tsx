@@ -12,6 +12,7 @@ import { listWorkstreams, seedStandardWorkstreams } from '@/lib/supabase/workstr
 import { STANDARD_WORKSTREAMS } from '@/lib/workstream/catalog'
 import { flattenStandardCapabilities } from '@/lib/capmap/standardCapabilities'
 import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
+import CapabilityAIReviewPanel from '@/components/capmap/CapabilityAIReviewPanel'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
@@ -45,6 +46,9 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const [aiBusy, setAiBusy] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiResults, setAiResults] = useState<DraftCap[] | null>(null)
+
+  // AI review/apply panel (Consistency Checker + Suggest Updates)
+  const [aiReview, setAiReview] = useState<'consistency' | 'suggest' | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -409,6 +413,18 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="9" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="2" y="8.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M11.5 9v4.5M9.25 11.25h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
           {seedingStd ? 'Seeding…' : 'Seed standard'}
         </button>
+        {caps.length > 0 && (
+          <button type="button" onClick={() => setAiReview('consistency')} title="AI review of duplicates, overlap, ownership, and level of detail across the capability map" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.3"/><path d="M10.5 10.5l3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M5.2 7l1.3 1.3 2.3-2.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Consistency Check
+          </button>
+        )}
+        {caps.length > 0 && (
+          <button type="button" onClick={() => setAiReview('suggest')} title="Prompt the AI to suggest updates for consistency, non-overlap, and uniform level of detail" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v3M8 11v3M2 8h3M11 8h3M4 4l2 2M10 10l2 2M12 4l-2 2M6 10l-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+            Suggest Updates
+          </button>
+        )}
         <button type="button" onClick={openAi} className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.6 3.4 3.7.5-2.7 2.6.6 3.7L8 9.9 4.8 11.7l.6-3.7L2.7 5.4l3.7-.5L8 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
           AI Draft
@@ -669,6 +685,19 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             </div>
           </div>
         </>
+      )}
+
+      {/* ─── AI Consistency Checker / Suggest Updates panel ─── */}
+      {aiReview && (
+        <CapabilityAIReviewPanel
+          mode={aiReview}
+          caps={caps}
+          workstreams={workstreams}
+          orgId={orgId}
+          userId={userId}
+          onClose={() => setAiReview(null)}
+          onApplied={load}
+        />
       )}
 
       {/* ─── AI Draft modal ─── */}
