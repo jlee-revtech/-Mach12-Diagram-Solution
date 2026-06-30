@@ -482,7 +482,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                           <div className="flex-1 h-px bg-[var(--m12-border)]/15" />
                         </div>
                       )}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         {groupCaps.map(c => (
                           <div
                             key={c.id}
@@ -569,7 +569,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             Archived ({archivedCaps.length})
           </button>
           {showArchived && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {archivedCaps.map(c => (
                 <div key={c.id} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/20 rounded-xl p-4 opacity-70 hover:opacity-100 transition-opacity">
                   <div className="flex items-start gap-2 mb-1">
