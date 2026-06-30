@@ -1774,7 +1774,10 @@ You understand:
 - A&D/GovCon end-to-end value streams (workstreams): Bid-to-Win, Contract-to-Closeout, Plan-to-Produce, Source-to-Pay, Design-to-Release, Acquire-to-Retire, Sustainment/MRO, Plan-to-Perform (Program & Portfolio), Record-to-Report, Hire-to-Retire. Every capability belongs to exactly one value stream.
 - A&D/GovCon enterprise systems and which capabilities they realize (ERP=SAP S/4HANA, PLM=Teamcenter/Windchill, IMS=Primavera P6, HCM=SuccessFactors/Workday/Costpoint, CLM=Dassian/Icertis, MES=SAP DM/Opcenter, FP&A=SAC/Anaplan, etc.).
 
-You assign each capability to one value stream (by code) and map it to the LOGICAL bedrock system categories that typically realize it, using ONLY the systemType slugs and value-stream codes provided.`
+You assign every capability on THREE axes, using ONLY the value-stream codes, systemType slugs, and physical-product names provided:
+1. VALUE STREAM — the single end-to-end stream the capability belongs to (by code).
+2. LOGICAL SYSTEM(S) — the 1-3 bedrock system categories (systemType slugs) that realize the capability (e.g. erp, plm, ims, clm, hcm, fpa, analytics, middleware).
+3. PHYSICAL SYSTEM(S) — for EACH logical system, the specific product that realizes it in THIS organization, chosen from that logical system's listed physical options (e.g. erp -> SAP S/4HANA, ims -> Oracle Primavera P6, clm -> Dassian, hcm -> SAP SuccessFactors). The first physical listed for a logical system is its default/primary; pick a more specific one only when the capability clearly calls for it (e.g. labor distribution -> Deltek Costpoint).`
 
 async function handleCapabilityMapDraft(prompt: string, context?: {
   catalog?: { systemType: string; label: string; physicals?: string[] }[]
@@ -1788,7 +1791,7 @@ async function handleCapabilityMapDraft(prompt: string, context?: {
   }
   const workstreams = context?.workstreams || []
   const catalogLines = catalog
-    .map(c => `- ${c.systemType} = ${c.label}${c.physicals?.length ? ` (${c.physicals.join(', ')})` : ''}`)
+    .map(c => `- ${c.systemType} = ${c.label}${c.physicals?.length ? ` -> physical options: ${c.physicals.join(', ')} (first = default/primary)` : ' (no physical products defined)'}`)
     .join('\n')
   const wsLines = workstreams.length
     ? workstreams.map(w => `- ${w.code} = ${w.name}${w.description ? ` — ${w.description}` : ''}`).join('\n')
@@ -1813,26 +1816,30 @@ ${prompt ? `Organization context / request: ${prompt}` : 'Assume a typical Aeros
 VALUE STREAMS (assign each capability to exactly one, by code):
 ${wsLines}
 
-BEDROCK SYSTEM CATALOG (use ONLY these systemType slugs):
+BEDROCK SYSTEM CATALOG (use ONLY these systemType slugs and the physical product names listed for each):
 ${catalogLines}${existingNote}
 
 Return ONLY valid JSON in this exact shape:
 {
   "capabilities": [
     {
-      "name": "Capability name (concise noun phrase)",
+      "name": "Capability name (concise action-verb-led phrase, e.g. \\"Manage Supplier Invoices\\")",
       "workstream": "value stream code from the list above",
-      "domain": "Optional finer grouping (e.g. Finance, Supply Chain, Engineering)",
+      "domain": "Capability group / L2 this belongs to (e.g. \\"Process Accounts Payable\\")",
       "description": "One-line description of the capability",
-      "systems": ["systemType slugs from the catalog that realize this capability"]
+      "systems": [
+        { "systemType": "logical systemType slug from the catalog", "physical": "one physical product name from THAT system's listed options" }
+      ]
     }
   ]
 }
 
 Guidelines:
 - Produce a thorough capability map${context?.focusWorkstream ? ' for the focused value stream (roughly 6-15 capabilities)' : ': roughly 25-45 capabilities spanning all the value streams'}.
-- "workstream" MUST be one of the value-stream codes listed above. Every capability gets exactly one.
-- Each capability maps to 1-3 logical systemType slugs. Use ONLY slugs present in the catalog.
+- "workstream" MUST be one of the value-stream codes listed above. Every capability gets exactly one (VALUE STREAM assignment).
+- "systems" maps each capability to 1-3 LOGICAL systems. For EACH entry pick the systemType slug AND one specific "physical" product from that system's listed options (PHYSICAL assignment). Use the first listed physical as the default unless the capability clearly calls for a specific one.
+- Use ONLY systemType slugs and physical names present in the catalog. Never invent a system or product.
+- "domain" should be an action-verb-led capability group; keep groups consistent across sibling capabilities.
 - Be A&D/GovCon-grade and concrete. Order by value stream.
 - Do NOT duplicate anything listed as already present.
 - No markdown, just the JSON object.`,

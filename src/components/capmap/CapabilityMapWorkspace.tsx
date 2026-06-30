@@ -21,7 +21,7 @@ import type { Workstream } from '@/lib/workstream/types'
 
 const UNALIGNED = '__unaligned__'
 
-interface DraftCap { name: string; workstreamCode: string; domain: string; description: string; systems: string[]; selected: boolean }
+interface DraftCap { name: string; workstreamCode: string; domain: string; description: string; systems: string[]; physicalSystemIds: string[]; physicalLabels: string[]; selected: boolean }
 
 export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: string; userId: string }) {
   const [catalog, setCatalog] = useState<BedrockSystemWithPhysicals[]>([])
@@ -315,11 +315,32 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
         }),
       })
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Draft failed') }
-      const data = await res.json() as { capabilities?: { name: string; workstream?: string; domain?: string; description?: string; systems?: string[] }[] }
+      type RawSystem = string | { systemType?: string; physical?: string }
+      const data = await res.json() as { capabilities?: { name: string; workstream?: string; domain?: string; description?: string; systems?: RawSystem[] }[] }
+      // Resolve a physical product (by name) under a logical system, falling back to its primary.
+      const resolvePhysical = (systemType: string, physName?: string): { id: string; label: string } | null => {
+        const sys = catByType.get(systemType)
+        if (!sys?.physicals?.length) return null
+        const match = physName ? sys.physicals.find(p => p.name.toLowerCase() === physName.trim().toLowerCase()) : undefined
+        const p = match ?? sys.physicals.find(p => p.is_primary) ?? sys.physicals[0]
+        return p ? { id: p.id, label: p.name } : null
+      }
       const existing = new Set(caps.map(c => c.name.toLowerCase()))
       const drafts: DraftCap[] = (data.capabilities || [])
         .filter(d => d.name && !existing.has(d.name.toLowerCase()))
-        .map(d => ({ name: d.name, workstreamCode: d.workstream && wsByCode.has(d.workstream) ? d.workstream : '', domain: d.domain || '', description: d.description || '', systems: (d.systems || []).filter(s => catByType.has(s)), selected: true }))
+        .map(d => {
+          const logical: string[] = []
+          const physIds: string[] = []
+          const physLabels: string[] = []
+          for (const entry of d.systems || []) {
+            const st = typeof entry === 'string' ? entry : entry?.systemType
+            if (!st || !catByType.has(st)) continue
+            if (!logical.includes(st)) logical.push(st)
+            const resolved = resolvePhysical(st, typeof entry === 'string' ? undefined : entry?.physical)
+            if (resolved && !physIds.includes(resolved.id)) { physIds.push(resolved.id); physLabels.push(resolved.label) }
+          }
+          return { name: d.name, workstreamCode: d.workstream && wsByCode.has(d.workstream) ? d.workstream : '', domain: d.domain || '', description: d.description || '', systems: logical, physicalSystemIds: physIds, physicalLabels: physLabels, selected: true }
+        })
       setAiResults(drafts)
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Draft failed')
@@ -340,6 +361,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
         domain: d.domain || undefined,
         workstream_id: d.workstreamCode ? wsByCode.get(d.workstreamCode)?.id ?? null : null,
         bedrockSystemIds: d.systems.map(s => catByType.get(s)?.id).filter((x): x is string => !!x),
+        physicalSystemIds: d.physicalSystemIds,
       })))
       setAiOpen(false); setAiResults(null); setAiPrompt(''); setAiFocusWs('')
       await load()
@@ -751,6 +773,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                               {d.description && <div className="text-[10px] text-[var(--m12-text-muted)] line-clamp-1">{d.description}</div>}
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {d.systems.map(st => { const s = catByType.get(st); return s ? <span key={st} className="text-[9px] rounded px-1 py-0.5 border" style={{ color: s.color || '#10B981', borderColor: `${s.color || '#10B981'}55` }}>{s.label}</span> : null })}
+                                {d.physicalLabels.map((pl, k) => <span key={`p${k}`} className="text-[9px] rounded px-1 py-0.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)]">{pl}</span>)}
                               </div>
                             </div>
                           </label>

@@ -145,7 +145,7 @@ export async function removeCapabilityPhysicalSystem(capabilityId: string, physi
 export async function bulkCreateCapabilities(
   orgId: string,
   userId: string,
-  items: { name: string; description?: string; domain?: string; workstream_id?: string | null; bedrockSystemIds: string[] }[],
+  items: { name: string; description?: string; domain?: string; workstream_id?: string | null; bedrockSystemIds: string[]; physicalSystemIds?: string[] }[],
   source = 'ai'
 ): Promise<Capability[]> {
   if (items.length === 0) return []
@@ -171,6 +171,9 @@ export async function bulkCreateCapabilities(
   created.forEach((cap, i) => {
     for (const sysId of items[i].bedrockSystemIds) {
       links.push({ organization_id: orgId, ...(userId ? { created_by: userId } : {}), capability_id: cap.id, bedrock_system_id: sysId })
+    }
+    for (const physId of items[i].physicalSystemIds ?? []) {
+      links.push({ organization_id: orgId, ...(userId ? { created_by: userId } : {}), capability_id: cap.id, physical_system_id: physId })
     }
   })
   if (links.length) {
