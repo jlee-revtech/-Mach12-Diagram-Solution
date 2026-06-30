@@ -209,7 +209,7 @@ export default function CapabilityAIReviewPanel({
               <div className="text-[8px] uppercase tracking-wider text-[var(--m12-text-muted)]">consistency</div>
             </div>
           )}
-          <button onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors" aria-label="Close">
+          <button type="button" onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors" aria-label="Close">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </button>
         </div>
@@ -225,7 +225,7 @@ export default function CapabilityAIReviewPanel({
               className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] placeholder:text-[var(--m12-text-muted)] focus:outline-none focus:border-[#10B981]/60 resize-none"
             />
             <div className="flex justify-end mt-2">
-              <button onClick={run} disabled={busy} className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#34D399] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <button type="button" onClick={run} disabled={busy} className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#34D399] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                 {busy ? 'Analyzing…' : ran ? 'Re-run' : 'Analyze'}
               </button>
             </div>
@@ -283,9 +283,9 @@ export default function CapabilityAIReviewPanel({
                     </span>
                   ) : (
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={() => setStatus(s => ({ ...s, [i]: 'dismissed' }))} className="text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] px-2 py-1 transition-colors">Dismiss</button>
+                      <button type="button" onClick={() => setStatus(s => ({ ...s, [i]: 'dismissed' }))} className="text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] px-2 py-1 transition-colors">Dismiss</button>
                       {canApply && (
-                        <button onClick={() => applyOne(i, f)} disabled={st === 'applying'} className="text-[10px] font-medium bg-[#10B981] hover:bg-[#34D399] disabled:opacity-50 text-white px-2.5 py-1 rounded-md transition-colors">
+                        <button type="button" onClick={() => applyOne(i, f)} disabled={st === 'applying'} className="text-[10px] font-medium bg-[#10B981] hover:bg-[#34D399] disabled:opacity-50 text-white px-2.5 py-1 rounded-md transition-colors">
                           {st === 'applying' ? 'Applying…' : st === 'error' ? 'Retry' : 'Apply'}
                         </button>
                       )}
@@ -302,8 +302,8 @@ export default function CapabilityAIReviewPanel({
           <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-[var(--m12-border)]/30">
             <span className="text-[11px] text-[var(--m12-text-muted)]">{applyableCount} change{applyableCount === 1 ? '' : 's'} ready to apply</span>
             <div className="flex items-center gap-2">
-              <button onClick={onClose} className="text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] px-3 py-1.5 transition-colors">Done</button>
-              <button onClick={applyAll} disabled={applyableCount === 0} className="inline-flex items-center gap-1.5 bg-[#10B981] hover:bg-[#34D399] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+              <button type="button" onClick={onClose} className="text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] px-3 py-1.5 transition-colors">Done</button>
+              <button type="button" onClick={applyAll} disabled={applyableCount === 0} className="inline-flex items-center gap-1.5 bg-[#10B981] hover:bg-[#34D399] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
                 Apply all ({applyableCount})
               </button>
             </div>

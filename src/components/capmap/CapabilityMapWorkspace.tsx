@@ -50,13 +50,16 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   // AI review/apply panel (Consistency Checker + Suggest Updates)
   const [aiReview, setAiReview] = useState<'consistency' | 'suggest' | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  // silent: refetch without tripping the full-screen loading gate (which would
+  // unmount any open panel/modal and remount it — e.g. re-running the AI review).
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true)
     const [c, m, w] = await Promise.all([listBedrockCatalog(orgId), listCapabilityMap(orgId, true), listWorkstreams(orgId)])
     setCatalog(c)
     setCaps(m.filter(x => !x.archived_at))
     setArchivedCaps(m.filter(x => x.archived_at))
-    setWorkstreams(w); setLoading(false)
+    setWorkstreams(w)
+    if (!opts?.silent) setLoading(false)
   }, [orgId])
   useEffect(() => { load() }, [load])
 
@@ -718,7 +721,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           orgId={orgId}
           userId={userId}
           onClose={() => setAiReview(null)}
-          onApplied={load}
+          onApplied={() => load({ silent: true })}
         />
       )}
 
