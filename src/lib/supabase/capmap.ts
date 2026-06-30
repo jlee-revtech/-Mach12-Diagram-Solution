@@ -39,12 +39,23 @@ export async function listCapabilities(orgId: string, includeArchived = false): 
 }
 
 export async function listCapabilitySystems(orgId: string): Promise<CapabilitySystemLink[]> {
-  const res = await fetch(
-    `${URL}/rest/v1/cm_capability_systems?organization_id=eq.${orgId}&select=*`,
-    { headers: headers() }
-  )
-  if (!res.ok) return []
-  return res.json()
+  // Page via Range — link rows can exceed PostgREST's 1000-row cap, which would
+  // otherwise silently drop some capability→system mappings.
+  const all: CapabilitySystemLink[] = []
+  let from = 0
+  const pageSize = 1000
+  while (true) {
+    const res = await fetch(
+      `${URL}/rest/v1/cm_capability_systems?organization_id=eq.${orgId}&select=*`,
+      { headers: { ...headers(), 'Range-Unit': 'items', 'Range': `${from}-${from + pageSize - 1}` } }
+    )
+    if (!res.ok) { if (res.status === 416) break; return all }
+    const chunk = await res.json() as CapabilitySystemLink[]
+    all.push(...chunk)
+    if (chunk.length < pageSize) break
+    from += pageSize
+  }
+  return all
 }
 
 // Capabilities merged with their logical + physical system ids.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
   listCapabilityMap, createCapability, updateCapability, deleteCapability,
   archiveCapability, restoreCapability,
@@ -12,6 +12,7 @@ import { listWorkstreams, seedStandardWorkstreams } from '@/lib/supabase/workstr
 import { STANDARD_WORKSTREAMS } from '@/lib/workstream/catalog'
 import { flattenStandardCapabilities } from '@/lib/capmap/standardCapabilities'
 import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
+import { createCmCapabilityShare, listCmCapabilityShares, deleteCmCapabilityShare, type CmCapabilityShare } from '@/lib/supabase/capmap-shares'
 import CapabilityAIReviewPanel from '@/components/capmap/CapabilityAIReviewPanel'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
@@ -49,6 +50,13 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
 
   // AI review/apply panel (Consistency Checker + Suggest Updates)
   const [aiReview, setAiReview] = useState<'consistency' | 'suggest' | null>(null)
+
+  // Read-only share links
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shares, setShares] = useState<CmCapabilityShare[]>([])
+  const [shareBusy, setShareBusy] = useState(false)
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const shareRef = useRef<HTMLDivElement>(null)
 
   // silent: refetch without tripping the full-screen loading gate (which would
   // unmount any open panel/modal and remount it — e.g. re-running the AI review).
@@ -375,6 +383,46 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     }
   }
 
+  // ─── Read-only share links ───
+  useEffect(() => {
+    if (!shareOpen) return
+    const h = (e: MouseEvent) => { if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [shareOpen])
+
+  const openShare = useCallback(async () => {
+    const next = !shareOpen
+    setShareOpen(next)
+    if (next) setShares(await listCmCapabilityShares(orgId))
+  }, [shareOpen, orgId])
+
+  const createWeekShare = useCallback(async () => {
+    setShareBusy(true)
+    try {
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      await createCmCapabilityShare(orgId, userId, expiresAt)
+      setShares(await listCmCapabilityShares(orgId))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create share link. Has migration 039 been run?')
+    } finally {
+      setShareBusy(false)
+    }
+  }, [orgId, userId])
+
+  const revokeShare = useCallback(async (id: string) => {
+    await deleteCmCapabilityShare(id).catch(() => {})
+    setShares(await listCmCapabilityShares(orgId))
+  }, [orgId])
+
+  const copyShareLink = useCallback((code: string) => {
+    navigator.clipboard.writeText(`${window.location.origin}/share/capmap/${code}`)
+    setCopiedCode(code)
+    setTimeout(() => setCopiedCode(c => (c === code ? null : c)), 2000)
+  }, [])
+
+  const activeShares = shares.filter(s => !s.expires_at || new Date(s.expires_at) > new Date())
+
   // ─── Render ───
   if (loading) return <div className="py-24 text-center text-sm text-[var(--m12-text-muted)]">Loading capability map…</div>
 
@@ -433,6 +481,41 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.5 11.5v1A1.5 1.5 0 004 14h8a1.5 1.5 0 001.5-1.5v-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
             Download
           </button>
+        )}
+        {caps.length > 0 && (
+          <div ref={shareRef} className="relative">
+            <button type="button" onClick={openShare} title="Create a read-only public link to this capability map" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.3"/><circle cx="12" cy="4" r="1.8" stroke="currentColor" strokeWidth="1.3"/><circle cx="12" cy="12" r="1.8" stroke="currentColor" strokeWidth="1.3"/><path d="M5.6 7.1l4.8-2.2M5.6 8.9l4.8 2.2" stroke="currentColor" strokeWidth="1.3"/></svg>
+              Share
+            </button>
+            {shareOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-80 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-[var(--m12-border)]/20">
+                  <div className="text-xs font-semibold text-[var(--m12-text)]">Read-only share link</div>
+                  <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">Anyone with the link can view the capability list (board + pivots). No login, no edits, no AI tools.</div>
+                </div>
+                <div className="p-3 space-y-2 max-h-72 overflow-y-auto">
+                  {activeShares.map(s => (
+                    <div key={s.id} className="bg-[var(--m12-bg)] rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <input readOnly aria-label="Read-only share link" value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/capmap/${s.code}`} onClick={e => (e.target as HTMLInputElement).select()} className="flex-1 bg-transparent text-[10px] text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)] truncate focus:outline-none" />
+                        <button type="button" onClick={() => copyShareLink(s.code)} className="shrink-0 text-[9px] font-medium text-[#34D399] hover:text-[#10B981] transition-colors">{copiedCode === s.code ? 'Copied!' : 'Copy'}</button>
+                        <button type="button" onClick={() => revokeShare(s.id)} title="Revoke this link" className="shrink-0 text-[var(--m12-text-muted)] hover:text-red-400 transition-colors">
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                        </button>
+                      </div>
+                      <div className="text-[9px] text-[var(--m12-text-muted)] mt-1">{s.expires_at ? `Expires ${new Date(s.expires_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}` : 'No expiry'}</div>
+                    </div>
+                  ))}
+                  {activeShares.length === 0 && <div className="text-[11px] text-[var(--m12-text-muted)] text-center py-2">No active links.</div>}
+                  <button type="button" onClick={createWeekShare} disabled={shareBusy} className="w-full flex items-center justify-center gap-1.5 bg-[#10B981] hover:bg-[#34D399] disabled:opacity-50 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2v6M2 5h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                    {shareBusy ? 'Generating…' : 'Generate 1-week link'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         <button type="button" onClick={handleSeedStandard} disabled={seedingStd} title="Seed a standard A&D capability map across every value stream" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 disabled:opacity-50 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="9" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="2" y="8.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M11.5 9v4.5M9.25 11.25h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
