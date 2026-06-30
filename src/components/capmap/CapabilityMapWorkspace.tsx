@@ -10,7 +10,8 @@ import {
 import { listBedrockCatalog, seedBedrockSystems } from '@/lib/supabase/bedrock-systems'
 import { listWorkstreams, seedStandardWorkstreams } from '@/lib/supabase/workstreams'
 import { STANDARD_WORKSTREAMS } from '@/lib/workstream/catalog'
-import { STANDARD_CAPABILITIES } from '@/lib/capmap/standardCapabilities'
+import { flattenStandardCapabilities } from '@/lib/capmap/standardCapabilities'
+import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
@@ -261,15 +262,20 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     try {
       const ws = await ensureWorkstreams()
       const codeToId = new Map(ws.map(w => [w.code, w.id]))
-      const existing = new Set(caps.map(c => c.name.trim().toLowerCase()))
+      // Dedup by value stream + capability group (domain) + sub-capability name, so the
+      // same granular verb can appear under different groups / streams without collisions.
+      const keyOf = (wsId: string | null, group: string, name: string) =>
+        `${wsId ?? ''}|${group.trim().toLowerCase()}|${name.trim().toLowerCase()}`
+      const existing = new Set(caps.map(c => keyOf(c.workstream_id, c.domain ?? '', c.name)))
       const items: { name: string; description?: string; domain?: string; workstream_id?: string | null; bedrockSystemIds: string[] }[] = []
       for (const def of STANDARD_WORKSTREAMS) {
         const wsId = codeToId.get(def.code) ?? null
-        for (const cap of STANDARD_CAPABILITIES[def.code] ?? []) {
-          const key = cap.name.trim().toLowerCase()
+        for (const cap of flattenStandardCapabilities(def.code)) {
+          const key = keyOf(wsId, cap.group, cap.name)
           if (existing.has(key)) continue
           existing.add(key)
-          items.push({ name: cap.name, description: cap.description, domain: cap.domain, workstream_id: wsId, bedrockSystemIds: [] })
+          // domain carries the L2 capability group; the board renders it as a sub-header.
+          items.push({ name: cap.name, description: cap.description, domain: cap.group, workstream_id: wsId, bedrockSystemIds: [] })
         }
       }
       if (items.length === 0) { alert('The standard capability map is already seeded for every value stream.'); return }
@@ -393,6 +399,12 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             {aligning ? 'Aligning…' : `Align to value streams${unalignedCount ? ` (${unalignedCount})` : ''}`}
           </button>
         )}
+        {caps.length > 0 && (
+          <button type="button" onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog)} title="Download the capability map as an Excel workbook" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.5 11.5v1A1.5 1.5 0 004 14h8a1.5 1.5 0 001.5-1.5v-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+            Download
+          </button>
+        )}
         <button type="button" onClick={handleSeedStandard} disabled={seedingStd} title="Seed a standard A&D capability map across every value stream" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 disabled:opacity-50 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="9" y="2.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><rect x="2" y="8.5" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M11.5 9v4.5M9.25 11.25h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
           {seedingStd ? 'Seeding…' : 'Seed standard'}
@@ -440,51 +452,76 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       ) : view === 'board' ? (
         /* ─── Board (grouped by value stream) ─── */
         <div className="space-y-6">
-          {groups.map(({ key, ws, list }) => (
-            <div key={key}>
-              <div className="flex items-center gap-2 mb-2">
-                {ws ? <span style={{ color: ws.color || '#10B981' }}><WorkstreamIcon icon={ws.icon} size={14} /></span> : <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />}
-                <h3 className="text-[12px] font-semibold tracking-wide" style={{ color: ws?.color || '#FBBF24' }}>{ws ? ws.name : 'Unaligned'}</h3>
-                <span className="text-[10px] text-[var(--m12-text-muted)]">{list.length}</span>
-                <div className="flex-1 h-px bg-[var(--m12-border)]/30" />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {list.map(c => (
-                  <div
-                    key={c.id}
-                    onClick={() => setSelectedId(c.id)}
-                    className={`group text-left bg-[var(--m12-bg-card)] border rounded-xl p-4 transition-all card-glow cursor-pointer ${selectedId === c.id ? 'border-[#10B981]/70' : 'border-[var(--m12-border)]/40 hover:border-[var(--m12-border)]'}`}
-                  >
-                    <div className="flex items-start gap-2 mb-2">
-                      <h4 className="text-sm font-semibold text-[var(--m12-text)] flex-1">{c.name}</h4>
-                      {c.domain && <span className="text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] shrink-0">{c.domain}</span>}
-                      {c.source === 'ai' && <span className="text-[8px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#34D399] border border-[#10B981]/40 rounded px-1 py-0.5 shrink-0">AI</span>}
-                      <button type="button" onClick={(e) => handleArchiveCap(c.id, e)} title="Archive capability" className="text-[var(--m12-border)] hover:text-[#EAB308] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-                      </button>
-                    </div>
-                    {c.description && <p className="text-[11px] text-[var(--m12-text-muted)] mb-2 line-clamp-2">{c.description}</p>}
-                    <div className="flex flex-wrap gap-1">
-                      {c.logicalSystemIds.length === 0 && c.physicalSystemIds.length === 0 && (
-                        <span className="text-[10px] text-[var(--m12-text-muted)] italic">Unmapped</span>
+          {groups.map(({ key, ws, list }) => {
+            // Sub-group by capability group (domain = the L2 tier), preserving sort order.
+            const subMap = new Map<string, CapabilityWithSystems[]>()
+            for (const c of list) {
+              const g = c.domain && c.domain.trim() ? c.domain.trim() : 'Other capabilities'
+              if (!subMap.has(g)) subMap.set(g, [])
+              subMap.get(g)!.push(c)
+            }
+            const subGroups = Array.from(subMap.entries())
+            // Only show sub-headers when there is a real group structure (not a single "Other" bucket).
+            const showSub = subGroups.length > 1 || subGroups[0]?.[0] !== 'Other capabilities'
+            return (
+              <div key={key}>
+                <div className="flex items-center gap-2 mb-3">
+                  {ws ? <span style={{ color: ws.color || '#10B981' }}><WorkstreamIcon icon={ws.icon} size={14} /></span> : <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />}
+                  <h3 className="text-[12px] font-semibold tracking-wide" style={{ color: ws?.color || '#FBBF24' }}>{ws ? ws.name : 'Unaligned'}</h3>
+                  <span className="text-[10px] text-[var(--m12-text-muted)]">{list.length}</span>
+                  <div className="flex-1 h-px bg-[var(--m12-border)]/30" />
+                </div>
+                <div className="space-y-4">
+                  {subGroups.map(([groupName, groupCaps]) => (
+                    <div key={groupName}>
+                      {showSub && (
+                        <div className="flex items-center gap-2 mb-2 pl-0.5">
+                          <span className="w-1 h-3 rounded-full shrink-0" style={{ background: ws?.color || '#10B981' }} />
+                          <h4 className="text-[11px] font-semibold tracking-wide text-[var(--m12-text-secondary)]">{groupName}</h4>
+                          <span className="text-[10px] text-[var(--m12-text-muted)]">{groupCaps.length}</span>
+                          <div className="flex-1 h-px bg-[var(--m12-border)]/15" />
+                        </div>
                       )}
-                      {c.logicalSystemIds.map(sid => {
-                        const s = catById.get(sid)
-                        if (!s) return null
-                        const physCount = c.physicalSystemIds.filter(p => physById.get(p)?.parentId === sid).length
-                        return (
-                          <span key={sid} className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: s.color || '#10B981', borderColor: `${s.color || '#10B981'}55`, background: `${s.color || '#10B981'}12` }}>
-                            <span className="w-1.5 h-1.5 rounded-sm" style={{ background: s.color || '#10B981' }} />
-                            {s.label}{physCount > 0 && <span className="opacity-60">·{physCount}</span>}
-                          </span>
-                        )
-                      })}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {groupCaps.map(c => (
+                          <div
+                            key={c.id}
+                            onClick={() => setSelectedId(c.id)}
+                            className={`group text-left bg-[var(--m12-bg-card)] border rounded-xl p-4 transition-all card-glow cursor-pointer ${selectedId === c.id ? 'border-[#10B981]/70' : 'border-[var(--m12-border)]/40 hover:border-[var(--m12-border)]'}`}
+                          >
+                            <div className="flex items-start gap-2 mb-2">
+                              <h4 className="text-sm font-semibold text-[var(--m12-text)] flex-1">{c.name}</h4>
+                              {c.source === 'ai' && <span className="text-[8px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#34D399] border border-[#10B981]/40 rounded px-1 py-0.5 shrink-0">AI</span>}
+                              <button type="button" onClick={(e) => handleArchiveCap(c.id, e)} title="Archive capability" className="text-[var(--m12-border)] hover:text-[#EAB308] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/><path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                              </button>
+                            </div>
+                            {c.description && <p className="text-[11px] text-[var(--m12-text-muted)] mb-2 line-clamp-2">{c.description}</p>}
+                            <div className="flex flex-wrap gap-1">
+                              {c.logicalSystemIds.length === 0 && c.physicalSystemIds.length === 0 && (
+                                <span className="text-[10px] text-[var(--m12-text-muted)] italic">Unmapped</span>
+                              )}
+                              {c.logicalSystemIds.map(sid => {
+                                const s = catById.get(sid)
+                                if (!s) return null
+                                const physCount = c.physicalSystemIds.filter(p => physById.get(p)?.parentId === sid).length
+                                return (
+                                  <span key={sid} className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: s.color || '#10B981', borderColor: `${s.color || '#10B981'}55`, background: `${s.color || '#10B981'}12` }}>
+                                    <span className="w-1.5 h-1.5 rounded-sm" style={{ background: s.color || '#10B981' }} />
+                                    {s.label}{physCount > 0 && <span className="opacity-60">·{physCount}</span>}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         /* ─── Pivot (slice into columns by the chosen dimension) ─── */
