@@ -6,12 +6,14 @@ import {
   getShareByCode, getCapabilityMapAnon, listCapabilitiesAnon,
   listCapabilityInputsAnon, listCapabilityOutputsAnon,
   listPersonasAnon, listInformationProductsAnon, listLogicalSystemsAnon, listTagsAnon,
+  listSystemDataElementsAnon, listWorkstreamsAnon,
 } from '@/lib/supabase/capability-maps'
 import type { CapabilityInput, CapabilityOutput } from '@/lib/sipoc/types'
 import SIPOCDrawer from '@/components/sipoc/SIPOCDrawer'
 import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import VersionBadge from '@/components/VersionBadge'
 import { useTheme } from '@/lib/theme-context'
+import { exportCapabilityMapWorkbook } from '@/lib/export/capabilityMap'
 
 export default function SharePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params)
@@ -49,12 +51,14 @@ export default function SharePage({ params }: { params: Promise<{ code: string }
       const outputs: Record<string, CapabilityOutput[]> = {}
       caps.forEach((c, i) => { inputs[c.id] = inputResults[i]; outputs[c.id] = outputResults[i] })
 
-      // Load entity pools
-      const [personas, informationProducts, logicalSystems, tags] = await Promise.all([
+      // Load entity pools (systemDataElements + workstreams feed the Excel export)
+      const [personas, informationProducts, logicalSystems, tags, systemDataElements, workstreams] = await Promise.all([
         listPersonasAnon(map.organization_id),
         listInformationProductsAnon(map.organization_id),
         listLogicalSystemsAnon(map.organization_id),
         listTagsAnon(map.organization_id),
+        listSystemDataElementsAnon(map.organization_id),
+        listWorkstreamsAnon(map.organization_id),
       ])
 
       // Populate the SIPOC store directly (same shape as loadMap + loadOrgEntities)
@@ -67,6 +71,8 @@ export default function SharePage({ params }: { params: Promise<{ code: string }
         informationProducts,
         logicalSystems,
         tags,
+        systemDataElements,
+        workstreams,
         loading: false,
       })
 
@@ -84,6 +90,29 @@ export default function SharePage({ params }: { params: Promise<{ code: string }
   const handleSelectCapability = useCallback((id: string) => {
     const current = useSIPOCStore.getState().selectedCapabilityId
     useSIPOCStore.getState().setSelectedCapability(current === id ? null : id)
+  }, [])
+
+  // Full capability-map Excel export — identical workbook to the authed editor,
+  // driven off the read-only store the share page already hydrated.
+  const handleExportAll = useCallback(() => {
+    const store = useSIPOCStore.getState()
+    const map = store.map
+    if (!map) return
+    try {
+      exportCapabilityMapWorkbook({
+        title: map.title,
+        tree: store.getCapabilityTree(),
+        hydrated: store.getHydratedCapabilities(),
+        informationProducts: store.informationProducts,
+        systemDataElements: store.systemDataElements,
+        logicalSystems: store.logicalSystems,
+        personas: store.personas,
+        workstreams: store.workstreams,
+      })
+    } catch (e) {
+      console.error('Export failed:', e)
+      alert(e instanceof Error ? e.message : 'Export failed')
+    }
   }, [])
 
   if (status === 'loading') {
@@ -131,8 +160,22 @@ export default function SharePage({ params }: { params: Promise<{ code: string }
           Read-Only
         </span>
 
+        {/* Easy button: full capability-map Excel export (same workbook as the editor) */}
+        <button
+          type="button"
+          onClick={handleExportAll}
+          title="Download the full capability map (L1 → L2 → L3 → SIPOC, IPs, data elements, use cases) as a structured Excel workbook"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-[#10B981]/20 to-[#06B6D4]/20 border border-[#10B981]/30 hover:border-[#10B981]/50 text-[#10B981] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M6 1.5v6M3.5 5L6 7.5 8.5 5M2 9.5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Export to Excel
+        </button>
+
         {/* Theme toggle */}
         <button
+          type="button"
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:border-[var(--m12-border)] transition-colors"

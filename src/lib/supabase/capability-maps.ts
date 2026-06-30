@@ -12,6 +12,7 @@ import type {
   SipocComment,
   SipocRegion,
 } from '@/lib/sipoc/types'
+import type { Workstream } from '@/lib/workstream/types'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -707,6 +708,24 @@ export async function listLogicalSystemsAnon(orgId: string): Promise<LogicalSyst
 export async function listTagsAnon(orgId: string): Promise<Tag[]> {
   return fetchAllPaginated<Tag>(
     `${URL}/rest/v1/tags?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    anonHeaders()
+  )
+}
+
+// Anon: system data elements + workstreams for shared maps. These feed the
+// read-only share page's "Export to Excel" (the Data Elements sheet, the
+// per-IP Data Elements column, and the Workstream column). RLS: anon read is
+// granted by migration 038 (system_data_elements) and 030 (workstreams).
+export async function listSystemDataElementsAnon(orgId: string): Promise<SystemDataElement[]> {
+  return fetchAllPaginated<SystemDataElement>(
+    `${URL}/rest/v1/system_data_elements?organization_id=eq.${orgId}&select=*&order=name.asc`,
+    anonHeaders()
+  )
+}
+
+export async function listWorkstreamsAnon(orgId: string): Promise<Workstream[]> {
+  return fetchAllPaginated<Workstream>(
+    `${URL}/rest/v1/workstreams?organization_id=eq.${orgId}&archived_at=is.null&select=*&order=sort_order.asc,name.asc`,
     anonHeaders()
   )
 }
