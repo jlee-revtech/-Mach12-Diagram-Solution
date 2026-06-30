@@ -17,6 +17,8 @@ import type {
   SipocRegion,
 } from './types'
 import * as api from '@/lib/supabase/capability-maps'
+import type { Workstream } from '@/lib/workstream/types'
+import { listWorkstreams } from '@/lib/supabase/workstreams'
 
 // ─── Store Interface ────────────────────────────────────
 interface SIPOCState {
@@ -29,6 +31,7 @@ interface SIPOCState {
   informationProducts: InformationProduct[]
   logicalSystems: LogicalSystem[]
   tags: Tag[]
+  workstreams: Workstream[]   // org-scoped value streams, for the Workstream tag/column
 
   // Capabilities and their I/O
   capabilities: Capability[]
@@ -287,6 +290,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   informationProducts: [],
   logicalSystems: [],
   tags: [],
+  workstreams: [],
   systemDataElements: [],
   capabilities: [],
   inputs: {},
@@ -353,12 +357,13 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       const start = performance.now()
       return p.then(r => ({ r, d: performance.now() - start, label }))
     }
-    const [pRes, ipRes, sysRes, tagRes, sdeRes] = await Promise.all([
+    const [pRes, ipRes, sysRes, tagRes, sdeRes, wsRes] = await Promise.all([
       time('personas', api.listPersonas(orgId)),
       time('IPs', api.listInformationProducts(orgId)),
       time('systems', api.listLogicalSystems(orgId)),
       time('tags', api.listTags(orgId)),
       time('dataElements', api.listSystemDataElements(orgId)),
+      time('workstreams', listWorkstreams(orgId)),
     ])
     set({
       personas: pRes.r,
@@ -366,6 +371,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       logicalSystems: sysRes.r,
       tags: tagRes.r,
       systemDataElements: sdeRes.r,
+      workstreams: wsRes.r,
     })
     const dTotal = performance.now() - t0
     console.log(
@@ -375,6 +381,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       `systems=${sysRes.d.toFixed(0)}ms (${sysRes.r.length})`,
       `tags=${tagRes.d.toFixed(0)}ms (${tagRes.r.length})`,
       `dataElements=${sdeRes.d.toFixed(0)}ms (${sdeRes.r.length})`,
+      `workstreams=${wsRes.d.toFixed(0)}ms (${wsRes.r.length})`,
     )
   },
 

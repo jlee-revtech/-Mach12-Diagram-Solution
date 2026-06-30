@@ -202,6 +202,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
         systemDataElements: store.systemDataElements,
         logicalSystems: store.logicalSystems,
         personas: store.personas,
+        workstreams: store.workstreams,
       })
     } catch (e) {
       console.error('Export failed:', e)

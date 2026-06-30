@@ -598,7 +598,7 @@ function ExportMenu({ hydrated, mapTitle, orgId }: { hydrated: HydratedCapabilit
           </div>
           {[
             { label: 'PDF', fn: () => exportSIPOCPdf(capName, exportCaps) },
-            { label: 'Excel', fn: () => { const s = useSIPOCStore.getState(); exportSIPOCExcel(capName, exportCaps, s.personas, s.informationProducts, s.logicalSystems) } },
+            { label: 'Excel', fn: () => { const s = useSIPOCStore.getState(); exportSIPOCExcel(capName, exportCaps, s.personas, s.informationProducts, s.logicalSystems, s.workstreams) } },
             { label: 'PowerPoint', fn: () => exportSIPOCPptx(capName, exportCaps) },
             { label: 'HTML', fn: () => exportSIPOCHtml(capName, exportCaps) },
           ].map(({ label, fn }) => (

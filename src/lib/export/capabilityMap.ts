@@ -28,6 +28,15 @@ function joinSemi(values: (string | undefined | null)[]): string {
   return values.filter((v): v is string => !!v && v.length > 0).join('; ')
 }
 
+// Short, presentation-friendly workstream label: drop the parenthetical
+// qualifier so "Plan-to-Perform (Program & Portfolio Management)" reads as
+// "Plan-to-Perform" in a spreadsheet cell.
+function workstreamLabel(ws?: { code: string; name: string }): string {
+  if (!ws) return ''
+  const base = ws.name.split('(')[0].trim()
+  return base || ws.name
+}
+
 interface CapabilityWithPath {
   cap: Capability
   l1Name: string
@@ -78,8 +87,9 @@ export function exportCapabilityMapWorkbook(opts: {
   systemDataElements: SystemDataElement[]
   logicalSystems: LogicalSystem[]
   personas: Persona[]
+  workstreams?: { id: string; code: string; name: string }[]
 }): void {
-  const { title, tree, hydrated, informationProducts, systemDataElements, logicalSystems, personas } = opts
+  const { title, tree, hydrated, informationProducts, systemDataElements, logicalSystems, personas, workstreams = [] } = opts
 
   const wb = XLSX.utils.book_new()
   const flat = flattenTree(tree)
@@ -87,6 +97,8 @@ export function exportCapabilityMapWorkbook(opts: {
   const sdeMap = new Map(systemDataElements.map(s => [s.id, s]))
   const ipMap = new Map(informationProducts.map(ip => [ip.id, ip]))
   const hydratedById = new Map(hydrated.map(h => [h.id, h]))
+  const wsById = new Map(workstreams.map(w => [w.id, w]))
+  const wsLabel = (id?: string | null): string => (id ? workstreamLabel(wsById.get(id)) : '')
 
   const counts = {
     l1: flat.filter(r => r.cap.level === 1).length,
@@ -111,7 +123,7 @@ export function exportCapabilityMapWorkbook(opts: {
     ['Personas', personas.length],
     [],
     ['Workbook Contents'],
-    ['Hierarchy', 'Every capability with its L1 / L2 / L3 path, system, description, features, use cases'],
+    ['Hierarchy', 'Every capability with its L1 / L2 / L3 path, workstream, system, description, features, use cases'],
     ['SIPOC by IP', 'One row per information product touchpoint (input or output) on every L3'],
     ['Information Products', 'Distinct IPs with their data elements and where they are produced and consumed'],
     ['Data Elements', 'Distinct data elements and which IPs / L3s reference them'],
@@ -129,7 +141,7 @@ export function exportCapabilityMapWorkbook(opts: {
 
   // ── Sheet 2: Hierarchy ────────────────────────────────────
   const hierarchyRows: (string | number)[][] = [
-    ['#', 'L1 Core Area', 'L2 Capability', 'L3 Functionality', 'Level', 'System', 'Description', 'Features', 'Use Cases', 'Inputs', 'Outputs'],
+    ['#', 'L1 Core Area', 'L2 Capability', 'L3 Functionality', 'Level', 'Workstream', 'System', 'Description', 'Features', 'Use Cases', 'Inputs', 'Outputs'],
   ]
   flat.forEach((row, i) => {
     const h = hydratedById.get(row.cap.id)
@@ -139,6 +151,7 @@ export function exportCapabilityMapWorkbook(opts: {
       row.l2Name,
       row.l3Name,
       `L${row.cap.level}`,
+      wsLabel(row.cap.workstream_id),
       h?.system?.name || '',
       row.cap.description || '',
       (row.cap.features || []).join('; '),
@@ -150,16 +163,16 @@ export function exportCapabilityMapWorkbook(opts: {
   const wsHier = XLSX.utils.aoa_to_sheet(hierarchyRows)
   wsHier['!cols'] = [
     { wch: 5 }, { wch: 28 }, { wch: 28 }, { wch: 32 },
-    { wch: 6 }, { wch: 22 }, { wch: 50 }, { wch: 50 }, { wch: 50 },
+    { wch: 6 }, { wch: 18 }, { wch: 22 }, { wch: 50 }, { wch: 50 }, { wch: 50 },
     { wch: 7 }, { wch: 7 },
   ]
-  boldHeader(wsHier, 0, 11)
+  boldHeader(wsHier, 0, 12)
   wsHier['!freeze'] = { xSplit: 0, ySplit: 1 }
   XLSX.utils.book_append_sheet(wb, wsHier, 'Hierarchy')
 
   // ── Sheet 3: SIPOC by IP ──────────────────────────────────
   const sipocRows: (string | number)[][] = [
-    ['L1 Core Area', 'L2 Capability', 'L3 Functionality', 'Side', 'Information Product', 'Category', 'Data Elements', 'IP Tags', 'Personas', 'Source / Destination Systems', 'Feeding System', 'Dimensions', 'Dimension Tags'],
+    ['L1 Core Area', 'L2 Capability', 'L3 Functionality', 'Workstream', 'Side', 'Information Product', 'Category', 'Data Elements', 'IP Tags', 'Personas', 'Source / Destination Systems', 'Feeding System', 'Dimensions', 'Dimension Tags'],
   ]
 
   const elementsForIP = (ip: InformationProduct | undefined): string => {
@@ -173,7 +186,7 @@ export function exportCapabilityMapWorkbook(opts: {
     h.inputs.forEach(inp => {
       const ip = ipMap.get(inp.information_product_id) || inp.informationProduct
       sipocRows.push([
-        path.l1, path.l2, path.l3, 'Input',
+        path.l1, path.l2, path.l3, wsLabel(h.workstream_id), 'Input',
         inp.informationProduct.name,
         inp.informationProduct.category || '',
         elementsForIP(ip),
@@ -188,7 +201,7 @@ export function exportCapabilityMapWorkbook(opts: {
     h.outputs.forEach(out => {
       const ip = ipMap.get(out.information_product_id) || out.informationProduct
       sipocRows.push([
-        path.l1, path.l2, path.l3, 'Output',
+        path.l1, path.l2, path.l3, wsLabel(h.workstream_id), 'Output',
         out.informationProduct.name,
         out.informationProduct.category || '',
         elementsForIP(ip),
@@ -203,11 +216,11 @@ export function exportCapabilityMapWorkbook(opts: {
   })
   const wsSipoc = XLSX.utils.aoa_to_sheet(sipocRows)
   wsSipoc['!cols'] = [
-    { wch: 26 }, { wch: 26 }, { wch: 30 }, { wch: 8 },
+    { wch: 26 }, { wch: 26 }, { wch: 30 }, { wch: 18 }, { wch: 8 },
     { wch: 32 }, { wch: 16 }, { wch: 40 }, { wch: 22 },
     { wch: 32 }, { wch: 32 }, { wch: 22 }, { wch: 36 }, { wch: 36 },
   ]
-  boldHeader(wsSipoc, 0, 13)
+  boldHeader(wsSipoc, 0, 14)
   wsSipoc['!freeze'] = { xSplit: 0, ySplit: 1 }
   XLSX.utils.book_append_sheet(wb, wsSipoc, 'SIPOC by IP')
 

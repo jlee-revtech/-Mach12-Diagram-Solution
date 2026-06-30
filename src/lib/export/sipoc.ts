@@ -455,9 +455,20 @@ export function exportSIPOCExcel(
   capabilities: HydratedCapability[],
   allPersonas: { id: string; name: string; role?: string; color: string }[],
   allProducts: { id: string; name: string; category?: string }[],
-  allSystems: { id: string; name: string; system_type?: string }[]
+  allSystems: { id: string; name: string; system_type?: string }[],
+  allWorkstreams: { id: string; code: string; name: string }[] = []
 ): void {
   const wb = XLSX.utils.book_new()
+
+  // Workstream label lookup: drop the parenthetical qualifier so
+  // "Plan-to-Perform (Program & Portfolio Management)" reads as "Plan-to-Perform".
+  const wsById = new Map(allWorkstreams.map(w => [w.id, w]))
+  const wsLabel = (id?: string | null): string => {
+    if (!id) return ''
+    const ws = wsById.get(id)
+    if (!ws) return ''
+    return ws.name.split('(')[0].trim() || ws.name
+  }
 
   // Helper: bold a header row (row index)
   const boldRow = (ws: XLSX.WorkSheet, rowIdx: number, colCount: number) => {
@@ -471,12 +482,12 @@ export function exportSIPOCExcel(
 
   // ── Sheet 1: Summary ──────────────────────────────────
   const summaryData: string[][] = [
-    ['SIPOC Capability Map', '', '', '', '', ''],
-    ['Title', title, '', '', '', ''],
-    ['Exported', new Date().toLocaleDateString(), '', '', '', ''],
-    ['Capabilities', capabilities.length.toString(), '', '', '', ''],
-    ['', '', '', '', '', ''],
-    ['#', 'Capability', 'System', 'Inputs', 'Outputs', 'Features'],
+    ['SIPOC Capability Map', '', '', '', '', '', ''],
+    ['Title', title, '', '', '', '', ''],
+    ['Exported', new Date().toLocaleDateString(), '', '', '', '', ''],
+    ['Capabilities', capabilities.length.toString(), '', '', '', '', ''],
+    ['', '', '', '', '', '', ''],
+    ['#', 'Capability', 'Workstream', 'System', 'Inputs', 'Outputs', 'Features'],
   ]
   capabilities.forEach((cap, i) => {
     const features = cap.features || []
@@ -484,6 +495,7 @@ export function exportSIPOCExcel(
     summaryData.push([
       (i + 1).toString(),
       cap.name,
+      wsLabel(cap.workstream_id),
       cap.system?.name || '',
       cap.inputs.length.toString(),
       cap.outputs.length.toString(),
@@ -491,12 +503,12 @@ export function exportSIPOCExcel(
     ])
     // Additional rows for remaining features
     features.slice(1).forEach(f => {
-      summaryData.push(['', '', '', '', '', f])
+      summaryData.push(['', '', '', '', '', '', f])
     })
   })
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
-  wsSummary['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 25 }, { wch: 10 }, { wch: 10 }, { wch: 40 }]
-  boldRow(wsSummary, 5, 6)
+  wsSummary['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 18 }, { wch: 25 }, { wch: 10 }, { wch: 10 }, { wch: 40 }]
+  boldRow(wsSummary, 5, 7)
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
 
   // ── Sheet 2: Inputs ───────────────────────────────────
@@ -548,10 +560,11 @@ export function exportSIPOCExcel(
 
   // ── Sheet 4: Detailed (one row per dimension) ─────────
   const detailRows: string[][] = [
-    ['Capability', 'Features', 'Side', 'Information Product', 'Category', 'Tags', 'Dimension', 'Dim Tags', 'Personas', 'Systems', 'Feeding System'],
+    ['Capability', 'Workstream', 'Features', 'Side', 'Information Product', 'Category', 'Tags', 'Dimension', 'Dim Tags', 'Personas', 'Systems', 'Feeding System'],
   ]
   capabilities.forEach(cap => {
     const feats = (cap.features || []).join('; ')
+    const ws = wsLabel(cap.workstream_id)
     cap.inputs.forEach(inp => {
       const personas = inp.supplierPersonas.map(p => p.name).join('; ')
       const systems = inp.sourceSystems.map(s => s.name).join('; ')
@@ -560,10 +573,10 @@ export function exportSIPOCExcel(
       if ((inp.dimensions || []).length > 0) {
         (inp.dimensions || []).forEach(dim => {
           const dimTags = (dim.tags || []).map(t => t.name).join('; ')
-          detailRows.push([cap.name, feats, 'Input', inp.informationProduct.name, inp.informationProduct.category || '', ipTags, dim.name, dimTags, personas, systems, feed])
+          detailRows.push([cap.name, ws, feats, 'Input', inp.informationProduct.name, inp.informationProduct.category || '', ipTags, dim.name, dimTags, personas, systems, feed])
         })
       } else {
-        detailRows.push([cap.name, feats, 'Input', inp.informationProduct.name, inp.informationProduct.category || '', ipTags, '', '', personas, systems, feed])
+        detailRows.push([cap.name, ws, feats, 'Input', inp.informationProduct.name, inp.informationProduct.category || '', ipTags, '', '', personas, systems, feed])
       }
     })
     cap.outputs.forEach(out => {
@@ -571,16 +584,16 @@ export function exportSIPOCExcel(
       const destSys = out.destinationSystems.map(s => s.name).join('; ')
       if ((out.dimensions || []).length > 0) {
         (out.dimensions || []).forEach(dim => {
-          detailRows.push([cap.name, feats, 'Output', out.informationProduct.name, out.informationProduct.category || '', '', dim.name, '', consumers, destSys, ''])
+          detailRows.push([cap.name, ws, feats, 'Output', out.informationProduct.name, out.informationProduct.category || '', '', dim.name, '', consumers, destSys, ''])
         })
       } else {
-        detailRows.push([cap.name, feats, 'Output', out.informationProduct.name, out.informationProduct.category || '', '', '', '', consumers, destSys, ''])
+        detailRows.push([cap.name, ws, feats, 'Output', out.informationProduct.name, out.informationProduct.category || '', '', '', '', consumers, destSys, ''])
       }
     })
   })
   const wsDetail = XLSX.utils.aoa_to_sheet(detailRows)
-  wsDetail['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 8 }, { wch: 35 }, { wch: 18 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 35 }, { wch: 30 }, { wch: 25 }]
-  boldRow(wsDetail, 0, 11)
+  wsDetail['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 35 }, { wch: 8 }, { wch: 35 }, { wch: 18 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 35 }, { wch: 30 }, { wch: 25 }]
+  boldRow(wsDetail, 0, 12)
   XLSX.utils.book_append_sheet(wb, wsDetail, 'Detailed')
 
   // ── Sheet 5: Entity Registry ──────────────────────────
