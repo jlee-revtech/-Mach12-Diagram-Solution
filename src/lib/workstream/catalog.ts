@@ -92,9 +92,9 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     color: '#10B981',
     icon: 'factory',
     sortOrder: 4,
-    sapModules: ['PP', 'PP-MRP', 'QM', 'LO-VC', 'PS', 'MM-IM'],
+    sapModules: ['PP', 'PP-MRP', 'PP-CRP (capacity)', 'PP/DS', 'QM', 'LO-VC', 'PS', 'MM-IM'],
     dassianModules: ['Project Mgmt (EVM)', 'MPIA / BOM cost'],
-    knowledgeSourceCodes: ['sap-data-load-so-to-ps', 'vibe-sap-recipes'],
+    knowledgeSourceCodes: ['sap-pp-capacity-planning', 'sap-data-load-so-to-ps', 'vibe-sap-recipes'],
     agentTagline: 'MRP, shop-floor, quality, and production consultant',
   },
   {
