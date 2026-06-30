@@ -1,5 +1,5 @@
 // ─── Canonical workstream catalog ──────────────────────
-// The canonical taxonomy is the SAP Solution Studio config roster: 7 A&D value
+// The canonical taxonomy is the SAP Solution Studio config roster: 10 A&D value
 // streams + 3 cross-cutting "platform" agents (security, analytics, dev). This
 // is the shared spine between Solution Architecture Studio (this app) and SAP
 // Solution Studio (cds-lineage), so the codes here MUST match Solution Studio's
@@ -10,10 +10,9 @@
 // workstream to the vibe-skill bundles that power its consultant agent (mirrors
 // Solution Studio's AGENT_SKILLS), and sap/dassianModules describe expertise.
 //
-// Codes here are stable slugs — do not rename without a data migration. The five
-// legacy SAS codes (bid-to-win, contract-to-closeout, design-to-release,
-// acquire-to-retire, sustainment-mro) were folded into canonical homes by
-// supabase/037_workstream_canonical_remap.sql; see LEGACY_TO_CANONICAL.
+// Codes here are stable slugs — do not rename without a data migration. The only
+// folded legacy codes are bid-to-win + contract-to-closeout, which roll up into
+// offer-to-cash; see LEGACY_TO_CANONICAL.
 
 export interface StandardWorkstreamDef {
   code: string
@@ -75,30 +74,64 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     agentTagline: 'EVMS, PMB, and EAC/ETC program-control consultant',
   },
   {
+    code: 'design-to-release',
+    name: 'Design-to-Release (Engineering / PLM)',
+    description: 'Requirements through design, configuration management, engineering change, and BOM release with first article inspection.',
+    color: '#8B5CF6',
+    icon: 'drafting',
+    sortOrder: 3,
+    sapModules: ['PLM', 'PP-BOM', 'ECM (engineering change)', 'QM (FAI)'],
+    dassianModules: [],
+    knowledgeSourceCodes: ['vibe-sap-recipes'],
+    agentTagline: 'Requirements, CM, and BOM-release consultant',
+  },
+  {
     code: 'plan-to-produce',
-    name: 'Plan-to-Produce (Engineering & Program Execution)',
-    description: 'Engineering and configuration management through production planning, MRP, shop-floor execution, and quality.',
+    name: 'Plan-to-Produce (Program Execution)',
+    description: 'Production planning, MRP, shop-floor execution, quality inspection, and production-order settlement.',
     color: '#10B981',
     icon: 'factory',
-    sortOrder: 3,
-    sapModules: ['PP', 'PP-MRP', 'QM', 'LO-VC', 'PLM / ECM', 'PP-BOM', 'PS', 'MM-IM'],
+    sortOrder: 4,
+    sapModules: ['PP', 'PP-MRP', 'QM', 'LO-VC', 'PS', 'MM-IM'],
     dassianModules: ['Project Mgmt (EVM)', 'MPIA / BOM cost'],
     knowledgeSourceCodes: ['sap-data-load-so-to-ps', 'vibe-sap-recipes'],
-    agentTagline: 'PLM, MRP, shop-floor, and quality consultant',
-    legacyCodes: ['design-to-release'],
+    agentTagline: 'MRP, shop-floor, quality, and production consultant',
   },
   {
     code: 'inventory-to-deliver',
-    name: 'Inventory-to-Deliver (Logistics, Property & Sustainment)',
-    description: 'Materials management, warehousing, deliveries, government/contractor property accountability, and depot/field sustainment (MRO).',
+    name: 'Inventory-to-Deliver (Logistics & Delivery)',
+    description: 'Materials management, warehousing/EWM, inventory, and outbound delivery with DD250 acceptance.',
     color: '#14B8A6',
     icon: 'truck',
-    sortOrder: 4,
-    sapModules: ['MM-IM', 'WM / EWM', 'LE (deliveries)', 'Handling Units', 'Batch / Serial', 'PM / EAM', 'FI-AA (property)'],
-    dassianModules: ['DD250 / ABS', 'GFP / property accountability'],
+    sortOrder: 5,
+    sapModules: ['MM-IM', 'WM / EWM', 'LE (deliveries)', 'Handling Units', 'Batch / Serial', 'Physical Inventory'],
+    dassianModules: ['DD250 / ABS'],
     knowledgeSourceCodes: ['sap-data-load-so-to-ps', 'vibe-sap-recipes'],
-    agentTagline: 'Logistics, GFP property, and MRO consultant',
-    legacyCodes: ['acquire-to-retire', 'sustainment-mro'],
+    agentTagline: 'Logistics, warehousing, and delivery consultant',
+  },
+  {
+    code: 'acquire-to-retire',
+    name: 'Acquire-to-Retire (Asset / Property / GFP)',
+    description: 'Government and contractor property accountability and fixed-asset lifecycle from acquisition through disposition.',
+    color: '#EC4899',
+    icon: 'asset',
+    sortOrder: 6,
+    sapModules: ['FI-AA', 'MM-IM', 'PS'],
+    dassianModules: ['GFP / property accountability'],
+    knowledgeSourceCodes: ['vibe-sap-recipes'],
+    agentTagline: 'GFP/CAP property and fixed-asset consultant',
+  },
+  {
+    code: 'sustainment-mro',
+    name: 'Sustainment / MRO',
+    description: 'Depot and field maintenance, repair, and overhaul with installed-base and warranty management.',
+    color: '#F43F5E',
+    icon: 'wrench',
+    sortOrder: 7,
+    sapModules: ['PM / EAM', 'CS', 'PP (refurb)', 'MM'],
+    dassianModules: [],
+    knowledgeSourceCodes: ['vibe-sap-recipes'],
+    agentTagline: 'Depot/field MRO and installed-base consultant',
   },
   {
     code: 'source-to-pay',
@@ -106,7 +139,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     description: 'Supplier management, sourcing, subcontracting with FAR/DFARS flowdowns, and procure-to-pay.',
     color: '#F59E0B',
     icon: 'cart',
-    sortOrder: 5,
+    sortOrder: 8,
     sapModules: ['MM', 'MM-PUR', 'MDG-S', 'Subcontracting', 'MM-IV', 'Ariba', 'FI-AP'],
     dassianModules: ['SCFM', 'Contracts (flowdowns, clause library)', 'PBP'],
     knowledgeSourceCodes: ['dassian-contracts', 'vibe-sap-recipes'],
@@ -116,9 +149,9 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     code: 'offer-to-cash',
     name: 'Offer-to-Cash (Capture, Contracts, Billing & Rev-Rec)',
     description: 'Sell-side lifecycle from capture and proposal through contract setup, CLIN/SLIN billing, deliveries acceptance, and revenue recognition.',
-    color: '#8B5CF6',
+    color: '#2563EB',
     icon: 'contract',
-    sortOrder: 6,
+    sortOrder: 9,
     sapModules: ['SD', 'SD-BIL', 'RAR', 'DP90', 'PS'],
     dassianModules: ['Contracts (CLIN/SLIN/ACRN, mods, DD250)', 'PBP', 'Billing (BIL / DRB)', 'ABS', 'Results Analysis (RAENH)'],
     knowledgeSourceCodes: ['dassian-contracts', 'dassian-cost-management', 'vibe-sap-recipes'],
@@ -131,7 +164,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     description: 'Workforce lifecycle: talent and clearances, records, compliant timekeeping, payroll, labor distribution, and offboarding.',
     color: '#F97316',
     icon: 'people',
-    sortOrder: 7,
+    sortOrder: 10,
     sapModules: ['HCM / SF', 'PT (time)', 'PY (payroll)', 'CATS'],
     dassianModules: ['Labor / role-based costing', 'CATS approval'],
     knowledgeSourceCodes: ['vibe-sap-recipes'],
@@ -144,7 +177,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     description: 'Cross-stream role design, authorizations, segregation-of-duties, and access governance.',
     color: '#64748B',
     icon: 'shield',
-    sortOrder: 8,
+    sortOrder: 11,
     sapModules: ['GRC', 'PFCG', 'SU24', 'IAG / IAM'],
     dassianModules: [],
     knowledgeSourceCodes: ['vibe-sap-recipes'],
@@ -157,7 +190,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     description: 'Cross-stream embedded analytics, operational and management reporting, and planning.',
     color: '#06B6D4',
     icon: 'chart',
-    sortOrder: 9,
+    sortOrder: 12,
     sapModules: ['Embedded Analytics', 'CDS analytical', 'SAC', 'Datasphere'],
     dassianModules: ['GPD / PACE reporting'],
     knowledgeSourceCodes: ['vibe-sap-recipes'],
@@ -170,7 +203,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     description: 'Cross-stream RICEFW, RAP extensions, CDS modeling, integration, and clean-core engineering.',
     color: '#0EA5E9',
     icon: 'code',
-    sortOrder: 10,
+    sortOrder: 13,
     sapModules: ['ABAP / RAP', 'BTP', 'CDS', 'Gateway / OData'],
     dassianModules: [],
     knowledgeSourceCodes: ['vibe-sap-recipes', 'vibe-update-class-include'],
@@ -184,7 +217,9 @@ export const WORKSTREAM_BY_CODE: Record<string, StandardWorkstreamDef> = Object.
 )
 
 // Crosswalk from legacy SAS workstream codes to their canonical home. Used by the
-// data migration and by any runtime that still encounters an old code.
+// data migration and by any runtime that still encounters an old code. Only
+// bid-to-win + contract-to-closeout remain folded (into offer-to-cash);
+// design-to-release, acquire-to-retire, and sustainment-mro are first-class again.
 export const LEGACY_TO_CANONICAL: Record<string, string> = Object.fromEntries(
   STANDARD_WORKSTREAMS.flatMap((w) => (w.legacyCodes ?? []).map((legacy) => [legacy, w.code]))
 )

@@ -29,31 +29,42 @@ export const STANDARD_CAPABILITIES: Record<string, StandardCapabilityDef[]> = {
     { name: 'Risk & Opportunity Management', domain: 'Risk', description: 'Risk register, handling plans, and burn-down.' },
     { name: 'Program Reporting (IPMR / NASA 533)', domain: 'Reporting', description: 'CPR/IPMR/533 contract performance reporting.' },
   ],
-  // plan-to-produce now also covers the former design-to-release (Engineering / PLM).
-  'plan-to-produce': [
+  'design-to-release': [
     { name: 'Requirements Management', domain: 'Engineering', description: 'Requirements capture, allocation, and traceability.' },
     { name: 'Design & Model Management', domain: 'PLM', description: 'CAD/MBSE design data and document management.' },
     { name: 'Configuration Management', domain: 'PLM', description: 'Baselines, effectivity, and configuration control.' },
     { name: 'Engineering Change Management', domain: 'PLM', description: 'ECR/ECO/ECN change request and disposition.' },
     { name: 'BOM Management & Release', domain: 'Engineering', description: 'Engineering and manufacturing BOM release.' },
+    { name: 'First Article Inspection (FAI)', domain: 'Quality', description: 'AS9102 first article inspection and approval.' },
+  ],
+  'plan-to-produce': [
     { name: 'Production Planning & Scheduling', domain: 'Manufacturing', description: 'Master production scheduling and capacity planning.' },
     { name: 'Material Requirements Planning (MRP)', domain: 'Manufacturing', description: 'Demand-driven material and component planning.' },
     { name: 'Shop Floor Execution', domain: 'Manufacturing', description: 'Production order release, confirmation, and dispatch.' },
-    { name: 'Quality Management & Inspection (incl. FAI)', domain: 'Quality', description: 'In-process and AS9102 first article inspection, NCM.' },
+    { name: 'Quality Management & Inspection', domain: 'Quality', description: 'In-process inspection, non-conformance, and quality records.' },
+    { name: 'Inventory & Goods Movement', domain: 'Supply Chain', description: 'Goods receipt/issue, stock management, and traceability.' },
     { name: 'Production Order Settlement', domain: 'Finance', description: 'Order cost collection and settlement to WBS/project.' },
   ],
-  // inventory-to-deliver now also covers the former acquire-to-retire (property)
-  // and sustainment-mro (depot/field MRO).
   'inventory-to-deliver': [
     { name: 'Inbound Logistics & Goods Receipt', domain: 'Logistics', description: 'Receiving, inspection, and goods receipt.' },
-    { name: 'Warehouse & Inventory Management', domain: 'Logistics', description: 'Stock management, traceability, and physical inventory.' },
+    { name: 'Warehouse & Inventory Management', domain: 'Logistics', description: 'Stock management, bin/warehouse (EWM), and traceability.' },
     { name: 'Outbound Delivery & DD250 Shipping', domain: 'Logistics', description: 'Picking, packing, delivery, and DD250 acceptance.' },
+    { name: 'Physical Inventory & Cycle Counting', domain: 'Supply Chain', description: 'Physical inventory, cycle counts, and reconciliation.' },
+    { name: 'Handling Units & Packaging', domain: 'Logistics', description: 'Handling unit management and packaging specifications.' },
+    { name: 'Batch & Serial Traceability', domain: 'Supply Chain', description: 'Batch and serial number genealogy and traceability.' },
+  ],
+  'acquire-to-retire': [
     { name: 'Government & Contractor Property (GFP/CAP)', domain: 'Property', description: 'Property accountability, custody, and reporting.' },
     { name: 'Asset Acquisition & Capitalization', domain: 'Finance', description: 'Capital asset acquisition and capitalization.' },
+    { name: 'Asset Tracking & Custody', domain: 'Property', description: 'Physical asset tracking, transfers, and audits.' },
+    { name: 'Depreciation & Asset Accounting', domain: 'Finance', description: 'Depreciation, revaluation, and asset accounting.' },
     { name: 'Property Disposition & Retirement', domain: 'Property', description: 'Disposal, retirement, and end-of-life accountability.' },
+  ],
+  'sustainment-mro': [
     { name: 'Maintenance Planning & Scheduling', domain: 'Sustainment', description: 'Preventive and corrective maintenance planning.' },
     { name: 'Work Order Execution (Depot/Field)', domain: 'Sustainment', description: 'Work order dispatch, execution, and confirmation.' },
     { name: 'Repair & Overhaul (Refurbishment)', domain: 'Sustainment', description: 'Teardown, repair, and refurbishment production.' },
+    { name: 'Installed Base & Equipment Management', domain: 'Service', description: 'Equipment, serial, and installed-base records.' },
     { name: 'Spares & Service Parts Management', domain: 'Supply Chain', description: 'Spares provisioning and service parts inventory.' },
     { name: 'Warranty & Service Contracts', domain: 'Service', description: 'Warranty claims and service agreement management.' },
   ],
@@ -65,7 +76,7 @@ export const STANDARD_CAPABILITIES: Record<string, StandardCapabilityDef[]> = {
     { name: 'Goods & Service Receipt', domain: 'Supply Chain', description: 'Receiving, inspection, and service entry.' },
     { name: 'Accounts Payable & 3-Way Match', domain: 'Finance', description: 'Invoice verification, matching, and payment.' },
   ],
-  // offer-to-cash now covers the former bid-to-win (capture) and
+  // offer-to-cash also covers the former bid-to-win (capture) and
   // contract-to-closeout (acquisition / billing) streams.
   'offer-to-cash': [
     { name: 'Opportunity Identification & Qualification', domain: 'Capture', description: 'Pipeline intake, gate reviews, and qualification of pursuits.' },
