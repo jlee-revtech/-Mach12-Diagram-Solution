@@ -65,6 +65,34 @@ const PATHS: Record<WorkstreamIconKey, React.ReactNode> = {
       <path d="M2.5 14.5c0-2.3 1.9-3.7 4-3.7s4 1.4 4 3.7M11 14.5c0-1.7 1-2.9 2.7-3.1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </>
   ),
+  truck: (
+    <>
+      <path d="M1.5 4.5h9v7h-9a.5.5 0 01-.5-.5v-6a.5.5 0 01.5-.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M10.5 7h3l3 2.8V11a.5.5 0 01-.5.5h-5.5V7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <circle cx="5" cy="13" r="1.3" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="12.5" cy="13" r="1.3" stroke="currentColor" strokeWidth="1.2" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M9 2l5.5 2v4.4c0 3.5-2.4 5.7-5.5 7.1-3.1-1.4-5.5-3.6-5.5-7.1V4L9 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M6.5 8.8l1.7 1.7 3.4-3.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
+  chart: (
+    <>
+      <path d="M3 2.5v11.5a.5.5 0 00.5.5H15.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <rect x="5.2" y="9" width="2.2" height="3.6" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="8.6" y="6.4" width="2.2" height="6.2" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="12" y="4" width="2.2" height="8.6" stroke="currentColor" strokeWidth="1.2" />
+    </>
+  ),
+  code: (
+    <>
+      <path d="M6.5 5L3 9l3.5 4M11.5 5L15 9l-3.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10.2 3.8l-2.4 10.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </>
+  ),
 }
 
 export function WorkstreamIcon({ icon, size = 18, className }: { icon?: string | null; size?: number; className?: string }) {
