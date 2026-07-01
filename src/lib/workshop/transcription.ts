@@ -89,9 +89,10 @@ class DeepgramTranscription implements TranscriptionProvider {
 
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const q = new URLSearchParams({ model: 'nova-2', language: 'en', smart_format: 'true', interim_results: 'true', punctuate: 'true' })
-      // Deepgram browser auth: pass the short-lived token as a WS subprotocol.
-      // (If a Deepgram change ever rejects this, switch 'token' -> 'bearer'.)
-      const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${q}`, ['token', tok.access_token])
+      // Deepgram auth: a short-lived JWT (from /v1/auth/grant) connects via the
+      // 'bearer' subprotocol (verified against the live API 2026-07-01). Raw API
+      // keys would use 'token' instead, but we never put the key in the browser.
+      const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${q}`, ['bearer', tok.access_token])
       this.ws = ws
       ws.onopen = () => {
         if (this.stopped) return
