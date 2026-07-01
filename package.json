@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@jlee-revtech/agent-core": "^0.3.0",
     "@supabase/supabase-js": "^2.39.8",
     "@xyflow/react": "^12.8.3",
     "docx": "^9.7.1",
