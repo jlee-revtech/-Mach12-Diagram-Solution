@@ -20,6 +20,8 @@ interface FacResult {
   say: string; nextQuestion?: string; coverage?: string; advanceAgenda?: boolean; pullSpecialist?: string; gaps?: string[]
 }
 
+const VOICE_CLOUD = process.env.NEXT_PUBLIC_VOICE_PROVIDER === 'deepgram'
+
 function authHeader(): Record<string, string> {
   try {
     const key = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
@@ -313,10 +315,10 @@ export default function WorkshopRoomPage() {
             <div className="border-t border-[var(--m12-border)]/40 p-3">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <input value={speaker} onChange={(e) => setSpeaker(e.target.value)} className="w-28 bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] outline-none" placeholder="Speaker" />
-                <button onClick={() => setVoiceOn((v) => !v)} title="Live voice transcription (Chrome/Edge)"
+                <button onClick={() => setVoiceOn((v) => !v)} title={`Live voice transcription — ${VOICE_CLOUD ? 'Deepgram (cloud)' : 'browser (Chrome/Edge)'}`}
                   className="text-[11px] px-2.5 py-1 rounded border transition-colors"
                   style={{ borderColor: voiceOn ? '#DC2626' : 'var(--m12-border)', color: voiceOn ? '#EF4444' : 'var(--m12-text-muted)', backgroundColor: voiceOn ? '#DC262614' : 'transparent' }}>
-                  {voiceOn ? '● Recording' : '🎙 Voice'}
+                  {voiceOn ? '● Recording' : '🎙 Voice'}{VOICE_CLOUD ? <span className="opacity-60"> ·cloud</span> : null}
                 </button>
                 <button onClick={facilitate} disabled={busy === 'facilitate'} className="text-[11px] px-2.5 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] disabled:opacity-50">{busy === 'facilitate' ? 'Thinking…' : '✦ Facilitate'}</button>
                 <div className="relative">
