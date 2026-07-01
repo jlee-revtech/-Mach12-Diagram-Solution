@@ -9,11 +9,13 @@ import {
   SEARCH_KNOWLEDGE,
   ARCHITECTURE_TOOLS,
   ORCHESTRATOR_TOOLS,
+  REALIZATION_TOOLS,
   type ToolContext,
   type AgentTool,
   type Citation,
   type KnowledgeClient,
 } from '@jlee-revtech/agent-core'
+import { sapRealizationFromEnv } from '@/lib/agents/sapRealization'
 
 // The Super Consultant agents now run on the shared @jlee-revtech/agent-core
 // brain: one loop + one tool belt for both apps. This route wires the diagram
@@ -32,6 +34,10 @@ const knowledge: KnowledgeClient = createKnowledgeClient({
   voyageKey: process.env.VOYAGE_API_KEY,
   voyageModel: process.env.VOYAGE_MODEL,
 })
+
+// Live-SAP realization (HTTP to Solution Studio). Undefined when unconfigured, so
+// the realization tools stay off and workstream agents keep the read-only set.
+const realization = sapRealizationFromEnv()
 
 const TOOL_LABELS: Record<string, string> = {
   search_knowledge: 'Searching the SAP / Dassian knowledge base',
@@ -78,7 +84,10 @@ function personaFor(agent: AgentRow): string {
 }
 
 function toolsForAgent(isOrchestrator: boolean): AgentTool[] {
-  return isOrchestrator ? ORCHESTRATOR_TOOLS : [SEARCH_KNOWLEDGE, ...ARCHITECTURE_TOOLS]
+  if (isOrchestrator) return ORCHESTRATOR_TOOLS
+  // Workstream agents get architecture + knowledge tools, plus the live-SAP
+  // realization tools when a realization backend is wired.
+  return [SEARCH_KNOWLEDGE, ...ARCHITECTURE_TOOLS, ...(realization ? REALIZATION_TOOLS : [])]
 }
 
 export async function POST(req: NextRequest) {
@@ -120,7 +129,7 @@ export async function POST(req: NextRequest) {
       const { data: subRow } = await kb.from('kb_workstream_agents').select('*').eq('code', code).maybeSingle()
       if (!subRow) return `No consultant agent exists for workstream "${code}".`
       const sub = agentFromRow(subRow)
-      const subCtx: ToolContext = { modelDb: userDb, orgId, agentWorkstreamCode: code, wsByCode, knowledge, citations, tenantKey: tenant }
+      const subCtx: ToolContext = { modelDb: userDb, orgId, agentWorkstreamCode: code, wsByCode, knowledge, citations, tenantKey: tenant, realization }
       const turn = await runAgentTurn({
         persona: personaFor(sub),
         tools: toolsForAgent(false),
@@ -141,7 +150,7 @@ export async function POST(req: NextRequest) {
         try {
           const ctx: ToolContext = {
             modelDb: userDb, orgId, agentWorkstreamCode: agentCode, wsByCode, knowledge, citations,
-            tenantKey: tenant, runSubAgent: agent.is_orchestrator ? runSubAgent : undefined,
+            tenantKey: tenant, realization, runSubAgent: agent.is_orchestrator ? runSubAgent : undefined,
           }
           const history = messages.map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content }))
           const turn = await runAgentTurn({
