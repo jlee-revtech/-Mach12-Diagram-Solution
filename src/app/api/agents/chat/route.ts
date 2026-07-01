@@ -1,13 +1,37 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { knowledgeAdmin } from '@/lib/knowledge/sharedClient'
-import { searchKnowledge } from '@/lib/knowledge/search'
-import { buildSystemPrompt, runAgentLoop, extractRecommendations } from '@/lib/agents/run'
-import type { AgentDef, Citation } from '@/lib/agents/types'
-import type { ToolCtx } from '@/lib/agents/tools'
+import {
+  runAgentTurn,
+  createKnowledgeClient,
+  buildWorkstreamPersona,
+  getWorkstream,
+  SEARCH_KNOWLEDGE,
+  ARCHITECTURE_TOOLS,
+  ORCHESTRATOR_TOOLS,
+  type ToolContext,
+  type AgentTool,
+  type Citation,
+  type KnowledgeClient,
+} from '@jlee-revtech/agent-core'
+
+// The Super Consultant agents now run on the shared @jlee-revtech/agent-core
+// brain: one loop + one tool belt for both apps. This route wires the diagram
+// app's environment into it (org-scoped model client, shared-kb knowledge client,
+// Anthropic key) and streams the turn. SAP-realization tools are added once an
+// HTTP-to-Solution-Studio SapRealization is injected; until then workstream
+// agents get the read-only architecture + knowledge tools (unchanged behavior).
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPA_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY!
+
+const knowledge: KnowledgeClient = createKnowledgeClient({
+  url: process.env.KNOWLEDGE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+  serviceKey: process.env.KNOWLEDGE_SUPABASE_SERVICE_KEY,
+  voyageKey: process.env.VOYAGE_API_KEY,
+  voyageModel: process.env.VOYAGE_MODEL,
+})
 
 const TOOL_LABELS: Record<string, string> = {
   search_knowledge: 'Searching the SAP / Dassian knowledge base',
@@ -20,15 +44,41 @@ const TOOL_LABELS: Record<string, string> = {
   list_integrations: 'Reading your integrations',
   list_workstreams: 'Reviewing your workstreams',
   ask_workstream_agent: 'Consulting a specialist workstream agent',
+  introspect_live_config: 'Inspecting live SAP configuration',
+  list_activities: 'Listing SAP configuration activities',
+  compose_config_plan: 'Composing a SAP configuration plan',
+  prepare_config: 'Preparing a configuration change',
+  execute_config: 'Executing a configuration change',
 }
 
-function agentFromRow(r: Record<string, unknown>): AgentDef {
+interface AgentRow {
+  code: string
+  system_persona: string | null
+  model: string | null
+  temperature: number | null
+  is_orchestrator: boolean
+}
+
+function agentFromRow(r: Record<string, unknown>): AgentRow {
   return {
-    code: r.code as string, display_name: r.display_name as string, tagline: r.tagline as string | null,
-    system_persona: r.system_persona as string | null, sap_modules: (r.sap_modules as string[]) || [],
-    dassian_modules: (r.dassian_modules as string[]) || [], knowledge_source_codes: (r.knowledge_source_codes as string[]) || [],
-    model: r.model as string | null, temperature: r.temperature as number | null, is_orchestrator: !!r.is_orchestrator,
+    code: r.code as string,
+    system_persona: (r.system_persona as string | null) ?? null,
+    model: (r.model as string | null) ?? null,
+    temperature: (r.temperature as number | null) ?? null,
+    is_orchestrator: !!r.is_orchestrator,
   }
+}
+
+function personaFor(agent: AgentRow): string {
+  if (agent.system_persona) return agent.system_persona
+  const ws = getWorkstream(agent.code)
+  return ws
+    ? buildWorkstreamPersona(ws)
+    : 'You are a world-class SAP S/4HANA and Dassian Aerospace & Defense functional consultant.'
+}
+
+function toolsForAgent(isOrchestrator: boolean): AgentTool[] {
+  return isOrchestrator ? ORCHESTRATOR_TOOLS : [SEARCH_KNOWLEDGE, ...ARCHITECTURE_TOOLS]
 }
 
 export async function POST(req: NextRequest) {
@@ -53,45 +103,62 @@ export async function POST(req: NextRequest) {
     const wsByCode = new Map<string, { id: string; name: string }>((wsRows || []).map((w) => [w.code, { id: w.id, name: w.name }]))
 
     const citations: Citation[] = []
+    const tenant = (tenantKey as string | null) ?? null
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content || ''
 
     // Pre-fetch a little baseline knowledge to seed grounding.
     let prefetched = ''
     try {
       const wsFilter = agent.is_orchestrator ? null : [agentCode]
-      const res = await searchKnowledge({ query: String(lastUser), workstreams: wsFilter, tenantKey: tenantKey ?? null, limit: 3 })
+      const res = await knowledge.search({ query: String(lastUser), workstreams: wsFilter, tenantKey: tenant, limit: 3 })
       for (const h of res.hits) if (h.sourceCode && !citations.find((c) => c.sourceCode === h.sourceCode)) citations.push({ sourceCode: h.sourceCode, sourceTitle: h.sourceTitle })
       prefetched = res.hits.map((h, i) => `[${i + 1}] (${h.sourceTitle}) ${h.content.slice(0, 700)}`).join('\n\n')
     } catch { /* knowledge optional */ }
-
-    const systemPrompt = buildSystemPrompt(agent, { pageContext, prefetched })
 
     // Orchestrator sub-agent runner: consult a specialist workstream agent.
     const runSubAgent = async (code: string, question: string): Promise<string> => {
       const { data: subRow } = await kb.from('kb_workstream_agents').select('*').eq('code', code).maybeSingle()
       if (!subRow) return `No consultant agent exists for workstream "${code}".`
       const sub = agentFromRow(subRow)
-      const subCtx: ToolCtx = { userDb, orgId, agentWorkstreamCode: code, wsByCode, citations, tenantKey: tenantKey ?? null, _systemPrompt: buildSystemPrompt(sub, {}) }
-      return runAgentLoop(sub, [{ role: 'user', content: question }], subCtx, { maxIters: 4, maxTokens: 1500 })
+      const subCtx: ToolContext = { modelDb: userDb, orgId, agentWorkstreamCode: code, wsByCode, knowledge, citations, tenantKey: tenant }
+      const turn = await runAgentTurn({
+        persona: personaFor(sub),
+        tools: toolsForAgent(false),
+        ctx: subCtx,
+        history: [{ role: 'user', content: question }],
+        anthropicApiKey: ANTHROPIC_KEY,
+        model: sub.model ?? undefined,
+        temperature: sub.temperature ?? undefined,
+        maxIters: 4,
+        maxTokens: 1500,
+      })
+      return turn.text
     }
 
     const stream = new ReadableStream({
       async start(controller) {
         const send = (event: string, data: unknown) => controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
         try {
-          const ctx: ToolCtx = {
-            userDb, orgId, agentWorkstreamCode: agentCode, wsByCode, citations,
-            tenantKey: tenantKey ?? null, _systemPrompt: systemPrompt,
-            runSubAgent: agent.is_orchestrator ? runSubAgent : undefined,
+          const ctx: ToolContext = {
+            modelDb: userDb, orgId, agentWorkstreamCode: agentCode, wsByCode, knowledge, citations,
+            tenantKey: tenant, runSubAgent: agent.is_orchestrator ? runSubAgent : undefined,
           }
           const history = messages.map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content }))
-          const raw = await runAgentLoop(agent, history, ctx, {
+          const turn = await runAgentTurn({
+            persona: personaFor(agent),
+            tools: toolsForAgent(agent.is_orchestrator),
+            ctx,
+            history,
+            anthropicApiKey: ANTHROPIC_KEY,
+            model: agent.model ?? undefined,
+            temperature: agent.temperature ?? undefined,
             maxIters: agent.is_orchestrator ? 8 : 6,
             maxTokens: 3000,
+            pageContext,
+            prefetchedKnowledge: prefetched,
             onTool: (name) => send('status', { label: TOOL_LABELS[name] || name, tool: name }),
           })
-          const { text, recommendations } = extractRecommendations(raw)
-          send('message', { text, recommendations, citations })
+          send('message', { text: turn.text, recommendations: turn.recommendations, citations: turn.citations })
           send('done', {})
         } catch (e) {
           send('error', { error: e instanceof Error ? e.message : 'agent failed' })
