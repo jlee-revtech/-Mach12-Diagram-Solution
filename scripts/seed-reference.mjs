@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const NS = '6f5a1c00-1b2c-4d3e-9f80-mach12reflib'.replace(/[^0-9a-f-]/g, '0')
-const LIB = { code: 'mach12-ad-core', title: 'Mach12 A&D Core Process Reference', version: '1.2.0', source: 'curated' }
+const LIB = { code: 'mach12-ad-core', title: 'Mach12 A&D Core Process Reference', version: '1.4.0', source: 'curated' }
 const libId = uuidv5(LIB.code, NS)
 const id = (path) => uuidv5(path, NS)
 
@@ -297,12 +297,152 @@ const GRAPH_INVOICE_PROCESSING = flow(
   ],
 )
 
+// ─── v1.3.0 leaf graphs: supply-chain, quality, billing, planning ──
+// Generalized from real A&D / SAP value-chain BPMLs; all client identifiers removed.
+
+const GRAPH_RECEIVING_INSPECTION = flow(
+  [
+    { id: 'l1', label: 'Receiving' },
+    { id: 'l2', label: 'Quality Inspector' },
+    { id: 'l3', label: 'Material Review' },
+    { id: 'l4', label: 'Buyer' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'Shipment arrives', lane: 'l1' },
+    { id: 'a1', type: 'serviceTask', label: 'Record Goods Receipt (PO)', lane: 'l1', role: 'Receiving Specialist', tcode: 'MIGO', desc: 'S/4HANA · GR posts against the PO; stock lands in inspection/blocked as configured.' },
+    { id: 'g0', type: 'exclusiveGateway', label: 'Government property?', lane: 'l1' },
+    { id: 'a2', type: 'userTask', label: 'Segregate to GFP / CAP Location', lane: 'l1', role: 'Receiving Specialist', desc: 'S/4HANA · FAR 52.245-1 physical segregation and unique-item tracking for Government / contractor-acquired property.' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'Inspection required?', lane: 'l2' },
+    { id: 'a3', type: 'userTask', label: 'Perform Source / Receiving Inspection', lane: 'l2', role: 'Quality Inspector', tcode: 'QA32', desc: 'S/4HANA · AS9100 inspection against the inspection plan and MICs; record results.' },
+    { id: 'g2', type: 'exclusiveGateway', label: 'Conforming?', lane: 'l2' },
+    { id: 'a4', type: 'serviceTask', label: 'Post to Unrestricted Stock', lane: 'l1', desc: 'S/4HANA · Usage decision releases stock for issue.' },
+    { id: 'a5', type: 'userTask', label: 'Move to Quarantine / Hold', lane: 'l2', role: 'Quality Inspector', desc: 'S/4HANA · Nonconforming material blocked from use.' },
+    { id: 'a6', type: 'userTask', label: 'Raise Nonconformance, Route to MRB', lane: 'l3', role: 'Quality Engineer', ricefw: ['WF-NCR-ROUTING'] },
+    { id: 'a7', type: 'userTask', label: 'Notify Buyer / Initiate Return to Vendor', lane: 'l4', role: 'Buyer', desc: 'S/4HANA · Supplier nonconformance feedback and return.' },
+    { id: 'e1', type: 'endEvent', label: 'Stock available for issue', lane: 'l1' },
+    { id: 'e2', type: 'endEvent', label: 'To MRB disposition', lane: 'l3' },
+  ],
+  [
+    ['s', 'a1'], ['a1', 'g0'],
+    ['g0', 'a2', 'conditional', 'Yes'], ['a2', 'g1'],
+    ['g0', 'g1', 'conditional', 'No'],
+    ['g1', 'a4', 'conditional', 'Not required'],
+    ['g1', 'a3', 'conditional', 'Required'], ['a3', 'g2'],
+    ['g2', 'a4', 'conditional', 'Conforming'], ['a4', 'e1'],
+    ['g2', 'a5', 'conditional', 'Nonconforming'], ['a5', 'a6'], ['a6', 'a7'], ['a7', 'e2'],
+  ],
+)
+
+const GRAPH_MRB = flow(
+  [
+    { id: 'l1', label: 'Originator' },
+    { id: 'l2', label: 'Quality Engineer' },
+    { id: 'l3', label: 'Material Review Board' },
+    { id: 'l4', label: 'Customer / Government' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'Nonconformance raised', lane: 'l1' },
+    { id: 'a1', type: 'userTask', label: 'Document Nonconformance (NCR)', lane: 'l1', role: 'Originator', desc: 'Defect, quantity, and location classified against the defect catalog.' },
+    { id: 'a2', type: 'userTask', label: 'Perform Engineering / Quality Review', lane: 'l2', role: 'Quality Engineer', tcode: 'QM02' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'MRB required?', lane: 'l2' },
+    { id: 'a3', type: 'userTask', label: 'Convene Material Review Board', lane: 'l3', role: 'MRB' },
+    { id: 'g2', type: 'exclusiveGateway', label: 'Disposition?', lane: 'l3' },
+    { id: 'a4', type: 'userTask', label: 'Use-As-Is / Repair (with rationale)', lane: 'l3', role: 'MRB' },
+    { id: 'a5', type: 'userTask', label: 'Rework to Drawing', lane: 'l2', role: 'Quality Engineer' },
+    { id: 'a6', type: 'manualTask', label: 'Scrap', lane: 'l2', role: 'Quality Engineer' },
+    { id: 'g3', type: 'exclusiveGateway', label: 'Customer / Gov concurrence needed?', lane: 'l3', desc: 'Major nonconformance or spec deviation/waiver.' },
+    { id: 'a7', type: 'userTask', label: 'Obtain Customer / Government Concurrence', lane: 'l4', role: 'Government Quality Rep', desc: 'FAR / contract quality clause; deviation or waiver request.' },
+    { id: 'a8', type: 'serviceTask', label: 'Trigger RCCA / CAPA', lane: 'l2', role: 'Quality Engineer', ricefw: ['WF-CAPA'] },
+    { id: 'a9', type: 'serviceTask', label: 'Close Nonconformance & Update Records', lane: 'l2', role: 'Quality Engineer' },
+    { id: 'e1', type: 'endEvent', label: 'Disposition closed', lane: 'l2' },
+  ],
+  [
+    ['s', 'a1'], ['a1', 'a2'], ['a2', 'g1'],
+    ['g1', 'a5', 'conditional', 'Minor - no MRB'],
+    ['g1', 'a3', 'conditional', 'MRB'], ['a3', 'g2'],
+    ['g2', 'a4', 'conditional', 'Use-as-is / Repair'], ['a4', 'g3'],
+    ['g2', 'a5', 'conditional', 'Rework'],
+    ['g2', 'a6', 'conditional', 'Scrap'],
+    ['g3', 'a7', 'conditional', 'Yes'], ['a7', 'a8'],
+    ['g3', 'a8', 'conditional', 'No'],
+    ['a5', 'a8'], ['a6', 'a8'],
+    ['a8', 'a9'], ['a9', 'e1'],
+  ],
+)
+
+const GRAPH_PROGRESS_BILLING = flow(
+  [
+    { id: 'l1', label: 'Program Finance' },
+    { id: 'l2', label: 'Billing Analyst' },
+    { id: 'l3', label: 'Contracts' },
+    { id: 'l4', label: 'Customer (WAWF/iRAPT)' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'Billing event due', lane: 'l1', desc: 'Milestone, percent-complete, or progress-payment cycle.' },
+    { id: 'a1', type: 'userTask', label: 'Compute Incurred Cost / Progress %', lane: 'l1', role: 'Program Finance', desc: 'Cost-to-cost POC or milestone evidence.' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'Billing basis?', lane: 'l1' },
+    { id: 'a2', type: 'serviceTask', label: 'Calculate Progress Payment', lane: 'l2', role: 'Billing Analyst', desc: 'FAR 52.232-16 progress-payment rate applied to incurred cost.' },
+    { id: 'a3', type: 'serviceTask', label: 'Generate Fixed-Price / Milestone Invoice', lane: 'l2', role: 'Billing Analyst' },
+    { id: 'a4', type: 'serviceTask', label: 'Generate Resource-Related Bill', lane: 'l2', role: 'Billing Analyst', tcode: 'DP91' },
+    { id: 'a5', type: 'userTask', label: 'Apply Withholds & Adjustments', lane: 'l2', role: 'Billing Analyst' },
+    { id: 'a6', type: 'serviceTask', label: 'Check Funding-Line Limits (LoF)', lane: 'l3', role: 'Contract Administrator', desc: 'FAR 52.232-22 limitation of funds; compare cumulative billing to funded value.' },
+    { id: 'g2', type: 'exclusiveGateway', label: 'Within funding?', lane: 'l3' },
+    { id: 'a7', type: 'userTask', label: 'Notify & Hold for Funding', lane: 'l3', role: 'Contract Administrator' },
+    { id: 'a8', type: 'serviceTask', label: 'Produce Billing Backup / Billed-Cost Report', lane: 'l2', role: 'Billing Analyst' },
+    { id: 'a9', type: 'serviceTask', label: 'Submit Invoice (WAWF / iRAPT)', lane: 'l4', desc: 'DD250 / receiving-report linkage for material acceptance.', ricefw: ['INT-WAWF'] },
+    { id: 'a10', type: 'serviceTask', label: 'Post Receivable & Apply Payment', lane: 'l1', role: 'Program Finance' },
+    { id: 'e1', type: 'endEvent', label: 'Invoice paid', lane: 'l1' },
+    { id: 'e2', type: 'endEvent', label: 'Held for funding', lane: 'l3' },
+  ],
+  [
+    ['s', 'a1'], ['a1', 'g1'],
+    ['g1', 'a2', 'conditional', 'Progress payment'], ['a2', 'a5'],
+    ['g1', 'a3', 'conditional', 'Fixed-price / milestone'], ['a3', 'a5'],
+    ['g1', 'a4', 'conditional', 'Cost-reimbursable'], ['a4', 'a5'],
+    ['a5', 'a6'], ['a6', 'g2'],
+    ['g2', 'a7', 'conditional', 'No'], ['a7', 'e2'],
+    ['g2', 'a8', 'conditional', 'Yes'], ['a8', 'a9'], ['a9', 'a10'], ['a10', 'e1'],
+  ],
+)
+
+const GRAPH_SOP = flow(
+  [
+    { id: 'l1', label: 'Demand Planner' },
+    { id: 'l2', label: 'Supply Planner' },
+    { id: 'l3', label: 'Finance' },
+    { id: 'l4', label: 'Executive' },
+  ],
+  [
+    { id: 's', type: 'startEvent', label: 'Monthly S&OP cycle', lane: 'l1' },
+    { id: 'a1', type: 'userTask', label: 'Prepare Demand Review & Data', lane: 'l1', role: 'Demand Planner', desc: 'Consensus demand plan vs. statistical baseline and intelligence.' },
+    { id: 'a2', type: 'userTask', label: 'Prepare Supply / Capacity Review', lane: 'l2', role: 'Supply Planner', desc: 'MPS, rough-cut capacity, and clear-to-build assessment.' },
+    { id: 'a3', type: 'userTask', label: 'Reconcile to Financial Plan', lane: 'l3', role: 'FP&A Analyst' },
+    { id: 'g1', type: 'exclusiveGateway', label: 'Demand-supply balanced?', lane: 'l2' },
+    { id: 'a4', type: 'userTask', label: 'Develop Rebalancing Scenarios', lane: 'l2', role: 'Supply Planner', desc: 'Capacity, inventory, and subcontract levers.' },
+    { id: 'a5', type: 'userTask', label: 'Conduct Pre-S&OP Alignment', lane: 'l1', role: 'S&OP Lead' },
+    { id: 'g2', type: 'exclusiveGateway', label: 'Consensus reached?', lane: 'l1' },
+    { id: 'a6', type: 'userTask', label: 'Escalate Gaps to Executive S&OP', lane: 'l4', role: 'Executive Sponsor' },
+    { id: 'a7', type: 'userTask', label: 'Conduct Executive S&OP & Decide', lane: 'l4', role: 'Executive Sponsor' },
+    { id: 'a8', type: 'serviceTask', label: 'Publish Consensus Plan', lane: 'l1', role: 'Demand Planner', ricefw: ['INT-IBP-PUBLISH'] },
+    { id: 'e1', type: 'endEvent', label: 'Plan published', lane: 'l1' },
+  ],
+  [
+    ['s', 'a1'], ['a1', 'a2'], ['a2', 'a3'], ['a3', 'g1'],
+    ['g1', 'a4', 'conditional', 'No'], ['a4', 'a5'],
+    ['g1', 'a5', 'conditional', 'Yes'],
+    ['a5', 'g2'],
+    ['g2', 'a8', 'conditional', 'Yes'],
+    ['g2', 'a6', 'conditional', 'No'], ['a6', 'a7'], ['a7', 'a8'],
+    ['a8', 'e1'],
+  ],
+)
+
 // ─── The catalog ───────────────────────────────────────
 // Node shape: { name, description?, scope?, lifecycle?, variant?, graph?, overlays?, children?|groups?|processes? }
 const SCENARIOS = [
   {
-    name: 'Bid-to-Win (Capture & Proposal)',
-    description: 'Pursuit lifecycle from opportunity qualification through proposal submission and award.',
+    name: 'Offer-to-Cash (Capture, Contracts, Billing & Rev-Rec)',
+    description: 'Sell-side lifecycle from capture and proposal through contract setup, funding, CLIN/SLIN and progress billing, deliveries acceptance, and closeout.',
     groups: [
       { name: 'Opportunity Qualification', processes: [
         { name: 'Qualify Opportunity', description: 'Gate review of fit, PWin, and bid/no-bid.' },
@@ -324,12 +464,6 @@ const SCENARIOS = [
         { name: 'Assemble & Submit Proposal', description: 'Compliance matrix, volumes, and submission.' },
         { name: 'Conduct Fact-Finding / Negotiation', description: 'Support DCAA/DCMA fact-finding and negotiate.' },
       ]},
-    ],
-  },
-  {
-    name: 'Contract-to-Closeout (Acquisition Mgmt)',
-    description: 'Award setup through funding, mods, CDRLs, and closeout.',
-    groups: [
       { name: 'Award Setup', processes: [
         { name: 'Set Up Contract Master', description: 'Create contract, CLIN/SLIN structure, and billing terms.' },
         { name: 'Establish Project & WBS', description: 'Stand up the project, WBS, and control accounts.' },
@@ -344,6 +478,15 @@ const SCENARIOS = [
         { name: 'Manage CDRL Schedule', description: 'Track CDRL/DID due dates and submissions.' },
         { name: 'Submit & Track DD250', description: 'Material inspection & acceptance via DD250/WAWF.', scope: 'DD250' },
       ]},
+      { name: 'Billing & Financial Processing', processes: [
+        { name: 'Perform Resource-Related Billing', description: 'Bill cost-reimbursable effort from posted actuals (DP91-style).' },
+        { name: 'Perform Fixed-Price / Milestone Billing', description: 'Bill fixed-price milestones and delivery events.' },
+        { name: 'Process Progress Payments / PBP', description: 'Compute and submit customary progress payments and performance-based payments.', graph: GRAPH_PROGRESS_BILLING, overlays: [ctrl('FAR', '52.232-16', 'Progress payments', 'Progress payments computed on incurred allowable cost at the contract rate.'), ctrl('DFARS', '252.232-7004', 'DoD progress-payment rates', 'Apply the correct customary/flexible progress-payment rate.')] },
+        { name: 'Manage Funding-Line Invoice Controls', description: 'Bill within funded value by ACRN/LOA and notify at thresholds.', overlays: [ctrl('FAR', '52.232-22', 'Limitation of funds', 'Cumulative billing controlled against funded value.')] },
+        { name: 'Manage Withholds & Adjustments', description: 'Apply contractual withholds, retentions, liquidations, and adjustments.' },
+        { name: 'Produce Billed-Cost Reports / Billing Backup', description: 'Generate billing backup and billed-cost detail to support the invoice.' },
+        { name: 'Process Invoice Output, Credits & AR', description: 'Issue the invoice (WAWF/iRAPT), process credits, and post receivables.', overlays: [ctrl('FAR', '52.232-25', 'Prompt payment', 'Valid invoices submitted and tracked to prompt-payment terms.')] },
+      ]},
       { name: 'Closeout', processes: [
         { name: 'Reconcile & De-obligate', description: 'Final reconciliation and excess funds de-obligation.' },
         { name: 'Execute Contract Closeout', description: 'Final invoice, releases, and records retention.' },
@@ -352,8 +495,36 @@ const SCENARIOS = [
   },
   {
     name: 'Plan-to-Produce (Program Execution)',
-    description: 'Production planning through shop-floor execution and delivery.',
+    description: 'Engineering-released production: demand and supply planning (S&OP), master scheduling and MRP, shop-floor execution, quality (AS9100 inspection, MRB, CAPA), and earned value.',
     groups: [
+      { name: 'Demand Planning', processes: [
+        { name: 'Generate Statistical Baseline Forecast', description: 'Best-fit statistical forecast from demand history.' },
+        { name: 'Develop Collaborative / Consensus Demand Plan', description: 'Reconcile sales, marketing, and program intelligence into a consensus plan.' },
+        { name: 'Plan New Product Introduction (NPI)', description: 'Forecast and phase-in for new products and platforms.' },
+        { name: 'Perform Demand Sensing & Scenario Planning', description: 'Short-term demand sensing and what-if scenarios.' },
+      ]},
+      { name: 'Supply Planning (Short & Mid Term)', processes: [
+        { name: 'Create Master Production Schedule (MPS)', description: 'Constrained MPS for key and critical items.' },
+        { name: 'Perform Rough-Cut Capacity Planning', description: 'Validate the plan against critical capacity (RCCP).' },
+        { name: 'Execute Distribution Requirements Planning (DRP)', description: 'Plan replenishment across the distribution network.' },
+        { name: 'Assess Clear-to-Build / Material Availability', description: 'Component availability and clear-to-build assessment.' },
+        { name: 'Plan Subcontract Manufacturing', description: 'Plan supply from subcontract / outside production.' },
+      ]},
+      { name: 'Sales & Operations Planning (S&OP)', processes: [
+        { name: 'Prepare S&OP Data & Analytics', description: 'Assemble demand, supply, and financial views for review.' },
+        { name: 'Reconcile to Financial Plan', description: 'Align the operating plan to the financial plan.' },
+        { name: 'Conduct Pre-S&OP & Executive S&OP', description: 'Pre-S&OP alignment and executive decision review.', graph: GRAPH_SOP },
+        { name: 'Publish Consensus Plan', description: 'Finalize and publish the agreed plan.' },
+      ]},
+      { name: 'Inventory Optimization', processes: [
+        { name: 'Optimize Safety Stock & Multi-Echelon Inventory', description: 'Set safety-stock and multi-echelon inventory targets.' },
+        { name: 'Manage Excess & Obsolete (E&O) Inventory', description: 'Identify and disposition excess and obsolete stock.' },
+      ]},
+      { name: 'Manage Performance (S&OE)', processes: [
+        { name: 'Monitor Forecast Accuracy & Bias', description: 'Track forecast accuracy, bias, and MAPE.' },
+        { name: 'Conduct Sales & Operations Execution (S&OE)', description: 'Short-horizon execution and exception management.' },
+        { name: 'Measure Inventory & Working-Capital Performance', description: 'Inventory turns and working-capital performance.' },
+      ]},
       { name: 'Schedule (IMS/IMP)', processes: [
         { name: 'Develop Integrated Master Schedule', description: 'Build and resource-load the IMS.', overlays: [ctrl('EVMS', 'GASP', 'Schedule integrity', 'IMS vertically/horizontally traceable to the IMP.')] },
         { name: 'Perform Schedule Risk Analysis', description: 'Monte Carlo SRA on the critical path.' },
@@ -361,14 +532,88 @@ const SCENARIOS = [
       { name: 'Production Planning', processes: [
         { name: 'Release Production Order', description: 'Convert planned orders and release to the floor.' },
         { name: 'Plan Material Requirements', description: 'MRP run and long-lead procurement triggers.' },
+        { name: 'Perform Detailed Scheduling & Capacity Leveling', description: 'Sequence operations and level work-center capacity against constraints.' },
+        { name: 'Manage Tooling & Special Equipment', description: 'Allocate and track special tooling and special test equipment for the order.' },
       ]},
-      { name: 'Shop Floor', processes: [
+      { name: 'Manufacturing Execution', processes: [
+        { name: 'Stage Materials & Manage Floor Stock', description: 'Pull and stage components; manage floor-stock consumption and backflush.' },
         { name: 'Confirm Operation', description: 'Record labor and operation confirmations.' },
-        { name: 'Perform In-Process Inspection', description: 'Quality inspection and nonconformance handling.' },
+        { name: 'Disposition Rework & Scrap', description: 'Execute rework or scrap dispositioning on the production order.' },
+        { name: 'Execute External / Subcontract Operations', description: 'Manage subcontracted operations and outside processing.' },
+        { name: 'Create As-Built / Serialized Genealogy Record', description: 'Capture the as-built configuration and serial genealogy.' },
         { name: 'Complete & Stock Order', description: 'Goods receipt finished goods to inventory.' },
       ]},
       { name: 'Earned Value', processes: [
         { name: 'Take Earned Value', description: 'Claim BCWP via the earned-value technique.', overlays: [ctrl('EVMS', 'EIA-748', 'Earned value management', 'Objective EV methods; no front-loading.'), kpi('CPI', '>= 0.95')] },
+      ]},
+      { name: 'Source & Receiving Inspection', processes: [
+        { name: 'Perform Source / Supplier Inspection', description: 'Inspection at the supplier prior to shipment.' },
+        { name: 'Perform Receiving Inspection & Disposition', description: 'Inbound inspection against the plan with accept / reject / MRB routing.', graph: GRAPH_RECEIVING_INSPECTION, overlays: [ctrl('Other', 'AS9100', 'Receiving inspection', 'Verify conformance and certifications before stock release.'), ctrl('FAR', '52.246-2', 'Inspection of supplies', 'Maintain an inspection system acceptable to the Government.')] },
+        { name: 'Review Certificate of Conformance', description: 'Validate CoC and material certifications.' },
+      ]},
+      { name: 'In-Process & Final Inspection', processes: [
+        { name: 'Perform In-Process Inspection', description: 'Record inspection characteristics during production.' },
+        { name: 'Perform First Article Inspection', description: 'FAI per AS9102 for new / changed parts.', overlays: [ctrl('Other', 'AS9102', 'First Article Inspection', 'Complete and document FAI for new/changed parts.')] },
+        { name: 'Perform Final / Pre-Ship Inspection', description: 'Final acceptance inspection before shipment.' },
+        { name: 'Support Customer & Government Source Inspection (GSI)', description: 'Government/customer source inspection at the point of acceptance.' },
+      ]},
+      { name: 'Nonconformance & MRB', processes: [
+        { name: 'Raise Quality Notification / Nonconformance', description: 'Document and classify the nonconformance (NCR).' },
+        { name: 'Perform Material Review Board Disposition', description: 'MRB review and disposition with customer concurrence where required.', graph: GRAPH_MRB },
+        { name: 'Execute Scrap / Rework / Use-As-Is / Repair', description: 'Carry out the MRB disposition.' },
+      ]},
+      { name: 'CAPA & Continuous Improvement', processes: [
+        { name: 'Perform Root Cause & Corrective Action (RCCA/8D)', description: 'Investigate root cause and drive corrective action.' },
+        { name: 'Perform Preventive Action', description: 'Preventive action to stop recurrence across products and lines.' },
+        { name: 'Measure Cost of Quality', description: 'Track prevention, appraisal, and failure cost.' },
+      ]},
+      { name: 'Calibration & Audit', processes: [
+        { name: 'Manage Calibration & Test Equipment', description: 'Calibration schedules and test-equipment control (often as PM orders).' },
+        { name: 'Conduct Internal & Supplier Quality Audits', description: 'AS9100 internal and supplier audits.', overlays: [ctrl('Other', 'AS9100', 'Audit program', 'Plan and perform internal and supplier quality audits.')] },
+        { name: 'Issue Quality Certificates / CoC', description: 'Generate certificates of conformance and quality records.' },
+        { name: 'Manage Supplier Corrective Action Requests (SCAR)', description: 'Issue and track SCARs to suppliers.' },
+      ]},
+    ],
+  },
+  {
+    name: 'Inventory to Deliver (Logistics & Inventory)',
+    description: 'Warehouse, inventory, and transportation: receiving and putaway, inventory management with property segregation, material issue, stock transfer, shipping, and reverse logistics.',
+    groups: [
+      { name: 'Inbound Warehousing & Receiving', processes: [
+        { name: 'Manage Inbound Shipment / ASN', description: 'Plan inbound deliveries and advanced shipping notifications.' },
+        { name: 'Receive Against Purchase Order', description: 'Post goods receipt against the PO.' },
+        { name: 'Perform Putaway', description: 'Direct and confirm putaway to storage bins.' },
+        { name: 'Manage Batch, Lot & Shelf-Life', description: 'Batch/lot characteristics, shelf-life, and expiration handling.' },
+        { name: 'Capture Serialization & As-Received Record', description: 'Record serial numbers and as-received configuration.' },
+      ]},
+      { name: 'Inventory Management', processes: [
+        { name: 'Manage Stock & Property Segregation', description: 'Manage stock with physical segregation of Government/contractor-acquired property.', overlays: [ctrl('FAR', '52.245-1', 'Government property', 'Segregate and uniquely track GFP/CAP in the property system.')] },
+        { name: 'Perform Cycle Counting', description: 'Cycle-count programs and adjustments.' },
+        { name: 'Perform Physical Inventory & Reconciliation', description: 'Periodic physical inventory and reconciliation.' },
+        { name: 'Manage Quarantine, Hold & MRB Stock', description: 'Control blocked, quarantine, and MRB-held stock.' },
+      ]},
+      { name: 'Internal Movements & Material Issue', processes: [
+        { name: 'Perform Kitting', description: 'Kit components for production or service orders.' },
+        { name: 'Issue Material to Production / WBS / Network', description: 'Issue components to orders, WBS, or networks.' },
+        { name: 'Issue Material to Cost Center / Internal Order', description: 'Issue material to overhead cost objects.' },
+        { name: 'Issue Subcontract Components', description: 'Provide components to subcontractors.' },
+        { name: 'Scrap from Inventory', description: 'Scrap and write off inventory.' },
+      ]},
+      { name: 'Inter / Intra-Company Transport', processes: [
+        { name: 'Create Stock Transport Order & Outbound Delivery', description: 'Raise the STO and outbound delivery.' },
+        { name: 'Manage Shipment', description: 'Plan and execute the transport.' },
+        { name: 'Receive Stock Transport Order', description: 'Receive the STO at the destination plant.' },
+      ]},
+      { name: 'Outbound Warehousing & Shipping', processes: [
+        { name: 'Create Outbound Delivery & Paperwork', description: 'Create the delivery and shipping/export documentation.', overlays: [ctrl('ITAR', '120-130', 'Export documentation', 'Apply export licensing/classification and ITAR/EAR documentation.')] },
+        { name: 'Pick, Pack & Ship', description: 'Pick, pack, and post goods issue.' },
+        { name: 'Manage Outbound Shipment & Proof of Delivery', description: 'Execute the shipment and capture proof of delivery.' },
+        { name: 'Hand Off Shipment to DD250 / WAWF', description: 'Link the shipment to DD250 acceptance and WAWF.', scope: 'DD250' },
+      ]},
+      { name: 'Reverse Logistics', processes: [
+        { name: 'Receive Customer Return', description: 'Process inbound customer returns.' },
+        { name: 'Return to Vendor', description: 'Return nonconforming or excess material to the vendor.' },
+        { name: 'Manage In-Transit & Returns Performance', description: 'Track in-transit stock and returns disposition.' },
       ]},
     ],
   },
@@ -414,13 +659,13 @@ const SCENARIOS = [
       ]},
       { name: 'Release', processes: [
         { name: 'Release BOM to ERP', description: 'Transfer engineering BOM to manufacturing BOM.' },
-        { name: 'Manage First Article Inspection', description: 'FAI per AS9102 before production release.', overlays: [ctrl('Other', 'AS9102', 'First Article Inspection', 'Complete FAI for new/changed parts.')] },
+        { name: 'Conduct Production Readiness Review', description: 'PRR gate confirming design, tooling, and process maturity before production release. First Article Inspection (AS9102) is owned by the Quality Management stream.' },
       ]},
     ],
   },
   {
     name: 'Acquire-to-Retire (Asset / Property / GFP)',
-    description: 'Government and contractor property accountability through disposition.',
+    description: 'Government/contractor property accountability and fixed-asset accounting from acquisition through disposition.',
     groups: [
       { name: 'Property Management', processes: [
         { name: 'Account for Government Furnished Property', description: 'Receive, record, and report GFP/GFE.', overlays: [ctrl('FAR', '52.245-1', 'Government property', 'Maintain a compliant property management system.')] },
@@ -438,19 +683,40 @@ const SCENARIOS = [
   },
   {
     name: 'Sustainment / MRO',
-    description: 'Depot and field maintenance, repair, and overhaul.',
+    description: 'Aftermarket service and depot/field MRO: returns and repair, service parts, technical support, warranty, and service contracts.',
     groups: [
-      { name: 'Induction', processes: [
-        { name: 'Induct Asset for Repair', description: 'Receive and induct asset; create MRO order.' },
-        { name: 'Assess & Disposition', description: 'Inspect, scope work, and disposition.' },
+      { name: 'Induction & Repair Initiation', processes: [
+        { name: 'Induct Asset for Repair', description: 'Receive and induct asset; create the MRO/service order.' },
+        { name: 'Evaluate & Workscope Repair', description: 'Inspect, scope the work, and disposition the repair.' },
+        { name: 'Develop Repair Quotation', description: 'Estimate and quote the repair to the customer.' },
+        { name: 'Manage Exchange (Advanced / In-House)', description: 'Advanced or in-house unit exchange against the installed base.' },
+      ]},
+      { name: 'Service Parts Planning', processes: [
+        { name: 'Plan Rotables & Spare Parts', description: 'Plan rotable pools and consumable spares to demand.' },
+        { name: 'Manage Rental & Loan Banks', description: 'Administer rental/loan units and returns.' },
+        { name: 'Manage Staging, Backorder & Clear-to-Build', description: 'Stage parts, resolve backorders, and confirm clear-to-build.' },
       ]},
       { name: 'Repair Execution', processes: [
         { name: 'Execute Repair Work', description: 'Perform repair operations and parts replacement.' },
-        { name: 'Perform Functional Test', description: 'Test and certify airworthiness/serviceability.' },
+        { name: 'Perform Repair Subcontracting', description: 'Manage subcontracted repair and outside processing.' },
+        { name: 'Perform Functional Test', description: 'Test and certify serviceability.' },
+        { name: 'Return to Service & Airworthiness Check', description: 'Certify airworthiness/serviceability and release.', overlays: [ctrl('Other', 'FAA-8130-3', 'Airworthiness release', 'Issue the airworthiness/serviceability certification.')] },
       ]},
-      { name: 'Return', processes: [
+      { name: 'Technical Support', processes: [
+        { name: 'Manage Service Bulletin / Modification / Retrofit', description: 'Plan and execute service bulletins, mods, and retrofits.' },
+        { name: 'Provide Field Service & Technical Support', description: 'Field repair, AOG support, and technical queries.' },
+      ]},
+      { name: 'Warranty & Claims', processes: [
+        { name: 'Manage Warranty & Claims Processing', description: 'Validate, adjudicate, and process warranty claims.' },
+        { name: 'Perform Supplier Warranty Recovery', description: 'Recover warranty cost from suppliers and subcontractors.' },
+      ]},
+      { name: 'Service Contract Management', processes: [
+        { name: 'Manage Service Contracts', description: 'Set up and administer service/sustainment contracts (PBL/CLS).' },
+        { name: 'Manage Maintenance Service Plans & Billing', description: 'Maintain service plans and bill service/usage.' },
+      ]},
+      { name: 'Return & Closeout', processes: [
         { name: 'Close MRO Work Order', description: 'Settle costs and close the work order.' },
-        { name: 'Return Asset to Service', description: 'Ship and update the installed base.' },
+        { name: 'Return Asset to Service & Update Installed Base', description: 'Ship the asset and update the installed base / equipment record.' },
       ]},
     ],
   },
@@ -557,6 +823,12 @@ const SCENARIOS = [
         { name: 'Perform Bank Transactions and Payments', description: 'Payment runs and bank statement processing.' },
         { name: 'Perform Escheatment', description: 'Unclaimed property / escheatment.' },
       ]},
+      { name: 'Perform Treasury & Cash Management', children: [
+        { name: 'Manage Cash Position & Liquidity', description: 'Daily cash position and short-term liquidity forecasting.' },
+        { name: 'Manage Debt & Investments', description: 'Borrowings, investments, and interest-rate exposure.' },
+        { name: 'Manage In-House Cash & Intercompany Netting', description: 'In-house bank, intercompany payments, and netting.' },
+        { name: 'Perform Bank Communication & Payment Status', description: 'Bank connectivity (host-to-host) and payment status tracking.' },
+      ]},
       { name: 'Perform Travel Accounting', children: [
         { name: 'Maintain Travel Master Data', description: 'Travel and expense master data.' },
         { name: 'Record Travel, P-Card, and Employee Expenses', description: 'Capture expenses to receiving objects.' },
@@ -572,11 +844,41 @@ const SCENARIOS = [
         ]},
         { name: 'Perform Year End Close', description: 'Year-end close and carryforward.' },
       ]},
+      { name: 'Perform Consolidation', children: [
+        { name: 'Execute Group Close', description: 'Collect and validate consolidation-unit data for the group close.' },
+        { name: 'Perform Intercompany Elimination', description: 'Eliminate intercompany payables/receivables, revenue, and profit-in-inventory.' },
+        { name: 'Perform Currency Translation', description: 'Translate local-currency data to group currency.' },
+        { name: 'Produce Consolidated Financial Statements', description: 'Consolidated balance sheet, P&L, and cash flow.' },
+      ]},
       { name: 'Perform Financial Reporting', children: [
         { name: 'Perform Overhead Claim Reporting', description: 'Annual incurred-cost / overhead claim reporting.', overlays: [ctrl('FAR', '52.216-7', 'Allowable cost & payment', 'Adequate incurred cost submission.'), acc('RevTech ICS Accelerator', 'revtech-ics')] },
         { name: 'Perform Financial Monthly Reporting', description: 'Monthly internal reporting.' },
         { name: 'Perform Financial Quarterly Reporting', description: 'Quarterly reporting.' },
         { name: 'Perform Financial Annual Reporting', description: 'Annual reporting.' },
+      ]},
+      { name: 'Asset Strategy & Portfolio', children: [
+        { name: 'Define Asset Lifecycle Strategy', description: 'Maintenance and replacement strategy by asset class.' },
+        { name: 'Manage Asset Portfolio & Capital Plan', description: 'Prioritize asset investments and capital projects.' },
+      ]},
+      { name: 'Asset Acquisition, Commissioning & Retirement', children: [
+        { name: 'Onboard / Install Asset', description: 'Create the equipment master and install the asset.' },
+        { name: 'Commission Asset', description: 'Commission and bring the asset into service.' },
+        { name: 'Certify Asset', description: 'Certify regulatory and safety compliance.' },
+        { name: 'Decommission & Retire Asset', description: 'Decommission, dispose, and retire the asset.' },
+      ]},
+      { name: 'Maintain Asset & Reliability', children: [
+        { name: 'Execute Preventive Maintenance', description: 'Plan and execute time/usage-based maintenance.' },
+        { name: 'Execute Corrective Maintenance (Breakdown)', description: 'Notification-driven breakdown and corrective work.' },
+        { name: 'Apply Reliability-Centered Maintenance (RCM)', description: 'Condition and reliability-based maintenance strategy.' },
+        { name: 'Manage Maintenance Work Orders & Confirmations', description: 'Plan, schedule, execute, and confirm maintenance orders.' },
+      ]},
+      { name: 'Asset Calibration & Compliance', children: [
+        { name: 'Manage Calibration & Test Equipment', description: 'Calibration orders and test-equipment control (shared with Quality Management).' },
+        { name: 'Monitor Asset Safety & Regulatory Compliance', description: 'Track safety, environmental, and regulatory compliance.' },
+      ]},
+      { name: 'Maintenance Supply', children: [
+        { name: 'Manage Maintenance Spares & Inventory', description: 'Plan and stock maintenance spares (MRO inventory).' },
+        { name: 'Procure Maintenance Services & Parts', description: 'Procure external maintenance services and parts.' },
       ]},
     ],
   },
@@ -606,6 +908,41 @@ const SCENARIOS = [
     ],
   },
 ]
+
+// ─── Library-wide convention: every value stream carries a Master Data (-00)
+//     and an Analytics & Reporting (-99) process group, matching the standard
+//     SAP A&D BPML structure. Content is tailored per stream. ──
+const leafify = (arr) => arr.map((n) => (typeof n === 'string' ? { name: n } : n))
+const STREAM_MD = {
+  'Record-to-Report (Finance / EVMS / DCAA)': ['Chart of Accounts & Ledger Master', 'Cost Center, Profit Center & Activity Master', 'Fixed Asset, Functional Location & Equipment Master', 'Tax & Bank Master'],
+  'Plan-to-Perform (Program & Portfolio Management)': ['Project, WBS & Network Master', 'OBS & CAM Assignment Master', 'Control Account & Work Package Master'],
+  'Design-to-Release (Engineering / PLM)': ['Engineering BOM & CAD Master', 'Requirement & Specification Master', 'Configuration Item & Baseline Master'],
+  'Plan-to-Produce (Program Execution)': ['Material, BOM & Routing Master', 'Work Center & Capacity Master', 'Production Version Master', 'Forecast Profile & Inspection Plan Master'],
+  'Inventory to Deliver (Logistics & Inventory)': ['Material & Plant/Storage-Location Master', 'Warehouse, Storage-Type & Bin Master', 'Batch, Serial & Handling-Unit Master'],
+  'Acquire-to-Retire (Asset / Property / GFP)': ['Government / Contractor Property Master', 'Fixed Asset Master', 'Asset Class & Depreciation-Area Master'],
+  'Sustainment / MRO': ['Installed-Base & Serialized-Asset Master', 'Repair Scope & Service-BOM Master', 'Rotable & Exchange-Pool Master'],
+  'Source-to-Pay (Procurement & Subcontracts)': ['Supplier & Business-Partner Master', 'Purchasing Info Record & Source List', 'Clause / Flowdown Catalog'],
+  'Offer-to-Cash (Capture, Contracts, Billing & Rev-Rec)': ['Opportunity & Pipeline Master', 'Contract & CLIN/SLIN Master', 'Funding & ACRN Master', 'Billing Plan & Terms Master'],
+  'Hire-to-Retire (Workforce / Clearances)': ['Employee & Org-Assignment Master', 'Position & Job Master', 'Clearance & Qualification Master'],
+}
+const STREAM_RPT = {
+  'Record-to-Report (Finance / EVMS / DCAA)': ['Financial Statement & Close Reporting', 'Indirect Rate & Incurred-Cost Reporting', 'Asset & Maintenance-Cost Reporting'],
+  'Plan-to-Perform (Program & Portfolio Management)': ['Cost/Schedule Variance (CPI/SPI) Reporting', 'EAC/ETC & Management-Reserve Reporting'],
+  'Design-to-Release (Engineering / PLM)': ['Engineering Change Throughput Reporting', 'Requirements Traceability Reporting'],
+  'Plan-to-Produce (Program Execution)': ['Production Performance & OEE Reporting', 'Earned Value (BCWP) Reporting', 'Forecast Accuracy & Cost-of-Quality Reporting'],
+  'Inventory to Deliver (Logistics & Inventory)': ['Inventory Accuracy & Aging Reporting', 'Logistics & Carrier Performance Reporting'],
+  'Acquire-to-Retire (Asset / Property / GFP)': ['Property Accountability Reporting (GFP/CAP)', 'Asset & Depreciation Reporting'],
+  'Sustainment / MRO': ['Turnaround Time (TAT) Reporting', 'Warranty & Cost-Per-Repair Analytics'],
+  'Source-to-Pay (Procurement & Subcontracts)': ['Spend & Savings Analytics', 'Supplier Performance & CPSR Reporting'],
+  'Offer-to-Cash (Capture, Contracts, Billing & Rev-Rec)': ['Pipeline & Win-Rate Reporting', 'Contract Status, Funding & Billing Reporting'],
+  'Hire-to-Retire (Workforce / Clearances)': ['Headcount & Labor-Utilization Reporting', 'Payroll & Labor-Distribution Reporting'],
+}
+for (const s of SCENARIOS) {
+  const kids = s.children || s.groups
+  if (!kids) continue
+  if (STREAM_MD[s.name]) kids.unshift({ name: 'Master Data', description: 'Master-data objects governing this value stream.', processes: leafify(STREAM_MD[s.name]) })
+  if (STREAM_RPT[s.name]) kids.push({ name: 'Analytics & Reporting', description: 'Operational and management reporting for this value stream.', processes: leafify(STREAM_RPT[s.name]) })
+}
 
 // ─── Catalog helpers (exported for the graph generator) ──
 export { SCENARIOS, LIB, libId, id }
