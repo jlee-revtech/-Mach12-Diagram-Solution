@@ -10,11 +10,23 @@ import {
 } from '@/lib/supabase/workshops'
 import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, WorkshopFocus, CaptureType } from '@/lib/workshop/types'
 import { CAPTURE_META } from '@/lib/workshop/types'
+import { createTranscription, type TranscriptionProvider } from '@/lib/workshop/transcription'
+import { exportRecapDocx, exportRecapPptx } from '@/lib/workshop/export'
+import type { WorkshopRecapData } from '@jlee-revtech/agent-core'
 import type { Workstream } from '@/lib/workstream/types'
 import VersionBadge from '@/components/VersionBadge'
 
 interface FacResult {
   say: string; nextQuestion?: string; coverage?: string; advanceAgenda?: boolean; pullSpecialist?: string; gaps?: string[]
+}
+
+function authHeader(): Record<string, string> {
+  try {
+    const key = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    const raw = key ? localStorage.getItem(key) : null
+    const tok = raw ? JSON.parse(raw)?.access_token : null
+    return tok ? { Authorization: `Bearer ${tok}` } : {}
+  } catch { return {} }
 }
 
 export default function WorkshopRoomPage() {
@@ -31,7 +43,13 @@ export default function WorkshopRoomPage() {
   const [fac, setFac] = useState<FacResult | null>(null)
   const [input, setInput] = useState('')
   const [speaker, setSpeaker] = useState('')
+  const [voiceOn, setVoiceOn] = useState(false)
+  const [interim, setInterim] = useState('')
+  const [recap, setRecap] = useState<WorkshopRecapData | null>(null)
+  const [pickSpecialist, setPickSpecialist] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
+  const voiceRef = useRef<TranscriptionProvider | null>(null)
+  const speakerRef = useRef('')
 
   const me = profile?.display_name || user?.email?.split('@')[0] || 'Facilitator'
 
@@ -46,13 +64,33 @@ export default function WorkshopRoomPage() {
       getWorkshop(id), listWorkstreams(organization.id), listAgenda(id), listMessages(id), listCaptures(id),
     ])
     setWs(w); setStreams(s); setAgenda(a); setMessages(m); setCaptures(c)
+    if (w?.recap) setRecap(w.recap as WorkshopRecapData)
   }, [organization, id])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setSpeaker(me) }, [me])
-  useEffect(() => { transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight }) }, [messages])
+  useEffect(() => { speakerRef.current = speaker }, [speaker])
+  useEffect(() => { transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight }) }, [messages, interim])
 
   const roster = (ws?.workstream_codes || []).map((c) => streams.find((s) => s.code === c)).filter(Boolean) as Workstream[]
+
+  // ─── Voice transcription (Web Speech API; final utterances -> transcript) ──
+  useEffect(() => {
+    if (!voiceOn || !ws || ws.status !== 'live') { voiceRef.current?.stop(); voiceRef.current = null; return }
+    const t = createTranscription()
+    if (!t.supported) { alert('Voice transcription needs Chrome or Edge (Web Speech API).'); setVoiceOn(false); return }
+    voiceRef.current = t
+    t.start(async (r) => {
+      if (r.isFinal) {
+        setInterim('')
+        if (r.text) {
+          await addMessage(ws.id, { speaker_kind: 'person', speaker_name: speakerRef.current || me, speaker_role: 'participant', content: r.text, source: 'voice' })
+          setMessages(await listMessages(ws.id))
+        }
+      } else setInterim(r.text)
+    }, (msg) => { alert(msg); setVoiceOn(false) })
+    return () => { t.stop(); voiceRef.current = null; setInterim('') }
+  }, [voiceOn, ws, me])
 
   // ─── Prep: generate brief ─────────────────────────────────
   const generateBrief = useCallback(async () => {
@@ -61,10 +99,7 @@ export default function WorkshopRoomPage() {
     try {
       const res = await fetch('/api/workshops/brief', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orgId: organization.id, topic: ws.topic || ws.title, objective: ws.objective,
-          customerName: ws.customer_name, workstreamCodes: ws.workstream_codes, focusAreas: ws.focus_areas,
-        }),
+        body: JSON.stringify({ orgId: organization.id, topic: ws.topic || ws.title, objective: ws.objective, customerName: ws.customer_name, workstreamCodes: ws.workstream_codes, focusAreas: ws.focus_areas }),
       })
       const data = await res.json()
       if (!res.ok || !data.brief) throw new Error(data.error || 'Brief generation failed')
@@ -72,25 +107,35 @@ export default function WorkshopRoomPage() {
       await replaceAgenda(ws.id, (data.brief.agenda || []).map((it: { title: string; objective?: string; focusType?: WorkshopFocus; timeboxMinutes?: number }) => ({
         title: it.title, objective: it.objective, focus_type: it.focusType, timebox_minutes: it.timeboxMinutes,
       })))
-      // seat the facilitator + specialist agents
       await setParticipants(ws.id,
         [{ display_name: me, org_role: 'Facilitator' }],
         [{ workstream_code: 'enterprise', display_name: 'Enterprise Architect', is_facilitator: true },
          ...roster.map((r) => ({ workstream_code: r.code, display_name: r.name.split('(')[0].trim() }))])
       await load()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed')
-    } finally { setBusy(null) }
+    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
   }, [ws, organization, me, roster, load])
 
   const setStatus = useCallback(async (status: Workshop['status']) => {
     if (!ws) return
-    const stamp = status === 'live' ? { started_at: new Date().toISOString() } : status === 'completed' ? { ended_at: new Date().toISOString() } : {}
+    const stamp = status === 'live' ? { started_at: new Date().toISOString() } : {}
     await updateWorkshop(ws.id, { status, ...stamp })
     await load()
   }, [ws, load])
 
-  // ─── Live: transcript + facilitation + capture ────────────
+  const endAndRecap = useCallback(async () => {
+    if (!ws || !organization) return
+    setVoiceOn(false)
+    setBusy('recap')
+    try {
+      await updateWorkshop(ws.id, { status: 'completed', ended_at: new Date().toISOString() })
+      const res = await fetch('/api/workshops/recap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workshopId: ws.id, orgId: organization.id }) })
+      const data = await res.json()
+      if (res.ok && data.recap) setRecap(data.recap)
+      await load()
+    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
+  }, [ws, organization, load])
+
+  // ─── Live: transcript + facilitation + specialists + capture ──
   const send = useCallback(async () => {
     if (!ws || !input.trim()) return
     await addMessage(ws.id, { speaker_kind: 'person', speaker_name: speaker || me, speaker_role: 'participant', content: input.trim(), source: 'typed' })
@@ -119,14 +164,29 @@ export default function WorkshopRoomPage() {
     setMessages(await listMessages(ws.id))
   }, [ws])
 
+  const contribute = useCallback(async (code: string) => {
+    if (!ws || !organization) return
+    setPickSpecialist(false)
+    setBusy(`contribute:${code}`)
+    try {
+      const active = agenda.find((a) => a.status === 'active')
+      const transcript = messages.slice(-16).map((m) => ({ speaker: m.speaker_name || m.speaker_role || 'participant', role: m.speaker_role, content: m.content }))
+      const res = await fetch('/api/workshops/contribute', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() },
+        body: JSON.stringify({ workshopId: ws.id, orgId: organization.id, workstreamCode: code, focus: active?.focus_type, transcript }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Contribution failed')
+      await addMessage(ws.id, { speaker_kind: 'agent', speaker_name: data.workstreamName || code, speaker_role: 'specialist', workstream_code: code, content: data.text, source: 'agent' })
+      setMessages(await listMessages(ws.id))
+    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
+  }, [ws, organization, agenda, messages])
+
   const capture = useCallback(async () => {
     if (!ws || !organization) return
     setBusy('capture')
     try {
-      const res = await fetch('/api/workshops/capture', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshopId: ws.id, orgId: organization.id }),
-      })
+      const res = await fetch('/api/workshops/capture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workshopId: ws.id, orgId: organization.id }) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Capture failed')
       setCaptures(await listCaptures(ws.id))
@@ -134,9 +194,20 @@ export default function WorkshopRoomPage() {
   }, [ws, organization])
 
   const setCap = useCallback(async (c: WorkshopCapture, status: WorkshopCapture['status']) => {
-    await updateCapture(c.id, { status, ...(status === 'applied' ? { applied_at: new Date().toISOString() } : {}) })
+    await updateCapture(c.id, { status })
     setCaptures((cs) => cs.map((x) => (x.id === c.id ? { ...x, status } : x)))
   }, [])
+
+  const applyCapture = useCallback(async (c: WorkshopCapture) => {
+    if (!organization) return
+    setBusy(`apply:${c.id}`)
+    try {
+      const res = await fetch('/api/workshops/apply', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify({ orgId: organization.id, captureId: c.id }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Apply failed')
+      setCaptures((cs) => cs.map((x) => (x.id === c.id ? { ...x, status: 'applied' } : x)))
+    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
+  }, [organization])
 
   const setActive = useCallback(async (item: WorkshopAgendaItem) => {
     for (const a of agenda) if (a.status === 'active' && a.id !== item.id) await updateAgendaItem(a.id, { status: 'done' })
@@ -147,9 +218,9 @@ export default function WorkshopRoomPage() {
   if (loading || !user || !organization || !ws) return null
 
   const proposed = captures.filter((c) => c.status === 'proposed')
-  const confirmed = captures.filter((c) => c.status === 'confirmed' || c.status === 'applied')
   const isLive = ws.status === 'live'
   const hasBrief = !!ws.brief
+  const contribBusy = busy?.startsWith('contribute:') ? busy.split(':')[1] : null
 
   return (
     <div className="min-h-screen bg-[var(--m12-bg)] flex flex-col">
@@ -176,11 +247,11 @@ export default function WorkshopRoomPage() {
           ))}
           {!hasBrief && <button onClick={generateBrief} disabled={busy === 'brief'} className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium">{busy === 'brief' ? 'Preparing…' : 'Generate Brief'}</button>}
           {hasBrief && !isLive && ws.status !== 'completed' && <button onClick={() => setStatus('live')} className="bg-[#059669] hover:bg-[#10B981] text-white px-3 py-1.5 rounded-lg text-xs font-medium">Start Workshop</button>}
-          {isLive && <button onClick={() => setStatus('completed')} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-3 py-1.5 rounded-lg text-xs font-medium">End & Recap</button>}
+          {isLive && <button onClick={endAndRecap} disabled={busy === 'recap'} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-3 py-1.5 rounded-lg text-xs font-medium">{busy === 'recap' ? 'Wrapping…' : 'End & Recap'}</button>}
         </div>
       </div>
 
-      {/* Prep view (no brief yet OR scheduled preview) */}
+      {/* Prep view */}
       {!isLive && ws.status !== 'completed' ? (
         <div className="flex-1 overflow-auto p-8">
           <div className="max-w-3xl mx-auto">
@@ -196,23 +267,16 @@ export default function WorkshopRoomPage() {
           </div>
         </div>
       ) : ws.status === 'completed' ? (
-        <div className="flex-1 overflow-auto p-8">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-base font-semibold text-[var(--m12-text)] mb-4">Workshop recap</h2>
-            <CaptureGroups captures={confirmed.length ? confirmed : captures} streams={streams} onSet={setCap} readOnly />
-            {captures.length === 0 && <p className="text-sm text-[var(--m12-text-muted)]">No captures were recorded.</p>}
-          </div>
-        </div>
+        <RecapView ws={ws} recap={recap} captures={captures} streams={streams} onSet={setCap} busy={busy} onRegen={endAndRecap} />
       ) : (
-        /* ─── Live Room: agenda | transcript | facilitation+captures ─── */
+        /* ─── Live Room ─── */
         <div className="flex-1 grid grid-cols-12 min-h-0">
           {/* Agenda rail */}
           <div className="col-span-3 border-r border-[var(--m12-border)]/40 overflow-auto p-4">
             <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-3">Agenda</div>
             <div className="space-y-1.5">
               {agenda.map((a) => (
-                <button key={a.id} onClick={() => setActive(a)}
-                  className="w-full text-left rounded-lg border px-3 py-2 transition-colors"
+                <button key={a.id} onClick={() => setActive(a)} className="w-full text-left rounded-lg border px-3 py-2 transition-colors"
                   style={{ borderColor: a.status === 'active' ? '#2563EB' : 'var(--m12-border)', backgroundColor: a.status === 'active' ? '#2563EB14' : 'transparent', opacity: a.status === 'done' ? 0.5 : 1 }}>
                   <div className="flex items-center gap-2">
                     {a.focus_type && <span className="text-[8px] uppercase tracking-wide px-1 py-0.5 rounded" style={{ backgroundColor: 'var(--m12-bg)', color: 'var(--m12-text-muted)' }}>{a.focus_type}</span>}
@@ -227,29 +291,45 @@ export default function WorkshopRoomPage() {
           {/* Transcript */}
           <div className="col-span-6 flex flex-col min-h-0 border-r border-[var(--m12-border)]/40">
             <div ref={transcriptRef} className="flex-1 overflow-auto p-4 space-y-3">
-              {messages.length === 0 && <div className="text-center text-xs text-[var(--m12-text-muted)] py-10">The room is ready. Type what&apos;s said, then Facilitate for the next question and Capture to log decisions.</div>}
+              {messages.length === 0 && !interim && <div className="text-center text-xs text-[var(--m12-text-muted)] py-10">The room is ready. Turn on 🎙 voice or type what&apos;s said, then Facilitate for the next question, bring in a specialist, and Capture to log decisions.</div>}
               {messages.map((m) => (
-                <div key={m.id} className={`flex gap-2 ${m.speaker_kind === 'agent' ? '' : ''}`}>
+                <div key={m.id} className="flex gap-2">
                   <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold" style={{ backgroundColor: m.speaker_kind === 'agent' ? '#2563EB1A' : 'var(--m12-bg-card)', color: m.speaker_kind === 'agent' ? '#3B82F6' : 'var(--m12-text-muted)' }}>
                     {m.speaker_kind === 'agent' ? 'AI' : (m.speaker_name || '?').slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-medium text-[var(--m12-text-secondary)]">{m.speaker_name || m.speaker_role}</span>
-                      {m.source === 'voice' && <span className="text-[8px] text-[var(--m12-text-muted)]">🎙</span>}
+                      {m.speaker_role === 'specialist' && <span className="text-[8px] uppercase tracking-wide px-1 py-0.5 rounded bg-[#2563EB1A] text-[#3B82F6]">specialist</span>}
+                      {m.source === 'voice' && <span className="text-[8px] text-[var(--m12-text-muted)]" title="Voice">🎙</span>}
                     </div>
                     <div className="text-xs text-[var(--m12-text)] whitespace-pre-wrap leading-relaxed">{m.content}</div>
                   </div>
                 </div>
               ))}
+              {interim && <div className="flex gap-2 opacity-50"><div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[9px] bg-[var(--m12-bg-card)]">🎙</div><div className="text-xs text-[var(--m12-text-muted)] italic pt-1">{interim}…</div></div>}
             </div>
             {/* Composer */}
             <div className="border-t border-[var(--m12-border)]/40 p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <input value={speaker} onChange={(e) => setSpeaker(e.target.value)} className="w-32 bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] outline-none" placeholder="Speaker" />
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <input value={speaker} onChange={(e) => setSpeaker(e.target.value)} className="w-28 bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] outline-none" placeholder="Speaker" />
+                <button onClick={() => setVoiceOn((v) => !v)} title="Live voice transcription (Chrome/Edge)"
+                  className="text-[11px] px-2.5 py-1 rounded border transition-colors"
+                  style={{ borderColor: voiceOn ? '#DC2626' : 'var(--m12-border)', color: voiceOn ? '#EF4444' : 'var(--m12-text-muted)', backgroundColor: voiceOn ? '#DC262614' : 'transparent' }}>
+                  {voiceOn ? '● Recording' : '🎙 Voice'}
+                </button>
                 <button onClick={facilitate} disabled={busy === 'facilitate'} className="text-[11px] px-2.5 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] disabled:opacity-50">{busy === 'facilitate' ? 'Thinking…' : '✦ Facilitate'}</button>
+                <div className="relative">
+                  <button onClick={() => setPickSpecialist((v) => !v)} disabled={!!contribBusy} className="text-[11px] px-2.5 py-1 rounded border border-[#7C3AED]/50 text-[#A78BFA] hover:bg-[#7C3AED14] disabled:opacity-50">{contribBusy ? 'Consulting…' : '＋ Bring in specialist'}</button>
+                  {pickSpecialist && (
+                    <div className="absolute bottom-full mb-1 left-0 z-10 bg-[var(--m12-bg-card)] border border-[var(--m12-border)] rounded-lg shadow-xl p-1 w-56 max-h-56 overflow-auto">
+                      {roster.map((r) => (
+                        <button key={r.code} onClick={() => contribute(r.code)} className="w-full text-left px-2 py-1.5 rounded text-[11px] text-[var(--m12-text)] hover:bg-[var(--m12-bg)]">{r.name.split('(')[0].trim()}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button onClick={capture} disabled={busy === 'capture'} className="text-[11px] px-2.5 py-1 rounded border border-[#059669]/50 text-[#10B981] hover:bg-[#05966914] disabled:opacity-50">{busy === 'capture' ? 'Capturing…' : '⎙ Capture'}</button>
-                <span className="ml-auto text-[9px] text-[var(--m12-text-muted)]" title="Voice transcription lands in the next increment">🎙 voice: soon</span>
               </div>
               <div className="flex gap-2">
                 <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }}
@@ -262,7 +342,6 @@ export default function WorkshopRoomPage() {
 
           {/* Facilitation + captures */}
           <div className="col-span-3 overflow-auto p-4 space-y-4">
-            {/* Facilitation panel */}
             <div>
               <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">Facilitator</div>
               {fac ? (
@@ -282,20 +361,21 @@ export default function WorkshopRoomPage() {
                       <ul className="text-[10px] text-[var(--m12-text-secondary)] space-y-0.5 list-disc list-inside">{fac.gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
                     </div>
                   )}
-                  {fac.pullSpecialist && <div className="text-[10px] text-[var(--m12-text-muted)]">Bring in: <span className="text-[var(--m12-text-secondary)]">{roster.find((r) => r.code === fac.pullSpecialist)?.name || fac.pullSpecialist}</span></div>}
+                  {fac.pullSpecialist && roster.find((r) => r.code === fac.pullSpecialist) && (
+                    <button onClick={() => contribute(fac.pullSpecialist!)} disabled={!!contribBusy} className="text-[10px] px-2 py-1 rounded border border-[#7C3AED]/50 text-[#A78BFA] hover:bg-[#7C3AED14] disabled:opacity-50">Bring in {roster.find((r) => r.code === fac.pullSpecialist)?.name.split('(')[0].trim()} →</button>
+                  )}
                 </div>
               ) : (
                 <div className="text-[11px] text-[var(--m12-text-muted)] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-3">Press <span className="text-[#3B82F6]">✦ Facilitate</span> for the next best question and coverage.</div>
               )}
             </div>
 
-            {/* Captures */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)]">Captured {captures.length > 0 && <span className="text-[var(--m12-text-secondary)]">({captures.length})</span>}</div>
                 {proposed.length > 0 && <span className="text-[9px] text-[#D97706]">{proposed.length} to review</span>}
               </div>
-              <CaptureGroups captures={captures} streams={streams} onSet={setCap} />
+              <CaptureGroups captures={captures} streams={streams} onSet={setCap} onApply={applyCapture} busy={busy} />
             </div>
           </div>
         </div>
@@ -340,19 +420,53 @@ function BriefView({ ws, agenda, onStart }: { ws: Workshop; agenda: WorkshopAgen
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// ─── Recap view ──────────────────────────────────────────────
+function RecapView({ ws, recap, captures, streams, onSet, busy, onRegen }: {
+  ws: Workshop; recap: WorkshopRecapData | null; captures: WorkshopCapture[]; streams: Workstream[]
+  onSet: (c: WorkshopCapture, s: WorkshopCapture['status']) => void; busy: string | null; onRegen: () => void
+}) {
   return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">{title}</div>
-      {children}
+    <div className="flex-1 overflow-auto p-8">
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-[var(--m12-text)]">Workshop recap</h2>
+          <div className="flex items-center gap-2">
+            {recap && <button onClick={() => exportRecapDocx(ws, recap)} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)]">Export Word</button>}
+            {recap && <button onClick={() => exportRecapPptx(ws, recap)} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)]">Export Deck</button>}
+            <button onClick={onRegen} disabled={busy === 'recap'} className="text-xs px-3 py-1.5 rounded-lg bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white">{busy === 'recap' ? 'Generating…' : recap ? 'Regenerate' : 'Generate recap'}</button>
+          </div>
+        </div>
+        {recap ? (
+          <div className="space-y-6">
+            <div>
+              <div className="text-sm font-semibold text-[#3B82F6] mb-1">{recap.headline}</div>
+              <p className="text-sm text-[var(--m12-text-secondary)] leading-relaxed">{recap.summary}</p>
+            </div>
+            {recap.decisions?.length > 0 && <Section title="Decisions"><ul className="space-y-1">{recap.decisions.map((d, i) => <li key={i} className="text-xs text-[var(--m12-text-secondary)] flex gap-2"><span className="text-[#2563EB]">✓</span>{d}</li>)}</ul></Section>}
+            {recap.actions?.length > 0 && <Section title="Actions"><ul className="space-y-1">{recap.actions.map((a, i) => <li key={i} className="text-xs text-[var(--m12-text-secondary)] flex gap-2"><span className="text-[#7C3AED]">→</span><span>{a.title}{a.owner ? ` — ${a.owner}` : ''}{a.due ? ` (due ${a.due})` : ''}</span></li>)}</ul></Section>}
+            {recap.deliverables?.length > 0 && <Section title="Deliverables"><ul className="space-y-1">{recap.deliverables.map((d, i) => <li key={i} className="text-xs text-[var(--m12-text-secondary)] flex gap-2"><span className="text-[#0891B2]">▤</span>{d}</li>)}</ul></Section>}
+            {recap.risks?.length > 0 && <Section title="Risks"><ul className="space-y-1">{recap.risks.map((r, i) => <li key={i} className="text-xs text-[var(--m12-text-secondary)] flex gap-2"><span className="text-[#DC2626]">⚠</span>{r}</li>)}</ul></Section>}
+            {recap.openQuestions?.length > 0 && <Section title="Open questions"><ul className="space-y-1">{recap.openQuestions.map((q, i) => <li key={i} className="text-xs text-[var(--m12-text-secondary)] flex gap-2"><span className="text-[#D97706]">?</span>{q}</li>)}</ul></Section>}
+            {recap.nextSteps?.length > 0 && <Section title="Next steps"><ul className="space-y-1">{recap.nextSteps.map((n, i) => <li key={i} className="text-xs text-[var(--m12-text-secondary)] flex gap-2"><span className="text-[#059669]">▸</span>{n}</li>)}</ul></Section>}
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--m12-text-muted)]">Generate the recap to synthesize the session into decisions, actions, deliverables, and next steps.</p>
+        )}
+        <Section title="Captured items"><CaptureGroups captures={captures} streams={streams} onSet={onSet} readOnly /></Section>
+      </div>
     </div>
   )
 }
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return <div><div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">{title}</div>{children}</div>
+}
+
 // ─── Captures ────────────────────────────────────────────────
-function CaptureGroups({ captures, streams, onSet, readOnly }: {
+function CaptureGroups({ captures, onSet, onApply, readOnly, busy }: {
   captures: WorkshopCapture[]; streams: Workstream[]
-  onSet: (c: WorkshopCapture, status: WorkshopCapture['status']) => void; readOnly?: boolean
+  onSet: (c: WorkshopCapture, status: WorkshopCapture['status']) => void
+  onApply?: (c: WorkshopCapture) => void; readOnly?: boolean; busy?: string | null
 }) {
   if (captures.length === 0) return <div className="text-[11px] text-[var(--m12-text-muted)]">Nothing captured yet.</div>
   const order: CaptureType[] = ['decision', 'action', 'deliverable', 'architecture_change', 'risk', 'question', 'parking_lot']
@@ -379,11 +493,11 @@ function CaptureGroups({ captures, streams, onSet, readOnly }: {
                       {c.status === 'proposed' ? (
                         <>
                           <button onClick={() => onSet(c, 'confirmed')} className="text-[9px] px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: meta.color }}>Confirm</button>
-                          {c.capture_type === 'architecture_change' && <button onClick={() => onSet(c, 'applied')} className="text-[9px] px-1.5 py-0.5 rounded border border-[#059669]/50 text-[#10B981]" title="Apply to the architecture model (write comes in a later increment)">Apply</button>}
+                          {c.capture_type === 'architecture_change' && onApply && <button onClick={() => onApply(c)} disabled={busy === `apply:${c.id}`} className="text-[9px] px-1.5 py-0.5 rounded border border-[#059669]/50 text-[#10B981] disabled:opacity-50" title="Write this change to the process model as a to-be overlay">{busy === `apply:${c.id}` ? 'Applying…' : 'Apply to model'}</button>}
                           <button onClick={() => onSet(c, 'dismissed')} className="text-[9px] px-1.5 py-0.5 rounded text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]">Dismiss</button>
                         </>
                       ) : (
-                        <span className="text-[9px]" style={{ color: c.status === 'dismissed' ? 'var(--m12-text-muted)' : meta.color }}>{c.status}</span>
+                        <span className="text-[9px]" style={{ color: c.status === 'dismissed' ? 'var(--m12-text-muted)' : meta.color }}>{c.status === 'applied' ? '✓ applied to model' : c.status}</span>
                       )}
                     </div>
                   )}
