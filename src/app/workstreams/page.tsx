@@ -84,6 +84,14 @@ export default function WorkstreamsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => router.push('/workshops')}
+              title="Workshops — agent-facilitated delivery sessions"
+              className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor" strokeWidth="1.3" /><circle cx="11" cy="5" r="2" stroke="currentColor" strokeWidth="1.3" /><path d="M2 13c0-1.7 1.3-3 3-3s3 1.3 3 3M8 13c0-1.7 1.3-3 3-3s3 1.3 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+              Workshops
+            </button>
+            <button
               onClick={() => router.push('/knowledge')}
               title="Knowledge base — SAP/Dassian baselines + customer knowledge"
               className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-xs font-medium transition-colors"

@@ -64,6 +64,7 @@ async function instantiate(refRootId, orgId, wsId) {
       process_model_id: model.id, parent_id: parent, level: s.level, node_kind: s.node_kind,
       name: s.name, description: s.description ?? null, sort_order: s.sort_order ?? 0,
       is_leaf: isLeaf, graph_data: s.graph_data ?? null, scope_item_ref: s.scope_item_ref ?? null,
+      workstream_id: wsId,
     }).select('id').single()
     if (nErr) throw new Error(`create node "${s.name}": ${nErr.message}`)
     idMap.set(s.id, node.id)
@@ -131,6 +132,17 @@ async function main() {
   }
   console.log(`3. Instantiated ${made} best-practice process model(s) for streams that had none.`)
 
+  // 3b. propagate workstream_id to the NODES of every homed model — the card's
+  // "Processes" KPI counts process_nodes, not process_models. Idempotent.
+  const { data: homedModels } = await db.from('process_models')
+    .select('id,workstream_id').eq('organization_id', orgId).not('workstream_id', 'is', null).is('archived_at', null)
+  let nodeModels = 0
+  for (const m of homedModels || []) {
+    const { error } = await db.from('process_nodes').update({ workstream_id: m.workstream_id }).eq('process_model_id', m.id)
+    if (!error) nodeModels++
+  }
+  console.log(`3b. Propagated workstream_id to nodes of ${nodeModels} homed model(s).`)
+
   // 4. best-effort home capability maps by title
   const { data: caps } = await db.from('capability_maps').select('id,title,workstream_id,archived_at').eq('organization_id', orgId)
   let capHomed = 0
@@ -144,9 +156,9 @@ async function main() {
   console.log(`4. Homed ${capHomed} capability map(s) by title.`)
 
   // report the resulting rollup
-  const { data: ru } = await db.from('workstream_rollup').select('code,process_models,capabilities,capability_maps').order('code')
-  console.log('\nResulting rollup (process_models / capabilities / capability_maps):')
-  for (const r of (ru || [])) console.log(`   ${r.code.padEnd(24)} proc=${r.process_models}  caps=${r.capabilities}  maps=${r.capability_maps}`)
+  const { data: ru } = await db.from('workstream_rollup').select('code,process_models,process_nodes,capabilities').order('code')
+  console.log('\nResulting rollup (process_models / process_nodes / capabilities):')
+  for (const r of (ru || [])) console.log(`   ${r.code.padEnd(24)} models=${r.process_models}  nodes=${r.process_nodes}  caps=${r.capabilities}`)
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })

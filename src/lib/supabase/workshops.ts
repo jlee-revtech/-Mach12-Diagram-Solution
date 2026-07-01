@@ -1,0 +1,256 @@
+// Workshop data access (raw PostgREST under the user's RLS, mirroring the other
+// src/lib/supabase/*.ts modules). Covers workshops + participants + agenda +
+// scenarios + transcript messages + captures.
+
+import type {
+  Workshop, WorkshopParticipant, WorkshopAgendaItem, WorkshopScenario,
+  WorkshopMessage, WorkshopCapture, WorkshopStatus, WorkshopFocus, WorkshopBriefData,
+  CaptureStatus, AgendaStatus,
+} from '@/lib/workshop/types'
+
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+function getToken(): string | null {
+  try {
+    const key = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    if (!key) return null
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw)?.access_token ?? null) : null
+  } catch {
+    return null
+  }
+}
+
+function headers(pref?: string): Record<string, string> {
+  const h: Record<string, string> = {
+    'Content-Type': 'application/json',
+    apikey: ANON,
+    Authorization: `Bearer ${getToken()}`,
+    Accept: 'application/json',
+  }
+  if (pref) h.Prefer = pref
+  return h
+}
+
+const one = <T>(arr: T[] | T): T => (Array.isArray(arr) ? arr[0] : arr)
+
+// ─── Workshops ──────────────────────────────────────────────
+
+export async function listWorkshops(orgId: string, includeArchived = false): Promise<Workshop[]> {
+  const arch = includeArchived ? '' : '&archived_at=is.null'
+  const res = await fetch(
+    `${URL}/rest/v1/workshops?organization_id=eq.${orgId}${arch}&select=*&order=created_at.desc`,
+    { headers: headers() },
+  )
+  return res.ok ? res.json() : []
+}
+
+export async function getWorkshop(id: string): Promise<Workshop | null> {
+  const res = await fetch(`${URL}/rest/v1/workshops?id=eq.${id}&select=*`, { headers: headers() })
+  if (!res.ok) return null
+  const arr = await res.json()
+  return arr[0] ?? null
+}
+
+export async function createWorkshop(
+  orgId: string,
+  userId: string | null,
+  data: {
+    title: string; topic?: string; objective?: string; customer_name?: string
+    focus_areas?: WorkshopFocus[]; workstream_codes?: string[]; scheduled_at?: string
+    settings?: Record<string, unknown>
+  },
+): Promise<Workshop> {
+  const res = await fetch(`${URL}/rest/v1/workshops`, {
+    method: 'POST',
+    headers: headers('return=representation'),
+    body: JSON.stringify({ organization_id: orgId, created_by: userId, status: 'draft', ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create workshop')
+  return one(arr)
+}
+
+export async function updateWorkshop(
+  id: string,
+  updates: Partial<{
+    title: string; topic: string; objective: string; customer_name: string
+    status: WorkshopStatus; focus_areas: WorkshopFocus[]; workstream_codes: string[]
+    scheduled_at: string | null; started_at: string | null; ended_at: string | null
+    brief: WorkshopBriefData | null; recap: unknown; settings: Record<string, unknown>; archived_at: string | null
+  }>,
+): Promise<void> {
+  await fetch(`${URL}/rest/v1/workshops?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: headers('return=minimal'),
+    body: JSON.stringify(updates),
+  })
+}
+
+export const archiveWorkshop = (id: string) => updateWorkshop(id, { archived_at: new Date().toISOString() })
+
+// ─── Participants ───────────────────────────────────────────
+
+export async function listParticipants(workshopId: string): Promise<WorkshopParticipant[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/workshop_participants?workshop_id=eq.${workshopId}&select=*&order=created_at.asc`,
+    { headers: headers() },
+  )
+  return res.ok ? res.json() : []
+}
+
+export async function setParticipants(
+  workshopId: string,
+  people: { display_name: string; email?: string; org_role?: string }[],
+  agents: { workstream_code: string; display_name: string; is_facilitator?: boolean }[],
+): Promise<void> {
+  await fetch(`${URL}/rest/v1/workshop_participants?workshop_id=eq.${workshopId}`, {
+    method: 'DELETE',
+    headers: headers('return=minimal'),
+  })
+  const rows = [
+    ...people.map((p) => ({ workshop_id: workshopId, kind: 'person', ...p })),
+    ...agents.map((a) => ({ workshop_id: workshopId, kind: 'agent', ...a })),
+  ]
+  if (rows.length) {
+    await fetch(`${URL}/rest/v1/workshop_participants`, {
+      method: 'POST',
+      headers: headers('return=minimal'),
+      body: JSON.stringify(rows),
+    })
+  }
+}
+
+// ─── Agenda ─────────────────────────────────────────────────
+
+export async function listAgenda(workshopId: string): Promise<WorkshopAgendaItem[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/workshop_agenda_items?workshop_id=eq.${workshopId}&select=*&order=sort_order.asc`,
+    { headers: headers() },
+  )
+  return res.ok ? res.json() : []
+}
+
+export async function replaceAgenda(
+  workshopId: string,
+  items: { title: string; objective?: string; focus_type?: WorkshopFocus; timebox_minutes?: number }[],
+): Promise<void> {
+  await fetch(`${URL}/rest/v1/workshop_agenda_items?workshop_id=eq.${workshopId}`, {
+    method: 'DELETE',
+    headers: headers('return=minimal'),
+  })
+  if (items.length) {
+    await fetch(`${URL}/rest/v1/workshop_agenda_items`, {
+      method: 'POST',
+      headers: headers('return=minimal'),
+      body: JSON.stringify(items.map((it, i) => ({ workshop_id: workshopId, sort_order: i, ...it }))),
+    })
+  }
+}
+
+export async function updateAgendaItem(
+  id: string,
+  updates: Partial<{ status: AgendaStatus; title: string; objective: string; timebox_minutes: number; notes: string }>,
+): Promise<void> {
+  await fetch(`${URL}/rest/v1/workshop_agenda_items?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: headers('return=minimal'),
+    body: JSON.stringify(updates),
+  })
+}
+
+// ─── Scenarios ──────────────────────────────────────────────
+
+export async function listScenarios(workshopId: string): Promise<WorkshopScenario[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/workshop_scenarios?workshop_id=eq.${workshopId}&select=*&order=sort_order.asc`,
+    { headers: headers() },
+  )
+  return res.ok ? res.json() : []
+}
+
+export async function createScenario(
+  workshopId: string,
+  data: { title: string; description?: string; focus_type?: WorkshopFocus; agenda_item_id?: string; sort_order?: number },
+): Promise<WorkshopScenario> {
+  const res = await fetch(`${URL}/rest/v1/workshop_scenarios`, {
+    method: 'POST',
+    headers: headers('return=representation'),
+    body: JSON.stringify({ workshop_id: workshopId, ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create scenario')
+  return one(arr)
+}
+
+// ─── Transcript ─────────────────────────────────────────────
+
+export async function listMessages(workshopId: string, sinceSeq = 0): Promise<WorkshopMessage[]> {
+  const filter = sinceSeq > 0 ? `&seq=gt.${sinceSeq}` : ''
+  const res = await fetch(
+    `${URL}/rest/v1/workshop_messages?workshop_id=eq.${workshopId}${filter}&select=*&order=seq.asc`,
+    { headers: headers() },
+  )
+  return res.ok ? res.json() : []
+}
+
+export async function addMessage(
+  workshopId: string,
+  msg: {
+    speaker_kind: 'person' | 'agent' | 'system'; content: string; speaker_name?: string
+    speaker_role?: string; workstream_code?: string; source?: string; agenda_item_id?: string
+    meta?: Record<string, unknown>
+  },
+): Promise<WorkshopMessage> {
+  // seq = max(seq)+1 for the workshop (best-effort; concurrency is fine for a room).
+  const last = await fetch(
+    `${URL}/rest/v1/workshop_messages?workshop_id=eq.${workshopId}&select=seq&order=seq.desc&limit=1`,
+    { headers: headers() },
+  )
+  const lastArr = last.ok ? await last.json() : []
+  const seq = (lastArr[0]?.seq ?? 0) + 1
+  const res = await fetch(`${URL}/rest/v1/workshop_messages`, {
+    method: 'POST',
+    headers: headers('return=representation'),
+    body: JSON.stringify({ workshop_id: workshopId, seq, source: 'typed', ...msg }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to add message')
+  return one(arr)
+}
+
+// ─── Captures ───────────────────────────────────────────────
+
+export async function listCaptures(workshopId: string): Promise<WorkshopCapture[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/workshop_captures?workshop_id=eq.${workshopId}&select=*&order=created_at.asc`,
+    { headers: headers() },
+  )
+  return res.ok ? res.json() : []
+}
+
+export async function createCapture(
+  workshopId: string,
+  data: Partial<WorkshopCapture> & { capture_type: WorkshopCapture['capture_type']; title: string },
+): Promise<WorkshopCapture> {
+  const res = await fetch(`${URL}/rest/v1/workshop_captures`, {
+    method: 'POST',
+    headers: headers('return=representation'),
+    body: JSON.stringify({ workshop_id: workshopId, ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create capture')
+  return one(arr)
+}
+
+export async function updateCapture(
+  id: string,
+  updates: Partial<{ status: CaptureStatus; title: string; detail: string; owner: string; due_date: string | null; applied_at: string | null }>,
+): Promise<void> {
+  await fetch(`${URL}/rest/v1/workshop_captures?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: headers('return=minimal'),
+    body: JSON.stringify(updates),
+  })
+}
