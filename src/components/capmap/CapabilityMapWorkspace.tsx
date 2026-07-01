@@ -50,6 +50,9 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
 
   // AI review/apply panel (Consistency Checker + Suggest Updates)
   const [aiReview, setAiReview] = useState<'consistency' | 'suggest' | null>(null)
+  // Track whether any finding was applied while the panel is open, so we refresh
+  // the board ONCE on close instead of reloading (and reflowing) it per-apply.
+  const reviewDirtyRef = useRef(false)
 
   // Read-only share links
   const [shareOpen, setShareOpen] = useState(false)
@@ -803,8 +806,8 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           workstreams={workstreams}
           orgId={orgId}
           userId={userId}
-          onClose={() => setAiReview(null)}
-          onApplied={() => load({ silent: true })}
+          onClose={() => { setAiReview(null); if (reviewDirtyRef.current) { reviewDirtyRef.current = false; load({ silent: true }) } }}
+          onApplied={() => { reviewDirtyRef.current = true }}
         />
       )}
 
