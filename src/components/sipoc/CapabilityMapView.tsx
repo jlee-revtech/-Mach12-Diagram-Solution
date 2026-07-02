@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { CapabilityTreeNode } from '@/lib/sipoc/types'
+import { CAPABILITY_STATUSES, type CapabilityStatus, type CapabilityTreeNode } from '@/lib/sipoc/types'
+import { CapabilityStatusBadge } from '@/components/sipoc/CapabilityStatusControl'
 import { useLockHolder } from '@/lib/collab/CapabilityMapCollabContext'
 
 const L1_COLORS = [
@@ -60,6 +61,7 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
       >
         <span className="text-[var(--m12-text-faint)] shrink-0">⠿</span>
         <span className="flex-1 min-w-0 truncate" title={node.description ? `${node.name}\n\n${node.description}` : node.name}>{node.name}</span>
+        <CapabilityStatusBadge status={node.status} />
         {lockedBy && (
           <span
             title={`Currently editing: ${lockedBy.name}`}
@@ -75,7 +77,7 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
             </svg>
           </span>
         )}
-        {!readOnly && otherL2s.length > 0 && (
+        {!readOnly && (
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
             className="opacity-0 group-hover/l3:opacity-100 shrink-0 w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-all"
@@ -91,27 +93,73 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
       </div>
       {menuOpen && (
         <div ref={menuRef} className="absolute right-0 top-full mt-0.5 z-50 w-56 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden">
+          {/* Review status */}
           <div className="px-2.5 py-1.5 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold border-b border-[var(--m12-border)]/20">
-            Move to...
+            Review Status
           </div>
-          <div className="max-h-[200px] overflow-y-auto py-0.5">
-            {otherL2s.map(l2 => (
+          <div className="py-0.5">
+            {CAPABILITY_STATUSES.map(s => (
               <button
-                key={l2.id}
+                key={s.value}
                 onClick={(e) => {
                   e.stopPropagation()
-                  onDrop(node.id, l2.id)
+                  useSIPOCStore.getState().updateCapability(node.id, { status: s.value as CapabilityStatus })
                   setMenuOpen(false)
                 }}
-                className="w-full text-left px-2.5 py-1.5 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors flex items-center gap-1.5"
+                className="w-full text-left px-2.5 py-1.5 text-[10px] flex items-center gap-2 hover:bg-[var(--m12-bg)] transition-colors"
               >
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-[var(--m12-text-muted)]">
-                  <path d="M1 4h5M4.5 2L6.5 4 4.5 6" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="truncate">{l2.parentName} / {l2.name}</span>
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                <span className={node.status === s.value ? 'font-semibold text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)]'}>
+                  Mark {s.label}
+                </span>
+                {node.status === s.value && (
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none" className="ml-auto text-[var(--m12-text-muted)]">
+                    <path d="M1.5 5.2l2.2 2.3L8.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </button>
             ))}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                useSIPOCStore.getState().updateCapability(node.id, { status: null })
+                setMenuOpen(false)
+              }}
+              className="w-full text-left px-2.5 py-1.5 text-[10px] flex items-center gap-2 hover:bg-[var(--m12-bg)] transition-colors"
+            >
+              <span className="w-2 h-2 rounded-full shrink-0 border border-[var(--m12-text-faint)]" />
+              <span className={!node.status ? 'font-semibold text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)]'}>
+                Not Started
+              </span>
+            </button>
           </div>
+
+          {/* Move to... */}
+          {otherL2s.length > 0 && (
+            <>
+              <div className="px-2.5 py-1.5 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold border-y border-[var(--m12-border)]/20">
+                Move to...
+              </div>
+              <div className="max-h-[200px] overflow-y-auto py-0.5">
+                {otherL2s.map(l2 => (
+                  <button
+                    key={l2.id}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDrop(node.id, l2.id)
+                      setMenuOpen(false)
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors flex items-center gap-1.5"
+                  >
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-[var(--m12-text-muted)]">
+                      <path d="M1 4h5M4.5 2L6.5 4 4.5 6" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className="truncate">{l2.parentName} / {l2.name}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

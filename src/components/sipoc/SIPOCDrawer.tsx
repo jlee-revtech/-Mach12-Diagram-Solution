@@ -11,6 +11,7 @@ import SIPOCTemplatesPanel from '@/components/sipoc/SIPOCTemplatesPanel'
 import ArtifactCommentBadge from '@/components/sipoc/ArtifactCommentBadge'
 import AnchorPickTarget from '@/components/sipoc/AnchorPickTarget'
 import CommentsRail from '@/components/sipoc/CommentsRail'
+import CapabilityStatusControl from '@/components/sipoc/CapabilityStatusControl'
 import { useLockHolder } from '@/lib/collab/CapabilityMapCollabContext'
 import type { SipocRegion } from '@/lib/sipoc/types'
 
@@ -814,6 +815,15 @@ export default function SIPOCDrawer({ orgId, editorOpen, onToggleEditor, onShowA
             </div>
           ))}
         </div>
+
+        {/* Review status (L3 only) */}
+        {hydrated && hydrated.level === 3 && (
+          <CapabilityStatusControl
+            capabilityId={hydrated.id}
+            status={hydrated.status}
+            readOnly={readOnly}
+          />
+        )}
 
         {/* SIPOC legend dots */}
         <div className="flex items-center gap-1">

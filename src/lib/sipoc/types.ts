@@ -64,6 +64,24 @@ export interface CapabilityMapRow {
   archived_at: string | null
 }
 
+// ─── Capability review status ──────────────────────────
+// Tracks review/build progress on a capability (primarily L3 functionalities).
+// A null/undefined status means "Not Started".
+export type CapabilityStatus = 'in_progress' | 'done'
+
+export const CAPABILITY_STATUSES: { value: CapabilityStatus; label: string; color: string }[] = [
+  { value: 'in_progress', label: 'In Progress', color: '#EAB308' },
+  { value: 'done', label: 'Done', color: '#10B981' },
+]
+
+export function capabilityStatusLabel(status?: string | null): string {
+  return CAPABILITY_STATUSES.find(s => s.value === status)?.label ?? ''
+}
+
+export function capabilityStatusColor(status?: string | null): string | undefined {
+  return CAPABILITY_STATUSES.find(s => s.value === status)?.color
+}
+
 // ─── Capabilities (the "P" in SIPOC) ───────────────────
 export interface Capability {
   id: string
@@ -78,6 +96,7 @@ export interface Capability {
   color?: string | null        // accent color for L1/L2 groupings
   system_id?: string | null
   workstream_id?: string | null
+  status?: CapabilityStatus | null   // review progress; null = Not Started
   sort_order: number
   created_at: string
   updated_at: string

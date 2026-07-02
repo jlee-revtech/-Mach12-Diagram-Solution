@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { capabilityStatusLabel } from '@/lib/sipoc/types'
 import type {
   Capability,
   CapabilityTreeNode,
@@ -100,11 +101,18 @@ export function exportCapabilityMapWorkbook(opts: {
   const wsById = new Map(workstreams.map(w => [w.id, w]))
   const wsLabel = (id?: string | null): string => (id ? workstreamLabel(wsById.get(id)) : '')
 
+  const l3Rows = flat.filter(r => r.cap.level === 3)
   const counts = {
     l1: flat.filter(r => r.cap.level === 1).length,
     l2: flat.filter(r => r.cap.level === 2).length,
-    l3: flat.filter(r => r.cap.level === 3).length,
+    l3: l3Rows.length,
   }
+  const review = {
+    done: l3Rows.filter(r => r.cap.status === 'done').length,
+    inProgress: l3Rows.filter(r => r.cap.status === 'in_progress').length,
+  }
+  const notStarted = counts.l3 - review.done - review.inProgress
+  const pctDone = counts.l3 ? `${Math.round((review.done / counts.l3) * 100)}%` : '0%'
 
   // ── Sheet 1: Summary ──────────────────────────────────────
   const summary: (string | number)[][] = [
@@ -122,8 +130,14 @@ export function exportCapabilityMapWorkbook(opts: {
     ['Logical Systems', logicalSystems.length],
     ['Personas', personas.length],
     [],
+    ['Review Progress (L3 Functionalities)'],
+    ['Done', review.done],
+    ['In Progress', review.inProgress],
+    ['Not Started', notStarted],
+    ['% Done', pctDone],
+    [],
     ['Workbook Contents'],
-    ['Hierarchy', 'Every capability with its L1 / L2 / L3 path, workstream, system, description, features, use cases'],
+    ['Hierarchy', 'Every capability with its L1 / L2 / L3 path, review status, workstream, system, description, features, use cases'],
     ['SIPOC by IP', 'One row per information product touchpoint (input or output) on every L3'],
     ['Information Products', 'Distinct IPs with their data elements and where they are produced and consumed'],
     ['Data Elements', 'Distinct data elements and which IPs / L3s reference them'],
@@ -133,15 +147,16 @@ export function exportCapabilityMapWorkbook(opts: {
     ['Personas', 'Distinct personas and where they appear as supplier or consumer'],
   ]
   const wsSummary = XLSX.utils.aoa_to_sheet(summary)
-  wsSummary['!cols'] = [{ wch: 32 }, { wch: 80 }]
+  wsSummary['!cols'] = [{ wch: 34 }, { wch: 80 }]
   boldHeader(wsSummary, 0, 2)
-  boldHeader(wsSummary, 5, 2)
-  boldHeader(wsSummary, 14, 2)
+  boldHeader(wsSummary, 5, 2)   // Counts
+  boldHeader(wsSummary, 14, 2)  // Review Progress
+  boldHeader(wsSummary, 20, 2)  // Workbook Contents
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
 
   // ── Sheet 2: Hierarchy ────────────────────────────────────
   const hierarchyRows: (string | number)[][] = [
-    ['#', 'L1 Core Area', 'L2 Capability', 'L3 Functionality', 'Level', 'Workstream', 'System', 'Description', 'Features', 'Use Cases', 'Inputs', 'Outputs'],
+    ['#', 'L1 Core Area', 'L2 Capability', 'L3 Functionality', 'Level', 'Status', 'Workstream', 'System', 'Description', 'Features', 'Use Cases', 'Inputs', 'Outputs'],
   ]
   flat.forEach((row, i) => {
     const h = hydratedById.get(row.cap.id)
@@ -151,6 +166,7 @@ export function exportCapabilityMapWorkbook(opts: {
       row.l2Name,
       row.l3Name,
       `L${row.cap.level}`,
+      capabilityStatusLabel(row.cap.status),
       wsLabel(row.cap.workstream_id),
       h?.system?.name || '',
       row.cap.description || '',
@@ -163,16 +179,16 @@ export function exportCapabilityMapWorkbook(opts: {
   const wsHier = XLSX.utils.aoa_to_sheet(hierarchyRows)
   wsHier['!cols'] = [
     { wch: 5 }, { wch: 28 }, { wch: 28 }, { wch: 32 },
-    { wch: 6 }, { wch: 18 }, { wch: 22 }, { wch: 50 }, { wch: 50 }, { wch: 50 },
+    { wch: 6 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 50 }, { wch: 50 }, { wch: 50 },
     { wch: 7 }, { wch: 7 },
   ]
-  boldHeader(wsHier, 0, 12)
+  boldHeader(wsHier, 0, 13)
   wsHier['!freeze'] = { xSplit: 0, ySplit: 1 }
   XLSX.utils.book_append_sheet(wb, wsHier, 'Hierarchy')
 
   // ── Sheet 3: SIPOC by IP ──────────────────────────────────
   const sipocRows: (string | number)[][] = [
-    ['L1 Core Area', 'L2 Capability', 'L3 Functionality', 'Workstream', 'Side', 'Information Product', 'Category', 'Data Elements', 'IP Tags', 'Personas', 'Source / Destination Systems', 'Feeding System', 'Dimensions', 'Dimension Tags'],
+    ['L1 Core Area', 'L2 Capability', 'L3 Functionality', 'Status', 'Workstream', 'Side', 'Information Product', 'Category', 'Data Elements', 'IP Tags', 'Personas', 'Source / Destination Systems', 'Feeding System', 'Dimensions', 'Dimension Tags'],
   ]
 
   const elementsForIP = (ip: InformationProduct | undefined): string => {
@@ -186,7 +202,7 @@ export function exportCapabilityMapWorkbook(opts: {
     h.inputs.forEach(inp => {
       const ip = ipMap.get(inp.information_product_id) || inp.informationProduct
       sipocRows.push([
-        path.l1, path.l2, path.l3, wsLabel(h.workstream_id), 'Input',
+        path.l1, path.l2, path.l3, capabilityStatusLabel(h.status), wsLabel(h.workstream_id), 'Input',
         inp.informationProduct.name,
         inp.informationProduct.category || '',
         elementsForIP(ip),
@@ -201,7 +217,7 @@ export function exportCapabilityMapWorkbook(opts: {
     h.outputs.forEach(out => {
       const ip = ipMap.get(out.information_product_id) || out.informationProduct
       sipocRows.push([
-        path.l1, path.l2, path.l3, wsLabel(h.workstream_id), 'Output',
+        path.l1, path.l2, path.l3, capabilityStatusLabel(h.status), wsLabel(h.workstream_id), 'Output',
         out.informationProduct.name,
         out.informationProduct.category || '',
         elementsForIP(ip),
@@ -216,11 +232,11 @@ export function exportCapabilityMapWorkbook(opts: {
   })
   const wsSipoc = XLSX.utils.aoa_to_sheet(sipocRows)
   wsSipoc['!cols'] = [
-    { wch: 26 }, { wch: 26 }, { wch: 30 }, { wch: 18 }, { wch: 8 },
+    { wch: 26 }, { wch: 26 }, { wch: 30 }, { wch: 12 }, { wch: 18 }, { wch: 8 },
     { wch: 32 }, { wch: 16 }, { wch: 40 }, { wch: 22 },
     { wch: 32 }, { wch: 32 }, { wch: 22 }, { wch: 36 }, { wch: 36 },
   ]
-  boldHeader(wsSipoc, 0, 14)
+  boldHeader(wsSipoc, 0, 15)
   wsSipoc['!freeze'] = { xSplit: 0, ySplit: 1 }
   XLSX.utils.book_append_sheet(wb, wsSipoc, 'SIPOC by IP')
 
