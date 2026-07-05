@@ -185,7 +185,7 @@ semantics as the browser helper, service-key auth.
 ## 6. Git
 
 - Repo: `jlee-revtech/-Mach12-Diagram-Solution`, branch `master`.
-- Commit: `da694b0` (`feat(workshops): section generation + evaluation API routes; brief duration/section wiring [phase 2b]`).
+- Commit: `a3238ab` (`feat(workshops): section generation + evaluation API routes; brief duration/section wiring [phase 2b]`). Pushed `b5e7d3c..a3238ab master -> master`.
 - Staged ONLY: `src/app/api/workshops/section/route.ts`, `src/app/api/workshops/brief/route.ts`,
   `src/lib/supabase/workshops.ts`, `src/lib/workshop/server.ts`, `package.json`, `src/lib/version.ts`,
   `docs/workshop-facilitation/handoff-phase2b.md`.
