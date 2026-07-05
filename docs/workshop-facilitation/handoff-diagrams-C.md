@@ -146,6 +146,6 @@ The three phases delivered, end to end:
   `docs/workshop-facilitation/handoff-diagrams-C.md`.
   Parallel WIP (`scripts/import-vibe-skills.mjs`, `src/lib/workstream/catalog.ts`) NOT
   staged (PLAN §7: never `git add -A`).
-- Commit: `6401ee4`
+- Commit: `1fd91b6`
   `feat(workshops): section + workshop-level content prompts, guidance wiring, Regenerate content [diagrams C]`.
-- Push: SUCCEEDED (`1002f8c..6401ee4 master -> master`).
+- Push: SUCCEEDED (`master -> master`).
