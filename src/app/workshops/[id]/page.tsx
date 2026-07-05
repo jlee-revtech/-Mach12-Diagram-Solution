@@ -12,7 +12,8 @@ import {
 import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType } from '@/lib/workshop/types'
 import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
 import { createTranscription, type TranscriptionProvider } from '@/lib/workshop/transcription'
-import { exportRecapDocx, exportRecapPptx } from '@/lib/workshop/export'
+import { exportRecapDocx, exportRecapPptx, exportFacilitationPptx } from '@/lib/workshop/export'
+import { loadFacilitationDeck } from '@/lib/workshop/deck'
 import type { WorkshopRecapData } from '@jlee-revtech/agent-core'
 import type { Workstream } from '@/lib/workstream/types'
 import VersionBadge from '@/components/VersionBadge'
@@ -153,6 +154,27 @@ export default function WorkshopRoomPage() {
       await reloadContent()
     } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
   }, [ws, organization, reloadContent])
+
+  // Download the facilitation deck as PPTX. Loads the same normalized slide model
+  // the Workshop Experience uses (loadFacilitationDeck), then hands it to the
+  // shared exporter. Enabled once at least one section has authored content.
+  const downloadFacilitationPptx = useCallback(async () => {
+    if (!ws) return
+    setBusy('deck')
+    try {
+      const deck = await loadFacilitationDeck(null, ws.id)
+      if (deck.slides.length === 0) throw new Error('No facilitation content yet. Generate a section first.')
+      await exportFacilitationPptx(
+        {
+          title: deck.workshop.title,
+          ...(deck.workshop.customerName ? { customerName: deck.workshop.customerName } : {}),
+          ...(deck.workshop.topic ? { topic: deck.workshop.topic } : {}),
+          ...(deck.workshop.durationMinutes ? { durationMinutes: deck.workshop.durationMinutes } : {}),
+        },
+        deck.slides,
+      )
+    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
+  }, [ws])
 
   const setStatus = useCallback(async (status: Workshop['status']) => {
     if (!ws) return
@@ -334,6 +356,14 @@ export default function WorkshopRoomPage() {
                     className="text-[10px] px-2 py-1 rounded font-medium text-white bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-40 disabled:hover:bg-[#2563EB]"
                   >
                     ▶ Enter Workshop Experience
+                  </button>
+                  <button
+                    onClick={downloadFacilitationPptx}
+                    disabled={!hasAnyContent || busy === 'deck'}
+                    title={hasAnyContent ? 'Download the facilitation deck as PowerPoint' : 'Generate at least one section first'}
+                    className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-40"
+                  >
+                    {busy === 'deck' ? 'Preparing…' : '⤓ Download facilitation deck (PPTX)'}
                   </button>
                 </div>
                 <div className="flex items-center gap-2">

@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { loadFacilitationDeck, type LoadedDeck, type DeckSection } from '@/lib/workshop/deck'
+import { exportFacilitationPptx } from '@/lib/workshop/export'
 import type { WorkshopSlide, WorkshopSlideBlock, ClarifyingQuestion } from '@jlee-revtech/agent-core'
 
 // Brand palette (matches src/lib/workshop/export.ts + the app tokens).
@@ -63,6 +64,27 @@ export default function WorkshopPresentPage() {
   const clamped = Math.min(current, Math.max(0, total - 1))
   const slide: WorkshopSlide | undefined = slides[clamped]
   const currentSectionId = deck?.slideSections[clamped] ?? null
+
+  const [downloading, setDownloading] = useState(false)
+  const downloadPptx = useCallback(async () => {
+    if (!deck || deck.slides.length === 0) return
+    setDownloading(true)
+    try {
+      await exportFacilitationPptx(
+        {
+          title: deck.workshop.title,
+          ...(deck.workshop.customerName ? { customerName: deck.workshop.customerName } : {}),
+          ...(deck.workshop.topic ? { topic: deck.workshop.topic } : {}),
+          ...(deck.workshop.durationMinutes ? { durationMinutes: deck.workshop.durationMinutes } : {}),
+        },
+        deck.slides,
+      )
+    } catch (e) {
+      setReviseErr(e instanceof Error ? e.message : 'Download failed')
+    } finally {
+      setDownloading(false)
+    }
+  }, [deck])
 
   const exit = useCallback(() => router.push(`/workshops/${id}`), [router, id])
   const go = useCallback((delta: number) => {
@@ -199,6 +221,15 @@ export default function WorkshopPresentPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="text-xs text-white/60 tabular-nums mr-1">{clamped + 1} / {total}</div>
+          <button
+            onClick={downloadPptx}
+            disabled={downloading || total === 0}
+            className="text-[11px] px-2.5 py-1 rounded border transition-colors disabled:opacity-30"
+            style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.7)', backgroundColor: 'transparent' }}
+            title="Download the facilitation deck as PowerPoint"
+          >
+            {downloading ? 'Preparing…' : 'Download PPTX'}
+          </button>
           <button
             onClick={() => setShowNotes((v) => !v)}
             disabled={!slide.facilitatorNotes}

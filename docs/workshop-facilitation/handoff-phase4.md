@@ -159,5 +159,8 @@ Supabase client without a signature change. Phase 5 can call
   `src/app/workshops/[id]/page.tsx`, `package.json`, `src/lib/version.ts`,
   `docs/workshop-facilitation/handoff-phase4.md`.
 - Parallel WIP (`scripts/import-vibe-skills.mjs`, `src/lib/workstream/catalog.ts`) NOT staged.
-- Commit: `<HASH>` (`feat(workshops): Workshop Experience walkthrough + shared deck loader [phase 4]`).
-- Push: `<STATUS>`.
+- Commit: `95bb44e` (`feat(workshops): Workshop Experience walkthrough + shared deck loader [phase 4]`).
+  6 files changed, 772 insertions(+), 3 deletions(-).
+- Push: SUCCEEDED (`ee1f703..95bb44e master -> master`). Branch was already up to date (no
+  rebase needed). The two parallel-WIP files were stashed for the push and popped back
+  afterward; they remain uncommitted, untouched.
