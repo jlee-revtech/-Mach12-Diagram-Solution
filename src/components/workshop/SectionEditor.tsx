@@ -11,12 +11,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type {
   SectionContent, OverviewSectionContent, WorkstreamSectionContent,
   EvaluationSectionContent, KeyDecision, ClarifyingQuestion, KbGap,
-  SectionGenerationResult,
+  SectionGenerationResult, WorkshopDiagram,
 } from '@jlee-revtech/agent-core'
 import type { WorkshopAgendaItem } from '@/lib/workshop/types'
 import type { Workstream } from '@/lib/workstream/types'
 import type { AgendaContentRow } from '@/lib/supabase/workshops'
 import { sectionMetaFor, CONFIDENCE_META } from './sectionMeta'
+import { DiagramCard } from './DiagramView'
 
 // The persisted section route also echoes version + status onto the result.
 type SectionResult = SectionGenerationResult & { version?: number; status?: string }
@@ -269,6 +270,18 @@ function ContentBody({ content }: { content: SectionContent }) {
   return <EvaluationBody c={content} />
 }
 
+// Section-level diagrams (content.diagrams), rendered below the per-kind body via
+// the shared DiagramCard (same SVG the walkthrough + PPTX use). The editor column
+// is fairly narrow, so we render at a slightly smaller intrinsic width.
+function SectionDiagrams({ diagrams }: { diagrams?: WorkshopDiagram[] }) {
+  if (!diagrams || diagrams.length === 0) return null
+  return (
+    <div className="space-y-3">
+      {diagrams.map((d, i) => <DiagramCard key={i} diagram={d} width={560} />)}
+    </div>
+  )
+}
+
 function Block({ title, color, children }: { title: string; color?: string; children: React.ReactNode }) {
   return (
     <div>
@@ -308,16 +321,19 @@ function ProsCons({ pros, cons }: { pros: string[]; cons: string[] }) {
 
 function OverviewBody({ c }: { c: OverviewSectionContent }) {
   return (
-    <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-4 space-y-3">
-      <div className="text-sm font-semibold text-[#0891B2]">{c.headline}</div>
-      <Block title="Talking points"><Bullets items={c.talkingPoints} color="#0891B2" /></Block>
-      {c.facilitatorNotes && (
-        <div className="pt-2 border-t border-[var(--m12-border)]/40">
-          <Block title="Facilitator notes">
-            <p className="text-[11px] text-[var(--m12-text-secondary)] leading-relaxed whitespace-pre-wrap">{c.facilitatorNotes}</p>
-          </Block>
-        </div>
-      )}
+    <div className="space-y-3">
+      <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-4 space-y-3">
+        <div className="text-sm font-semibold text-[#0891B2]">{c.headline}</div>
+        <Block title="Talking points"><Bullets items={c.talkingPoints} color="#0891B2" /></Block>
+        {c.facilitatorNotes && (
+          <div className="pt-2 border-t border-[var(--m12-border)]/40">
+            <Block title="Facilitator notes">
+              <p className="text-[11px] text-[var(--m12-text-secondary)] leading-relaxed whitespace-pre-wrap">{c.facilitatorNotes}</p>
+            </Block>
+          </div>
+        )}
+      </div>
+      <SectionDiagrams diagrams={c.diagrams} />
     </div>
   )
 }
@@ -331,6 +347,7 @@ function WorkstreamBody({ c }: { c: WorkstreamSectionContent }) {
         </Block>
       </div>
       {c.keyDecisions.map((d) => <DecisionCard key={d.id} d={d} />)}
+      <SectionDiagrams diagrams={c.diagrams} />
     </div>
   )
 }
@@ -376,6 +393,8 @@ function DecisionCard({ d }: { d: KeyDecision }) {
         <div className="text-[12px] text-[var(--m12-text)] font-medium leading-snug">{d.recommendedDecision.recommendation}</div>
         <p className="text-[11px] text-[var(--m12-text-secondary)] leading-relaxed mt-1">{d.recommendedDecision.rationale}</p>
       </div>
+
+      {d.diagram && <DiagramCard diagram={d.diagram} width={520} />}
     </div>
   )
 }
@@ -419,6 +438,7 @@ function EvaluationBody({ c }: { c: EvaluationSectionContent }) {
           </Block>
         </div>
       </div>
+      <SectionDiagrams diagrams={c.diagrams} />
     </div>
   )
 }

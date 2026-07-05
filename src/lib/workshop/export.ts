@@ -4,6 +4,34 @@
 
 import type { WorkshopRecapData, WorkshopSlide, WorkshopSlideBlock } from '@jlee-revtech/agent-core'
 import type { Workshop } from '@/lib/workshop/types'
+import { renderWorkshopDiagramSvg } from '@/lib/workshop/diagramSvg'
+
+// Rasterize an SVG string to a PNG data URL via an offscreen canvas at 2x for
+// crispness. Browser-only (uses Image + canvas). Returns '' on any failure so the
+// PPTX export can skip the image instead of throwing.
+async function svgToPngDataUrl(svg: string, width: number, height: number): Promise<string> {
+  try {
+    const scale = 2
+    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image()
+      im.onload = () => resolve(im)
+      im.onerror = () => reject(new Error('svg image load failed'))
+      im.src = url
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(width * scale))
+    canvas.height = Math.max(1, Math.round(height * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return ''
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/png')
+  } catch {
+    return ''
+  }
+}
 
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -142,6 +170,33 @@ export async function exportFacilitationPptx(meta: FacilitationMeta, slides: Wor
     }
 
     const bodyY = heading(s, slide)
+
+    // Diagram slide: rasterize the SAME SVG the HTML surfaces render, then place it
+    // centered below the heading, preserving aspect ratio. Any caption bullets sit
+    // at the bottom. Rasterization failure skips the image (never throws).
+    if (slide.diagram) {
+      const { svg, width: dw, height: dh } = renderWorkshopDiagramSvg(slide.diagram, { width: 960 })
+      const data = await svgToPngDataUrl(svg, dw, dh)
+      const captionItems = (slide.bullets ?? []).filter(Boolean)
+      const captionH = captionItems.length ? 0.9 : 0
+      const areaX = 0.6, areaW = 12.13
+      const areaY = bodyY
+      const areaH = 7.2 - areaY - captionH
+      if (data && areaH > 0.5) {
+        const aspect = dw / dh
+        let w = areaW
+        let h = w / aspect
+        if (h > areaH) { h = areaH; w = h * aspect }
+        const x = areaX + (areaW - w) / 2
+        const y = areaY + (areaH - h) / 2
+        s.addImage({ data, x, y, w, h })
+      }
+      if (captionItems.length) {
+        s.addText(bulletRuns(captionItems, { color: GREY, fontSize: 13 }), { x: 0.7, y: 7.2 - captionH + 0.05, w: 12, h: captionH, valign: 'top' })
+      }
+      addNotesIfAny(s, slide.facilitatorNotes)
+      continue
+    }
 
     if (slide.kind === 'agenda' || slide.kind === 'bullets') {
       const items = slide.bullets ?? []

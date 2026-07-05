@@ -1,6 +1,6 @@
 {
   "name": "mach12-diagram",
-  "version": "0.3.128",
+  "version": "0.3.129",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3003",

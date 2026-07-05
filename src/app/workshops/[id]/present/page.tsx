@@ -12,6 +12,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { loadFacilitationDeck, type LoadedDeck, type DeckSection } from '@/lib/workshop/deck'
 import { exportFacilitationPptx } from '@/lib/workshop/export'
+import DiagramView from '@/components/workshop/DiagramView'
 import type { WorkshopSlide, WorkshopSlideBlock, ClarifyingQuestion } from '@jlee-revtech/agent-core'
 
 // Brand palette (matches src/lib/workshop/export.ts + the app tokens).
@@ -358,12 +359,41 @@ export default function WorkshopPresentPage() {
 
 // ─── The 16:9 slide stage, rendered by slide.kind ────────────────────────────
 function SlideStage({ slide }: { slide: WorkshopSlide }) {
+  // A slide carrying a diagram shows the heading + the diagram prominently
+  // (same SVG the editor + PPTX use), regardless of kind.
+  if (slide.diagram) return <DiagramSlide slide={slide} />
   if (slide.kind === 'title') return <TitleSlide slide={slide} />
   if (slide.kind === 'agenda') return <AgendaSlide slide={slide} />
   if (slide.kind === 'bullets') return <BulletsSlide slide={slide} />
   if (slide.kind === 'context') return <ContextSlide slide={slide} />
   // decision + evaluation both render as block grids with a heading.
   return <BlocksSlide slide={slide} />
+}
+
+// A diagram slide: heading band + the diagram filling the stage, with any
+// caption/bullets beneath. The diagram's own title/caption live inside the SVG,
+// so we only show slide-level bullets here (buildSlides puts the caption there).
+function DiagramSlide({ slide }: { slide: WorkshopSlide }) {
+  const bullets = (slide.bullets ?? []).filter(Boolean)
+  return (
+    <SlideChrome kicker={slide.subheading}>
+      <h2 className="text-[2.2vw] font-bold mb-[1.5%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
+      <div className="flex-1 min-h-0 flex items-center justify-center overflow-auto">
+        <div className="w-full max-w-[68%]">
+          {slide.diagram && <DiagramView diagram={slide.diagram} width={880} />}
+        </div>
+      </div>
+      {bullets.length > 0 && (
+        <ul className="mt-[1.5%] space-y-[0.8%]">
+          {bullets.map((b, i) => (
+            <li key={i} className="flex items-baseline gap-[1.2%] text-[1.15vw] leading-snug" style={{ color: '#475569' }}>
+              <span className="shrink-0" style={{ color: CYAN }}>▸</span><span>{b}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SlideChrome>
+  )
 }
 
 function SlideChrome({ children, kicker }: { children: React.ReactNode; kicker?: string }) {
