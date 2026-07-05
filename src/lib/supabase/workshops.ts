@@ -5,8 +5,10 @@
 import type {
   Workshop, WorkshopParticipant, WorkshopAgendaItem, WorkshopScenario,
   WorkshopMessage, WorkshopCapture, WorkshopStatus, WorkshopFocus, WorkshopBriefData,
-  CaptureStatus, AgendaStatus,
+  CaptureStatus, AgendaStatus, SectionKind,
 } from '@/lib/workshop/types'
+
+export type { SectionKind }
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -252,5 +254,114 @@ export async function updateCapture(
     method: 'PATCH',
     headers: headers('return=minimal'),
     body: JSON.stringify(updates),
+  })
+}
+
+// ─── Agenda section content (facilitation layer, migration 046) ─────────────
+
+// SectionKind ('overview' | 'workstream' | 'evaluation') is re-exported above
+// from @/lib/workshop/types.
+// status: 'empty' | 'generating' | 'draft' | 'needs_input' | 'final'
+export type AgendaContentStatus = 'empty' | 'generating' | 'draft' | 'needs_input' | 'final'
+
+// TODO(phase2b): tighten `content` by importing `SectionContent` from
+// @jlee-revtech/agent-core (and clarifying_questions/kb_gaps likewise). Phase 1
+// keeps it loose (`unknown`) so the data model can land before agent-core ships.
+export interface AgendaContentRow {
+  id: string
+  workshop_id: string
+  agenda_item_id: string
+  section_kind: SectionKind
+  content: unknown
+  clarifying_questions: unknown
+  kb_gaps: unknown
+  status: AgendaContentStatus
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export async function listAgendaContent(workshopId: string): Promise<AgendaContentRow[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/workshop_agenda_content?workshop_id=eq.${workshopId}&select=*&order=created_at.asc`,
+    { headers: headers() },
+  )
+  return res.ok ? res.json() : []
+}
+
+export async function getAgendaContent(agendaItemId: string): Promise<AgendaContentRow | null> {
+  const res = await fetch(
+    `${URL}/rest/v1/workshop_agenda_content?agenda_item_id=eq.${agendaItemId}&select=*`,
+    { headers: headers() },
+  )
+  if (!res.ok) return null
+  const arr = await res.json()
+  return arr[0] ?? null
+}
+
+// Upsert on agenda_item_id (the table's UNIQUE key). On update, bump `version`.
+export async function upsertAgendaContent(
+  data: {
+    workshopId: string
+    agendaItemId: string
+    sectionKind: SectionKind
+    content?: unknown
+    clarifyingQuestions?: unknown
+    kbGaps?: unknown
+    status?: AgendaContentStatus
+  },
+): Promise<AgendaContentRow> {
+  const existing = await getAgendaContent(data.agendaItemId)
+  const body: Record<string, unknown> = {
+    workshop_id: data.workshopId,
+    agenda_item_id: data.agendaItemId,
+    section_kind: data.sectionKind,
+    updated_at: new Date().toISOString(),
+  }
+  if (data.content !== undefined) body.content = data.content
+  if (data.clarifyingQuestions !== undefined) body.clarifying_questions = data.clarifyingQuestions
+  if (data.kbGaps !== undefined) body.kb_gaps = data.kbGaps
+  if (data.status !== undefined) body.status = data.status
+
+  if (existing) {
+    body.version = (existing.version ?? 1) + 1
+    const res = await fetch(
+      `${URL}/rest/v1/workshop_agenda_content?agenda_item_id=eq.${data.agendaItemId}`,
+      { method: 'PATCH', headers: headers('return=representation'), body: JSON.stringify(body) },
+    )
+    const arr = await res.json()
+    if (!res.ok) throw new Error(arr.message || 'Failed to update agenda content')
+    return one(arr)
+  }
+
+  const res = await fetch(`${URL}/rest/v1/workshop_agenda_content`, {
+    method: 'POST',
+    headers: headers('return=representation'),
+    body: JSON.stringify(body),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error(arr.message || 'Failed to create agenda content')
+  return one(arr)
+}
+
+export async function updateWorkshopDuration(workshopId: string, minutes: number): Promise<void> {
+  await fetch(`${URL}/rest/v1/workshops?id=eq.${workshopId}`, {
+    method: 'PATCH',
+    headers: headers('return=minimal'),
+    body: JSON.stringify({ duration_minutes: minutes }),
+  })
+}
+
+export async function setAgendaSectionMeta(
+  agendaItemId: string,
+  meta: { sectionKind?: SectionKind; workstreamCode?: string | null },
+): Promise<void> {
+  const body: Record<string, unknown> = {}
+  if (meta.sectionKind !== undefined) body.section_kind = meta.sectionKind
+  if (meta.workstreamCode !== undefined) body.workstream_code = meta.workstreamCode
+  await fetch(`${URL}/rest/v1/workshop_agenda_items?id=eq.${agendaItemId}`, {
+    method: 'PATCH',
+    headers: headers('return=minimal'),
+    body: JSON.stringify(body),
   })
 }

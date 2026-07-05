@@ -72,6 +72,9 @@ export interface WorkshopParticipant {
   created_at: string
 }
 
+// Facilitation-content classification (migration 046)
+export type SectionKind = 'overview' | 'workstream' | 'evaluation'
+
 export interface WorkshopAgendaItem {
   id: string
   workshop_id: string
@@ -84,6 +87,9 @@ export interface WorkshopAgendaItem {
   linked_artifact_type: string | null
   linked_artifact_id: string | null
   notes: string | null
+  // 046: classify the agenda item for the facilitation-content layer.
+  section_kind?: SectionKind | null
+  workstream_code?: string | null
   created_at: string
   updated_at: string
 }
