@@ -49,6 +49,10 @@ export default function WorkshopRoomPage() {
   const [content, setContent] = useState<AgendaContentRow[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [durationMinutes, setDurationMinutes] = useState<number>(DEFAULT_DURATION_MINUTES)
+  // 047: workshop-level guidance prompt (persisted to workshops.facilitation_prompt).
+  const [facPrompt, setFacPrompt] = useState<string>('')
+  const [facPromptSaved, setFacPromptSaved] = useState(false)
+  const [regenProgress, setRegenProgress] = useState<{ done: number; total: number } | null>(null)
   const [messages, setMessages] = useState<WorkshopMessage[]>([])
   const [captures, setCaptures] = useState<WorkshopCapture[]>([])
   const [busy, setBusy] = useState<string | null>(null)
@@ -77,6 +81,7 @@ export default function WorkshopRoomPage() {
     ])
     setWs(w); setStreams(s); setAgenda(a); setContent(ct); setMessages(m); setCaptures(c)
     if (w?.duration_minutes) setDurationMinutes(w.duration_minutes)
+    setFacPrompt(w?.facilitation_prompt || '')
     if (w?.recap) setRecap(w.recap as WorkshopRecapData)
   }, [organization, id])
 
@@ -143,6 +148,58 @@ export default function WorkshopRoomPage() {
     setDurationMinutes(minutes)
     if (ws) await updateWorkshopDuration(ws.id, minutes)
   }, [ws])
+
+  // Persist the workshop-level guidance prompt (047). Threaded server-side as
+  // `guidance` into every section generate and the brief; no body change needed
+  // on the client calls, the routes read facilitation_prompt off the workshop.
+  const saveFacPrompt = useCallback(async () => {
+    if (!ws) return
+    const text = facPrompt.trim()
+    await updateWorkshop(ws.id, { facilitation_prompt: text || null })
+    setWs((prev) => (prev ? { ...prev, facilitation_prompt: text || null } : prev))
+    setFacPromptSaved(true)
+    setTimeout(() => setFacPromptSaved(false), 1800)
+  }, [ws, facPrompt])
+
+  // Regenerate content across every section that already has a content row,
+  // honoring the workshop-level guidance (saved first). Keeps the agenda intact;
+  // runs with small concurrency and shows progress, then reloads the rows.
+  const regenerateContent = useCallback(async () => {
+    if (!ws || !organization) return
+    const ids = content.filter((c) => !!c.content).map((c) => c.agenda_item_id)
+    if (ids.length === 0) return
+    setBusy('regen-content')
+    // Save the prompt first so the section route reads the latest guidance.
+    try {
+      const text = facPrompt.trim()
+      await updateWorkshop(ws.id, { facilitation_prompt: text || null })
+      setWs((prev) => (prev ? { ...prev, facilitation_prompt: text || null } : prev))
+    } catch { /* keep going; a stale prompt is better than blocking the regen */ }
+
+    setRegenProgress({ done: 0, total: ids.length })
+    let done = 0
+    const CONCURRENCY = 2
+    const queue = [...ids]
+    const worker = async () => {
+      for (;;) {
+        const agendaItemId = queue.shift()
+        if (!agendaItemId) return
+        try {
+          await fetch('/api/workshops/section', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workshopId: ws.id, orgId: organization.id, agendaItemId }),
+          })
+        } catch { /* one section failing should not abort the batch */ }
+        done += 1
+        setRegenProgress({ done, total: ids.length })
+      }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, ids.length) }, () => worker()))
+      await reloadContent()
+    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') }
+    finally { setRegenProgress(null); setBusy(null) }
+  }, [ws, organization, content, facPrompt, reloadContent])
 
   // Directly run the section route for one agenda item (used by the prep-level
   // "Generate Solution Architecture Evaluation" action). SectionEditor has its
@@ -421,6 +478,43 @@ export default function WorkshopRoomPage() {
                     className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">
                     {busy === 'brief' ? 'Preparing…' : 'Regenerate brief'}
                   </button>
+                </div>
+              </div>
+
+              {/* Workshop-level guidance prompt (047). Persisted to
+                  workshops.facilitation_prompt and honored by Regenerate brief,
+                  Regenerate content, and every per-section generate. */}
+              <div className="rounded-lg border border-[#2563EB]/30 bg-[#2563EB0A] p-3 space-y-2">
+                <div className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Guidance for all content</div>
+                <textarea
+                  value={facPrompt}
+                  onChange={(e) => setFacPrompt(e.target.value)}
+                  onBlur={saveFacPrompt}
+                  rows={2}
+                  placeholder="Tone, emphasis, what to include or avoid. e.g. Keep it executive-level, favor buy over build, and flag any FAR/DFARS exposure."
+                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] outline-none resize-none"
+                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={saveFacPrompt}
+                    disabled={busy === 'regen-content' || facPrompt === (ws.facilitation_prompt || '')}
+                    className="text-[10px] px-2 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] disabled:opacity-40"
+                  >
+                    {facPromptSaved ? 'Saved' : 'Save guidance'}
+                  </button>
+                  <button
+                    onClick={regenerateContent}
+                    disabled={!hasAnyContent || busy === 'regen-content'}
+                    title={hasAnyContent ? 'Save the prompt, then regenerate every section that has content honoring it' : 'Generate at least one section first'}
+                    className="text-[10px] px-2 py-1 rounded font-medium text-white bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-40 disabled:hover:bg-[#2563EB]"
+                  >
+                    {busy === 'regen-content'
+                      ? (regenProgress ? `Regenerating ${regenProgress.done}/${regenProgress.total}…` : 'Regenerating…')
+                      : '↻ Regenerate content'}
+                  </button>
+                  <span className="text-[9px] text-[var(--m12-text-muted)] leading-snug">
+                    Honored by Regenerate brief, Regenerate content, and each section generate.
+                  </span>
                 </div>
               </div>
 

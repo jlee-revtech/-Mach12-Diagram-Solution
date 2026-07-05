@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     // Load + org-scope the workshop.
     const { data: ws } = await db
       .from('workshops')
-      .select('id, topic, title, customer_name, objective, duration_minutes, workstream_codes')
+      .select('id, topic, title, customer_name, objective, duration_minutes, workstream_codes, facilitation_prompt')
       .eq('id', workshopId)
       .eq('organization_id', orgId)
       .maybeSingle()
@@ -85,6 +85,9 @@ export async function POST(req: NextRequest) {
     const topic = (ws.topic as string) || (ws.title as string) || ''
     const customerName = (ws.customer_name as string) || undefined
     const durationMinutes = (ws.duration_minutes as number) || undefined
+    // Workshop-level guidance (047): threaded into every section generate as
+    // `guidance`, SEPARATE from the per-section `feedback` revise instruction.
+    const guidance = ((ws.facilitation_prompt as string | null) || '').trim() || undefined
     const sectionKind: SectionKind = (item.section_kind as SectionKind) || 'overview'
     const timeboxMinutes = item.timebox_minutes ?? undefined
     const focus = (item.focus_type as WorkshopFocus) || undefined
@@ -190,6 +193,7 @@ export async function POST(req: NextRequest) {
       knowledgeThin,
       priorContent,
       feedback: feedback || undefined,
+      guidance,
       clarificationAnswers: clarificationAnswers?.length ? clarificationAnswers : undefined,
       workstreamDecisions,
       anthropicApiKey: ANTHROPIC_KEY,

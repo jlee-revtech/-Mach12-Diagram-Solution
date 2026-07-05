@@ -72,7 +72,7 @@ export default function SectionEditor({
     ? { content: content.content, clarifyingQuestions: content.clarifying_questions ?? [], kbGaps: content.kb_gaps ?? [], groundingUsed: false, version: content.version, status: content.status }
     : null)
 
-  const call = async (body: Record<string, unknown>) => {
+  const call = async (body: Record<string, unknown>): Promise<boolean> => {
     setBusy(true)
     setError(null)
     try {
@@ -86,14 +86,22 @@ export default function SectionEditor({
       const result = data as SectionResult
       setLocal(result)
       onSaved(result)
+      return true
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed')
+      return false
     } finally {
       setBusy(false)
     }
   }
 
-  const generate = () => call({})
+  // Generate / enrich this section. The prompt box (feedback) drives BOTH the first
+  // generate (an initial steer) and subsequent enrich/revise; clear it on success.
+  const generate = async () => {
+    const fb = feedback.trim()
+    const ok = await call(fb ? { feedback: fb } : {})
+    if (ok && fb) setFeedback('')
+  }
 
   const regenerateWithAnswers = () => {
     const clarificationAnswers = (view?.clarifyingQuestions ?? [])
@@ -101,12 +109,6 @@ export default function SectionEditor({
       .filter((a) => a.answer)
     if (clarificationAnswers.length === 0) { setError('Answer at least one question first.'); return }
     call({ clarificationAnswers })
-  }
-
-  const updateWithFeedback = () => {
-    const fb = feedback.trim()
-    if (!fb) return
-    call({ feedback: fb }).then(() => setFeedback(''))
   }
 
   return (
@@ -130,6 +132,7 @@ export default function SectionEditor({
         <button
           onClick={generate}
           disabled={busy}
+          title={feedback.trim() ? 'Generate honoring your prompt below' : (view?.content ? 'Regenerate this section' : 'Generate this section')}
           className="shrink-0 bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
         >
           {busy ? 'Generating…' : view?.content ? 'Regenerate' : 'Generate content'}
@@ -193,26 +196,39 @@ export default function SectionEditor({
         </div>
       )}
 
-      {/* NL feedback (req 9) */}
-      {view?.content && (
-        <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-3">
-          <div className="text-[10px] uppercase tracking-wide text-[var(--m12-text-muted)] mb-1.5">Tell the agent how to change this section</div>
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            rows={2}
-            placeholder="e.g. Make the recommended decision firmer and add a cost-plus vs fixed-price angle."
-            className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] outline-none resize-none mb-2"
-          />
-          <button
-            onClick={updateWithFeedback}
-            disabled={busy || !feedback.trim()}
-            className="text-[11px] px-2.5 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] disabled:opacity-50"
-          >
-            {busy ? 'Updating…' : 'Update section'}
-          </button>
+      {/* Prompt box (req 9): usable to GENERATE (first draft) and to enrich/revise.
+          Available before content exists, so the first generation honors it too.
+          The header Generate button and the button here both submit this prompt. */}
+      <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-3">
+        <div className="text-[10px] uppercase tracking-wide text-[var(--m12-text-muted)] mb-1.5">
+          Prompt: generate or enrich this section, optional
         </div>
-      )}
+        <textarea
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          rows={2}
+          placeholder={
+            view?.content
+              ? 'e.g. Make the recommended decision firmer and add a cost-plus vs fixed-price angle.'
+              : 'e.g. Emphasize the make-vs-buy trade-off and keep talking points executive-level.'
+          }
+          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] outline-none resize-none mb-2"
+        />
+        <button
+          onClick={generate}
+          disabled={busy || (!view?.content && !feedback.trim())}
+          className="text-[11px] px-2.5 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] disabled:opacity-50"
+        >
+          {busy
+            ? (view?.content ? 'Updating…' : 'Generating…')
+            : view?.content
+              ? (feedback.trim() ? 'Update section' : 'Regenerate section')
+              : 'Generate with prompt'}
+        </button>
+        <div className="text-[9px] text-[var(--m12-text-muted)] mt-1.5 leading-snug">
+          This section-level prompt is combined with the workshop-level guidance set in the Sections panel.
+        </div>
+      </div>
     </div>
   )
 }

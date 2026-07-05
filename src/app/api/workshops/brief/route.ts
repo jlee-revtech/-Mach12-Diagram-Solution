@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       focusAreas,
       scenarios,
       durationMinutes,
+      guidance,
     }: {
       orgId: string
       workshopId?: string
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
       focusAreas?: WorkshopFocus[]
       scenarios?: { title: string; description?: string; focusType?: WorkshopFocus }[]
       durationMinutes?: number
+      guidance?: string
     } = body
     if (!orgId || !topic) return json({ error: 'orgId and topic are required' }, 400)
 
@@ -45,6 +47,20 @@ export async function POST(req: NextRequest) {
     const codes = workstreamCodes || []
     const workstreams = await workstreamRoster(db, orgId, codes)
     const modelPreRead = await assemblePreRead(db, orgId, codes)
+
+    // Workshop-level guidance (047): honor the persisted facilitation_prompt when a
+    // workshop id is supplied, else the guidance passed in the body. Threaded into
+    // generateBrief so "Regenerate brief" honors the same steer as every section.
+    let effectiveGuidance = (guidance || '').trim() || undefined
+    if (workshopId && !effectiveGuidance) {
+      const { data: gws } = await db
+        .from('workshops')
+        .select('facilitation_prompt')
+        .eq('id', workshopId)
+        .eq('organization_id', orgId)
+        .maybeSingle<{ facilitation_prompt: string | null }>()
+      effectiveGuidance = (gws?.facilitation_prompt || '').trim() || undefined
+    }
 
     const brief = await generateBrief({
       topic,
@@ -55,6 +71,7 @@ export async function POST(req: NextRequest) {
       scenarios,
       modelPreRead,
       durationMinutes,
+      guidance: effectiveGuidance,
       anthropicApiKey: ANTHROPIC_KEY,
     })
     if (!brief) return json({ error: 'Failed to generate brief' }, 502)

@@ -64,6 +64,9 @@ export interface Workshop {
   ended_at: string | null
   brief: WorkshopBriefData | null
   recap: unknown | null
+  // 047: persisted workshop-level guidance prompt, threaded as `guidance` into
+  // every content generation (brief + every section).
+  facilitation_prompt?: string | null
   settings: Record<string, unknown>
   created_by: string | null
   created_at: string
