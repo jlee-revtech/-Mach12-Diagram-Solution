@@ -111,5 +111,5 @@ only whatever the old row still holds (no crash), so it will look sparse.
   `src/app/api/workshops/section/route.ts`, `package.json`, `src/lib/version.ts`,
   `docs/workshop-facilitation/handoff-reframe-D2.md`. Parallel-session WIP
   (`scripts/import-vibe-skills.mjs`, `src/lib/workstream/catalog.ts`) NOT staged.
-- Commit: `<HASH>` `fix(workshops): render reframed labeled/bulleted section content + per-decision visual [reframe D2]`.
-- Push: `<STATUS>`.
+- Commit: `0e74901` `fix(workshops): render reframed labeled/bulleted section content + per-decision visual [reframe D2]`.
+- Push: succeeded (`6427ff7..0e74901  master -> master`).
