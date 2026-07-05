@@ -269,6 +269,8 @@ export default function WorkshopRoomPage() {
   const hasWorkstreamContent = agenda.some(
     (a) => a.section_kind === 'workstream' && !!contentByItem.get(a.id)?.content,
   )
+  // Enable the Workshop Experience once any section has authored content.
+  const hasAnyContent = content.some((c) => !!c.content)
 
   return (
     <div className="min-h-screen bg-[var(--m12-bg)] flex flex-col">
@@ -323,7 +325,17 @@ export default function WorkshopRoomPage() {
             {/* Left: brief summary + section cards */}
             <div className="col-span-5 border-r border-[var(--m12-border)]/40 overflow-auto p-5 space-y-4">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)]">Sections</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)]">Sections</div>
+                  <button
+                    onClick={() => router.push(`/workshops/${ws.id}/present`)}
+                    disabled={!hasAnyContent}
+                    title={hasAnyContent ? 'Open the full-screen Workshop Experience' : 'Generate at least one section first'}
+                    className="text-[10px] px-2 py-1 rounded font-medium text-white bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-40 disabled:hover:bg-[#2563EB]"
+                  >
+                    ▶ Enter Workshop Experience
+                  </button>
+                </div>
                 <div className="flex items-center gap-2">
                   <select value={durationMinutes} onChange={(e) => saveDuration(Number(e.target.value))} title="Workshop length" aria-label="Workshop length"
                     className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded px-2 py-1 text-[10px] text-[var(--m12-text)] outline-none">
