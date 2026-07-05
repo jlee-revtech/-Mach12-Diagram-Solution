@@ -164,5 +164,8 @@ and section metadata show.
   `src/app/workshops/page.tsx`, `src/lib/workshop/types.ts`, `src/lib/supabase/workshops.ts`,
   `package.json`, `src/lib/version.ts`, `docs/workshop-facilitation/handoff-phase3.md`.
 - Parallel WIP (`scripts/import-vibe-skills.mjs`, `src/lib/workstream/catalog.ts`) NOT staged.
-- Commit: `<HASH>` (`feat(workshops): section authoring UI + duration selector [phase 3]`).
-- Push: `<STATUS>`.
+- Commit: `414a5b7` (`feat(workshops): section authoring UI + duration selector [phase 3]`).
+  10 files changed, 884 insertions(+), 36 deletions(-).
+- Push: SUCCEEDED (`4da5f19..414a5b7 master -> master`). Branch was already up to date
+  (no rebase needed). The two parallel-WIP files were stashed for the push and popped back
+  afterward; they remain uncommitted, untouched.
