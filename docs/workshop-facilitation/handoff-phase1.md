@@ -113,6 +113,7 @@ Notes for the next phase:
 ## 5. Git
 
 - Repo: `jlee-revtech/-Mach12-Diagram-Solution`, branch `master`.
-- Commit: see the return message / `git log` (`feat(workshops): facilitation content data model (migration 046) [phase 1]`).
+- Commit: `0761404` (`feat(workshops): facilitation content data model (migration 046) [phase 1]`).
 - Staged ONLY: `supabase/046_workshop_facilitation.sql`, `src/lib/supabase/workshops.ts`, `src/lib/workshop/types.ts`, `package.json`, `src/lib/version.ts`, `docs/workshop-facilitation/PLAN.md`, `docs/workshop-facilitation/handoff-phase1.md`.
-- Push status: recorded in the return message.
+- Push: SUCCEEDED (`c3b41d1..0761404 master -> master`).
+- The parallel-session WIP (`scripts/import-vibe-skills.mjs`, `src/lib/workstream/catalog.ts`) was stashed during the rebase/push and popped back afterward; it remains uncommitted in the working tree, untouched.
