@@ -7,7 +7,7 @@ import { listWorkstreams } from '@/lib/supabase/workstreams'
 import {
   getWorkshop, updateWorkshop, listAgenda, updateAgendaItem, updateWorkshopDuration,
   listMessages, addMessage, listCaptures, updateCapture, setParticipants,
-  listAgendaContent, type AgendaContentRow,
+  listAgendaContent, restartWorkshop, archiveWorkshop, type AgendaContentRow,
 } from '@/lib/supabase/workshops'
 import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType } from '@/lib/workshop/types'
 import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
@@ -19,12 +19,15 @@ import type { Workstream } from '@/lib/workstream/types'
 import VersionBadge from '@/components/VersionBadge'
 import SectionCard from '@/components/workshop/SectionCard'
 import SectionEditor from '@/components/workshop/SectionEditor'
+import BriefLoading from '@/components/workshop/BriefLoading'
 
 interface FacResult {
   say: string; nextQuestion?: string; coverage?: string; advanceAgenda?: boolean; pullSpecialist?: string; gaps?: string[]
 }
 
 const VOICE_CLOUD = process.env.NEXT_PUBLIC_VOICE_PROVIDER === 'deepgram'
+
+const roomMenuItemCls = 'w-full text-left px-3 py-2 text-[11px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] hover:text-[var(--m12-text)] disabled:opacity-40 transition-colors'
 
 function authHeader(): Record<string, string> {
   try {
@@ -123,10 +126,14 @@ export default function WorkshopRoomPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.brief) throw new Error(data.error || 'Brief generation failed')
-      await setParticipants(ws.id,
-        [{ display_name: me, org_role: 'Facilitator' }],
-        [{ workstream_code: 'enterprise', display_name: 'Enterprise Architect', is_facilitator: true },
-         ...roster.map((r) => ({ workstream_code: r.code, display_name: r.name.split('(')[0].trim() }))])
+      // Participants are non-critical: never let a failure here block the reload
+      // that surfaces the persisted brief + agenda.
+      try {
+        await setParticipants(ws.id,
+          [{ display_name: me, org_role: 'Facilitator' }],
+          [{ workstream_code: 'enterprise', display_name: 'Enterprise Architect', is_facilitator: true },
+           ...roster.map((r) => ({ workstream_code: r.code, display_name: r.name.split('(')[0].trim() }))])
+      } catch { /* keep going */ }
       await load()
     } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
   }, [ws, organization, me, roster, durationMinutes, load])
@@ -182,6 +189,21 @@ export default function WorkshopRoomPage() {
     await updateWorkshop(ws.id, { status, ...stamp })
     await load()
   }, [ws, load])
+
+  // ─── Restart (reopen prep, non-destructive) / Archive ─────
+  const [menuOpen, setMenuOpen] = useState(false)
+  const restartThis = useCallback(async () => {
+    if (!ws) return
+    if (!confirm('Restart this workshop back to the prep phase? Your brief, agenda, section content, transcript, captures, and recap are all preserved. Nothing is deleted.')) return
+    setMenuOpen(false); setBusy('restart')
+    try { await restartWorkshop(ws.id); await load() } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
+  }, [ws, load])
+  const archiveThis = useCallback(async () => {
+    if (!ws) return
+    if (!confirm('Archive this workshop? It moves to the Archived list; you can restore it anytime from there. No data is deleted.')) return
+    setMenuOpen(false)
+    try { await archiveWorkshop(ws.id); router.push('/workshops') } catch (e) { alert(e instanceof Error ? e.message : 'Failed') }
+  }, [ws, router])
 
   const endAndRecap = useCallback(async () => {
     if (!ws || !organization) return
@@ -297,6 +319,14 @@ export default function WorkshopRoomPage() {
   return (
     <div className="min-h-screen bg-[var(--m12-bg)] flex flex-col">
       {/* Header */}
+      {busy === 'brief' && (
+        <BriefLoading
+          customerName={ws.customer_name || undefined}
+          workstreamCount={roster.length || (ws.workstream_codes || []).length}
+          durationMinutes={durationMinutes}
+          mode={hasBrief ? 'regenerate' : 'brief'}
+        />
+      )}
       <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--m12-border)]/40">
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => router.push('/workshops')} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]" title="Back">
@@ -320,6 +350,22 @@ export default function WorkshopRoomPage() {
           {!hasBrief && <button onClick={generateBrief} disabled={busy === 'brief'} className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium">{busy === 'brief' ? 'Preparing…' : 'Generate Brief'}</button>}
           {hasBrief && !isLive && ws.status !== 'completed' && <button onClick={() => setStatus('live')} className="bg-[#059669] hover:bg-[#10B981] text-white px-3 py-1.5 rounded-lg text-xs font-medium">Start Workshop</button>}
           {isLive && <button onClick={endAndRecap} disabled={busy === 'recap'} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-3 py-1.5 rounded-lg text-xs font-medium">{busy === 'recap' ? 'Wrapping…' : 'End & Recap'}</button>}
+          <div className="relative">
+            <button onClick={() => setMenuOpen((v) => !v)} disabled={busy === 'restart'} title="Workshop actions" aria-label="Workshop actions"
+              className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-1.5 py-1 leading-none text-base rounded disabled:opacity-40">⋯</button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-8 z-20 w-52 rounded-lg border border-[var(--m12-border)] bg-[var(--m12-bg-card)] shadow-xl py-1">
+                  <button onClick={restartThis} disabled={busy === 'restart'} className={roomMenuItemCls}>
+                    ↺&nbsp; Restart to prep
+                    <span className="block text-[9px] text-[var(--m12-text-muted)] mt-0.5">Reopen prep; keeps all content and data</span>
+                  </button>
+                  <button onClick={archiveThis} className={roomMenuItemCls}>⤓&nbsp; Archive workshop</button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -408,7 +454,14 @@ export default function WorkshopRoomPage() {
                 </div>
               )}
 
-              <details className="rounded-lg border border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)] px-3 py-2">
+              {!ws.brief?.objectives?.length && !agenda.length && !ws.brief?.preRead?.trim() && (
+                <div className="rounded-lg border border-[#D97706]/50 bg-[#D9770610] p-3 text-[11px]">
+                  <div className="font-medium text-[var(--m12-text)] mb-1">The brief came back empty</div>
+                  <div className="text-[var(--m12-text-muted)] mb-2">No objectives, agenda, or pre-read were returned. This is usually transient (a model hiccup or a missing ANTHROPIC_API_KEY). Regenerate to try again.</div>
+                  <button onClick={generateBrief} disabled={busy === 'brief'} className="text-[10px] px-2 py-1 rounded bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-40 text-white font-medium">Regenerate brief</button>
+                </div>
+              )}
+              <details open className="rounded-lg border border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)] px-3 py-2">
                 <summary className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] cursor-pointer">Workshop brief</summary>
                 <div className="mt-3"><BriefView ws={ws} agenda={agenda} onStart={() => setStatus('live')} /></div>
               </details>

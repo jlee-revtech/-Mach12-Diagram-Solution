@@ -94,6 +94,21 @@ export async function updateWorkshop(
 
 export const archiveWorkshop = (id: string) => updateWorkshop(id, { archived_at: new Date().toISOString() })
 
+export const restoreWorkshop = (id: string) => updateWorkshop(id, { archived_at: null })
+
+// Restart: reopen the workshop at the prep phase without losing any downstream
+// data. Only the workshop's phase markers and the agenda navigation flags are
+// reset; the brief, agenda, per-section facilitation content, transcript
+// messages, captures, and recap are all preserved in place.
+export async function restartWorkshop(id: string): Promise<void> {
+  await updateWorkshop(id, { status: 'draft', started_at: null, ended_at: null })
+  await fetch(`${URL}/rest/v1/workshop_agenda_items?workshop_id=eq.${id}`, {
+    method: 'PATCH',
+    headers: headers('return=minimal'),
+    body: JSON.stringify({ status: 'pending' }),
+  })
+}
+
 // ─── Participants ───────────────────────────────────────────
 
 export async function listParticipants(workshopId: string): Promise<WorkshopParticipant[]> {

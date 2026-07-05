@@ -1,6 +1,6 @@
 {
   "name": "mach12-diagram",
-  "version": "0.3.125",
+  "version": "0.3.126",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3003",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
-    "@jlee-revtech/agent-core": "^0.6.0",
+    "@jlee-revtech/agent-core": "^0.6.1",
     "@supabase/supabase-js": "^2.39.8",
     "@xyflow/react": "^12.8.3",
     "docx": "^9.7.1",

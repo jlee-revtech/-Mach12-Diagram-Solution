@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
-import { listWorkshops, createWorkshop } from '@/lib/supabase/workshops'
+import { listWorkshops, createWorkshop, archiveWorkshop, restoreWorkshop, restartWorkshop } from '@/lib/supabase/workshops'
 import type { Workstream } from '@/lib/workstream/types'
 import type { Workshop, WorkshopFocus } from '@/lib/workshop/types'
 import { FOCUS_AREAS, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
@@ -23,6 +23,9 @@ export default function WorkshopsPage() {
   const [loadingData, setLoadingData] = useState(true)
   const [showNew, setShowNew] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [view, setView] = useState<'active' | 'archived'>('active')
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   // new-workshop form
   const [title, setTitle] = useState('')
@@ -41,7 +44,8 @@ export default function WorkshopsPage() {
   const load = useCallback(async () => {
     if (!organization) return
     setLoadingData(true)
-    const [ws, wk] = await Promise.all([listWorkstreams(organization.id), listWorkshops(organization.id)])
+    // Fetch active + archived once; the Active/Archived toggle filters client-side.
+    const [ws, wk] = await Promise.all([listWorkstreams(organization.id), listWorkshops(organization.id, true)])
     setWorkstreams(ws)
     setWorkshops(wk)
     setLoadingData(false)
@@ -50,6 +54,29 @@ export default function WorkshopsPage() {
   useEffect(() => { load() }, [load])
 
   const toggle = <T,>(arr: T[], v: T): T[] => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+
+  // ─── Archive / Restart / Restore actions ──────────────────
+  const runAction = useCallback(async (id: string, fn: (id: string) => Promise<void>) => {
+    setBusyId(id)
+    try { await fn(id); setMenuId(null); await load() }
+    catch (e) { alert(e instanceof Error ? e.message : 'Action failed') }
+    finally { setBusyId(null) }
+  }, [load])
+
+  const onArchive = useCallback((id: string) => {
+    if (!confirm('Archive this workshop? It moves to the Archived list; you can restore it anytime. No data is deleted.')) return
+    runAction(id, archiveWorkshop)
+  }, [runAction])
+
+  const onRestore = useCallback((id: string) => runAction(id, restoreWorkshop), [runAction])
+
+  const onRestart = useCallback((id: string) => {
+    if (!confirm('Restart this workshop back to the prep phase? Your brief, agenda, section content, transcript, captures, and recap are all preserved. Nothing is deleted.')) return
+    runAction(id, restartWorkshop)
+  }, [runAction])
+
+  const visible = workshops.filter((w) => (view === 'archived' ? !!w.archived_at : !w.archived_at))
+  const archivedCount = workshops.filter((w) => !!w.archived_at).length
 
   const handleCreate = useCallback(async () => {
     if (!organization || !title.trim() || wsCodes.length === 0) return
@@ -88,13 +115,24 @@ export default function WorkshopsPage() {
             <span className="text-[var(--m12-text-secondary)] text-lg font-medium">Workshops</span>
             <span className="self-end mb-0.5"><VersionBadge /></span>
           </div>
-          <button
-            onClick={() => setShowNew((v) => !v)}
-            className="flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors shadow-lg shadow-[#2563EB]/20"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-            New Workshop
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center rounded-lg border border-[var(--m12-border)]/50 p-0.5 text-[11px]">
+              {(['active', 'archived'] as const).map((v) => (
+                <button key={v} onClick={() => setView(v)}
+                  className="px-2.5 py-1 rounded-md font-medium capitalize transition-colors"
+                  style={{ backgroundColor: view === v ? '#2563EB' : 'transparent', color: view === v ? '#fff' : 'var(--m12-text-muted)' }}>
+                  {v}{v === 'archived' && archivedCount ? ` (${archivedCount})` : ''}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowNew((v) => !v)}
+              className="flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors shadow-lg shadow-[#2563EB]/20"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+              New Workshop
+            </button>
+          </div>
         </div>
         <p className="text-sm text-[var(--m12-text-muted)] mb-8 ml-9">
           Agent-facilitated delivery sessions. Prep an agenda, run the room with your value-stream consultants, and capture decisions, actions, and deliverables live.
@@ -166,20 +204,44 @@ export default function WorkshopsPage() {
         {/* Workshop list */}
         {loadingData ? (
           <div className="text-center py-24 text-[var(--m12-text-muted)] text-sm">Loading…</div>
-        ) : workshops.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div className="text-center py-24 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
-            <h2 className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">No workshops yet</h2>
-            <p className="text-sm text-[var(--m12-text-muted)] mb-6 max-w-md mx-auto">Create a workshop to prep an agenda and run an agent-facilitated session with your value-stream consultants.</p>
-            <button onClick={() => setShowNew(true)} className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-5 py-2.5 rounded-lg text-sm font-medium">New Workshop</button>
+            <h2 className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">{view === 'archived' ? 'No archived workshops' : 'No workshops yet'}</h2>
+            <p className="text-sm text-[var(--m12-text-muted)] mb-6 max-w-md mx-auto">{view === 'archived' ? 'Workshops you archive show up here. You can restore any of them later; nothing is deleted.' : 'Create a workshop to prep an agenda and run an agent-facilitated session with your value-stream consultants.'}</p>
+            {view === 'active' && <button onClick={() => setShowNew(true)} className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-5 py-2.5 rounded-lg text-sm font-medium">New Workshop</button>}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {workshops.map((w) => (
-              <button key={w.id} onClick={() => router.push(`/workshops/${w.id}`)}
-                className="text-left bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl p-5 transition-all card-glow">
+            {visible.map((w) => (
+              <div key={w.id} role="button" tabIndex={0}
+                onClick={() => router.push(`/workshops/${w.id}`)}
+                onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/workshops/${w.id}`) }}
+                className="relative text-left bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl p-5 transition-all card-glow cursor-pointer outline-none"
+                style={{ opacity: view === 'archived' || busyId === w.id ? 0.65 : 1 }}>
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="text-sm font-semibold text-[var(--m12-text)] leading-tight">{w.title}</h3>
-                  <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0" style={{ color: STATUS_COLOR[w.status], backgroundColor: `${STATUS_COLOR[w.status]}1A` }}>{w.status}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ color: STATUS_COLOR[w.status], backgroundColor: `${STATUS_COLOR[w.status]}1A` }}>{w.status}</span>
+                    <div className="relative">
+                      <button onClick={(e) => { e.stopPropagation(); setMenuId(menuId === w.id ? null : w.id) }}
+                        className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-1 leading-none text-base rounded" title="Actions" aria-label="Actions">⋯</button>
+                      {menuId === w.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuId(null) }} />
+                          <div className="absolute right-0 top-6 z-20 w-44 rounded-lg border border-[var(--m12-border)] bg-[var(--m12-bg-card)] shadow-xl py-1">
+                            {view === 'active' ? (
+                              <>
+                                <button onClick={(e) => { e.stopPropagation(); onRestart(w.id) }} disabled={busyId === w.id} className={menuItemCls}>↺&nbsp; Restart to prep</button>
+                                <button onClick={(e) => { e.stopPropagation(); onArchive(w.id) }} disabled={busyId === w.id} className={menuItemCls}>⤓&nbsp; Archive</button>
+                              </>
+                            ) : (
+                              <button onClick={(e) => { e.stopPropagation(); onRestore(w.id) }} disabled={busyId === w.id} className={menuItemCls}>↩&nbsp; Restore</button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 {w.customer_name && <div className="text-[11px] text-[var(--m12-text-muted)] mb-3">{w.customer_name}</div>}
                 <div className="flex flex-wrap gap-1 mb-3">
@@ -190,8 +252,11 @@ export default function WorkshopsPage() {
                   })}
                   {(w.workstream_codes || []).length > 4 && <span className="text-[9px] text-[var(--m12-text-muted)]">+{w.workstream_codes.length - 4}</span>}
                 </div>
-                <div className="text-[10px] text-[var(--m12-text-muted)]">{new Date(w.created_at).toLocaleDateString()}</div>
-              </button>
+                <div className="flex items-center justify-between text-[10px] text-[var(--m12-text-muted)]">
+                  <span>{new Date(w.created_at).toLocaleDateString()}</span>
+                  {w.archived_at && <span className="italic">archived</span>}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -201,6 +266,8 @@ export default function WorkshopsPage() {
 }
 
 const inputCls = 'w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] outline-none transition-colors'
+
+const menuItemCls = 'w-full text-left px-3 py-1.5 text-[11px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] hover:text-[var(--m12-text)] disabled:opacity-40 transition-colors'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
