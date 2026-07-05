@@ -203,9 +203,9 @@ export interface SvgResult {
 // A row of rounded-rect step boxes left to right, wrapping after ~4 per row.
 // Elbow arrows connect consecutive steps; a wrapped row connects down-then-into
 // the first box of the next row.
-function renderFlow(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
+function renderFlow(d: WorkshopDiagram, requestedWidth: number, f: Frame): SvgResult {
   const steps = (d.steps ?? []).filter((s) => s && (s.label || s.sublabel))
-  if (steps.length === 0) return renderEmpty(d, width, f, 'No steps to show')
+  if (steps.length === 0) return renderEmpty(d, requestedWidth, f, 'No steps to show')
 
   const LABEL_FS = 13
   const SUB_FS = 11
@@ -238,6 +238,17 @@ function renderFlow(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
   // Uniform box height + width per column band keeps the grid crisp.
   const boxH = Math.max(...boxes.map((b) => b.h))
   const perRow = Math.min(MAX_PER_ROW, boxes.length)
+
+  // Grow the SVG so the widest per-row grouping fits instead of clipping. Measure
+  // each row's natural width using the same per-row grouping the layout uses below.
+  let maxRowW = 0
+  for (let r = 0; r < boxes.length; r += perRow) {
+    const rowBoxes = boxes.slice(r, r + perRow)
+    const rowW = rowBoxes.reduce((acc, b) => acc + b.w, 0) + GAP_X * Math.max(0, rowBoxes.length - 1)
+    if (rowW > maxRowW) maxRowW = rowW
+  }
+  const naturalWidth = f.padX * 2 + maxRowW
+  const width = Math.min(1600, Math.max(requestedWidth, Math.ceil(naturalWidth)))
 
   // Lay boxes into rows; center each row horizontally in the available width.
   const availW = width - f.padX * 2
@@ -323,11 +334,11 @@ function renderFlow(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
 // ─── matrix ──────────────────────────────────────────────────────────────────
 // A table: header row (columns) + a left header column (rows[].label). Cells from
 // rows[].cells. Even column widths sized to the widest cell; zebra header shading.
-function renderMatrix(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
+function renderMatrix(d: WorkshopDiagram, requestedWidth: number, f: Frame): SvgResult {
   const columns = (d.columns ?? []).map((c) => String(c ?? ''))
   const rows = (d.rows ?? []).filter((r) => r && (r.label || (r.cells && r.cells.length)))
   if (columns.length === 0 && rows.length === 0)
-    return renderEmpty(d, width, f, 'No table data to show')
+    return renderEmpty(d, requestedWidth, f, 'No table data to show')
 
   const FS = 12.5
   const HEAD_FS = 12.5
@@ -335,12 +346,8 @@ function renderMatrix(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
   const CELL_PAD_Y = 9
   const nCols = columns.length
   const nDataCols = nCols // right-side value columns
-  const totalCols = nDataCols + 1 // + the left label column
 
-  const availW = width - f.padX * 2
-
-  // Column content width estimate. Label column sized to widest row label; data
-  // columns share the remaining width evenly.
+  // Label column sized to widest row label.
   const labelTexts = rows.map((r) => String(r.label ?? ''))
   const labelColW = Math.max(
     110,
@@ -349,7 +356,16 @@ function renderMatrix(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
       Math.ceil(Math.max(0, ...labelTexts.map((t) => estTextWidth(t, FS)))) + CELL_PAD_X * 2,
     ),
   )
-  const dataColW = nDataCols > 0 ? Math.max(90, (availW - labelColW) / nDataCols) : 0
+
+  // Grow the SVG so every data column keeps a comfortable, readable width instead of
+  // being squeezed (or overflowing) at a fixed canvas size.
+  const desiredDataColW = 150
+  const naturalWidth = f.padX * 2 + labelColW + desiredDataColW * nDataCols
+  const width = Math.min(1600, Math.max(requestedWidth, Math.ceil(naturalWidth)))
+
+  const availW = width - f.padX * 2
+  // Data columns fill the (now sufficient) remaining width evenly.
+  const dataColW = nDataCols > 0 ? Math.max(desiredDataColW, (availW - labelColW) / nDataCols) : 0
 
   // Wrap every cell to its column width, then row height = tallest cell.
   const wrapCol = (text: string, colW: number, fs: number) =>
@@ -505,9 +521,9 @@ function renderQuadrant(d: WorkshopDiagram, width: number, f: Frame): SvgResult 
 // of boxes. connections[] are drawn between named nodes as orthogonal elbow
 // connectors: leave the source bottom-center, route V-then-H-then-V, enter the
 // target top-center. Edge labels get an opaque chip.
-function renderLayers(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
+function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): SvgResult {
   const layers = (d.layers ?? []).filter((l) => l && (l.label || (l.nodes && l.nodes.length)))
-  if (layers.length === 0) return renderEmpty(d, width, f, 'No layers to show')
+  if (layers.length === 0) return renderEmpty(d, requestedWidth, f, 'No layers to show')
 
   const LABEL_GUTTER = 128 // reserved left column for band labels (skill: gutter)
   const NODE_FS = 12
@@ -520,19 +536,10 @@ function renderLayers(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
   const MIN_NODE_W = 84
   const MAX_NODE_W = 190
 
-  const availW = width - f.padX * 2 - LABEL_GUTTER
-  const bandX = f.padX + LABEL_GUTTER
-
-  // Measure + place every node. Keep an index of node-label -> geometry (for the
-  // first occurrence) so connections can dock to face centers.
-  interface NodeBox { x: number; y: number; w: number; h: number; lines: string[] }
-  const nodeByLabel = new Map<string, NodeBox>()
-  const bands: { label: string; y: number; nodes: NodeBox[] }[] = []
-
-  let y = f.contentTop
-  layers.forEach((layer) => {
+  // Measure every band's node widths FIRST (node width logic unchanged), then grow
+  // the SVG so the widest row fits instead of clipping off the right edge.
+  const measuredBands = layers.map((layer) => {
     const names = (layer.nodes ?? []).map((n) => String(n ?? '')).filter(Boolean)
-    // Measure each node width.
     const measured = names.map((name) => {
       const lines = wrapText(name, NODE_FS, MAX_NODE_W - NODE_PAD_X * 2, 2)
       const w = Math.max(
@@ -541,17 +548,34 @@ function renderLayers(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
       )
       return { name, lines, w }
     })
-    // Center the row within the band area; if it overflows, left-align (it wraps
-    // by clamping widths, but we never overlap because we advance x by w+gap).
     const rowW = measured.reduce((acc, m) => acc + m.w, 0) + NODE_GAP * Math.max(0, measured.length - 1)
-    let x = bandX + Math.max(0, (availW - rowW) / 2)
-    const nodes: NodeBox[] = measured.map((m) => {
+    return { label: String(layer.label ?? ''), measured, rowW }
+  })
+
+  const maxRowW = Math.max(0, ...measuredBands.map((b) => b.rowW))
+  const naturalWidth = f.padX * 2 + LABEL_GUTTER + maxRowW
+  const width = Math.min(1600, Math.max(requestedWidth, Math.ceil(naturalWidth)))
+
+  const availW = width - f.padX * 2 - LABEL_GUTTER
+  const bandX = f.padX + LABEL_GUTTER
+
+  // Place every node. Keep an index of node-label -> geometry (for the first
+  // occurrence) so connections can dock to face centers.
+  interface NodeBox { x: number; y: number; w: number; h: number; lines: string[] }
+  const nodeByLabel = new Map<string, NodeBox>()
+  const bands: { label: string; y: number; nodes: NodeBox[] }[] = []
+
+  let y = f.contentTop
+  measuredBands.forEach((mb) => {
+    // Center the row within the band area (the SVG is now wide enough to hold it).
+    let x = bandX + Math.max(0, (availW - mb.rowW) / 2)
+    const nodes: NodeBox[] = mb.measured.map((m) => {
       const box: NodeBox = { x, y, w: m.w, h: NODE_H, lines: m.lines }
       x += m.w + NODE_GAP
       if (!nodeByLabel.has(m.name)) nodeByLabel.set(m.name, box)
       return box
     })
-    bands.push({ label: String(layer.label ?? ''), y, nodes })
+    bands.push({ label: mb.label, y, nodes })
     y += NODE_H + BAND_GAP
   })
 

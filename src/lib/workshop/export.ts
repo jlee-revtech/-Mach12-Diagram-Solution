@@ -88,12 +88,12 @@ export async function exportRecapPptx(ws: Workshop, recap: WorkshopRecapData): P
     const s = pptx.addSlide()
     s.addText(title, { x: 0.6, y: 0.4, w: 12, h: 0.7, fontSize: 24, bold: true, color: DARK })
     s.addText(items.map((i) => ({ text: i, options: { bullet: true, color: DARK, fontSize: 15, paraSpaceAfter: 6 } })),
-      { x: 0.7, y: 1.3, w: 12, h: 5.6, valign: 'top' })
+      { x: 0.7, y: 1.3, w: 12, h: 5.6, valign: 'top', fit: 'shrink' })
   }
 
   const summary = pptx.addSlide()
   summary.addText('Summary', { x: 0.6, y: 0.4, w: 12, h: 0.7, fontSize: 24, bold: true, color: DARK })
-  summary.addText(recap.summary, { x: 0.7, y: 1.3, w: 12, h: 5, fontSize: 16, color: DARK, valign: 'top' })
+  summary.addText(recap.summary, { x: 0.7, y: 1.3, w: 12, h: 5, fontSize: 16, color: DARK, valign: 'top', fit: 'shrink' })
 
   bulletSlide('Decisions', recap.decisions)
   bulletSlide('Actions', (recap.actions || []).map((a) => `${a.title}${a.owner ? ` — ${a.owner}` : ''}${a.due ? ` (due ${a.due})` : ''}`))
@@ -155,14 +155,130 @@ export async function exportFacilitationPptx(meta: FacilitationMeta, slides: Wor
   const bulletRuns = (items: string[], opts: { color?: string; fontSize?: number } = {}) =>
     items.map((t) => ({ text: t, options: { bullet: true, color: opts.color ?? DARK, fontSize: opts.fontSize ?? 15, paraSpaceAfter: 6 } }))
 
+  const MAX_Y = 7.15 // bottom bound so nothing runs off the 7.5in slide
+
+  // Does this slide carry any renderable text (beyond a title slide's heading)?
+  const slideHasText = (slide: WorkshopSlide): boolean => {
+    const blockText = (slide.blocks ?? []).some(
+      (b) => !!b.body || (b.bullets?.length ?? 0) > 0 || (b.pros?.length ?? 0) > 0 || (b.cons?.length ?? 0) > 0,
+    )
+    const bulletText = (slide.bullets?.length ?? 0) > 0 && slide.kind !== 'title'
+    return blockText || bulletText
+  }
+
+  // Estimate a single card's height (same heuristic as before, shrink-fit still
+  // guards overflow within the card).
+  const estCardHeight = (b: WorkshopSlideBlock, w: number): number => {
+    let h = b.label ? 0.35 : 0
+    if (b.body) h += Math.max(0.5, Math.ceil(b.body.length / (w * 8)) * 0.28)
+    const lines = (b.bullets?.length ?? 0) + (b.pros?.length ?? 0) + (b.cons?.length ?? 0)
+    if (isProsConsBlock(b)) h += 0.4 + Math.ceil(Math.max(b.pros?.length ?? 0, b.cons?.length ?? 0)) * 0.3
+    else h += lines * 0.3
+    return h + 0.4
+  }
+
+  // Paint one block card at (x,y) with width w, bounded so its bottom never passes
+  // maxY. Every variable-length text run gets fit:'shrink'. Returns the next y.
+  const paintCard = (
+    s: ReturnType<typeof pptx.addSlide>,
+    b: WorkshopSlideBlock,
+    x: number,
+    y: number,
+    w: number,
+    maxY: number,
+  ): number => {
+    const rec = isRecommendationBlock(b)
+    const h = Math.max(0.4, Math.min(estCardHeight(b, w), maxY - y))
+    s.addShape(pptx.ShapeType.roundRect, {
+      x, y, w, h, rectRadius: 0.06,
+      fill: { color: rec ? REC_FILL : PANEL },
+      line: { color: rec ? REC_BORDER : PANEL_BORDER, width: 1 },
+    })
+    let iy = y + 0.14
+    if (b.label) {
+      s.addText(b.label.toUpperCase(), { x: x + 0.18, y: iy, w: w - 0.36, h: 0.3, fontSize: 10, bold: true, color: rec ? BLUE : GREY, charSpacing: 1 })
+      iy += 0.34
+    }
+    if (b.body) {
+      s.addText(b.body, { x: x + 0.18, y: iy, w: w - 0.36, h: h - (iy - y) - 0.12, fontSize: 13, color: DARK, valign: 'top', paraSpaceAfter: 6, fit: 'shrink' })
+    } else if (isBulletBlock(b)) {
+      s.addText(bulletRuns(b.bullets ?? [], { color: DARK, fontSize: 12.5 }), { x: x + 0.18, y: iy, w: w - 0.36, h: h - (iy - y) - 0.12, valign: 'top', fit: 'shrink' })
+    } else if (isProsConsBlock(b)) {
+      const halfW = (w - 0.5) / 2
+      const px = x + 0.18, cx = x + 0.18 + halfW + 0.14
+      s.addText('PROS', { x: px, y: iy, w: halfW, h: 0.26, fontSize: 9, bold: true, color: GREEN, charSpacing: 1 })
+      s.addText('CONS', { x: cx, y: iy, w: halfW, h: 0.26, fontSize: 9, bold: true, color: RED, charSpacing: 1 })
+      const listY = iy + 0.3, listH = h - (listY - y) - 0.12
+      const pros = (b.pros ?? []).map((t) => ({ text: t, options: { bullet: { characterCode: '2022' }, color: DARK, fontSize: 11.5, paraSpaceAfter: 4 } }))
+      const cons = (b.cons ?? []).map((t) => ({ text: t, options: { bullet: { characterCode: '2022' }, color: DARK, fontSize: 11.5, paraSpaceAfter: 4 } }))
+      if (pros.length) s.addText(pros, { x: px, y: listY, w: halfW, h: listH, valign: 'top', fit: 'shrink' })
+      else s.addText('None', { x: px, y: listY, w: halfW, h: 0.3, fontSize: 11, color: '94A3B8' })
+      if (cons.length) s.addText(cons, { x: cx, y: listY, w: halfW, h: listH, valign: 'top', fit: 'shrink' })
+      else s.addText('None', { x: cx, y: listY, w: halfW, h: 0.3, fontSize: 11, color: '94A3B8' })
+    }
+    return y + h + 0.16
+  }
+
+  // Render a slide's text into the box (x, y, w) never passing maxY. Single-column
+  // stacked cards (robust against overflow) for block slides; context body for a
+  // context slide; plain bullets otherwise. Everything shrink-fits.
+  const renderTextArea = (
+    s: ReturnType<typeof pptx.addSlide>,
+    slide: WorkshopSlide,
+    x: number,
+    y: number,
+    w: number,
+    maxY: number,
+  ) => {
+    const blocks = slide.blocks ?? []
+    const hasBlockContent = blocks.some(
+      (b) => !!b.body || (b.bullets?.length ?? 0) > 0 || (b.pros?.length ?? 0) > 0 || (b.cons?.length ?? 0) > 0,
+    )
+    if (hasBlockContent) {
+      let cy = y
+      for (const b of blocks) {
+        if (cy >= maxY - 0.3) break
+        cy = paintCard(s, b, x, cy, w, maxY)
+      }
+      return
+    }
+    if (slide.kind === 'context') {
+      const body = blocks.map((b) => b.body).filter(Boolean).join('\n\n')
+      const text = body || (slide.bullets ?? []).join('\n')
+      if (text) s.addText(text, { x, y, w, h: maxY - y, fontSize: 16, color: DARK, valign: 'top', paraSpaceAfter: 10, fit: 'shrink' })
+      return
+    }
+    const items = (slide.bullets ?? []).filter(Boolean)
+    if (items.length) s.addText(bulletRuns(items), { x, y, w, h: maxY - y, valign: 'top', fit: 'shrink' })
+  }
+
+  // Contain-fit an image into a box preserving aspect ratio, centered, never larger.
+  const placeDiagram = (
+    s: ReturnType<typeof pptx.addSlide>,
+    data: string,
+    aspect: number,
+    boxX: number,
+    boxY: number,
+    boxW: number,
+    boxH: number,
+  ) => {
+    if (!data || boxW <= 0 || boxH <= 0) return
+    let w = boxW
+    let h = w / aspect
+    if (h > boxH) { h = boxH; w = h * aspect }
+    const x = boxX + (boxW - w) / 2
+    const y = boxY + (boxH - h) / 2
+    s.addImage({ data, x, y, w, h })
+  }
+
   for (const slide of slides) {
     const s = pptx.addSlide()
     s.background = { color: 'FFFFFF' }
 
     if (slide.kind === 'title') {
       s.addShape(pptx.ShapeType.rect, { x: 0.6, y: 2.15, w: 2, h: 0.09, fill: { color: BLUE } })
-      s.addText(slide.heading, { x: 0.6, y: 2.4, w: 12.1, h: 1.4, fontSize: 34, bold: true, color: DARK, valign: 'top' })
-      if (slide.subheading) s.addText(slide.subheading, { x: 0.6, y: 3.9, w: 12.1, h: 0.7, fontSize: 16, color: BLUE })
+      s.addText(slide.heading, { x: 0.6, y: 2.4, w: 12.1, h: 1.4, fontSize: 34, bold: true, color: DARK, valign: 'top', fit: 'shrink' })
+      if (slide.subheading) s.addText(slide.subheading, { x: 0.6, y: 3.9, w: 12.1, h: 0.7, fontSize: 16, color: BLUE, fit: 'shrink' })
       const footer = [meta.customerName, 'Workshop facilitation deck'].filter(Boolean).join('  ·  ')
       s.addText(footer, { x: 0.6, y: 6.6, w: 12.1, h: 0.4, fontSize: 12, color: GREY })
       addNotesIfAny(s, slide.facilitatorNotes)
@@ -170,135 +286,50 @@ export async function exportFacilitationPptx(meta: FacilitationMeta, slides: Wor
     }
 
     const bodyY = heading(s, slide)
+    const hasText = slideHasText(slide)
+    const hasDiagram = !!slide.diagram
+    const AREA_X = 0.6, AREA_W = 12.13
 
-    // Diagram slide: rasterize the SAME SVG the HTML surfaces render, then place it
-    // centered below the heading, preserving aspect ratio. Any caption bullets sit
-    // at the bottom. Rasterization failure skips the image (never throws).
-    if (slide.diagram) {
-      const { svg, width: dw, height: dh } = renderWorkshopDiagramSvg(slide.diagram, { width: 960 })
+    if (hasDiagram && hasText) {
+      // Rasterize the SAME SVG the HTML surfaces render; lay text + diagram so BOTH
+      // show. Rasterization failure skips the image (never throws).
+      const { svg, width: dw, height: dh } = renderWorkshopDiagramSvg(slide.diagram!, { width: 1000 })
       const data = await svgToPngDataUrl(svg, dw, dh)
-      const captionItems = (slide.bullets ?? []).filter(Boolean)
-      const captionH = captionItems.length ? 0.9 : 0
-      const areaX = 0.6, areaW = 12.13
-      const areaY = bodyY
-      const areaH = 7.2 - areaY - captionH
-      if (data && areaH > 0.5) {
-        const aspect = dw / dh
-        let w = areaW
-        let h = w / aspect
-        if (h > areaH) { h = areaH; w = h * aspect }
-        const x = areaX + (areaW - w) / 2
-        const y = areaY + (areaH - h) / 2
-        s.addImage({ data, x, y, w, h })
-      }
-      if (captionItems.length) {
-        s.addText(bulletRuns(captionItems, { color: GREY, fontSize: 13 }), { x: 0.7, y: 7.2 - captionH + 0.05, w: 12, h: captionH, valign: 'top' })
-      }
-      addNotesIfAny(s, slide.facilitatorNotes)
-      continue
-    }
+      const aspect = dh > 0 ? dw / dh : 1.6
 
-    if (slide.kind === 'agenda' || slide.kind === 'bullets') {
-      const items = slide.bullets ?? []
-      if (items.length) {
-        s.addText(bulletRuns(items), { x: 0.7, y: bodyY, w: 12, h: 7.4 - bodyY - 0.3, valign: 'top' })
-      }
-      addNotesIfAny(s, slide.facilitatorNotes)
-      continue
-    }
-
-    if (slide.kind === 'context') {
-      const body = (slide.blocks ?? []).map((b) => b.body).filter(Boolean).join('\n\n')
-      const text = body || (slide.bullets ?? []).join('\n')
-      if (text) s.addText(text, { x: 0.7, y: bodyY, w: 12, h: 7.4 - bodyY - 0.3, fontSize: 16, color: DARK, valign: 'top', paraSpaceAfter: 10 })
-      addNotesIfAny(s, slide.facilitatorNotes)
-      continue
-    }
-
-    // decision + evaluation: render blocks as a 2-column card grid. Prose /
-    // recommendation blocks span the full width; pros/cons + bullet blocks sit in
-    // a column so options render side by side.
-    renderBlocks(s, slide.blocks ?? [], bodyY)
-    addNotesIfAny(s, slide.facilitatorNotes)
-  }
-
-  function renderBlocks(s: ReturnType<typeof pptx.addSlide>, blocks: WorkshopSlideBlock[], startY: number) {
-    const LEFT = 0.6, FULL_W = 12.13, COL_W = 5.96, GAP = 0.21, RIGHT_X = LEFT + COL_W + GAP
-    const MAX_Y = 7.2
-    let yFull = startY               // running y for full-width (spanning) blocks
-    let colY = -1                    // running y once we start a 2-column band (shared top)
-    let side: 0 | 1 = 0              // which column comes next
-    let yLeft = startY, yRight = startY
-
-    const estHeight = (b: WorkshopSlideBlock, w: number): number => {
-      let h = b.label ? 0.35 : 0
-      if (b.body) h += Math.max(0.5, Math.ceil(b.body.length / (w * 8)) * 0.28)
-      const lines = (b.bullets?.length ?? 0) + (b.pros?.length ?? 0) + (b.cons?.length ?? 0)
-      if (isProsConsBlock(b)) h += 0.4 + Math.ceil(Math.max(b.pros?.length ?? 0, b.cons?.length ?? 0)) * 0.3
-      else h += lines * 0.3
-      return h + 0.4
-    }
-
-    const paintCard = (b: WorkshopSlideBlock, x: number, y: number, w: number): number => {
-      const rec = isRecommendationBlock(b)
-      const h = Math.min(estHeight(b, w), MAX_Y - y)
-      s.addShape(pptx.ShapeType.roundRect, {
-        x, y, w, h, rectRadius: 0.06,
-        fill: { color: rec ? REC_FILL : PANEL },
-        line: { color: rec ? REC_BORDER : PANEL_BORDER, width: 1 },
-      })
-      let iy = y + 0.14
-      if (b.label) {
-        s.addText(b.label.toUpperCase(), { x: x + 0.18, y: iy, w: w - 0.36, h: 0.3, fontSize: 10, bold: true, color: rec ? BLUE : GREY, charSpacing: 1 })
-        iy += 0.34
-      }
-      if (b.body) {
-        s.addText(b.body, { x: x + 0.18, y: iy, w: w - 0.36, h: h - (iy - y) - 0.12, fontSize: 13, color: DARK, valign: 'top', paraSpaceAfter: 6 })
-      } else if (isBulletBlock(b)) {
-        s.addText(bulletRuns(b.bullets ?? [], { color: DARK, fontSize: 12.5 }), { x: x + 0.18, y: iy, w: w - 0.36, h: h - (iy - y) - 0.12, valign: 'top' })
-      } else if (isProsConsBlock(b)) {
-        const halfW = (w - 0.5) / 2
-        const px = x + 0.18, cx = x + 0.18 + halfW + 0.14
-        s.addText('PROS', { x: px, y: iy, w: halfW, h: 0.26, fontSize: 9, bold: true, color: GREEN, charSpacing: 1 })
-        s.addText('CONS', { x: cx, y: iy, w: halfW, h: 0.26, fontSize: 9, bold: true, color: RED, charSpacing: 1 })
-        const listY = iy + 0.3, listH = h - (listY - y) - 0.12
-        const pros = (b.pros ?? []).map((t) => ({ text: t, options: { bullet: { characterCode: '2022' }, color: DARK, fontSize: 11.5, paraSpaceAfter: 4 } }))
-        const cons = (b.cons ?? []).map((t) => ({ text: t, options: { bullet: { characterCode: '2022' }, color: DARK, fontSize: 11.5, paraSpaceAfter: 4 } }))
-        if (pros.length) s.addText(pros, { x: px, y: listY, w: halfW, h: listH, valign: 'top' })
-        else s.addText('None', { x: px, y: listY, w: halfW, h: 0.3, fontSize: 11, color: '94A3B8' })
-        if (cons.length) s.addText(cons, { x: cx, y: listY, w: halfW, h: listH, valign: 'top' })
-        else s.addText('None', { x: cx, y: listY, w: halfW, h: 0.3, fontSize: 11, color: '94A3B8' })
-      }
-      return y + h + 0.16
-    }
-
-    // A spanning block flushes any open 2-column band first, then paints full width.
-    const flushColumns = () => {
-      yFull = Math.max(yFull, yLeft, yRight)
-      colY = -1; side = 0
-    }
-
-    for (const b of blocks) {
-      if (colY < 0) { yLeft = yFull; yRight = yFull }
-      const span = !isProsConsBlock(b) && !isBulletBlock(b)
-      if (span) {
-        flushColumns()
-        if (yFull >= MAX_Y - 0.4) continue
-        yFull = paintCard(b, LEFT, yFull, FULL_W)
-        yLeft = yFull; yRight = yFull
+      if (aspect >= 2.0) {
+        // Wide diagram (e.g. layers): text band on top, diagram full-width below.
+        const TEXT_H = 2.6
+        const textMaxY = Math.min(bodyY + TEXT_H, MAX_Y)
+        renderTextArea(s, slide, 0.7, bodyY, AREA_W, textMaxY)
+        const diagY = textMaxY + 0.1
+        placeDiagram(s, data, aspect, AREA_X, diagY, AREA_W, MAX_Y - diagY)
       } else {
-        colY = Math.min(yLeft, yRight)
-        if (side === 0) {
-          if (yLeft >= MAX_Y - 0.4) continue
-          yLeft = paintCard(b, LEFT, yLeft, COL_W)
-          side = 1
-        } else {
-          if (yRight >= MAX_Y - 0.4) continue
-          yRight = paintCard(b, RIGHT_X, yRight, COL_W)
-          side = 0
-        }
+        // Squarer diagram: text in the left column, diagram in the right column.
+        const TEXT_W = 6.6
+        const GAP = 0.2
+        renderTextArea(s, slide, 0.7, bodyY, TEXT_W - 0.1, MAX_Y)
+        const rightX = AREA_X + TEXT_W + GAP
+        const rightW = AREA_X + AREA_W - rightX
+        placeDiagram(s, data, aspect, rightX, bodyY, rightW, MAX_Y - bodyY)
       }
+      addNotesIfAny(s, slide.facilitatorNotes)
+      continue
     }
+
+    if (hasDiagram && !hasText) {
+      // Diagram-only: contain-fit full-width below the heading.
+      const { svg, width: dw, height: dh } = renderWorkshopDiagramSvg(slide.diagram!, { width: 1000 })
+      const data = await svgToPngDataUrl(svg, dw, dh)
+      const aspect = dh > 0 ? dw / dh : 1.6
+      placeDiagram(s, data, aspect, AREA_X, bodyY, AREA_W, MAX_Y - bodyY)
+      addNotesIfAny(s, slide.facilitatorNotes)
+      continue
+    }
+
+    // No diagram: render the text full-width below the heading.
+    renderTextArea(s, slide, 0.7, bodyY, AREA_W, MAX_Y)
+    addNotesIfAny(s, slide.facilitatorNotes)
   }
 
   const out = (await pptx.write({ outputType: 'blob' })) as Blob
