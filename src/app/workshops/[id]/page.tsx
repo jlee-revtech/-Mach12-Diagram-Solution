@@ -471,6 +471,7 @@ export default function WorkshopRoomPage() {
             <div className="col-span-7 overflow-auto p-6">
               {selectedItem ? (
                 <SectionEditor
+                  key={selectedItem.id}
                   workshopId={ws.id}
                   orgId={organization.id}
                   item={selectedItem}
