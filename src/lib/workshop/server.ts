@@ -65,6 +65,13 @@ export async function assemblePreRead(db: SupabaseClient, orgId: string, codes: 
   return lines.join('\n')
 }
 
+/** Resolve a single workstream code to its display name for the org. */
+export async function workstreamName(db: SupabaseClient, orgId: string, code: string): Promise<string> {
+  if (!code) return code
+  const { data } = await db.from('workstreams').select('name').eq('organization_id', orgId).eq('code', code).maybeSingle()
+  return (data?.name as string) || code
+}
+
 /** Recent transcript lines for facilitation/capture, oldest-first. */
 export async function recentTranscript(
   db: SupabaseClient,

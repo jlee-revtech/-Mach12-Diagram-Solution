@@ -7,6 +7,7 @@ import type {
   WorkshopMessage, WorkshopCapture, WorkshopStatus, WorkshopFocus, WorkshopBriefData,
   CaptureStatus, AgendaStatus, SectionKind,
 } from '@/lib/workshop/types'
+import type { SectionContent, ClarifyingQuestion, KbGap } from '@jlee-revtech/agent-core'
 
 export type { SectionKind }
 
@@ -264,17 +265,17 @@ export async function updateCapture(
 // status: 'empty' | 'generating' | 'draft' | 'needs_input' | 'final'
 export type AgendaContentStatus = 'empty' | 'generating' | 'draft' | 'needs_input' | 'final'
 
-// TODO(phase2b): tighten `content` by importing `SectionContent` from
-// @jlee-revtech/agent-core (and clarifying_questions/kb_gaps likewise). Phase 1
-// keeps it loose (`unknown`) so the data model can land before agent-core ships.
+// `content` is the agent-core SectionContent union (loose in the DB, typed here);
+// clarifying_questions and kb_gaps are the agent-core arrays. Null before the
+// section has been generated.
 export interface AgendaContentRow {
   id: string
   workshop_id: string
   agenda_item_id: string
   section_kind: SectionKind
-  content: unknown
-  clarifying_questions: unknown
-  kb_gaps: unknown
+  content: SectionContent | null
+  clarifying_questions: ClarifyingQuestion[]
+  kb_gaps: KbGap[]
   status: AgendaContentStatus
   version: number
   created_at: string
@@ -305,9 +306,9 @@ export async function upsertAgendaContent(
     workshopId: string
     agendaItemId: string
     sectionKind: SectionKind
-    content?: unknown
-    clarifyingQuestions?: unknown
-    kbGaps?: unknown
+    content?: SectionContent | null
+    clarifyingQuestions?: ClarifyingQuestion[]
+    kbGaps?: KbGap[]
     status?: AgendaContentStatus
   },
 ): Promise<AgendaContentRow> {
