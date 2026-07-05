@@ -7,7 +7,7 @@ import { listWorkstreams } from '@/lib/supabase/workstreams'
 import { listWorkshops, createWorkshop } from '@/lib/supabase/workshops'
 import type { Workstream } from '@/lib/workstream/types'
 import type { Workshop, WorkshopFocus } from '@/lib/workshop/types'
-import { FOCUS_AREAS } from '@/lib/workshop/types'
+import { FOCUS_AREAS, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import VersionBadge from '@/components/VersionBadge'
 
@@ -31,6 +31,7 @@ export default function WorkshopsPage() {
   const [customer, setCustomer] = useState('')
   const [wsCodes, setWsCodes] = useState<string[]>([])
   const [focus, setFocus] = useState<WorkshopFocus[]>(['process', 'data'])
+  const [durationMinutes, setDurationMinutes] = useState<number>(DEFAULT_DURATION_MINUTES)
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth')
@@ -61,6 +62,7 @@ export default function WorkshopsPage() {
         customer_name: customer.trim() || undefined,
         workstream_codes: wsCodes,
         focus_areas: focus,
+        duration_minutes: durationMinutes,
         settings: { voice: true },
       })
       router.push(`/workshops/${w.id}`)
@@ -68,7 +70,7 @@ export default function WorkshopsPage() {
       alert(e instanceof Error ? e.message : 'Failed to create workshop')
       setCreating(false)
     }
-  }, [organization, user, title, topic, objective, customer, wsCodes, focus, router])
+  }, [organization, user, title, topic, objective, customer, wsCodes, focus, durationMinutes, router])
 
   if (loading || !user || !organization) return null
 
@@ -127,19 +129,28 @@ export default function WorkshopsPage() {
                 })}
               </div>
             </div>
-            <div className="mb-5">
-              <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">Focus areas</div>
-              <div className="flex flex-wrap gap-2">
-                {FOCUS_AREAS.map((f) => {
-                  const on = focus.includes(f.key)
-                  return (
-                    <button key={f.key} onClick={() => setFocus((a) => toggle(a, f.key))} title={f.blurb}
-                      className="rounded-full border px-3 py-1 text-[11px] font-medium transition-colors"
-                      style={{ borderColor: on ? '#2563EB' : 'var(--m12-border)', backgroundColor: on ? '#2563EB14' : 'transparent', color: on ? '#3B82F6' : 'var(--m12-text-muted)' }}>
-                      {f.label}
-                    </button>
-                  )
-                })}
+            <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">Focus areas</div>
+                <div className="flex flex-wrap gap-2">
+                  {FOCUS_AREAS.map((f) => {
+                    const on = focus.includes(f.key)
+                    return (
+                      <button key={f.key} onClick={() => setFocus((a) => toggle(a, f.key))} title={f.blurb}
+                        className="rounded-full border px-3 py-1 text-[11px] font-medium transition-colors"
+                        style={{ borderColor: on ? '#2563EB' : 'var(--m12-border)', backgroundColor: on ? '#2563EB14' : 'transparent', color: on ? '#3B82F6' : 'var(--m12-text-muted)' }}>
+                        {f.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">Workshop length</div>
+                <select value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} title="Workshop length" aria-label="Workshop length" className={`${inputCls} appearance-none`}>
+                  {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
+                </select>
+                <div className="text-[10px] text-[var(--m12-text-muted)] mt-1.5">Agenda timeboxes and per-section depth scale to this length.</div>
               </div>
             </div>
             <div className="flex items-center gap-2">

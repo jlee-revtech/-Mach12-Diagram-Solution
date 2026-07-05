@@ -5,16 +5,19 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
 import {
-  getWorkshop, updateWorkshop, listAgenda, replaceAgenda, updateAgendaItem,
+  getWorkshop, updateWorkshop, listAgenda, updateAgendaItem, updateWorkshopDuration,
   listMessages, addMessage, listCaptures, updateCapture, setParticipants,
+  listAgendaContent, type AgendaContentRow,
 } from '@/lib/supabase/workshops'
-import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, WorkshopFocus, CaptureType } from '@/lib/workshop/types'
-import { CAPTURE_META } from '@/lib/workshop/types'
+import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType } from '@/lib/workshop/types'
+import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
 import { createTranscription, type TranscriptionProvider } from '@/lib/workshop/transcription'
 import { exportRecapDocx, exportRecapPptx } from '@/lib/workshop/export'
 import type { WorkshopRecapData } from '@jlee-revtech/agent-core'
 import type { Workstream } from '@/lib/workstream/types'
 import VersionBadge from '@/components/VersionBadge'
+import SectionCard from '@/components/workshop/SectionCard'
+import SectionEditor from '@/components/workshop/SectionEditor'
 
 interface FacResult {
   say: string; nextQuestion?: string; coverage?: string; advanceAgenda?: boolean; pullSpecialist?: string; gaps?: string[]
@@ -39,6 +42,9 @@ export default function WorkshopRoomPage() {
   const [ws, setWs] = useState<Workshop | null>(null)
   const [streams, setStreams] = useState<Workstream[]>([])
   const [agenda, setAgenda] = useState<WorkshopAgendaItem[]>([])
+  const [content, setContent] = useState<AgendaContentRow[]>([])
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [durationMinutes, setDurationMinutes] = useState<number>(DEFAULT_DURATION_MINUTES)
   const [messages, setMessages] = useState<WorkshopMessage[]>([])
   const [captures, setCaptures] = useState<WorkshopCapture[]>([])
   const [busy, setBusy] = useState<string | null>(null)
@@ -62,12 +68,19 @@ export default function WorkshopRoomPage() {
 
   const load = useCallback(async () => {
     if (!organization || !id) return
-    const [w, s, a, m, c] = await Promise.all([
-      getWorkshop(id), listWorkstreams(organization.id), listAgenda(id), listMessages(id), listCaptures(id),
+    const [w, s, a, ct, m, c] = await Promise.all([
+      getWorkshop(id), listWorkstreams(organization.id), listAgenda(id), listAgendaContent(id), listMessages(id), listCaptures(id),
     ])
-    setWs(w); setStreams(s); setAgenda(a); setMessages(m); setCaptures(c)
+    setWs(w); setStreams(s); setAgenda(a); setContent(ct); setMessages(m); setCaptures(c)
+    if (w?.duration_minutes) setDurationMinutes(w.duration_minutes)
     if (w?.recap) setRecap(w.recap as WorkshopRecapData)
   }, [organization, id])
+
+  // Reload only the per-section content rows (after a section generate/revise).
+  const reloadContent = useCallback(async () => {
+    if (!id) return
+    setContent(await listAgendaContent(id))
+  }, [id])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setSpeaker(me) }, [me])
@@ -95,27 +108,51 @@ export default function WorkshopRoomPage() {
   }, [voiceOn, ws, me])
 
   // ─── Prep: generate brief ─────────────────────────────────
+  // The brief route now persists the agenda server-side (with section_kind /
+  // workstream_code) and stores duration_minutes, so we pass workshopId +
+  // durationMinutes and STOP persisting the agenda client-side. After it returns
+  // we reload from the DB so the normalized timeboxes + section metadata show.
   const generateBrief = useCallback(async () => {
     if (!ws || !organization) return
     setBusy('brief')
     try {
       const res = await fetch('/api/workshops/brief', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId: organization.id, topic: ws.topic || ws.title, objective: ws.objective, customerName: ws.customer_name, workstreamCodes: ws.workstream_codes, focusAreas: ws.focus_areas }),
+        body: JSON.stringify({ workshopId: ws.id, orgId: organization.id, topic: ws.topic || ws.title, objective: ws.objective, customerName: ws.customer_name, workstreamCodes: ws.workstream_codes, focusAreas: ws.focus_areas, durationMinutes }),
       })
       const data = await res.json()
       if (!res.ok || !data.brief) throw new Error(data.error || 'Brief generation failed')
-      await updateWorkshop(ws.id, { brief: data.brief, status: 'scheduled' })
-      await replaceAgenda(ws.id, (data.brief.agenda || []).map((it: { title: string; objective?: string; focusType?: WorkshopFocus; timeboxMinutes?: number }) => ({
-        title: it.title, objective: it.objective, focus_type: it.focusType, timebox_minutes: it.timeboxMinutes,
-      })))
       await setParticipants(ws.id,
         [{ display_name: me, org_role: 'Facilitator' }],
         [{ workstream_code: 'enterprise', display_name: 'Enterprise Architect', is_facilitator: true },
          ...roster.map((r) => ({ workstream_code: r.code, display_name: r.name.split('(')[0].trim() }))])
       await load()
     } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
-  }, [ws, organization, me, roster, load])
+  }, [ws, organization, me, roster, durationMinutes, load])
+
+  // Save the workshop length from the prep panel (persists duration_minutes).
+  const saveDuration = useCallback(async (minutes: number) => {
+    setDurationMinutes(minutes)
+    if (ws) await updateWorkshopDuration(ws.id, minutes)
+  }, [ws])
+
+  // Directly run the section route for one agenda item (used by the prep-level
+  // "Generate Solution Architecture Evaluation" action). SectionEditor has its
+  // own inline generate; this drives the same route for the evaluation card.
+  const runSection = useCallback(async (agendaItemId: string) => {
+    if (!ws || !organization) return
+    setBusy(`section:${agendaItemId}`)
+    try {
+      const res = await fetch('/api/workshops/section', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workshopId: ws.id, orgId: organization.id, agendaItemId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Section generation failed')
+      setSelectedItemId(agendaItemId)
+      await reloadContent()
+    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
+  }, [ws, organization, reloadContent])
 
   const setStatus = useCallback(async (status: Workshop['status']) => {
     if (!ws) return
@@ -224,6 +261,15 @@ export default function WorkshopRoomPage() {
   const hasBrief = !!ws.brief
   const contribBusy = busy?.startsWith('contribute:') ? busy.split(':')[1] : null
 
+  // ─── Prep section-authoring derived state ───
+  const contentByItem = new Map(content.map((c) => [c.agenda_item_id, c]))
+  const wsByCode = (code?: string | null) => (code ? streams.find((s) => s.code === code) ?? null : null)
+  const selectedItem = agenda.find((a) => a.id === selectedItemId) ?? null
+  const evaluationItem = agenda.find((a) => a.section_kind === 'evaluation') ?? null
+  const hasWorkstreamContent = agenda.some(
+    (a) => a.section_kind === 'workstream' && !!contentByItem.get(a.id)?.content,
+  )
+
   return (
     <div className="min-h-screen bg-[var(--m12-bg)] flex flex-col">
       {/* Header */}
@@ -255,19 +301,99 @@ export default function WorkshopRoomPage() {
 
       {/* Prep view */}
       {!isLive && ws.status !== 'completed' ? (
-        <div className="flex-1 overflow-auto p-8">
-          <div className="max-w-3xl mx-auto">
-            {!hasBrief ? (
+        !hasBrief ? (
+          <div className="flex-1 overflow-auto p-8">
+            <div className="max-w-3xl mx-auto">
               <div className="text-center py-20 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
                 <h2 className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">Prep the workshop</h2>
                 <p className="text-sm text-[var(--m12-text-muted)] mb-6 max-w-md mx-auto">The consultant agents will read {ws.customer_name || 'the customer'}&apos;s architecture for this topic and prepare a timeboxed agenda, a pre-read, the gaps to drive, and the questions to ask.</p>
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  <span className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)]">Workshop length</span>
+                  <select value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} title="Workshop length" aria-label="Workshop length"
+                    className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] outline-none">
+                    {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
+                  </select>
+                </div>
                 <button onClick={generateBrief} disabled={busy === 'brief'} className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg text-sm font-medium">{busy === 'brief' ? 'Preparing the brief…' : 'Generate Workshop Brief'}</button>
               </div>
-            ) : (
-              <BriefView ws={ws} agenda={agenda} onStart={() => setStatus('live')} />
-            )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex-1 grid grid-cols-12 min-h-0">
+            {/* Left: brief summary + section cards */}
+            <div className="col-span-5 border-r border-[var(--m12-border)]/40 overflow-auto p-5 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)]">Sections</div>
+                <div className="flex items-center gap-2">
+                  <select value={durationMinutes} onChange={(e) => saveDuration(Number(e.target.value))} title="Workshop length" aria-label="Workshop length"
+                    className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded px-2 py-1 text-[10px] text-[var(--m12-text)] outline-none">
+                    {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
+                  </select>
+                  <button onClick={generateBrief} disabled={busy === 'brief'} title="Regenerate the brief + agenda for the current length"
+                    className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">
+                    {busy === 'brief' ? 'Preparing…' : 'Regenerate brief'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {agenda.map((a, i) => (
+                  <SectionCard
+                    key={a.id}
+                    item={a}
+                    index={i}
+                    content={contentByItem.get(a.id)}
+                    workstream={wsByCode(a.workstream_code)}
+                    selected={selectedItemId === a.id}
+                    onSelect={() => setSelectedItemId(a.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Evaluation action (req 5) */}
+              {evaluationItem && (
+                <div className="rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED0F] p-3">
+                  <div className="text-[11px] font-medium text-[var(--m12-text)] mb-0.5">Solution Architecture Evaluation</div>
+                  <div className="text-[10px] text-[var(--m12-text-muted)] mb-2">Synthesizes across the workstream recommendations to reconcile where they diverge. Generate the workstream sections first.</div>
+                  <button
+                    onClick={() => runSection(evaluationItem.id)}
+                    disabled={!hasWorkstreamContent || busy === `section:${evaluationItem.id}`}
+                    className="text-[11px] px-2.5 py-1 rounded bg-[#7C3AED] hover:bg-[#8B5CF6] disabled:opacity-40 text-white font-medium"
+                    title={hasWorkstreamContent ? 'Generate the cross-workstream evaluation' : 'Generate at least one workstream section first'}
+                  >
+                    {busy === `section:${evaluationItem.id}` ? 'Synthesizing…' : 'Generate Solution Architecture Evaluation'}
+                  </button>
+                </div>
+              )}
+
+              <details className="rounded-lg border border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)] px-3 py-2">
+                <summary className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] cursor-pointer">Workshop brief</summary>
+                <div className="mt-3"><BriefView ws={ws} agenda={agenda} onStart={() => setStatus('live')} /></div>
+              </details>
+            </div>
+
+            {/* Right: section editor */}
+            <div className="col-span-7 overflow-auto p-6">
+              {selectedItem ? (
+                <SectionEditor
+                  workshopId={ws.id}
+                  orgId={organization.id}
+                  item={selectedItem}
+                  workstream={wsByCode(selectedItem.workstream_code)}
+                  content={contentByItem.get(selectedItem.id)}
+                  onSaved={reloadContent}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-center">
+                  <div className="max-w-sm">
+                    <div className="text-sm font-semibold text-[var(--m12-text-secondary)] mb-1">Author the facilitation content</div>
+                    <p className="text-xs text-[var(--m12-text-muted)]">Pick a section on the left to generate its content: overview talking points, workstream key decisions with recommendations, or the cross-workstream evaluation.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
       ) : ws.status === 'completed' ? (
         <RecapView ws={ws} recap={recap} captures={captures} streams={streams} onSet={setCap} busy={busy} onRegen={endAndRecap} />
       ) : (

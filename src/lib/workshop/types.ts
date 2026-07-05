@@ -17,6 +17,17 @@ export const FOCUS_AREAS: { key: WorkshopFocus; label: string; blurb: string }[]
   { key: 'poc', label: 'PoC / Demo', blurb: 'Walk a proof of concept, get feedback' },
 ]
 
+// Enumerated workshop lengths. Selectable (never free text), per Josh's rule.
+export const DURATION_OPTIONS: { minutes: number; label: string }[] = [
+  { minutes: 60, label: '1 hour' },
+  { minutes: 90, label: '1.5 hours' },
+  { minutes: 120, label: '2 hours' },
+  { minutes: 180, label: '3 hours' },
+  { minutes: 240, label: 'Half day (4h)' },
+  { minutes: 480, label: 'Full day (8h)' },
+]
+export const DEFAULT_DURATION_MINUTES = 120
+
 export const CAPTURE_META: Record<CaptureType, { label: string; color: string; icon: string }> = {
   decision: { label: 'Decision', color: '#2563EB', icon: '✓' },
   action: { label: 'Action', color: '#7C3AED', icon: '→' },
@@ -47,6 +58,7 @@ export interface Workshop {
   status: WorkshopStatus
   focus_areas: WorkshopFocus[]
   workstream_codes: string[]
+  duration_minutes: number | null
   scheduled_at: string | null
   started_at: string | null
   ended_at: string | null

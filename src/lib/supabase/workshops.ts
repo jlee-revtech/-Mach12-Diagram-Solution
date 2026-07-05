@@ -62,6 +62,7 @@ export async function createWorkshop(
   data: {
     title: string; topic?: string; objective?: string; customer_name?: string
     focus_areas?: WorkshopFocus[]; workstream_codes?: string[]; scheduled_at?: string
+    duration_minutes?: number
     settings?: Record<string, unknown>
   },
 ): Promise<Workshop> {
