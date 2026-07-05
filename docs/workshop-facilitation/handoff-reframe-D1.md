@@ -152,12 +152,12 @@ bullets. `buildFacilitationDeck` picks all of this up unchanged (it flatMaps `bu
 ## 4. Git
 - **agent-core** (`jlee-revtech/agent-core`, branch `main`):
   - Staged: `src/workshop.ts`, `package.json` only.
-  - Commit: `<AGENT_CORE_HASH>` `feat(workshop): reframe workstream content into labeled bulleted sections + required per-decision visual [reframe D1]`.
-  - Push: `<AGENT_CORE_PUSH>`.
+  - Commit: `680026f35ce44909faaad838a15e4563521a8d95` `feat(workshop): reframe workstream content into labeled bulleted sections + required per-decision visual [reframe D1]`.
+  - Push: succeeded (`5d2a620..680026f  main -> main`).
 - **app** (`jlee-revtech/-Mach12-Diagram-Solution`, branch `master`):
   - Staged: `package.json`, `package-lock.json`, `src/lib/version.ts`,
     `docs/workshop-facilitation/PLAN-content-reframe.md`,
     `docs/workshop-facilitation/handoff-reframe-D1.md` only. (Parallel WIP NOT staged.)
-  - Commit: `<APP_HASH>` `chore(workshops): consume agent-core 0.6.3 (content reframe) [reframe D1]`.
-  - Push: `<APP_PUSH>`.
+  - Commit: `b0fb5188235227464553edb03050b4c9e5f741b0` `chore(workshops): consume agent-core 0.6.3 (content reframe) [reframe D1]`.
+  - Push: succeeded (`b5803f3..b0fb518  master -> master`).
   - NOTE: app build is intentionally RED until D2 updates the renderer.
