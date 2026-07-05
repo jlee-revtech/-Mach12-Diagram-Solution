@@ -58,7 +58,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 1,
     sapModules: ['FI-GL', 'FI-AA', 'CO-CCA', 'CO-PA', 'CO-PC', 'PS settlement', 'Group Reporting'],
     dassianModules: ['Cost Management (OH, costing sheets, FR)', 'Results Analysis (RAENH rev-rec)'],
-    knowledgeSourceCodes: ['dassian-results-analysis', 'dassian-cost-management', 'vibe-sap-recipes'],
+    knowledgeSourceCodes: ['sap-ad-commercial-defense-structure', 'dassian-results-analysis', 'dassian-cost-management', 'sap-cats-time-recording', 'vibe-sap-recipes'],
     agentTagline: 'GL, costing, rates, and rev-rec consultant',
   },
   {
@@ -70,7 +70,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 2,
     sapModules: ['PS', 'PPM', 'CO', 'Group Reporting'],
     dassianModules: ['Project Mgmt (PPC, EVM, CAM, EAC/ETC, IPMR/533)'],
-    knowledgeSourceCodes: ['dassian-project-management', 'vibe-sap-recipes'],
+    knowledgeSourceCodes: ['dassian-project-management', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes'],
     agentTagline: 'EVMS, PMB, and EAC/ETC program-control consultant',
   },
   {
@@ -94,7 +94,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 4,
     sapModules: ['PP', 'PP-MRP', 'PP-CRP (capacity)', 'PP/DS', 'QM', 'LO-VC', 'PS', 'MM-IM'],
     dassianModules: ['Project Mgmt (EVM)', 'MPIA / BOM cost'],
-    knowledgeSourceCodes: ['sap-pp-capacity-planning', 'sap-data-load-so-to-ps', 'vibe-sap-recipes'],
+    knowledgeSourceCodes: ['sap-pp-capacity-planning', 'sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes'],
     agentTagline: 'MRP, shop-floor, quality, and production consultant',
   },
   {
@@ -106,7 +106,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 5,
     sapModules: ['MM-IM', 'WM / EWM', 'LE (deliveries)', 'Handling Units', 'Batch / Serial', 'Physical Inventory'],
     dassianModules: ['DD250 / ABS'],
-    knowledgeSourceCodes: ['sap-data-load-so-to-ps', 'vibe-sap-recipes'],
+    knowledgeSourceCodes: ['sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes'],
     agentTagline: 'Logistics, warehousing, and delivery consultant',
   },
   {
@@ -142,7 +142,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 8,
     sapModules: ['MM', 'MM-PUR', 'MDG-S', 'Subcontracting', 'MM-IV', 'Ariba', 'FI-AP'],
     dassianModules: ['SCFM', 'Contracts (flowdowns, clause library)', 'PBP'],
-    knowledgeSourceCodes: ['dassian-contracts', 'vibe-sap-recipes'],
+    knowledgeSourceCodes: ['dassian-contracts', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes'],
     agentTagline: 'Subcontracts, flowdowns, and P2P consultant',
   },
   {
@@ -154,7 +154,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 9,
     sapModules: ['SD', 'SD-BIL', 'RAR', 'DP90', 'PS'],
     dassianModules: ['Contracts (CLIN/SLIN/ACRN, mods, DD250)', 'PBP', 'Billing (BIL / DRB)', 'ABS', 'Results Analysis (RAENH)'],
-    knowledgeSourceCodes: ['dassian-contracts', 'dassian-cost-management', 'vibe-sap-recipes'],
+    knowledgeSourceCodes: ['dassian-contracts', 'dassian-cost-management', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes'],
     agentTagline: 'Capture, contracts, billing, and rev-rec consultant',
     legacyCodes: ['bid-to-win', 'contract-to-closeout'],
   },
@@ -167,7 +167,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 10,
     sapModules: ['HCM / SF', 'PT (time)', 'PY (payroll)', 'CATS'],
     dassianModules: ['Labor / role-based costing', 'CATS approval'],
-    knowledgeSourceCodes: ['vibe-sap-recipes'],
+    knowledgeSourceCodes: ['sap-cats-time-recording', 'vibe-sap-recipes'],
     agentTagline: 'Clearances, compliant timekeeping, and payroll consultant',
   },
   // ─── Cross-cutting platform agents (serve every value stream) ─
@@ -180,7 +180,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 11,
     sapModules: ['GRC', 'PFCG', 'SU24', 'IAG / IAM'],
     dassianModules: [],
-    knowledgeSourceCodes: ['vibe-sap-recipes'],
+    knowledgeSourceCodes: ['sap-ad-commercial-defense-structure', 'vibe-sap-recipes'],
     agentTagline: 'Roles, authorizations, and SoD consultant',
     isPlatform: true,
   },
