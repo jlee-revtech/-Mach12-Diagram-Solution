@@ -163,10 +163,14 @@ export async function POST(req: NextRequest) {
           decisions: [],
         }
         for (const d of c.keyDecisions || []) {
+          // recommendedDecision.rationale is now string[] (content reframe); the
+          // evaluation input contract still expects a single string, so join the
+          // bullets. Defensive against old rows that persisted a plain string.
+          const r = d.recommendedDecision?.rationale
           entry.decisions.push({
             title: d.title,
-            recommendation: d.recommendedDecision.recommendation,
-            rationale: d.recommendedDecision.rationale,
+            recommendation: d.recommendedDecision?.recommendation,
+            rationale: Array.isArray(r) ? r.join('; ') : (r || undefined),
           })
         }
         decisionsByCode.set(code, entry)

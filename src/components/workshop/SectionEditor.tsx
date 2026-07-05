@@ -321,18 +321,27 @@ function Bullets({ items, marker, color }: { items: string[]; marker?: string; c
 }
 
 function ProsCons({ pros, cons }: { pros: string[]; cons: string[] }) {
+  const p = pros || []
+  const c = cons || []
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
         <div className="text-[9px] uppercase tracking-wide text-[#059669] mb-1">Pros</div>
-        {pros.length ? <Bullets items={pros} marker="+" color="#059669" /> : <div className="text-[10px] text-[var(--m12-text-muted)]">None</div>}
+        {p.length ? <Bullets items={p} marker="+" color="#059669" /> : <div className="text-[10px] text-[var(--m12-text-muted)]">None</div>}
       </div>
       <div>
         <div className="text-[9px] uppercase tracking-wide text-[#DC2626] mb-1">Cons</div>
-        {cons.length ? <Bullets items={cons} marker="−" color="#DC2626" /> : <div className="text-[10px] text-[var(--m12-text-muted)]">None</div>}
+        {c.length ? <Bullets items={c} marker="−" color="#DC2626" /> : <div className="text-[10px] text-[var(--m12-text-muted)]">None</div>}
       </div>
     </div>
   )
+}
+
+// Coerce a field that SHOULD be a string[] into one. New rows carry arrays; old
+// persisted rows may carry a single string blob (pre-reframe shape). Never crash:
+// a string becomes a one-item list, null/undefined becomes an empty list.
+function asBullets(v: unknown): string[] {
+  return Array.isArray(v) ? (v as string[]) : v ? [String(v)] : []
 }
 
 function OverviewBody({ c }: { c: OverviewSectionContent }) {
@@ -355,46 +364,78 @@ function OverviewBody({ c }: { c: OverviewSectionContent }) {
 }
 
 function WorkstreamBody({ c }: { c: WorkstreamSectionContent }) {
+  // Defensive against old persisted rows: these fields may be missing or (for
+  // overallConsiderations / currentState) a string blob from the pre-reframe shape.
+  const considerations = asBullets(c.overallConsiderations)
+  const current = asBullets(c.currentState)
+  const options = c.futureStateOptions || []
+  const decisions = c.keyDecisions || []
   return (
     <div className="space-y-3">
-      <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-4">
-        <Block title="Focused context" color="#2563EB">
-          <p className="text-[12px] text-[var(--m12-text-secondary)] leading-relaxed whitespace-pre-wrap">{c.focusedContext}</p>
-        </Block>
-      </div>
-      {c.keyDecisions.map((d) => <DecisionCard key={d.id} d={d} />)}
+      {(considerations.length > 0 || current.length > 0 || options.length > 0) && (
+        <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-4 space-y-3">
+          {considerations.length > 0 && (
+            <Block title="Overall considerations" color="#2563EB">
+              <Bullets items={considerations} color="#2563EB" />
+            </Block>
+          )}
+          {current.length > 0 && (
+            <div className={considerations.length > 0 ? 'pt-2 border-t border-[var(--m12-border)]/40' : ''}>
+              <Block title="Current state" color="#0891B2">
+                <Bullets items={current} color="#0891B2" />
+              </Block>
+            </div>
+          )}
+          {options.length > 0 && (
+            <div className={considerations.length > 0 || current.length > 0 ? 'pt-2 border-t border-[var(--m12-border)]/40' : ''}>
+              <Block title="Options for future state" color="#7C3AED">
+                <div className="space-y-2.5">
+                  {options.map((o, i) => (
+                    <div key={i} className="border border-[var(--m12-border)]/40 rounded-lg p-2.5">
+                      <div className="text-[11px] font-medium text-[var(--m12-text)]">{o.label}</div>
+                      {o.summary && <p className="text-[10px] text-[var(--m12-text-muted)] leading-snug mt-0.5 mb-1.5">{o.summary}</p>}
+                      <div className={o.summary ? '' : 'mt-1.5'}>
+                        <ProsCons pros={o.pros || []} cons={o.cons || []} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Block>
+            </div>
+          )}
+        </div>
+      )}
+
+      {decisions.length > 0 && (
+        <div className="text-[10px] uppercase tracking-wide text-[var(--m12-text-muted)]">Key decisions</div>
+      )}
+      {decisions.map((d, i) => <DecisionCard key={d.id || i} d={d} />)}
       <SectionDiagrams diagrams={c.diagrams} />
     </div>
   )
 }
 
 function DecisionCard({ d }: { d: KeyDecision }) {
-  const conf = d.recommendedDecision.confidence
+  const rec = d.recommendedDecision || { recommendation: '', rationale: [] }
+  const conf = rec.confidence
   const confMeta = conf ? CONFIDENCE_META[conf] : null
+  // context + rationale are string[] in the new shape; old rows may carry a blob.
+  const context = asBullets(d.context)
+  const rationale = asBullets(rec.rationale)
+  const leadingQuestions = d.leadingQuestions || []
   return (
     <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-4 space-y-3">
       <div>
         <div className="text-[12px] font-semibold text-[var(--m12-text)]">{d.title}</div>
-        <p className="text-[11px] text-[var(--m12-text-muted)] leading-relaxed mt-0.5">{d.context}</p>
+        {context.length > 0 && (
+          <div className="mt-1.5">
+            <Block title="Context"><Bullets items={context} /></Block>
+          </div>
+        )}
       </div>
 
-      {d.options && d.options.length > 0 && (
-        <div className="space-y-2.5">
-          {d.options.map((o, i) => (
-            <div key={i} className="border border-[var(--m12-border)]/40 rounded-lg p-2.5">
-              <div className="text-[11px] font-medium text-[var(--m12-text)] mb-1.5">{o.label}</div>
-              <ProsCons pros={o.pros} cons={o.cons} />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {d.factors && d.factors.length > 0 && (
-        <Block title="Factors to weigh" color="#7C3AED"><Bullets items={d.factors} marker="▸" color="#7C3AED" /></Block>
-      )}
-
-      {d.leadingQuestions.length > 0 && (
-        <Block title="Leading questions" color="#D97706"><Bullets items={d.leadingQuestions} marker="?" color="#D97706" /></Block>
+      {leadingQuestions.length > 0 && (
+        <Block title="Leading questions" color="#D97706"><Bullets items={leadingQuestions} marker="?" color="#D97706" /></Block>
       )}
 
       <div className="rounded-lg border border-[#2563EB]/40 bg-[#2563EB0F] p-3">
@@ -406,25 +447,38 @@ function DecisionCard({ d }: { d: KeyDecision }) {
             </span>
           )}
         </div>
-        <div className="text-[12px] text-[var(--m12-text)] font-medium leading-snug">{d.recommendedDecision.recommendation}</div>
-        <p className="text-[11px] text-[var(--m12-text-secondary)] leading-relaxed mt-1">{d.recommendedDecision.rationale}</p>
+        <div className="text-[12px] text-[var(--m12-text)] font-medium leading-snug">{rec.recommendation}</div>
+        {rationale.length > 0 && (
+          <div className="mt-1.5">
+            <Block title="Rationale" color="#3B82F6"><Bullets items={rationale} color="#3B82F6" /></Block>
+          </div>
+        )}
       </div>
 
-      {d.diagram && <DiagramCard diagram={d.diagram} width={520} />}
+      {/* Every decision carries its own visual (required in the new shape); render it
+          directly under the recommendation so it reads as this decision's diagram. */}
+      {d.diagram && (
+        <div className="pt-1">
+          <div className="text-[9px] uppercase tracking-wide text-[var(--m12-text-muted)] mb-1.5">Decision visual</div>
+          <DiagramCard diagram={d.diagram} width={520} />
+        </div>
+      )}
     </div>
   )
 }
 
 function EvaluationBody({ c }: { c: EvaluationSectionContent }) {
+  const divergences = c.divergences || []
+  const rationale = asBullets(c.rationale)
   return (
     <div className="space-y-3">
-      {c.divergences.length > 0 && (
+      {divergences.length > 0 && (
         <div className="space-y-2">
-          {c.divergences.map((dv, i) => (
+          {divergences.map((dv, i) => (
             <div key={i} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-3">
               <div className="text-[12px] font-semibold text-[var(--m12-text)] mb-1.5">{dv.topic}</div>
               <div className="space-y-1 mb-2">
-                {dv.positions.map((p, j) => (
+                {(dv.positions || []).map((p, j) => (
                   <div key={j} className="flex gap-2 text-[11px]">
                     <span className="text-[#7C3AED] font-medium shrink-0">{p.workstreamCode}</span>
                     <span className="text-[var(--m12-text-secondary)] leading-snug">{p.stance}</span>
@@ -444,15 +498,15 @@ function EvaluationBody({ c }: { c: EvaluationSectionContent }) {
           <div className="text-[10px] uppercase tracking-wide text-[#7C3AED] mb-1">Overall recommendation</div>
           <div className="text-[12px] text-[var(--m12-text)] font-medium leading-snug">{c.overallRecommendation}</div>
         </div>
-        <ProsCons pros={c.pros} cons={c.cons} />
+        <ProsCons pros={c.pros || []} cons={c.cons || []} />
         {c.tradeoffs && c.tradeoffs.length > 0 && (
           <Block title="Tradeoffs" color="#D97706"><Bullets items={c.tradeoffs} marker="⇄" color="#D97706" /></Block>
         )}
-        <div className="pt-2 border-t border-[var(--m12-border)]/40">
-          <Block title="Rationale">
-            <p className="text-[11px] text-[var(--m12-text-secondary)] leading-relaxed whitespace-pre-wrap">{c.rationale}</p>
-          </Block>
-        </div>
+        {rationale.length > 0 && (
+          <div className="pt-2 border-t border-[var(--m12-border)]/40">
+            <Block title="Rationale"><Bullets items={rationale} /></Block>
+          </div>
+        )}
       </div>
       <SectionDiagrams diagrams={c.diagrams} />
     </div>
