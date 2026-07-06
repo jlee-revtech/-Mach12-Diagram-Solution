@@ -85,5 +85,5 @@ Net effect on `required`:
 - app (`jlee-revtech/-Mach12-Diagram-Solution`, branch `master`):
   - Staged: `package.json`, `package-lock.json`, `src/lib/version.ts`,
     `docs/workshop-facilitation/handoff-decisions-diagrams.md` only. (Parallel WIP NOT staged.)
-  - Commit: `__APP_HASH__` `chore(workshops): consume agent-core 0.6.4 (mandatory decisions + diagrams)`.
-  - Push: `__APP_PUSH__`.
+  - Commit: `f034c12` `chore(workshops): consume agent-core 0.6.5 (mandatory decisions + diagrams)`.
+  - Push: succeeded (`2213a37..f034c12  master -> master`).
