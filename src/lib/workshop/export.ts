@@ -166,19 +166,22 @@ export async function exportFacilitationPptx(meta: FacilitationMeta, slides: Wor
     return blockText || bulletText
   }
 
-  // Estimate a single card's height (same heuristic as before, shrink-fit still
-  // guards overflow within the card).
+  // Estimate a single card's height by SUMMING every content part it carries
+  // (body + bullets + pros/cons can all coexist, e.g. an option with a summary
+  // plus pros/cons, or a recommendation with a line plus rationale bullets).
+  const bodyLines = (b: WorkshopSlideBlock, w: number) =>
+    b.body ? Math.max(0.3, Math.ceil(b.body.length / (w * 7)) * 0.26) : 0
   const estCardHeight = (b: WorkshopSlideBlock, w: number): number => {
-    let h = b.label ? 0.35 : 0
-    if (b.body) h += Math.max(0.5, Math.ceil(b.body.length / (w * 8)) * 0.28)
-    const lines = (b.bullets?.length ?? 0) + (b.pros?.length ?? 0) + (b.cons?.length ?? 0)
-    if (isProsConsBlock(b)) h += 0.4 + Math.ceil(Math.max(b.pros?.length ?? 0, b.cons?.length ?? 0)) * 0.3
-    else h += lines * 0.3
-    return h + 0.4
+    let h = 0.14 + (b.label ? 0.34 : 0)
+    h += bodyLines(b, w)
+    if (isBulletBlock(b)) h += (b.bullets?.length ?? 0) * 0.28
+    if (isProsConsBlock(b)) h += 0.3 + Math.max(b.pros?.length ?? 0, b.cons?.length ?? 0) * 0.28
+    return h + 0.16
   }
 
   // Paint one block card at (x,y) with width w, bounded so its bottom never passes
-  // maxY. Every variable-length text run gets fit:'shrink'. Returns the next y.
+  // maxY. Renders ALL present content parts (body, then bullets, then pros/cons)
+  // stacked, each with fit:'shrink'. Returns the next y.
   const paintCard = (
     s: ReturnType<typeof pptx.addSlide>,
     b: WorkshopSlideBlock,
@@ -189,28 +192,36 @@ export async function exportFacilitationPptx(meta: FacilitationMeta, slides: Wor
   ): number => {
     const rec = isRecommendationBlock(b)
     const h = Math.max(0.4, Math.min(estCardHeight(b, w), maxY - y))
+    const bottom = y + h - 0.1
     s.addShape(pptx.ShapeType.roundRect, {
       x, y, w, h, rectRadius: 0.06,
       fill: { color: rec ? REC_FILL : PANEL },
       line: { color: rec ? REC_BORDER : PANEL_BORDER, width: 1 },
     })
+    const ix = x + 0.18, iw = w - 0.36
     let iy = y + 0.14
     if (b.label) {
-      s.addText(b.label.toUpperCase(), { x: x + 0.18, y: iy, w: w - 0.36, h: 0.3, fontSize: 10, bold: true, color: rec ? BLUE : GREY, charSpacing: 1 })
+      s.addText(b.label.toUpperCase(), { x: ix, y: iy, w: iw, h: 0.3, fontSize: 10, bold: true, color: rec ? BLUE : GREY, charSpacing: 1 })
       iy += 0.34
     }
-    if (b.body) {
-      s.addText(b.body, { x: x + 0.18, y: iy, w: w - 0.36, h: h - (iy - y) - 0.12, fontSize: 13, color: DARK, valign: 'top', paraSpaceAfter: 6, fit: 'shrink' })
-    } else if (isBulletBlock(b)) {
-      s.addText(bulletRuns(b.bullets ?? [], { color: DARK, fontSize: 12.5 }), { x: x + 0.18, y: iy, w: w - 0.36, h: h - (iy - y) - 0.12, valign: 'top', fit: 'shrink' })
-    } else if (isProsConsBlock(b)) {
+    if (b.body && iy < bottom) {
+      const bh = Math.min(Math.max(0.3, bodyLines(b, w)), bottom - iy)
+      s.addText(b.body, { x: ix, y: iy, w: iw, h: bh, fontSize: 13, color: DARK, valign: 'top', paraSpaceAfter: 4, fit: 'shrink' })
+      iy += bh + 0.06
+    }
+    if (isBulletBlock(b) && iy < bottom) {
+      const bh = Math.min((b.bullets?.length ?? 0) * 0.28, bottom - iy)
+      s.addText(bulletRuns(b.bullets ?? [], { color: DARK, fontSize: 12.5 }), { x: ix, y: iy, w: iw, h: bh, valign: 'top', fit: 'shrink' })
+      iy += bh + 0.06
+    }
+    if (isProsConsBlock(b) && iy < bottom) {
       const halfW = (w - 0.5) / 2
-      const px = x + 0.18, cx = x + 0.18 + halfW + 0.14
+      const px = ix, cx = ix + halfW + 0.14
       s.addText('PROS', { x: px, y: iy, w: halfW, h: 0.26, fontSize: 9, bold: true, color: GREEN, charSpacing: 1 })
       s.addText('CONS', { x: cx, y: iy, w: halfW, h: 0.26, fontSize: 9, bold: true, color: RED, charSpacing: 1 })
-      const listY = iy + 0.3, listH = h - (listY - y) - 0.12
-      const pros = (b.pros ?? []).map((t) => ({ text: t, options: { bullet: { characterCode: '2022' }, color: DARK, fontSize: 11.5, paraSpaceAfter: 4 } }))
-      const cons = (b.cons ?? []).map((t) => ({ text: t, options: { bullet: { characterCode: '2022' }, color: DARK, fontSize: 11.5, paraSpaceAfter: 4 } }))
+      const listY = iy + 0.3, listH = Math.max(0.3, bottom - listY)
+      const runs = (arr?: string[]) => (arr ?? []).map((t) => ({ text: t, options: { bullet: { characterCode: '2022' }, color: DARK, fontSize: 11.5, paraSpaceAfter: 4 } }))
+      const pros = runs(b.pros), cons = runs(b.cons)
       if (pros.length) s.addText(pros, { x: px, y: listY, w: halfW, h: listH, valign: 'top', fit: 'shrink' })
       else s.addText('None', { x: px, y: listY, w: halfW, h: 0.3, fontSize: 11, color: '94A3B8' })
       if (cons.length) s.addText(cons, { x: cx, y: listY, w: halfW, h: listH, valign: 'top', fit: 'shrink' })
