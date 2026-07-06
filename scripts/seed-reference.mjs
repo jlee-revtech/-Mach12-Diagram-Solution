@@ -766,7 +766,7 @@ const SCENARIOS = [
 
   // ─── Deep stream: Record-to-Report ──
   {
-    name: 'Record-to-Report (Finance / EVMS / DCAA)',
+    name: 'Record-to-Report (Finance / DCAA)',
     description: 'End-to-end financial accounting and reporting: GL, assets, cost, tax, bank, travel, close, and reporting.',
     children: [
       { name: 'Perform General Ledger Accounting', children: [
@@ -914,7 +914,7 @@ const SCENARIOS = [
 //     SAP A&D BPML structure. Content is tailored per stream. ──
 const leafify = (arr) => arr.map((n) => (typeof n === 'string' ? { name: n } : n))
 const STREAM_MD = {
-  'Record-to-Report (Finance / EVMS / DCAA)': ['Chart of Accounts & Ledger Master', 'Cost Center, Profit Center & Activity Master', 'Fixed Asset, Functional Location & Equipment Master', 'Tax & Bank Master'],
+  'Record-to-Report (Finance / DCAA)': ['Chart of Accounts & Ledger Master', 'Cost Center, Profit Center & Activity Master', 'Fixed Asset, Functional Location & Equipment Master', 'Tax & Bank Master'],
   'Plan-to-Perform (Program & Portfolio Management)': ['Project, WBS & Network Master', 'OBS & CAM Assignment Master', 'Control Account & Work Package Master'],
   'Design-to-Release (Engineering / PLM)': ['Engineering BOM & CAD Master', 'Requirement & Specification Master', 'Configuration Item & Baseline Master'],
   'Plan-to-Produce (Program Execution)': ['Material, BOM & Routing Master', 'Work Center & Capacity Master', 'Production Version Master', 'Forecast Profile & Inspection Plan Master'],
@@ -926,7 +926,7 @@ const STREAM_MD = {
   'Hire-to-Retire (Workforce / Clearances)': ['Employee & Org-Assignment Master', 'Position & Job Master', 'Clearance & Qualification Master'],
 }
 const STREAM_RPT = {
-  'Record-to-Report (Finance / EVMS / DCAA)': ['Financial Statement & Close Reporting', 'Indirect Rate & Incurred-Cost Reporting', 'Asset & Maintenance-Cost Reporting'],
+  'Record-to-Report (Finance / DCAA)': ['Financial Statement & Close Reporting', 'Indirect Rate & Incurred-Cost Reporting', 'Asset & Maintenance-Cost Reporting'],
   'Plan-to-Perform (Program & Portfolio Management)': ['Cost/Schedule Variance (CPI/SPI) Reporting', 'EAC/ETC & Management-Reserve Reporting'],
   'Design-to-Release (Engineering / PLM)': ['Engineering Change Throughput Reporting', 'Requirements Traceability Reporting'],
   'Plan-to-Produce (Program Execution)': ['Production Performance & OEE Reporting', 'Earned Value (BCWP) Reporting', 'Forecast Accuracy & Cost-of-Quality Reporting'],

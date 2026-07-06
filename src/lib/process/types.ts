@@ -315,7 +315,7 @@ export const PROCESS_REFERENCE_SCENARIOS = [
   'Design-to-Release (Engineering / PLM)',
   'Acquire-to-Retire (Asset / Property / GFP)',
   'Sustainment / MRO',
-  'Record-to-Report (Finance / EVMS / DCAA)',
+  'Record-to-Report (Finance / DCAA)',
   'Hire-to-Retire (Workforce / Clearances)',
 ] as const
 

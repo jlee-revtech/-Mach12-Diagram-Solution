@@ -51,7 +51,7 @@ export type WorkstreamIconKey =
 export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
   {
     code: 'record-to-report',
-    name: 'Record-to-Report (Finance / EVMS / DCAA)',
+    name: 'Record-to-Report (Finance / DCAA)',
     description: 'End-to-end financial accounting and reporting: GL, assets, cost, indirect rates, settlement, revenue recognition, and close.',
     color: '#EAB308',
     icon: 'ledger',
