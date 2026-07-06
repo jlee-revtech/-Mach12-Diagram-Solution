@@ -20,6 +20,81 @@ import {
 } from '@jlee-revtech/agent-core'
 import { getWorkshop, listAgenda, listAgendaContent } from '@/lib/supabase/workshops'
 
+// Coerce any value into a string[] (bullets). Guards against OLD-shape persisted
+// content (pre-reframe) where context / rationale / talkingPoints were single
+// strings: buildSlides would otherwise emit a string where a bullet array is
+// expected and a downstream `.map` throws ("e.map is not a function").
+function asArr(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x) => x != null && x !== '').map((x) => String(x))
+  if (v == null || v === '') return []
+  return [String(v)]
+}
+
+// Normalize a persisted content row into the CURRENT section-content shape so the
+// deck builder never receives a string where it expects an array. New-shape
+// content passes through unchanged; old rows render best-effort (regenerate to get
+// the full new structure + per-decision visuals).
+function normalizeSectionContent(content: SectionContent): SectionContent {
+  const c = content as unknown as Record<string, unknown>
+  if (c.kind === 'workstream') {
+    const legacyFocus = typeof c.focusedContext === 'string' ? [c.focusedContext as string] : []
+    const keyDecisions = (Array.isArray(c.keyDecisions) ? c.keyDecisions : []).map((d) => {
+      const dd = (d ?? {}) as Record<string, unknown>
+      const rec = (dd.recommendedDecision ?? {}) as Record<string, unknown>
+      return {
+        id: String(dd.id ?? ''),
+        title: String(dd.title ?? ''),
+        context: asArr(dd.context),
+        leadingQuestions: asArr(dd.leadingQuestions),
+        recommendedDecision: {
+          recommendation: String(rec.recommendation ?? ''),
+          rationale: asArr(rec.rationale),
+          ...(rec.confidence ? { confidence: rec.confidence } : {}),
+        },
+        ...(dd.diagram ? { diagram: dd.diagram } : {}),
+      }
+    })
+    return {
+      kind: 'workstream',
+      workstreamCode: String(c.workstreamCode ?? ''),
+      ...(c.workstreamName ? { workstreamName: String(c.workstreamName) } : {}),
+      overallConsiderations: c.overallConsiderations != null ? asArr(c.overallConsiderations) : legacyFocus,
+      currentState: asArr(c.currentState),
+      futureStateOptions: (Array.isArray(c.futureStateOptions) ? c.futureStateOptions : []).map((o) => {
+        const oo = (o ?? {}) as Record<string, unknown>
+        return {
+          label: String(oo.label ?? ''),
+          ...(oo.summary ? { summary: String(oo.summary) } : {}),
+          pros: asArr(oo.pros),
+          cons: asArr(oo.cons),
+        }
+      }),
+      keyDecisions,
+      ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+    } as unknown as SectionContent
+  }
+  if (c.kind === 'evaluation') {
+    return {
+      kind: 'evaluation',
+      divergences: Array.isArray(c.divergences) ? c.divergences : [],
+      overallRecommendation: String(c.overallRecommendation ?? ''),
+      pros: asArr(c.pros),
+      cons: asArr(c.cons),
+      ...(c.tradeoffs != null ? { tradeoffs: asArr(c.tradeoffs) } : {}),
+      rationale: asArr(c.rationale),
+      ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+    } as unknown as SectionContent
+  }
+  // overview
+  return {
+    kind: 'overview',
+    headline: String(c.headline ?? ''),
+    talkingPoints: asArr(c.talkingPoints),
+    ...(c.facilitatorNotes ? { facilitatorNotes: String(c.facilitatorNotes) } : {}),
+    ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+  } as unknown as SectionContent
+}
+
 export interface DeckWorkshop {
   id: string
   title: string
@@ -83,7 +158,9 @@ export async function loadFacilitationDeck(
       agendaItemId: item.id,
       agendaTitle: item.title,
       ...(item.timebox_minutes != null ? { timeboxMinutes: item.timebox_minutes } : {}),
-      content: row.content,
+      // Normalize so OLD-shape rows (pre-reframe strings) never reach buildSlides
+      // as a string where an array is expected.
+      content: normalizeSectionContent(row.content),
     })
   }
 
