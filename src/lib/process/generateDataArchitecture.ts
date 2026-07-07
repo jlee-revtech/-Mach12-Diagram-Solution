@@ -1,6 +1,6 @@
-// Client helper: kick off the workstream data-architecture generation route and
-// return the new diagram id (the route persists + links it back to the L3s).
-// Shared by the /workstreams cards and the agent chat panel.
+// Client helpers for the workstream data-architecture flow: list the L3 flows +
+// their status, ask clarifying questions for a selection, and generate a diagram
+// for the selected L3 flow(s). Shared by the /workstreams cards and agent panel.
 
 function getToken(): string | null {
   try {
@@ -10,6 +10,19 @@ function getToken(): string | null {
   } catch { return null }
 }
 
+const authHeaders = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` })
+
+export interface DataArchProcess {
+  id: string
+  name: string
+  capabilityCount: number
+  hasSystemLanes: boolean
+  buildable: boolean
+  existingDiagramId: string | null
+}
+
+export interface ClarifyingQuestion { id: string; question: string; why?: string }
+
 export interface DataArchResult {
   diagramId: string
   title: string
@@ -17,18 +30,44 @@ export interface DataArchResult {
   flowCount: number
   groupCount: number
   processCount: number
-  capabilityCount: number
 }
 
+// List the workstream's L3 process flows with build status + whether each already
+// has a data architecture.
+export async function listWorkstreamDataArchProcesses(orgId: string, workstreamId: string): Promise<DataArchProcess[]> {
+  const res = await fetch(`/api/workstreams/data-architecture?orgId=${encodeURIComponent(orgId)}&workstreamId=${encodeURIComponent(workstreamId)}`, {
+    headers: authHeaders(),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to load process flows')
+  return (data.processes ?? []) as DataArchProcess[]
+}
+
+// Clarifying questions needed to build the diagram(s) for the selected L3 flows.
+export async function clarifyDataArchitecture(orgId: string, workstreamId: string, processNodeIds: string[]): Promise<ClarifyingQuestion[]> {
+  const res = await fetch('/api/workstreams/data-architecture', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ step: 'clarify', orgId, workstreamId, processNodeIds }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to prepare clarifying questions')
+  return (data.clarifyingQuestions ?? []) as ClarifyingQuestion[]
+}
+
+// Generate + persist one data-architecture diagram for the given L3 flow(s),
+// honoring any clarifying answers. Pass a single node id for a per-L3 diagram.
 export async function generateWorkstreamDataArchitecture(
   orgId: string,
   workstreamId: string,
   userId: string,
+  processNodeIds?: string[],
+  clarificationAnswers?: { question: string; answer: string }[],
 ): Promise<DataArchResult> {
   const res = await fetch('/api/workstreams/data-architecture', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-    body: JSON.stringify({ orgId, workstreamId, userId }),
+    headers: authHeaders(),
+    body: JSON.stringify({ step: 'generate', orgId, workstreamId, userId, processNodeIds, clarificationAnswers }),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Data-architecture generation failed')

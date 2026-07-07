@@ -9,7 +9,7 @@ import { WORKSTREAM_BY_CODE } from '@/lib/workstream/catalog'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import AgentChatPanel from '@/components/agents/AgentChatPanel'
 import VersionBadge from '@/components/VersionBadge'
-import { generateWorkstreamDataArchitecture } from '@/lib/process/generateDataArchitecture'
+import DataArchitectureDialog from '@/components/process/DataArchitectureDialog'
 
 const EMPTY_ROLLUP = {
   process_models: 0, process_nodes: 0, capabilities: 0, capability_maps: 0,
@@ -26,22 +26,9 @@ export default function WorkstreamsPage() {
   const [seeding, setSeeding] = useState(false)
   const [agentOpen, setAgentOpen] = useState(false)
   const [agentCode, setAgentCode] = useState('enterprise')
-  const [archBusyId, setArchBusyId] = useState<string | null>(null)
+  const [archWs, setArchWs] = useState<Workstream | null>(null)
 
   const openAgent = (code: string) => { setAgentCode(code); setAgentOpen(true) }
-
-  const handleGenerateArch = useCallback(async (w: Workstream) => {
-    if (!organization || !user) return
-    setArchBusyId(w.id)
-    try {
-      const { diagramId } = await generateWorkstreamDataArchitecture(organization.id, w.id, user.id)
-      router.push(`/diagram/${diagramId}`)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to generate the data architecture')
-    } finally {
-      setArchBusyId(null)
-    }
-  }, [organization, user, router])
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth')
@@ -211,23 +198,13 @@ export default function WorkstreamsPage() {
                     Ask the consultant
                   </button>
                   <button
-                    onClick={() => handleGenerateArch(w)}
-                    disabled={archBusyId === w.id}
+                    onClick={() => setArchWs(w)}
                     title="Generate a data-architecture diagram from this workstream's L3 process flows and assigned capabilities"
-                    className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium text-white transition-colors disabled:opacity-60"
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium text-white transition-colors"
                     style={{ backgroundColor: color }}
                   >
-                    {archBusyId === w.id ? (
-                      <>
-                        <span className="inline-block w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                        Generating…
-                      </>
-                    ) : (
-                      <>
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><rect x="9" y="2.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><rect x="5.5" y="9.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 6.5v1.5a1 1 0 001 1h5a1 1 0 001-1V6.5M8 9.3V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
-                        Generate data architecture
-                      </>
-                    )}
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><rect x="9" y="2.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><rect x="5.5" y="9.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 6.5v1.5a1 1 0 001 1h5a1 1 0 001-1V6.5M8 9.3V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
+                    Generate data architecture
                   </button>
                 </div>
               )
@@ -237,6 +214,14 @@ export default function WorkstreamsPage() {
       </div>
       {agentOpen && (
         <AgentChatPanel orgId={organization.id} userId={user.id} workstreams={workstreams} initialAgentCode={agentCode} onClose={() => setAgentOpen(false)} />
+      )}
+      {archWs && (
+        <DataArchitectureDialog
+          orgId={organization.id}
+          userId={user.id}
+          workstream={{ id: archWs.id, name: archWs.name, ...(archWs.color ? { color: archWs.color } : {}) }}
+          onClose={() => setArchWs(null)}
+        />
       )}
     </div>
   )

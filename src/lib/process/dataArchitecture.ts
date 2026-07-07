@@ -158,7 +158,7 @@ export function buildDeterministicArchSpec(input: ArchBuildInput): ArchSpec {
     systems: Array.from(systems.values()),
     flows: flowList,
     groups,
-    title: `${input.workstreamName} — Data Architecture`,
+    title: `${input.workstreamName}: Data Architecture`,
   }
 }
 
