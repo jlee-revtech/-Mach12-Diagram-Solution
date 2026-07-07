@@ -6,7 +6,7 @@
 // KB-gap callouts with the seeding recipe from PLAN §7 (req 3), and an NL-feedback
 // box (req 9). It NEVER runs embeddings/imports; KB gaps only show the steps.
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type {
   SectionContent, OverviewSectionContent, WorkstreamSectionContent,
@@ -67,9 +67,13 @@ export default function SectionEditor({
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [feedback, setFeedback] = useState('')
   // Direct manual-edit mode: a working draft of the structured content the user
-  // hand-edits, saved back to the SAME content row the AI writes.
+  // hand-edits, AUTO-SAVED (debounced) back to the SAME content row the AI writes.
   const [draft, setDraft] = useState<SectionContent | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const snapshotRef = useRef<SectionContent | null>(null)  // content at edit-start (for revert)
+  const lastSavedRef = useRef<string>('')                  // serialized last-persisted draft
+  const pendingRef = useRef<SectionContent | null>(null)   // latest draft not yet persisted
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const meta = sectionMetaFor(item.section_kind)
 
@@ -77,6 +81,64 @@ export default function SectionEditor({
   const view: SectionResult | null = local ?? (content?.content
     ? { content: content.content, clarifyingQuestions: content.clarifying_questions ?? [], kbGaps: content.kb_gaps ?? [], groundingUsed: false, version: content.version, status: content.status }
     : null)
+
+  // Persist the current draft to the SAME content row the AI writes. Returns the
+  // fresh result (used to update local view + notify the parent).
+  const persistDraft = async (d: SectionContent): Promise<SectionResult> => {
+    const row = await upsertAgendaContent({
+      workshopId,
+      agendaItemId: item.id,
+      sectionKind: (item.section_kind ?? d.kind) as SectionKind,
+      content: d,
+      status: 'final', // a hand-edit resolves the section
+    })
+    return {
+      content: d,
+      clarifyingQuestions: view?.clarifyingQuestions ?? [],
+      kbGaps: view?.kbGaps ?? [],
+      groundingUsed: view?.groundingUsed ?? false,
+      version: row.version,
+      status: row.status,
+    }
+  }
+
+  // Auto-save: whenever the draft changes, debounce a save. Skips the initial draft
+  // (equals the loaded content) and any state that was just persisted.
+  useEffect(() => {
+    if (!draft) return
+    const serialized = JSON.stringify(draft)
+    if (serialized === lastSavedRef.current) return
+    pendingRef.current = draft
+    setSaveStatus('saving')
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      const d = pendingRef.current
+      if (!d) return
+      try {
+        const result = await persistDraft(d)
+        lastSavedRef.current = JSON.stringify(d)
+        pendingRef.current = null
+        setLocal(result)
+        onSaved(result)
+        setSaveStatus('saved')
+      } catch (e) {
+        setSaveStatus('error')
+        setError(e instanceof Error ? e.message : 'Auto-save failed')
+      }
+    }, 800)
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft])
+
+  // Flush a pending save on unmount (e.g. switching sections) so no edit is lost.
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      const d = pendingRef.current
+      if (d) void persistDraft(d).catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const call = async (body: Record<string, unknown>): Promise<boolean> => {
     setBusy(true)
@@ -117,15 +179,55 @@ export default function SectionEditor({
     call({ clarificationAnswers })
   }
 
-  // ─── Manual edit (no AI): open a draft, save it straight to the content row ──
+  // ─── Manual edit (no AI): open a draft that auto-saves as you type ──
   const startEditing = () => {
     if (!view?.content) return
     setError(null)
     // Normalize so the structured editor always gets arrays (old rows may carry
     // pre-reframe string blobs), matching what the deck/walkthrough render.
-    setDraft(normalizeSectionContent(view.content))
+    const snap = normalizeSectionContent(view.content)
+    snapshotRef.current = snap
+    lastSavedRef.current = JSON.stringify(snap)
+    pendingRef.current = null
+    setSaveStatus('saved')
+    setDraft(snap)
   }
-  const cancelEditing = () => { setDraft(null); setError(null) }
+
+  // Persist immediately (used by Done + Retry). Returns true on success.
+  const flushSave = async (d: SectionContent): Promise<boolean> => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    if (JSON.stringify(d) === lastSavedRef.current) return true
+    setSaveStatus('saving')
+    setError(null)
+    try {
+      const result = await persistDraft(d)
+      lastSavedRef.current = JSON.stringify(d)
+      pendingRef.current = null
+      setLocal(result)
+      onSaved(result)
+      setSaveStatus('saved')
+      return true
+    } catch (e) {
+      setSaveStatus('error')
+      setError(e instanceof Error ? e.message : 'Save failed')
+      return false
+    }
+  }
+
+  // Done: flush any pending change, then leave edit mode (stays open on error).
+  const finishEditing = async () => {
+    if (draft && !(await flushSave(draft))) return
+    setDraft(null)
+    setSaveStatus('idle')
+  }
+  const retrySave = () => { if (draft) void flushSave(draft) }
+  // Revert: restore the content as it was when editing started, then leave.
+  const revertEditing = async () => {
+    const snap = snapshotRef.current
+    if (snap && !(await flushSave(snap))) return
+    setDraft(null)
+    setSaveStatus('idle')
+  }
 
   // AI diagram generator wired into the structured editor's per-diagram prompt box.
   const generateDiagram: GenerateDiagramFn = async ({ prompt, current, context, preferType }) => {
@@ -154,38 +256,8 @@ export default function SectionEditor({
     return target === 'bullets' ? (frag?.bullets ?? null) : frag
   }) as unknown as GenerateContentFn
 
-  const saveEdits = async () => {
-    if (!draft) return
-    setSaving(true)
-    setError(null)
-    try {
-      const row = await upsertAgendaContent({
-        workshopId,
-        agendaItemId: item.id,
-        sectionKind: (item.section_kind ?? draft.kind) as SectionKind,
-        content: draft,
-        // A hand-edit resolves the section; mark it final.
-        status: 'final',
-      })
-      const result: SectionResult = {
-        content: draft,
-        clarifyingQuestions: view?.clarifyingQuestions ?? [],
-        kbGaps: view?.kbGaps ?? [],
-        groundingUsed: view?.groundingUsed ?? false,
-        version: row.version,
-        status: row.status,
-      }
-      setLocal(result)
-      onSaved(result)
-      setDraft(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save your edits')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // While hand-editing, the panel is a focused form with its own save/cancel bar.
+  // While hand-editing, the panel auto-saves as you type. The bar shows save status
+  // plus Revert (restore to edit-start) and Done (flush + leave).
   if (draft) {
     return (
       <div className="space-y-4">
@@ -193,18 +265,20 @@ export default function SectionEditor({
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-wide text-[#3B82F6] mb-0.5">Editing content</div>
             <h3 className="text-sm font-semibold text-[var(--m12-text)] leading-snug">{item.title}</h3>
-            <p className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">Edits are yours, no AI. They save to this section and flow into the Workshop Experience and the deck.</p>
+            <p className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">Edits are yours, no AI. They save automatically and flow into the Workshop Experience and the deck.</p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <button type="button" onClick={cancelEditing} disabled={saving} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Cancel</button>
-            <button type="button" onClick={saveEdits} disabled={saving} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">{saving ? 'Saving…' : 'Save changes'}</button>
+            <SaveStatusPill status={saveStatus} onRetry={retrySave} />
+            <button type="button" onClick={revertEditing} disabled={saveStatus === 'saving'} title="Discard changes made since you opened the editor" className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Revert</button>
+            <button type="button" onClick={finishEditing} disabled={saveStatus === 'saving'} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">Done</button>
           </div>
         </div>
         {error && <div className="text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
         <SectionContentEditor value={draft} onChange={setDraft} generateDiagram={generateDiagram} generateContent={generateContent} />
         <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-[var(--m12-border)]/40">
-          <button type="button" onClick={cancelEditing} disabled={saving} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Cancel</button>
-          <button type="button" onClick={saveEdits} disabled={saving} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">{saving ? 'Saving…' : 'Save changes'}</button>
+          <SaveStatusPill status={saveStatus} onRetry={retrySave} />
+          <button type="button" onClick={revertEditing} disabled={saveStatus === 'saving'} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Revert</button>
+          <button type="button" onClick={finishEditing} disabled={saveStatus === 'saving'} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">Done</button>
         </div>
       </div>
     )
@@ -394,6 +468,20 @@ function KbGapCallout({ gap, workstream }: { gap: KbGap; workstream?: Workstream
       </div>
     </div>
   )
+}
+
+// Auto-save status indicator shown in the edit bar.
+function SaveStatusPill({ status, onRetry }: { status: 'idle' | 'saving' | 'saved' | 'error'; onRetry: () => void }) {
+  if (status === 'idle') return null
+  if (status === 'saving') {
+    return (
+      <span className="text-[10px] text-[var(--m12-text-muted)] flex items-center gap-1">
+        <span className="inline-block w-2.5 h-2.5 border-2 border-[var(--m12-border)] border-t-[#2563EB] rounded-full animate-spin" />Saving…
+      </span>
+    )
+  }
+  if (status === 'saved') return <span className="text-[10px] text-[#10B981] flex items-center gap-1">✓ All changes saved</span>
+  return <button type="button" onClick={onRetry} className="text-[10px] text-[#EF4444] hover:underline">Save failed, retry</button>
 }
 
 // "Notes & Considerations" read block, shown under the section content in prep.
