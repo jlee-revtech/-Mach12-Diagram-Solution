@@ -19,6 +19,7 @@ import {
   type SectionContent,
 } from '@jlee-revtech/agent-core'
 import { getWorkshop, listAgenda, listAgendaContent } from '@/lib/supabase/workshops'
+import { readSynthesis, sortByPriority } from './decisionCriteria'
 
 // Coerce any value into a string[] (bullets). Guards against OLD-shape persisted
 // content (pre-reframe) where context / rationale / talkingPoints were single
@@ -88,6 +89,10 @@ export function normalizeSectionContent(content: SectionContent): SectionContent
       ...(c.tradeoffs != null ? { tradeoffs: asArr(c.tradeoffs) } : {}),
       rationale: asArr(c.rationale),
       ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      // App-level decision-criteria synthesis (carried through unchanged).
+      ...(Array.isArray(c.decisionCriteria) ? { decisionCriteria: c.decisionCriteria } : {}),
+      ...(Array.isArray(c.actions) ? { actions: c.actions } : {}),
+      ...(Array.isArray(c.nextSteps) ? { nextSteps: asArr(c.nextSteps) } : {}),
       ...notes,
     } as unknown as SectionContent
   }
@@ -205,6 +210,28 @@ export async function loadFacilitationDeck(
     if (notes.length) {
       slides.push({ kind: 'bullets', heading: 'Notes & Considerations', subheading: s.agendaTitle, bullets: notes })
       slideSections.push(s.agendaItemId)
+    }
+    // Evaluation section: the synthesized decision-criteria deliverable as slides.
+    if (s.content.kind === 'evaluation') {
+      const { decisionCriteria, actions, nextSteps } = readSynthesis(s.content)
+      if (decisionCriteria.length) {
+        slides.push({
+          kind: 'bullets', heading: 'Decision Criteria', subheading: s.agendaTitle,
+          bullets: sortByPriority(decisionCriteria).map((d) => `${d.criterion}${d.priority ? ` (${d.priority})` : ''}${d.rationale ? `: ${d.rationale}` : ''}`),
+        })
+        slideSections.push(s.agendaItemId)
+      }
+      if (actions.length) {
+        slides.push({
+          kind: 'bullets', heading: 'Actions', subheading: s.agendaTitle,
+          bullets: actions.map((a) => `${a.title}${a.owner ? `, ${a.owner}` : ''}${a.due ? ` (due ${a.due})` : ''}`),
+        })
+        slideSections.push(s.agendaItemId)
+      }
+      if (nextSteps.length) {
+        slides.push({ kind: 'bullets', heading: 'Next Steps', subheading: s.agendaTitle, bullets: nextSteps })
+        slideSections.push(s.agendaItemId)
+      }
     }
   }
 
