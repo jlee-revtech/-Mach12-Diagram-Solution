@@ -11,12 +11,23 @@
 // sub-objects (future-state options, key decisions, divergences), and the typed
 // diagrams (flow / matrix / quadrant / layers) with a live preview.
 
+import { useState } from 'react'
 import type {
   SectionContent, OverviewSectionContent, WorkstreamSectionContent,
   EvaluationSectionContent, FutureStateOption, KeyDecision, EvaluationDivergence,
   WorkshopDiagram, WorkshopDiagramType,
 } from '@jlee-revtech/agent-core'
 import { DiagramCard } from './DiagramView'
+
+// Host-supplied AI generator: turns a prompt (plus the current diagram + context)
+// into a fresh WorkshopDiagram. The host owns the fetch + auth (it has workshopId
+// / orgId); this component stays presentational. Absent -> no AI box is shown.
+export type GenerateDiagramFn = (opts: {
+  prompt: string
+  current?: WorkshopDiagram
+  context?: string
+  preferType?: WorkshopDiagramType
+}) => Promise<WorkshopDiagram | null>
 
 // ─── Immutable array helpers ─────────────────────────────────────────────────
 function replaceAt<T>(arr: T[], i: number, v: T): T[] { const c = arr.slice(); c[i] = v; return c }
@@ -252,20 +263,77 @@ function LayersEditor({ d, onChange }: { d: WorkshopDiagram; onChange: (d: Works
   )
 }
 
-// One diagram: type + title + caption + type-specific body + a live preview.
-function DiagramEditor({ diagram, onChange, onRemove }: {
+// AI prompt box: describe the visual you want and the engine returns a typed
+// diagram, replacing the one below. Keeps the current type as a hint and passes
+// the current diagram so a prompt can also revise. Only rendered when the host
+// wired a generator.
+function DiagramPromptBar({ diagram, gen, onChange, context }: {
+  diagram: WorkshopDiagram; gen: GenerateDiagramFn; onChange: (d: WorkshopDiagram) => void; context?: string
+}) {
+  const [prompt, setPrompt] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const hasContent = !!(diagram.steps?.length || diagram.rows?.length || diagram.points?.length || diagram.layers?.length)
+  const run = async () => {
+    const p = prompt.trim()
+    if (!p) return
+    setBusy(true)
+    setErr(null)
+    try {
+      const d = await gen({ prompt: p, current: diagram, preferType: diagram.type, ...(context ? { context } : {}) })
+      if (!d) { setErr('No diagram came back. Try rephrasing the prompt.'); return }
+      onChange(d)
+      setPrompt('')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Generation failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="rounded-lg border border-[#7C3AED]/30 bg-[#7C3AED0A] p-2 space-y-1.5">
+      <div className="text-[10px] uppercase tracking-wide text-[#A78BFA]">Generate with AI</div>
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) run() }}
+        rows={2}
+        placeholder={hasContent
+          ? 'Describe a change or a new visual. e.g. Turn this into a quadrant of cost vs risk.'
+          : 'Describe the visual. e.g. A flow of the 3-way match: PO, goods receipt, invoice, payment.'}
+        className={`${INPUT} resize-none`}
+      />
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={run} disabled={busy || !prompt.trim()}
+          className="text-[10px] px-2 py-1 rounded font-medium text-white bg-[#7C3AED] hover:bg-[#8B5CF6] disabled:opacity-40">
+          {busy ? 'Generating…' : hasContent ? '✦ Generate / revise' : '✦ Generate diagram'}
+        </button>
+        <span className="text-[9px] text-[var(--m12-text-muted)]">Replaces the diagram below; you can then fine-tune it by hand. Cmd/Ctrl+Enter.</span>
+      </div>
+      {err && <div className="text-[10px] text-[#EF4444]">{err}</div>}
+    </div>
+  )
+}
+
+const DIAGRAM_SELECT = 'bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5 text-[11px] text-[var(--m12-text)] outline-none'
+
+// One diagram: an optional AI prompt box, then type + title + caption +
+// type-specific body + a live preview.
+function DiagramEditor({ diagram, onChange, onRemove, gen, context }: {
   diagram: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void; onRemove: () => void
+  gen?: GenerateDiagramFn; context?: string
 }) {
   return (
     <div className="border border-[#2563EB]/25 bg-[#2563EB08] rounded-lg p-3 space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Diagram</span>
-        <select className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5 text-[11px] text-[var(--m12-text)] outline-none"
+        <select aria-label="Diagram type" title="Diagram type" className={DIAGRAM_SELECT}
           value={diagram.type} onChange={(e) => onChange(scaffoldForType(e.target.value as WorkshopDiagramType, diagram))}>
           {DIAGRAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
         <button type="button" onClick={onRemove} className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-[#DC2626]/40 text-[#EF4444] hover:bg-[#DC262614]">Remove diagram</button>
       </div>
+      {gen && <DiagramPromptBar diagram={diagram} gen={gen} onChange={onChange} context={context} />}
       <TextField label="Title" value={diagram.title ?? ''} placeholder="Diagram title" onChange={(v) => onChange({ ...diagram, title: v || undefined })} />
       <TextField label="Caption" value={diagram.caption ?? ''} placeholder="One line explaining the diagram" onChange={(v) => onChange({ ...diagram, caption: v || undefined })} />
       {diagram.type === 'flow' && <FlowEditor d={diagram} onChange={onChange} />}
@@ -282,16 +350,19 @@ function DiagramEditor({ diagram, onChange, onRemove }: {
 
 // A single diagram slot (used where the model requires exactly one, e.g. a key
 // decision's visual). Always present; cannot be removed, only retyped/edited.
-function SingleDiagramEditor({ diagram, onChange }: { diagram: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void }) {
+function SingleDiagramEditor({ diagram, onChange, gen, context }: {
+  diagram: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void; gen?: GenerateDiagramFn; context?: string
+}) {
   return (
     <div className="border border-[#2563EB]/25 bg-[#2563EB08] rounded-lg p-3 space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Decision visual</span>
-        <select className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5 text-[11px] text-[var(--m12-text)] outline-none"
+        <select aria-label="Diagram type" title="Diagram type" className={DIAGRAM_SELECT}
           value={diagram.type} onChange={(e) => onChange(scaffoldForType(e.target.value as WorkshopDiagramType, diagram))}>
           {DIAGRAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </div>
+      {gen && <DiagramPromptBar diagram={diagram} gen={gen} onChange={onChange} context={context} />}
       <TextField label="Title" value={diagram.title ?? ''} placeholder="Diagram title" onChange={(v) => onChange({ ...diagram, title: v || undefined })} />
       <TextField label="Caption" value={diagram.caption ?? ''} placeholder="One line explaining the diagram" onChange={(v) => onChange({ ...diagram, caption: v || undefined })} />
       {diagram.type === 'flow' && <FlowEditor d={diagram} onChange={onChange} />}
@@ -307,13 +378,15 @@ function SingleDiagramEditor({ diagram, onChange }: { diagram: WorkshopDiagram; 
 }
 
 // Editor for an optional list of section-level diagrams.
-function DiagramListEditor({ diagrams, onChange }: { diagrams?: WorkshopDiagram[]; onChange: (d: WorkshopDiagram[]) => void }) {
+function DiagramListEditor({ diagrams, onChange, gen, context }: {
+  diagrams?: WorkshopDiagram[]; onChange: (d: WorkshopDiagram[]) => void; gen?: GenerateDiagramFn; context?: string
+}) {
   const list = diagrams ?? []
   return (
     <Field label="Diagrams">
       <div className="space-y-2">
         {list.map((d, i) => (
-          <DiagramEditor key={i} diagram={d} onChange={(nd) => onChange(replaceAt(list, i, nd))} onRemove={() => onChange(removeAt(list, i))} />
+          <DiagramEditor key={i} diagram={d} gen={gen} context={context} onChange={(nd) => onChange(replaceAt(list, i, nd))} onRemove={() => onChange(removeAt(list, i))} />
         ))}
         <button type="button" className={ADD_BTN} onClick={() => onChange([...list, scaffoldForType('flow', { type: 'flow' })])}>+ Diagram</button>
       </div>
@@ -341,11 +414,14 @@ function OptionEditor({ o, onChange, onRemove, i, len, onMove }: {
   )
 }
 
-function DecisionEditor({ d, onChange, onRemove, i, len, onMove }: {
+function DecisionEditor({ d, onChange, onRemove, i, len, onMove, gen }: {
   d: KeyDecision; onChange: (d: KeyDecision) => void; onRemove: () => void
-  i: number; len: number; onMove: (dir: -1 | 1) => void
+  i: number; len: number; onMove: (dir: -1 | 1) => void; gen?: GenerateDiagramFn
 }) {
   const rec = d.recommendedDecision ?? { recommendation: '', rationale: [] }
+  const diagramContext = [d.title ? `Decision: ${d.title}` : '', rec.recommendation ? `Recommendation: ${rec.recommendation}` : '']
+    .filter(Boolean)
+    .join('. ')
   return (
     <div className={`${CARD} space-y-2.5`}>
       <div className="flex items-start gap-1.5">
@@ -359,7 +435,7 @@ function DecisionEditor({ d, onChange, onRemove, i, len, onMove }: {
         <TextAreaField value={rec.recommendation} placeholder="One short sentence" onChange={(v) => onChange({ ...d, recommendedDecision: { ...rec, recommendation: v } })} />
         <StringListEditor label="Rationale" color="#3B82F6" items={rec.rationale ?? []} placeholder="Reasoning point" addLabel="Rationale point" onChange={(rationale) => onChange({ ...d, recommendedDecision: { ...rec, rationale } })} />
         <Field label="Confidence">
-          <select className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5 text-[11px] text-[var(--m12-text)] outline-none"
+          <select aria-label="Confidence" title="Confidence" className={DIAGRAM_SELECT}
             value={rec.confidence ?? ''} onChange={(e) => onChange({ ...d, recommendedDecision: { ...rec, confidence: (e.target.value || undefined) as KeyDecision['recommendedDecision']['confidence'] } })}>
             <option value="">Unset</option>
             <option value="low">Low</option>
@@ -368,7 +444,7 @@ function DecisionEditor({ d, onChange, onRemove, i, len, onMove }: {
           </select>
         </Field>
       </div>
-      <SingleDiagramEditor diagram={d.diagram ?? scaffoldForType('flow', { type: 'flow' })} onChange={(diagram) => onChange({ ...d, diagram })} />
+      <SingleDiagramEditor diagram={d.diagram ?? scaffoldForType('flow', { type: 'flow' })} gen={gen} context={diagramContext} onChange={(diagram) => onChange({ ...d, diagram })} />
     </div>
   )
 }
@@ -402,20 +478,21 @@ function DivergenceEditor({ dv, onChange, onRemove, i, len, onMove }: {
 }
 
 // ─── Per-kind editors ────────────────────────────────────────────────────────
-function OverviewEditor({ c, onChange }: { c: OverviewSectionContent; onChange: (c: OverviewSectionContent) => void }) {
+function OverviewEditor({ c, onChange, gen }: { c: OverviewSectionContent; onChange: (c: OverviewSectionContent) => void; gen?: GenerateDiagramFn }) {
   return (
     <div className="space-y-3">
       <TextField label="Headline" value={c.headline} placeholder="Section headline" onChange={(v) => onChange({ ...c, headline: v })} />
       <StringListEditor label="Talking points" color="#0891B2" items={c.talkingPoints ?? []} placeholder="Talking point" addLabel="Talking point" onChange={(talkingPoints) => onChange({ ...c, talkingPoints })} />
       <TextAreaField label="Facilitator notes" rows={3} value={c.facilitatorNotes ?? ''} placeholder="Private note on how to run this section" onChange={(v) => onChange({ ...c, facilitatorNotes: v || undefined })} />
-      <DiagramListEditor diagrams={c.diagrams} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+      <DiagramListEditor diagrams={c.diagrams} gen={gen} context={c.headline || undefined} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
     </div>
   )
 }
 
-function WorkstreamEditor({ c, onChange }: { c: WorkstreamSectionContent; onChange: (c: WorkstreamSectionContent) => void }) {
+function WorkstreamEditor({ c, onChange, gen }: { c: WorkstreamSectionContent; onChange: (c: WorkstreamSectionContent) => void; gen?: GenerateDiagramFn }) {
   const options = c.futureStateOptions ?? []
   const decisions = c.keyDecisions ?? []
+  const wsContext = c.workstreamName || c.workstreamCode || undefined
   return (
     <div className="space-y-3">
       <TextField label="Workstream name" value={c.workstreamName ?? ''} placeholder="Value stream name" onChange={(v) => onChange({ ...c, workstreamName: v || undefined })} />
@@ -437,7 +514,7 @@ function WorkstreamEditor({ c, onChange }: { c: WorkstreamSectionContent; onChan
       <Field label="Key decisions">
         <div className="space-y-2">
           {decisions.map((d, i) => (
-            <DecisionEditor key={d.id || i} d={d} i={i} len={decisions.length}
+            <DecisionEditor key={d.id || i} d={d} i={i} len={decisions.length} gen={gen}
               onChange={(nd) => onChange({ ...c, keyDecisions: replaceAt(decisions, i, nd) })}
               onMove={(dir) => onChange({ ...c, keyDecisions: move(decisions, i, dir) })}
               onRemove={() => onChange({ ...c, keyDecisions: removeAt(decisions, i) })} />
@@ -447,12 +524,12 @@ function WorkstreamEditor({ c, onChange }: { c: WorkstreamSectionContent; onChan
         </div>
       </Field>
 
-      <DiagramListEditor diagrams={c.diagrams} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+      <DiagramListEditor diagrams={c.diagrams} gen={gen} context={wsContext} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
     </div>
   )
 }
 
-function EvaluationEditor({ c, onChange }: { c: EvaluationSectionContent; onChange: (c: EvaluationSectionContent) => void }) {
+function EvaluationEditor({ c, onChange, gen }: { c: EvaluationSectionContent; onChange: (c: EvaluationSectionContent) => void; gen?: GenerateDiagramFn }) {
   const divergences = c.divergences ?? []
   return (
     <div className="space-y-3">
@@ -476,17 +553,19 @@ function EvaluationEditor({ c, onChange }: { c: EvaluationSectionContent; onChan
         <StringListEditor label="Tradeoffs" color="#D97706" items={c.tradeoffs ?? []} placeholder="Tradeoff" addLabel="Tradeoff" onChange={(tradeoffs) => onChange({ ...c, tradeoffs: tradeoffs.length ? tradeoffs : undefined })} />
         <StringListEditor label="Rationale" color="#7C3AED" items={c.rationale ?? []} placeholder="Reasoning point" addLabel="Rationale point" onChange={(rationale) => onChange({ ...c, rationale })} />
       </div>
-      <DiagramListEditor diagrams={c.diagrams} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+      <DiagramListEditor diagrams={c.diagrams} gen={gen} context={c.overallRecommendation || undefined} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
     </div>
   )
 }
 
 // ─── Public component ────────────────────────────────────────────────────────
-export default function SectionContentEditor({ value, onChange }: {
+export default function SectionContentEditor({ value, onChange, generateDiagram }: {
   value: SectionContent
   onChange: (next: SectionContent) => void
+  // Optional: wire an AI generator to show a "Generate with AI" box on each diagram.
+  generateDiagram?: GenerateDiagramFn
 }) {
-  if (value.kind === 'overview') return <OverviewEditor c={value} onChange={onChange} />
-  if (value.kind === 'workstream') return <WorkstreamEditor c={value} onChange={onChange} />
-  return <EvaluationEditor c={value} onChange={onChange} />
+  if (value.kind === 'overview') return <OverviewEditor c={value} onChange={onChange} gen={generateDiagram} />
+  if (value.kind === 'workstream') return <WorkstreamEditor c={value} onChange={onChange} gen={generateDiagram} />
+  return <EvaluationEditor c={value} onChange={onChange} gen={generateDiagram} />
 }

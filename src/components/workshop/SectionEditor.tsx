@@ -19,7 +19,7 @@ import { upsertAgendaContent, type AgendaContentRow } from '@/lib/supabase/works
 import { normalizeSectionContent } from '@/lib/workshop/deck'
 import { sectionMetaFor, CONFIDENCE_META } from './sectionMeta'
 import { DiagramCard } from './DiagramView'
-import SectionContentEditor from './SectionContentEditor'
+import SectionContentEditor, { type GenerateDiagramFn } from './SectionContentEditor'
 
 // The persisted section route also echoes version + status onto the result.
 type SectionResult = SectionGenerationResult & { version?: number; status?: string }
@@ -127,6 +127,19 @@ export default function SectionEditor({
   }
   const cancelEditing = () => { setDraft(null); setError(null) }
 
+  // AI diagram generator wired into the structured editor's per-diagram prompt box.
+  const generateDiagram: GenerateDiagramFn = async ({ prompt, current, context, preferType }) => {
+    const ctx = [item.title, item.objective, workstream?.name?.split('(')[0].trim(), context].filter(Boolean).join('. ')
+    const res = await fetch('/api/workshops/diagram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workshopId, orgId, prompt, current, ...(ctx ? { context: ctx } : {}), preferType }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Diagram generation failed')
+    return data.diagram ?? null
+  }
+
   const saveEdits = async () => {
     if (!draft) return
     setSaving(true)
@@ -174,7 +187,7 @@ export default function SectionEditor({
           </div>
         </div>
         {error && <div className="text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
-        <SectionContentEditor value={draft} onChange={setDraft} />
+        <SectionContentEditor value={draft} onChange={setDraft} generateDiagram={generateDiagram} />
         <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-[var(--m12-border)]/40">
           <button type="button" onClick={cancelEditing} disabled={saving} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Cancel</button>
           <button type="button" onClick={saveEdits} disabled={saving} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">{saving ? 'Saving…' : 'Save changes'}</button>
