@@ -14,7 +14,7 @@ import { loadFacilitationDeck, type LoadedDeck, type DeckSection } from '@/lib/w
 import { exportFacilitationPptx } from '@/lib/workshop/export'
 import { upsertAgendaContent } from '@/lib/supabase/workshops'
 import DiagramView from '@/components/workshop/DiagramView'
-import SectionContentEditor, { type GenerateDiagramFn } from '@/components/workshop/SectionContentEditor'
+import SectionContentEditor, { type GenerateDiagramFn, type GenerateContentFn } from '@/components/workshop/SectionContentEditor'
 import type { WorkshopSlide, WorkshopSlideBlock, ClarifyingQuestion, SectionContent, SectionKind } from '@jlee-revtech/agent-core'
 
 // Brand palette (matches src/lib/workshop/export.ts + the app tokens).
@@ -201,6 +201,20 @@ export default function WorkshopPresentPage() {
     if (!res.ok) throw new Error(data.error || 'Diagram generation failed')
     return data.diagram ?? null
   }, [deck, currentSectionId, id, organization])
+
+  const generateContent = useCallback((async ({ target, prompt, context }: { target: string; prompt: string; context?: string }) => {
+    const sec = deck?.sections.find((s) => s.agendaItemId === currentSectionId)
+    const ctx = [deck?.workshop.topic, deck?.workshop.customerName, sec?.agendaTitle, context].filter(Boolean).join('. ')
+    const res = await fetch('/api/workshops/section-fragment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workshopId: id, orgId: organization?.id, target, prompt, ...(ctx ? { context: ctx } : {}) }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Generation failed')
+    const frag = data.fragment ?? null
+    return target === 'bullets' ? (frag?.bullets ?? null) : frag
+  }) as unknown as GenerateContentFn, [deck, currentSectionId, id, organization])
 
   const saveEditSection = useCallback(async () => {
     if (!organization || !id || !currentSectionId || !editDraft) return
@@ -446,7 +460,7 @@ export default function WorkshopPresentPage() {
             </div>
             {editErr && <div className="mx-4 mt-3 text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{editErr}</div>}
             <div className="flex-1 overflow-auto p-4">
-              <SectionContentEditor value={editDraft} onChange={setEditDraft} generateDiagram={generateDiagram} />
+              <SectionContentEditor value={editDraft} onChange={setEditDraft} generateDiagram={generateDiagram} generateContent={generateContent} />
             </div>
             <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--m12-border)]/60 shrink-0">
               <button type="button" onClick={() => setEditDraft(null)} disabled={savingEdit} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Cancel</button>

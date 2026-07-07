@@ -29,6 +29,21 @@ export type GenerateDiagramFn = (opts: {
   preferType?: WorkshopDiagramType
 }) => Promise<WorkshopDiagram | null>
 
+// Host-supplied AI generator for TEXT fragments: bullets (summary / current state /
+// considerations / rationale / pros / cons), a future-state option, a full key
+// decision, an overview (headline + talking points), or an evaluation summary.
+// Overloaded so each call site gets the right return type. Absent -> no AI text
+// boxes are shown.
+export type EvalFragment = { overallRecommendation?: string; pros?: string[]; cons?: string[]; tradeoffs?: string[]; rationale?: string[] }
+export type OverviewFragment = { headline?: string; talkingPoints: string[] }
+export interface GenerateContentFn {
+  (opts: { target: 'bullets'; prompt: string; context?: string }): Promise<string[] | null>
+  (opts: { target: 'option'; prompt: string; context?: string }): Promise<FutureStateOption | null>
+  (opts: { target: 'decision'; prompt: string; context?: string }): Promise<KeyDecision | null>
+  (opts: { target: 'overview'; prompt: string; context?: string }): Promise<OverviewFragment | null>
+  (opts: { target: 'evaluation'; prompt: string; context?: string }): Promise<EvalFragment | null>
+}
+
 // ─── Immutable array helpers ─────────────────────────────────────────────────
 function replaceAt<T>(arr: T[], i: number, v: T): T[] { const c = arr.slice(); c[i] = v; return c }
 function removeAt<T>(arr: T[], i: number): T[] { const c = arr.slice(); c.splice(i, 1); return c }
@@ -110,6 +125,46 @@ function StringListEditor({ label, items, onChange, placeholder, addLabel = 'Add
         <button type="button" className={ADD_BTN} onClick={() => onChange([...list, ''])}>+ {addLabel}</button>
       </div>
     </Field>
+  )
+}
+
+// A compact AI prompt bar for generating text content. The caller's onRun applies
+// the generated fragment (append bullets, add an option/decision, fill a summary).
+function AiContentBar({ label, placeholder, onRun }: {
+  label: string; placeholder: string; onRun: (prompt: string) => Promise<void>
+}) {
+  const [prompt, setPrompt] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const run = async () => {
+    const p = prompt.trim()
+    if (!p) return
+    setBusy(true)
+    setErr(null)
+    try { await onRun(p); setPrompt('') }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Generation failed') }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="rounded-lg border border-[#7C3AED]/30 bg-[#7C3AED0A] p-2 space-y-1.5">
+      <div className="text-[10px] uppercase tracking-wide text-[#A78BFA]">{label}</div>
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) run() }}
+        rows={2}
+        placeholder={placeholder}
+        className={`${INPUT} resize-none`}
+      />
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={run} disabled={busy || !prompt.trim()}
+          className="text-[10px] px-2 py-1 rounded font-medium text-white bg-[#7C3AED] hover:bg-[#8B5CF6] disabled:opacity-40">
+          {busy ? 'Generating…' : '✦ Generate'}
+        </button>
+        <span className="text-[9px] text-[var(--m12-text-muted)]">Cmd/Ctrl+Enter.</span>
+      </div>
+      {err && <div className="text-[10px] text-[#EF4444]">{err}</div>}
+    </div>
   )
 }
 
@@ -478,9 +533,19 @@ function DivergenceEditor({ dv, onChange, onRemove, i, len, onMove }: {
 }
 
 // ─── Per-kind editors ────────────────────────────────────────────────────────
-function OverviewEditor({ c, onChange, gen }: { c: OverviewSectionContent; onChange: (c: OverviewSectionContent) => void; gen?: GenerateDiagramFn }) {
+function OverviewEditor({ c, onChange, gen, genContent }: { c: OverviewSectionContent; onChange: (c: OverviewSectionContent) => void; gen?: GenerateDiagramFn; genContent?: GenerateContentFn }) {
   return (
     <div className="space-y-3">
+      {genContent && (
+        <AiContentBar
+          label="Generate overview with AI"
+          placeholder="e.g. Summarize the make-vs-buy framing for a new A&D contract; keep it executive-level."
+          onRun={async (p) => {
+            const f = await genContent({ target: 'overview', prompt: p, ...(c.headline ? { context: c.headline } : {}) })
+            if (f) onChange({ ...c, ...(f.headline && !c.headline ? { headline: f.headline } : {}), talkingPoints: [...(c.talkingPoints ?? []), ...(f.talkingPoints ?? [])] })
+          }}
+        />
+      )}
       <TextField label="Headline" value={c.headline} placeholder="Section headline" onChange={(v) => onChange({ ...c, headline: v })} />
       <StringListEditor label="Talking points" color="#0891B2" items={c.talkingPoints ?? []} placeholder="Talking point" addLabel="Talking point" onChange={(talkingPoints) => onChange({ ...c, talkingPoints })} />
       <TextAreaField label="Facilitator notes" rows={3} value={c.facilitatorNotes ?? ''} placeholder="Private note on how to run this section" onChange={(v) => onChange({ ...c, facilitatorNotes: v || undefined })} />
@@ -489,15 +554,24 @@ function OverviewEditor({ c, onChange, gen }: { c: OverviewSectionContent; onCha
   )
 }
 
-function WorkstreamEditor({ c, onChange, gen }: { c: WorkstreamSectionContent; onChange: (c: WorkstreamSectionContent) => void; gen?: GenerateDiagramFn }) {
+function WorkstreamEditor({ c, onChange, gen, genContent }: { c: WorkstreamSectionContent; onChange: (c: WorkstreamSectionContent) => void; gen?: GenerateDiagramFn; genContent?: GenerateContentFn }) {
   const options = c.futureStateOptions ?? []
   const decisions = c.keyDecisions ?? []
   const wsContext = c.workstreamName || c.workstreamCode || undefined
+  const withWs = (s: string) => (wsContext ? `${wsContext}: ${s}` : s)
   return (
     <div className="space-y-3">
       <TextField label="Workstream name" value={c.workstreamName ?? ''} placeholder="Value stream name" onChange={(v) => onChange({ ...c, workstreamName: v || undefined })} />
       <StringListEditor label="Overall considerations" color="#2563EB" items={c.overallConsiderations ?? []} placeholder="Consideration" addLabel="Consideration" onChange={(overallConsiderations) => onChange({ ...c, overallConsiderations })} />
+      {genContent && (
+        <AiContentBar label="Generate considerations with AI" placeholder="e.g. Why co-mingling contracts matters for DCAA audit readiness."
+          onRun={async (p) => { const b = await genContent({ target: 'bullets', prompt: p, context: withWs('overall considerations, the stakes') }); if (b?.length) onChange({ ...c, overallConsiderations: [...(c.overallConsiderations ?? []), ...b] }) }} />
+      )}
       <StringListEditor label="Current state" color="#0891B2" items={c.currentState ?? []} placeholder="As-is point" addLabel="Current-state point" onChange={(currentState) => onChange({ ...c, currentState })} />
+      {genContent && (
+        <AiContentBar label="Generate current state with AI" placeholder="e.g. Describe the as-is contract accounting setup and its gaps."
+          onRun={async (p) => { const b = await genContent({ target: 'bullets', prompt: p, context: withWs('current state, the as-is relevant to the decision') }); if (b?.length) onChange({ ...c, currentState: [...(c.currentState ?? []), ...b] }) }} />
+      )}
 
       <Field label="Future-state options">
         <div className="space-y-2">
@@ -508,6 +582,10 @@ function WorkstreamEditor({ c, onChange, gen }: { c: WorkstreamSectionContent; o
               onRemove={() => onChange({ ...c, futureStateOptions: removeAt(options, i) })} />
           ))}
           <button type="button" className={ADD_BTN} onClick={() => onChange({ ...c, futureStateOptions: [...options, { label: '', pros: [], cons: [] }] })}>+ Option</button>
+          {genContent && (
+            <AiContentBar label="Generate an option with AI (name the pros/cons to call out)" placeholder="e.g. Option: single co-mingled cost center. Call out pros: simpler setup; cons: harder DCAA segregation."
+              onRun={async (p) => { const o = await genContent({ target: 'option', prompt: p, context: withWs('a future-state option with pros and cons') }); if (o) onChange({ ...c, futureStateOptions: [...options, { label: o.label ?? '', ...(o.summary ? { summary: o.summary } : {}), pros: o.pros ?? [], cons: o.cons ?? [] }] }) }} />
+          )}
         </div>
       </Field>
 
@@ -521,6 +599,15 @@ function WorkstreamEditor({ c, onChange, gen }: { c: WorkstreamSectionContent; o
           ))}
           <button type="button" className={ADD_BTN}
             onClick={() => onChange({ ...c, keyDecisions: [...decisions, { id: `decision-${decisions.length + 1}`, title: '', context: [], leadingQuestions: [], recommendedDecision: { recommendation: '', rationale: [] }, diagram: scaffoldForType('flow', { type: 'flow' }) }] })}>+ Decision</button>
+          {genContent && (
+            <AiContentBar label="Generate a decision with AI (describe it and the pros/cons to call out)" placeholder="e.g. Decision on co-mingle vs separate cost centers. Call out pros of separation: clean DCAA segregation, audit clarity. Cons: setup overhead, more master data."
+              onRun={async (p) => {
+                const d = await genContent({ target: 'decision', prompt: p, context: withWs('a key decision framed around the topic') })
+                if (!d) return
+                const id = d.id && !decisions.some((x) => x.id === d.id) ? d.id : `decision-${decisions.length + 1}`
+                onChange({ ...c, keyDecisions: [...decisions, { ...d, id, diagram: d.diagram ?? scaffoldForType('flow', { type: 'flow' }) }] })
+              }} />
+          )}
         </div>
       </Field>
 
@@ -529,10 +616,28 @@ function WorkstreamEditor({ c, onChange, gen }: { c: WorkstreamSectionContent; o
   )
 }
 
-function EvaluationEditor({ c, onChange, gen }: { c: EvaluationSectionContent; onChange: (c: EvaluationSectionContent) => void; gen?: GenerateDiagramFn }) {
+function EvaluationEditor({ c, onChange, gen, genContent }: { c: EvaluationSectionContent; onChange: (c: EvaluationSectionContent) => void; gen?: GenerateDiagramFn; genContent?: GenerateContentFn }) {
   const divergences = c.divergences ?? []
   return (
     <div className="space-y-3">
+      {genContent && (
+        <AiContentBar
+          label="Generate recommendation + pros/cons with AI"
+          placeholder="e.g. Recommend separate cost centers across the workstreams. Call out pros: audit clarity, DCAA segregation; cons: setup overhead."
+          onRun={async (p) => {
+            const f = await genContent({ target: 'evaluation', prompt: p, ...(c.overallRecommendation ? { context: c.overallRecommendation } : {}) })
+            if (!f) return
+            onChange({
+              ...c,
+              ...(f.overallRecommendation && !c.overallRecommendation ? { overallRecommendation: f.overallRecommendation } : {}),
+              pros: [...(c.pros ?? []), ...(f.pros ?? [])],
+              cons: [...(c.cons ?? []), ...(f.cons ?? [])],
+              ...(f.tradeoffs?.length ? { tradeoffs: [...(c.tradeoffs ?? []), ...f.tradeoffs] } : {}),
+              rationale: [...(c.rationale ?? []), ...(f.rationale ?? [])],
+            })
+          }}
+        />
+      )}
       <Field label="Divergences">
         <div className="space-y-2">
           {divergences.map((dv, i) => (
@@ -559,13 +664,15 @@ function EvaluationEditor({ c, onChange, gen }: { c: EvaluationSectionContent; o
 }
 
 // ─── Public component ────────────────────────────────────────────────────────
-export default function SectionContentEditor({ value, onChange, generateDiagram }: {
+export default function SectionContentEditor({ value, onChange, generateDiagram, generateContent }: {
   value: SectionContent
   onChange: (next: SectionContent) => void
   // Optional: wire an AI generator to show a "Generate with AI" box on each diagram.
   generateDiagram?: GenerateDiagramFn
+  // Optional: wire an AI generator to show "Generate with AI" boxes for text content.
+  generateContent?: GenerateContentFn
 }) {
-  if (value.kind === 'overview') return <OverviewEditor c={value} onChange={onChange} gen={generateDiagram} />
-  if (value.kind === 'workstream') return <WorkstreamEditor c={value} onChange={onChange} gen={generateDiagram} />
-  return <EvaluationEditor c={value} onChange={onChange} gen={generateDiagram} />
+  if (value.kind === 'overview') return <OverviewEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+  if (value.kind === 'workstream') return <WorkstreamEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+  return <EvaluationEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
 }
