@@ -20,6 +20,7 @@ import VersionBadge from '@/components/VersionBadge'
 import SectionCard from '@/components/workshop/SectionCard'
 import SectionEditor from '@/components/workshop/SectionEditor'
 import BriefLoading from '@/components/workshop/BriefLoading'
+import TranscriptUploadDialog from '@/components/workshop/TranscriptUploadDialog'
 
 interface FacResult {
   say: string; nextQuestion?: string; coverage?: string; advanceAgenda?: boolean; pullSpecialist?: string; gaps?: string[]
@@ -63,6 +64,7 @@ export default function WorkshopRoomPage() {
   const [interim, setInterim] = useState('')
   const [recap, setRecap] = useState<WorkshopRecapData | null>(null)
   const [pickSpecialist, setPickSpecialist] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const voiceRef = useRef<TranscriptionProvider | null>(null)
   const speakerRef = useRef('')
@@ -384,6 +386,13 @@ export default function WorkshopRoomPage() {
           mode={hasBrief ? 'regenerate' : 'brief'}
         />
       )}
+      {uploadOpen && (
+        <TranscriptUploadDialog
+          workshopId={ws.id}
+          onClose={() => setUploadOpen(false)}
+          onImported={async () => { setMessages(await listMessages(ws.id)) }}
+        />
+      )}
       <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--m12-border)]/40">
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => router.push('/workshops')} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]" title="Back">
@@ -636,6 +645,7 @@ export default function WorkshopRoomPage() {
                   style={{ borderColor: voiceOn ? '#DC2626' : 'var(--m12-border)', color: voiceOn ? '#EF4444' : 'var(--m12-text-muted)', backgroundColor: voiceOn ? '#DC262614' : 'transparent' }}>
                   {voiceOn ? '● Recording' : '🎙 Voice'}{VOICE_CLOUD ? <span className="opacity-60"> ·cloud</span> : null}
                 </button>
+                <button onClick={() => setUploadOpen(true)} title="Upload or paste a transcript into this workshop" className="text-[11px] px-2.5 py-1 rounded border border-[var(--m12-border)]/60 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">⤒ Transcript</button>
                 <button onClick={facilitate} disabled={busy === 'facilitate'} className="text-[11px] px-2.5 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] disabled:opacity-50">{busy === 'facilitate' ? 'Thinking…' : '✦ Facilitate'}</button>
                 <div className="relative">
                   <button onClick={() => setPickSpecialist((v) => !v)} disabled={!!contribBusy} className="text-[11px] px-2.5 py-1 rounded border border-[#7C3AED]/50 text-[#A78BFA] hover:bg-[#7C3AED14] disabled:opacity-50">{contribBusy ? 'Consulting…' : '＋ Bring in specialist'}</button>

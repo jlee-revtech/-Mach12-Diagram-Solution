@@ -240,6 +240,43 @@ export async function addMessage(
   return one(arr)
 }
 
+// Bulk-append transcript messages (e.g. an uploaded transcript). Computes the
+// starting seq once, then inserts every row in a single request. Returns the count.
+export async function addMessages(
+  workshopId: string,
+  msgs: {
+    speaker_kind?: 'person' | 'agent' | 'system'; content: string; speaker_name?: string
+    speaker_role?: string; source?: string
+  }[],
+): Promise<number> {
+  if (!msgs.length) return 0
+  const last = await fetch(
+    `${URL}/rest/v1/workshop_messages?workshop_id=eq.${workshopId}&select=seq&order=seq.desc&limit=1`,
+    { headers: headers() },
+  )
+  const lastArr = last.ok ? await last.json() : []
+  const startSeq = (lastArr[0]?.seq ?? 0) + 1
+  const rows = msgs.map((m, i) => ({
+    workshop_id: workshopId,
+    seq: startSeq + i,
+    speaker_kind: m.speaker_kind ?? 'person',
+    speaker_role: m.speaker_role ?? 'participant',
+    source: m.source ?? 'upload',
+    content: m.content,
+    ...(m.speaker_name ? { speaker_name: m.speaker_name } : {}),
+  }))
+  const res = await fetch(`${URL}/rest/v1/workshop_messages`, {
+    method: 'POST',
+    headers: headers('return=minimal'),
+    body: JSON.stringify(rows),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to add transcript messages')
+  }
+  return rows.length
+}
+
 // ─── Captures ───────────────────────────────────────────────
 
 export async function listCaptures(workshopId: string): Promise<WorkshopCapture[]> {
