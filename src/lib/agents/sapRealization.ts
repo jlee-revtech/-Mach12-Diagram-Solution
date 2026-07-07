@@ -32,7 +32,8 @@ export function createSapRealization(cfg: RealizationConfig): SapRealization {
     listActivities: (workstreamCode) => call('list_activities', { workstreamCode }),
     composeConfigPlan: (workstreamCode, instruction) => call('compose_config_plan', { workstreamCode, instruction }),
     prepareConfig: (workstreamCode, activityKey, inputs) => call('prepare_config', { workstreamCode, activityKey, inputs }),
-    executeConfig: (workstreamCode, activityKey, inputs) => call('execute_config', { workstreamCode, activityKey, inputs }),
+    executeConfig: (workstreamCode, activityKey, inputs, approvalToken, humanConfirmed) =>
+      call('execute_config', { workstreamCode, activityKey, inputs, approvalToken, humanConfirmed }),
   }
 }
 
