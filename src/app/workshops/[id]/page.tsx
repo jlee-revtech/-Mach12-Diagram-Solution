@@ -7,7 +7,8 @@ import { listWorkstreams } from '@/lib/supabase/workstreams'
 import {
   getWorkshop, updateWorkshop, listAgenda, updateAgendaItem, updateWorkshopDuration,
   listMessages, addMessage, listCaptures, updateCapture, setParticipants,
-  listAgendaContent, restartWorkshop, archiveWorkshop, type AgendaContentRow,
+  listAgendaContent, restartWorkshop, archiveWorkshop, readWorkshopShare,
+  type AgendaContentRow, type WorkshopShare,
 } from '@/lib/supabase/workshops'
 import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType } from '@/lib/workshop/types'
 import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
@@ -21,6 +22,7 @@ import SectionCard from '@/components/workshop/SectionCard'
 import SectionEditor from '@/components/workshop/SectionEditor'
 import BriefLoading from '@/components/workshop/BriefLoading'
 import TranscriptUploadDialog from '@/components/workshop/TranscriptUploadDialog'
+import WorkshopShareDialog from '@/components/workshop/WorkshopShareDialog'
 
 interface FacResult {
   say: string; nextQuestion?: string; coverage?: string; advanceAgenda?: boolean; pullSpecialist?: string; gaps?: string[]
@@ -65,6 +67,7 @@ export default function WorkshopRoomPage() {
   const [recap, setRecap] = useState<WorkshopRecapData | null>(null)
   const [pickSpecialist, setPickSpecialist] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const voiceRef = useRef<TranscriptionProvider | null>(null)
   const speakerRef = useRef('')
@@ -393,6 +396,14 @@ export default function WorkshopRoomPage() {
           onImported={async () => { setMessages(await listMessages(ws.id)) }}
         />
       )}
+      {shareOpen && (
+        <WorkshopShareDialog
+          workshopId={ws.id}
+          initialShare={readWorkshopShare(ws)}
+          onClose={() => setShareOpen(false)}
+          onChange={(share: WorkshopShare) => setWs((prev) => (prev ? { ...prev, settings: { ...(prev.settings || {}), share } } : prev))}
+        />
+      )}
       <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--m12-border)]/40">
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => router.push('/workshops')} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]" title="Back">
@@ -476,6 +487,13 @@ export default function WorkshopRoomPage() {
                     className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-40"
                   >
                     {busy === 'deck' ? 'Preparing…' : '⤓ Download facilitation deck (PPTX)'}
+                  </button>
+                  <button
+                    onClick={() => setShareOpen(true)}
+                    title="Create a public, read-only share link for the workshop prep"
+                    className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)]"
+                  >
+                    🔗 Share prep
                   </button>
                 </div>
                 <div className="flex items-center gap-2">

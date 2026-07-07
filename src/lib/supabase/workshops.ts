@@ -93,6 +93,38 @@ export async function updateWorkshop(
   })
 }
 
+// ─── Public read-only share (stored in workshops.settings.share) ────────────
+// A random code grants anon read of the workshop prep via a service-key API
+// route (/api/share/workshop/[code]); no new table or RLS needed.
+export interface WorkshopShare { code: string; enabled: boolean; created_at: string }
+
+function newShareCode(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let s = ''
+  for (let i = 0; i < 16; i++) s += chars[Math.floor(Math.random() * chars.length)]
+  return s
+}
+
+export function readWorkshopShare(w: Workshop | null): WorkshopShare | null {
+  const s = (w?.settings as { share?: Partial<WorkshopShare> } | undefined)?.share
+  return s?.code ? { code: s.code, enabled: !!s.enabled, created_at: s.created_at || '' } : null
+}
+
+// Enable (creating a code if needed) or disable the public share, merging into the
+// existing settings so nothing else is clobbered.
+export async function setWorkshopShare(workshopId: string, enabled: boolean): Promise<WorkshopShare> {
+  const w = await getWorkshop(workshopId)
+  const settings = (w?.settings as Record<string, unknown>) || {}
+  const existing = (settings.share as Partial<WorkshopShare> | undefined) || {}
+  const share: WorkshopShare = {
+    code: existing.code || newShareCode(),
+    enabled,
+    created_at: existing.created_at || new Date().toISOString(),
+  }
+  await updateWorkshop(workshopId, { settings: { ...settings, share } })
+  return share
+}
+
 export const archiveWorkshop = (id: string) => updateWorkshop(id, { archived_at: new Date().toISOString() })
 
 export const restoreWorkshop = (id: string) => updateWorkshop(id, { archived_at: null })
