@@ -7,6 +7,7 @@ import { PROCESS_LEVEL_LABEL } from '@/lib/process/types'
 import { pushProcessLeafToNewDiagram } from '@/lib/process/pushToDiagram'
 import ProcessLeafEditor from './ProcessLeafEditor'
 import SipocLinkPanel from './SipocLinkPanel'
+import CapabilityAssignPanel from './CapabilityAssignPanel'
 import OverlayPanel from './OverlayPanel'
 import InterfacePanel from './InterfacePanel'
 import TestPlanDialog from './TestPlanDialog'
@@ -125,6 +126,7 @@ export default function ProcessLeafView({
               </div>
             </div>
             {orgId && <SipocLinkPanel nodeId={nodeId} orgId={orgId} readOnly={readOnly} />}
+            {orgId && <CapabilityAssignPanel nodeId={nodeId} orgId={orgId} userId={userId} readOnly={readOnly} />}
             <OverlayPanel nodeId={nodeId} readOnly={readOnly} />
             <InterfacePanel nodeId={nodeId} readOnly={readOnly} />
           </>

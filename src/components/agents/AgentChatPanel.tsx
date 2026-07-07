@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Workstream } from '@/lib/workstream/types'
 import type { Recommendation, Citation } from '@/lib/agents/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import { WORKSTREAM_BY_CODE } from '@/lib/workstream/catalog'
+import { generateWorkstreamDataArchitecture } from '@/lib/process/generateDataArchitecture'
 
 interface Msg {
   role: 'user' | 'assistant'
@@ -27,16 +29,37 @@ interface Props {
   orgId: string
   workstreams: Workstream[]
   initialAgentCode?: string
+  userId?: string
   onClose: () => void
 }
 
-export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, onClose }: Props) {
+export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, userId, onClose }: Props) {
+  const router = useRouter()
   const [agentCode, setAgentCode] = useState(initialAgentCode || 'enterprise')
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [archBusy, setArchBusy] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // The workstream this agent speaks for (enterprise orchestrator has none).
+  const workstream = agentCode === 'enterprise' ? null : workstreams.find((w) => w.code === agentCode) ?? null
+
+  const generateArch = useCallback(async () => {
+    if (!workstream || !userId || archBusy) return
+    setArchBusy(true)
+    setMessages((m) => [...m, { role: 'assistant', text: `Generating the data-architecture diagram for ${workstream.name} from its L3 process flows and assigned capabilities…` }])
+    try {
+      const r = await generateWorkstreamDataArchitecture(orgId, workstream.id, userId)
+      setMessages((m) => [...m, { role: 'assistant', text: `Done. "${r.title}" has ${r.systemCount} systems, ${r.flowCount} data flows, and ${r.groupCount} capability groupings across ${r.processCount} process flow(s). Opening it now.` }])
+      router.push(`/diagram/${r.diagramId}`)
+    } catch (e) {
+      setMessages((m) => [...m, { role: 'assistant', text: `⚠️ ${e instanceof Error ? e.message : 'Failed to generate the data architecture'}` }])
+    } finally {
+      setArchBusy(false)
+    }
+  }, [workstream, userId, orgId, archBusy, router])
 
   useEffect(() => { if (initialAgentCode) setAgentCode(initialAgentCode) }, [initialAgentCode])
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }) }, [messages, status])
@@ -116,6 +139,28 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, o
           <option value="enterprise">Enterprise Architect (orchestrator)</option>
           {workstreams.map((w) => <option key={w.id} value={w.code}>{w.name}</option>)}
         </select>
+        {workstream && userId && (
+          <button
+            type="button"
+            onClick={generateArch}
+            disabled={archBusy}
+            title="Generate a data-architecture diagram from this workstream's L3 process flows and assigned capabilities"
+            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium text-white transition-colors disabled:opacity-60"
+            style={{ backgroundColor: agentMeta.color }}
+          >
+            {archBusy ? (
+              <>
+                <span className="inline-block w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Generating data architecture…
+              </>
+            ) : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><rect x="9" y="2.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><rect x="5.5" y="9.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 6.5v1.5a1 1 0 001 1h5a1 1 0 001-1V6.5M8 9.3V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
+                Generate data architecture
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Messages */}
