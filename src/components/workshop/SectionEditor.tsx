@@ -11,13 +11,15 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type {
   SectionContent, OverviewSectionContent, WorkstreamSectionContent,
   EvaluationSectionContent, KeyDecision, ClarifyingQuestion, KbGap,
-  SectionGenerationResult, WorkshopDiagram,
+  SectionGenerationResult, WorkshopDiagram, SectionKind,
 } from '@jlee-revtech/agent-core'
 import type { WorkshopAgendaItem } from '@/lib/workshop/types'
 import type { Workstream } from '@/lib/workstream/types'
-import type { AgendaContentRow } from '@/lib/supabase/workshops'
+import { upsertAgendaContent, type AgendaContentRow } from '@/lib/supabase/workshops'
+import { normalizeSectionContent } from '@/lib/workshop/deck'
 import { sectionMetaFor, CONFIDENCE_META } from './sectionMeta'
 import { DiagramCard } from './DiagramView'
+import SectionContentEditor from './SectionContentEditor'
 
 // The persisted section route also echoes version + status onto the result.
 type SectionResult = SectionGenerationResult & { version?: number; status?: string }
@@ -64,6 +66,10 @@ export default function SectionEditor({
   )
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [feedback, setFeedback] = useState('')
+  // Direct manual-edit mode: a working draft of the structured content the user
+  // hand-edits, saved back to the SAME content row the AI writes.
+  const [draft, setDraft] = useState<SectionContent | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const meta = sectionMetaFor(item.section_kind)
 
@@ -111,6 +117,72 @@ export default function SectionEditor({
     call({ clarificationAnswers })
   }
 
+  // ─── Manual edit (no AI): open a draft, save it straight to the content row ──
+  const startEditing = () => {
+    if (!view?.content) return
+    setError(null)
+    // Normalize so the structured editor always gets arrays (old rows may carry
+    // pre-reframe string blobs), matching what the deck/walkthrough render.
+    setDraft(normalizeSectionContent(view.content))
+  }
+  const cancelEditing = () => { setDraft(null); setError(null) }
+
+  const saveEdits = async () => {
+    if (!draft) return
+    setSaving(true)
+    setError(null)
+    try {
+      const row = await upsertAgendaContent({
+        workshopId,
+        agendaItemId: item.id,
+        sectionKind: (item.section_kind ?? draft.kind) as SectionKind,
+        content: draft,
+        // A hand-edit resolves the section; mark it final.
+        status: 'final',
+      })
+      const result: SectionResult = {
+        content: draft,
+        clarifyingQuestions: view?.clarifyingQuestions ?? [],
+        kbGaps: view?.kbGaps ?? [],
+        groundingUsed: view?.groundingUsed ?? false,
+        version: row.version,
+        status: row.status,
+      }
+      setLocal(result)
+      onSaved(result)
+      setDraft(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save your edits')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // While hand-editing, the panel is a focused form with its own save/cancel bar.
+  if (draft) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3 sticky top-0 z-10 bg-[var(--m12-bg)] pb-2 -mt-1 pt-1">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wide text-[#3B82F6] mb-0.5">Editing content</div>
+            <h3 className="text-sm font-semibold text-[var(--m12-text)] leading-snug">{item.title}</h3>
+            <p className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">Edits are yours, no AI. They save to this section and flow into the Workshop Experience and the deck.</p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button type="button" onClick={cancelEditing} disabled={saving} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Cancel</button>
+            <button type="button" onClick={saveEdits} disabled={saving} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">{saving ? 'Saving…' : 'Save changes'}</button>
+          </div>
+        </div>
+        {error && <div className="text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
+        <SectionContentEditor value={draft} onChange={setDraft} />
+        <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-[var(--m12-border)]/40">
+          <button type="button" onClick={cancelEditing} disabled={saving} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Cancel</button>
+          <button type="button" onClick={saveEdits} disabled={saving} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">{saving ? 'Saving…' : 'Save changes'}</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* Header + generate action */}
@@ -129,14 +201,27 @@ export default function SectionEditor({
           <h3 className="text-sm font-semibold text-[var(--m12-text)] leading-snug">{item.title}</h3>
           {item.objective && <p className="text-[11px] text-[var(--m12-text-muted)] mt-0.5">{item.objective}</p>}
         </div>
-        <button
-          onClick={generate}
-          disabled={busy}
-          title={feedback.trim() ? 'Generate honoring your prompt below' : (view?.content ? 'Regenerate this section' : 'Generate this section')}
-          className="shrink-0 bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
-        >
-          {busy ? 'Generating…' : view?.content ? 'Regenerate' : 'Generate content'}
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {view?.content && (
+            <button
+              type="button"
+              onClick={startEditing}
+              disabled={busy}
+              title="Hand-edit this section's text and diagrams (no AI)"
+              className="border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-2.5 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50"
+            >
+              ✎ Edit
+            </button>
+          )}
+          <button
+            onClick={generate}
+            disabled={busy}
+            title={feedback.trim() ? 'Generate honoring your prompt below' : (view?.content ? 'Regenerate this section' : 'Generate this section')}
+            className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
+          >
+            {busy ? 'Generating…' : view?.content ? 'Regenerate' : 'Generate content'}
+          </button>
+        </div>
       </div>
 
       {item.section_kind === 'evaluation' && (
@@ -147,9 +232,11 @@ export default function SectionEditor({
 
       {error && <div className="text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
 
-      {/* Content by kind */}
+      {/* Content by kind. Normalize first so OLD-shape rows (pre-reframe string
+          blobs where an array is now expected) never throw "x.map is not a
+          function"; this matches what the deck/walkthrough render. */}
       {view?.content ? (
-        <ContentBody content={view.content} />
+        <ContentBody content={normalizeSectionContent(view.content)} />
       ) : !busy ? (
         <div className="text-[11px] text-[var(--m12-text-muted)] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-4 text-center">
           No content yet. Press <span className="text-[#3B82F6]">Generate content</span> to draft this section.

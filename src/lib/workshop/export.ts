@@ -3,6 +3,7 @@
 // stay out of the server bundle).
 
 import type { WorkshopRecapData, WorkshopSlide, WorkshopSlideBlock } from '@jlee-revtech/agent-core'
+import type PptxGenJSType from 'pptxgenjs'
 import type { Workshop } from '@/lib/workshop/types'
 import { renderWorkshopDiagramSvg } from '@/lib/workshop/diagramSvg'
 
@@ -46,6 +47,51 @@ function download(blob: Blob, filename: string) {
 
 const safe = (s: string) => s.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'workshop'
 
+// ─── Mach12.ai branding ──────────────────────────────────────────────────────
+// The Tesseract brand mark (src/app/icon.svg), inlined so the deck is fully
+// self-contained, plus a blue→cyan gradient rule. Both are rasterized to PNG via
+// the existing svgToPngDataUrl helper and reused across every slide.
+const MACH12_BLUE = '2563EB'
+
+const MACH12_ICON_SVG = `<svg width="76" height="76" viewBox="0 0 76 76" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="m12" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect width="76" height="76" rx="16" fill="white"/><g transform="translate(38, 38)"><rect x="-26" y="-26" width="52" height="52" fill="none" stroke="url(#m12)" stroke-width="1.8" opacity="0.2"/><rect x="-12" y="-12" width="24" height="24" fill="none" stroke="url(#m12)" stroke-width="1.8" opacity="0.7"/><line x1="-26" y1="-26" x2="-12" y2="-12" stroke="url(#m12)" stroke-width="1.1" opacity="0.25"/><line x1="26" y1="-26" x2="12" y2="-12" stroke="url(#m12)" stroke-width="1.1" opacity="0.25"/><line x1="26" y1="26" x2="12" y2="12" stroke="url(#m12)" stroke-width="1.1" opacity="0.25"/><line x1="-26" y1="26" x2="-12" y2="12" stroke="url(#m12)" stroke-width="1.1" opacity="0.25"/><polygon points="-26,-26 26,-26 12,-12 -12,-12" fill="#2563EB" opacity="0.22"/><polygon points="26,-26 26,26 12,12 12,-12" fill="#3B82F6" opacity="0.16"/><polygon points="-26,26 26,26 12,12 -12,12" fill="#06B6D4" opacity="0.12"/><polygon points="-26,-26 -26,26 -12,12 -12,-12" fill="#1D4ED8" opacity="0.18"/><rect x="-12" y="-12" width="24" height="24" fill="url(#m12)" opacity="0.12"/><rect x="-5" y="-5" width="10" height="10" rx="1.5" fill="url(#m12)" opacity="0.9"/><circle cx="-26" cy="-26" r="2" fill="#2563EB" opacity="0.45"/><circle cx="26" cy="-26" r="2" fill="#3B82F6" opacity="0.45"/><circle cx="26" cy="26" r="2" fill="#06B6D4" opacity="0.45"/><circle cx="-26" cy="26" r="2" fill="#1D4ED8" opacity="0.45"/><circle cx="-12" cy="-12" r="1.2" fill="#2563EB" opacity="0.6"/><circle cx="12" cy="-12" r="1.2" fill="#3B82F6" opacity="0.6"/><circle cx="12" cy="12" r="1.2" fill="#06B6D4" opacity="0.6"/><circle cx="-12" cy="12" r="1.2" fill="#1D4ED8" opacity="0.6"/></g></svg>`
+
+const mach12BarSvg = () =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="10" viewBox="0 0 240 10"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2563EB"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs><rect width="240" height="10" rx="5" fill="url(#g)"/></svg>`
+
+interface BrandAssets { logo: string; bar: string }
+
+async function loadBrandAssets(): Promise<BrandAssets> {
+  const [logo, bar] = await Promise.all([
+    svgToPngDataUrl(MACH12_ICON_SVG, 76, 76),
+    svgToPngDataUrl(mach12BarSvg(), 240, 10),
+  ])
+  return { logo, bar }
+}
+
+// A slim Mach12.ai footer painted on every slide: a full-width gradient rule, the
+// brand mark + wordmark bottom-left, and optional context (customer · deck) with a
+// page number bottom-right. Slide layout is 13.333 x 7.5in.
+function addBrandFooter(
+  s: PptxGenJSType.Slide,
+  assets: BrandAssets,
+  opts: { context?: string; page?: number; total?: number } = {},
+) {
+  const GREY = '64748B'
+  if (assets.bar) s.addImage({ data: assets.bar, x: 0.6, y: 7.0, w: 12.13, h: 0.035 })
+  if (assets.logo) s.addImage({ data: assets.logo, x: 0.6, y: 7.08, w: 0.26, h: 0.26 })
+  s.addText('Mach12.ai', { x: 0.92, y: 7.08, w: 2, h: 0.26, fontSize: 10, bold: true, color: MACH12_BLUE, valign: 'middle' })
+  const right = [opts.context, opts.page ? `${opts.page}${opts.total ? ` / ${opts.total}` : ''}` : '']
+    .filter(Boolean)
+    .join('     ')
+  if (right) s.addText(right, { x: 6.0, y: 7.08, w: 6.73, h: 0.26, fontSize: 9, color: GREY, align: 'right', valign: 'middle' })
+}
+
+// The branded title lockup for the top of a title slide: mark + MACH12.AI wordmark.
+function addBrandLockup(s: PptxGenJSType.Slide, assets: BrandAssets) {
+  if (assets.logo) s.addImage({ data: assets.logo, x: 0.6, y: 0.55, w: 0.62, h: 0.62 })
+  s.addText('MACH12.AI', { x: 1.32, y: 0.55, w: 6, h: 0.62, fontSize: 18, bold: true, color: MACH12_BLUE, charSpacing: 3, valign: 'middle' })
+}
+
 export async function exportRecapDocx(ws: Workshop, recap: WorkshopRecapData): Promise<void> {
   const { Document, Packer, Paragraph, HeadingLevel, TextRun } = await import('docx')
   const P = (text: string, opts: { bullet?: boolean; bold?: boolean } = {}) =>
@@ -74,26 +120,32 @@ export async function exportRecapPptx(ws: Workshop, recap: WorkshopRecapData): P
   const pptx = new PptxGenJS()
   pptx.defineLayout({ name: 'W', width: 13.333, height: 7.5 })
   pptx.layout = 'W'
-  const BLUE = '2563EB', DARK = '0F172A', GREY = '475569'
+  const BLUE = '2563EB', DARK = '0F172A'
+  const assets = await loadBrandAssets()
+  const footerContext = [ws.customer_name, 'Workshop recap'].filter(Boolean).join('  ·  ')
 
   // Title
   const t = pptx.addSlide()
   t.background = { color: 'FFFFFF' }
+  addBrandLockup(t, assets)
+  if (assets.bar) t.addImage({ data: assets.bar, x: 0.6, y: 2.15, w: 2.4, h: 0.08 })
   t.addText(ws.title, { x: 0.6, y: 2.4, w: 12, h: 1, fontSize: 34, bold: true, color: DARK })
   t.addText([ws.customer_name, recap.headline].filter(Boolean).join('  ·  '), { x: 0.6, y: 3.5, w: 12, h: 0.6, fontSize: 16, color: BLUE })
-  t.addText('Workshop recap', { x: 0.6, y: 6.6, w: 12, h: 0.4, fontSize: 12, color: GREY })
+  addBrandFooter(t, assets, { context: 'Workshop recap' })
 
   const bulletSlide = (title: string, items: string[]) => {
     if (!items?.length) return
     const s = pptx.addSlide()
     s.addText(title, { x: 0.6, y: 0.4, w: 12, h: 0.7, fontSize: 24, bold: true, color: DARK })
     s.addText(items.map((i) => ({ text: i, options: { bullet: true, color: DARK, fontSize: 15, paraSpaceAfter: 6 } })),
-      { x: 0.7, y: 1.3, w: 12, h: 5.6, valign: 'top', fit: 'shrink' })
+      { x: 0.7, y: 1.3, w: 12, h: 5.4, valign: 'top', fit: 'shrink' })
+    addBrandFooter(s, assets, { context: footerContext })
   }
 
   const summary = pptx.addSlide()
   summary.addText('Summary', { x: 0.6, y: 0.4, w: 12, h: 0.7, fontSize: 24, bold: true, color: DARK })
   summary.addText(recap.summary, { x: 0.7, y: 1.3, w: 12, h: 5, fontSize: 16, color: DARK, valign: 'top', fit: 'shrink' })
+  addBrandFooter(summary, assets, { context: footerContext })
 
   bulletSlide('Decisions', recap.decisions)
   bulletSlide('Actions', (recap.actions || []).map((a) => `${a.title}${a.owner ? ` — ${a.owner}` : ''}${a.due ? ` (due ${a.due})` : ''}`))
@@ -136,6 +188,8 @@ export async function exportFacilitationPptx(meta: FacilitationMeta, slides: Wor
   const PANEL = 'F8FAFC', PANEL_BORDER = 'E2E8F0', REC_FILL = 'EFF3FE', REC_BORDER = '9DB8F5'
 
   const title = meta.title || 'Workshop'
+  const assets = await loadBrandAssets()
+  const footerContext = [meta.customerName, 'Facilitation deck'].filter(Boolean).join('  ·  ')
 
   const addNotesIfAny = (s: ReturnType<typeof pptx.addSlide>, notes?: string) => {
     if (notes && notes.trim()) s.addNotes(notes)
@@ -155,7 +209,7 @@ export async function exportFacilitationPptx(meta: FacilitationMeta, slides: Wor
   const bulletRuns = (items: string[], opts: { color?: string; fontSize?: number } = {}) =>
     items.map((t) => ({ text: t, options: { bullet: true, color: opts.color ?? DARK, fontSize: opts.fontSize ?? 15, paraSpaceAfter: 6 } }))
 
-  const MAX_Y = 7.15 // bottom bound so nothing runs off the 7.5in slide
+  const MAX_Y = 6.85 // bottom bound so content clears the Mach12.ai brand footer
 
   // Does this slide carry any renderable text (beyond a title slide's heading)?
   const slideHasText = (slide: WorkshopSlide): boolean => {
@@ -282,19 +336,27 @@ export async function exportFacilitationPptx(meta: FacilitationMeta, slides: Wor
     s.addImage({ data, x, y, w, h })
   }
 
+  let pageNum = 0
+  const totalPages = slides.length
   for (const slide of slides) {
     const s = pptx.addSlide()
     s.background = { color: 'FFFFFF' }
+    pageNum += 1
 
     if (slide.kind === 'title') {
-      s.addShape(pptx.ShapeType.rect, { x: 0.6, y: 2.15, w: 2, h: 0.09, fill: { color: BLUE } })
+      addBrandLockup(s, assets)
+      if (assets.bar) s.addImage({ data: assets.bar, x: 0.6, y: 2.15, w: 2.4, h: 0.08 })
+      else s.addShape(pptx.ShapeType.rect, { x: 0.6, y: 2.15, w: 2, h: 0.09, fill: { color: BLUE } })
       s.addText(slide.heading, { x: 0.6, y: 2.4, w: 12.1, h: 1.4, fontSize: 34, bold: true, color: DARK, valign: 'top', fit: 'shrink' })
       if (slide.subheading) s.addText(slide.subheading, { x: 0.6, y: 3.9, w: 12.1, h: 0.7, fontSize: 16, color: BLUE, fit: 'shrink' })
-      const footer = [meta.customerName, 'Workshop facilitation deck'].filter(Boolean).join('  ·  ')
-      s.addText(footer, { x: 0.6, y: 6.6, w: 12.1, h: 0.4, fontSize: 12, color: GREY })
+      addBrandFooter(s, assets, { context: 'Facilitation deck' })
       addNotesIfAny(s, slide.facilitatorNotes)
       continue
     }
+
+    // Mach12.ai brand footer on every content slide (drawn first; content is
+    // bounded by MAX_Y so it never collides).
+    addBrandFooter(s, assets, { context: footerContext, page: pageNum, total: totalPages })
 
     const bodyY = heading(s, slide)
     const hasText = slideHasText(slide)

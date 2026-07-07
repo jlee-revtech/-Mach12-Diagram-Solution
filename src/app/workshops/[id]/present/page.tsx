@@ -12,8 +12,10 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { loadFacilitationDeck, type LoadedDeck, type DeckSection } from '@/lib/workshop/deck'
 import { exportFacilitationPptx } from '@/lib/workshop/export'
+import { upsertAgendaContent } from '@/lib/supabase/workshops'
 import DiagramView from '@/components/workshop/DiagramView'
-import type { WorkshopSlide, WorkshopSlideBlock, ClarifyingQuestion } from '@jlee-revtech/agent-core'
+import SectionContentEditor from '@/components/workshop/SectionContentEditor'
+import type { WorkshopSlide, WorkshopSlideBlock, ClarifyingQuestion, SectionContent, SectionKind } from '@jlee-revtech/agent-core'
 
 // Brand palette (matches src/lib/workshop/export.ts + the app tokens).
 const BLUE = '#2563EB'
@@ -38,6 +40,11 @@ export default function WorkshopPresentPage() {
   const [revising, setRevising] = useState(false)
   const [reviseErr, setReviseErr] = useState<string | null>(null)
   const [revise, setRevise] = useState<ReviseState | null>(null)
+  // Direct manual edit of the current slide's section (no AI): a working draft of
+  // the structured content, saved to the SAME content row the deck derives from.
+  const [editDraft, setEditDraft] = useState<SectionContent | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editErr, setEditErr] = useState<string | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -99,11 +106,20 @@ export default function WorkshopPresentPage() {
     })
   }, [total])
 
-  // Keyboard nav: ArrowLeft/Right + Escape. Ignore while typing in the revise bar.
+  // Keyboard nav: ArrowLeft/Right + Escape. Ignore while typing in a field, and
+  // never navigate slides while the edit drawer is open (Escape closes it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) {
+      const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')
+      if (editDraft) {
+        if (e.key === 'Escape') {
+          if (typing) { (t as HTMLElement).blur(); return }
+          e.preventDefault(); setEditDraft(null)
+        }
+        return
+      }
+      if (typing) {
         if (e.key === 'Escape') (t as HTMLElement).blur()
         return
       }
@@ -114,7 +130,7 @@ export default function WorkshopPresentPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go, exit])
+  }, [go, exit, editDraft])
 
   // Live NL revise: POST /api/workshops/section for the current slide's section.
   const submitRevise = useCallback(async (extra?: { clarificationAnswers?: { question: string; answer: string }[] }) => {
@@ -163,6 +179,42 @@ export default function WorkshopPresentPage() {
     submitRevise({ clarificationAnswers })
   }, [revise, submitRevise])
 
+  // ─── Manual edit of the current section (opens a drawer over the deck) ──
+  const startEditSection = useCallback(() => {
+    const sec = deck?.sections.find((s) => s.agendaItemId === currentSectionId)
+    if (!sec) return
+    setEditErr(null)
+    // deck.sections content is already normalized by the loader, so the editor
+    // gets clean arrays even for old-shape rows.
+    setEditDraft(sec.content)
+  }, [deck, currentSectionId])
+
+  const saveEditSection = useCallback(async () => {
+    if (!organization || !id || !currentSectionId || !editDraft) return
+    setSavingEdit(true)
+    setEditErr(null)
+    try {
+      await upsertAgendaContent({
+        workshopId: id,
+        agendaItemId: currentSectionId,
+        sectionKind: editDraft.kind as SectionKind,
+        content: editDraft,
+        status: 'final',
+      })
+      // Reload the deck so the slides re-derive; keep the viewer on this section.
+      const d = await reload()
+      if (d) {
+        const firstIdx = d.slideSections.findIndex((s) => s === currentSectionId)
+        if (firstIdx >= 0) setCurrent(firstIdx)
+      }
+      setEditDraft(null)
+    } catch (e) {
+      setEditErr(e instanceof Error ? e.message : 'Failed to save your edits')
+    } finally {
+      setSavingEdit(false)
+    }
+  }, [organization, id, currentSectionId, editDraft, reload])
+
   if (loading || !user || !organization) return null
 
   // ─── Empty state: no content authored yet ───
@@ -205,6 +257,7 @@ export default function WorkshopPresentPage() {
   }
 
   const sectionForRail = (sec: DeckSection): boolean => sec.agendaItemId === currentSectionId
+  const currentSection = deck.sections.find((s) => s.agendaItemId === currentSectionId) ?? null
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: DARK }}>
@@ -230,6 +283,15 @@ export default function WorkshopPresentPage() {
             title="Download the facilitation deck as PowerPoint"
           >
             {downloading ? 'Preparing…' : 'Download PPTX'}
+          </button>
+          <button
+            onClick={startEditSection}
+            disabled={!currentSectionId}
+            className="text-[11px] px-2.5 py-1 rounded border transition-colors disabled:opacity-30"
+            style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.7)', backgroundColor: 'transparent' }}
+            title={currentSectionId ? "Edit this section's text and diagrams by hand" : 'Title and agenda slides cannot be edited'}
+          >
+            ✎ Edit
           </button>
           <button
             onClick={() => setShowNotes((v) => !v)}
@@ -353,6 +415,33 @@ export default function WorkshopPresentPage() {
           </div>
         </div>
       </div>
+
+      {/* Manual edit drawer: hand-edit the current section's structured content.
+          Saves to the same content row the deck derives from, so the slides,
+          walkthrough, and PPTX all update together. */}
+      {editDraft && (
+        <div className="absolute inset-0 z-30 flex justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!savingEdit) setEditDraft(null) }} />
+          <div className="relative w-full max-w-md h-full flex flex-col shadow-2xl border-l border-[var(--m12-border)]" style={{ backgroundColor: 'var(--m12-bg)' }}>
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--m12-border)]/60 shrink-0">
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Edit section</div>
+                <div className="text-sm font-semibold text-[var(--m12-text)] truncate">{currentSection?.agendaTitle ?? 'Section'}</div>
+                <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">No AI. Your edits flow into the deck and the PPTX.</div>
+              </div>
+              <button type="button" onClick={() => { if (!savingEdit) setEditDraft(null) }} title="Close (Esc)" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] text-lg leading-none px-1">✕</button>
+            </div>
+            {editErr && <div className="mx-4 mt-3 text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{editErr}</div>}
+            <div className="flex-1 overflow-auto p-4">
+              <SectionContentEditor value={editDraft} onChange={setEditDraft} />
+            </div>
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--m12-border)]/60 shrink-0">
+              <button type="button" onClick={() => setEditDraft(null)} disabled={savingEdit} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={saveEditSection} disabled={savingEdit} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save changes'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

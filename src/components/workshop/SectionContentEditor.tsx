@@ -1,0 +1,492 @@
+'use client'
+
+// Direct manual editor for a section's facilitation content. It edits the SAME
+// typed SectionContent that the AI generates and that the deck (walkthrough +
+// PPTX) is derived from, so a hand-edit here shows up everywhere without drift.
+// Fully controlled: it takes `value` + `onChange` and never persists itself; the
+// host (prep SectionEditor / Workshop Experience present drawer) owns save.
+//
+// Every field is editable: prose (headline, notes, recommendations), bullet
+// lists (talking points, considerations, pros/cons, rationale...), the structured
+// sub-objects (future-state options, key decisions, divergences), and the typed
+// diagrams (flow / matrix / quadrant / layers) with a live preview.
+
+import type {
+  SectionContent, OverviewSectionContent, WorkstreamSectionContent,
+  EvaluationSectionContent, FutureStateOption, KeyDecision, EvaluationDivergence,
+  WorkshopDiagram, WorkshopDiagramType,
+} from '@jlee-revtech/agent-core'
+import { DiagramCard } from './DiagramView'
+
+// ─── Immutable array helpers ─────────────────────────────────────────────────
+function replaceAt<T>(arr: T[], i: number, v: T): T[] { const c = arr.slice(); c[i] = v; return c }
+function removeAt<T>(arr: T[], i: number): T[] { const c = arr.slice(); c.splice(i, 1); return c }
+function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
+  const j = i + dir
+  if (j < 0 || j >= arr.length) return arr
+  const c = arr.slice()
+  const a = c[i] as T, b = c[j] as T
+  c[i] = b; c[j] = a
+  return c
+}
+
+// ─── Shared class strings (dark/light token aware) ───────────────────────────
+const INPUT = 'w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded px-2 py-1 text-[11px] text-[var(--m12-text)] outline-none'
+const LABEL = 'text-[10px] uppercase tracking-wide text-[var(--m12-text-muted)] mb-1'
+const GHOST_BTN = 'text-[10px] px-1.5 py-0.5 rounded border border-[var(--m12-border)]/50 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:border-[var(--m12-border)] transition-colors'
+const ADD_BTN = 'text-[10px] px-2 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] transition-colors'
+const CARD = 'bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-3'
+
+// ─── Field primitives ────────────────────────────────────────────────────────
+function Field({ label, children }: { label?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      {label && <div className={LABEL}>{label}</div>}
+      {children}
+    </div>
+  )
+}
+
+function TextField({ label, value, onChange, placeholder }: {
+  label?: string; value: string; onChange: (v: string) => void; placeholder?: string
+}) {
+  return (
+    <Field label={label}>
+      <input className={INPUT} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+    </Field>
+  )
+}
+
+function TextAreaField({ label, value, onChange, placeholder, rows = 2 }: {
+  label?: string; value: string; onChange: (v: string) => void; placeholder?: string; rows?: number
+}) {
+  return (
+    <Field label={label}>
+      <textarea className={`${INPUT} resize-none leading-snug`} rows={rows} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+    </Field>
+  )
+}
+
+// Reorder + remove controls for a list row.
+function RowControls({ i, len, onMove, onRemove }: {
+  i: number; len: number; onMove: (dir: -1 | 1) => void; onRemove: () => void
+}) {
+  return (
+    <div className="flex items-center gap-0.5 shrink-0">
+      <button type="button" title="Move up" disabled={i === 0} onClick={() => onMove(-1)} className={`${GHOST_BTN} disabled:opacity-30`}>↑</button>
+      <button type="button" title="Move down" disabled={i === len - 1} onClick={() => onMove(1)} className={`${GHOST_BTN} disabled:opacity-30`}>↓</button>
+      <button type="button" title="Remove" onClick={onRemove} className="text-[10px] px-1.5 py-0.5 rounded border border-[#DC2626]/40 text-[#EF4444] hover:bg-[#DC262614]">✕</button>
+    </div>
+  )
+}
+
+// Editor for a string[] (bullets, pros, cons, steps of text, etc.).
+function StringListEditor({ label, items, onChange, placeholder, addLabel = 'Add', color }: {
+  label?: string; items: string[]; onChange: (next: string[]) => void
+  placeholder?: string; addLabel?: string; color?: string
+}) {
+  const list = items ?? []
+  return (
+    <Field label={label}>
+      <div className="space-y-1.5">
+        {list.map((t, i) => (
+          <div key={i} className="flex items-start gap-1.5">
+            {color && <span className="text-[11px] mt-1 shrink-0" style={{ color }}>•</span>}
+            <input className={INPUT} value={t} placeholder={placeholder} onChange={(e) => onChange(replaceAt(list, i, e.target.value))} />
+            <RowControls i={i} len={list.length} onMove={(d) => onChange(move(list, i, d))} onRemove={() => onChange(removeAt(list, i))} />
+          </div>
+        ))}
+        <button type="button" className={ADD_BTN} onClick={() => onChange([...list, ''])}>+ {addLabel}</button>
+      </div>
+    </Field>
+  )
+}
+
+// ─── Diagram editors ─────────────────────────────────────────────────────────
+const DIAGRAM_TYPES: { value: WorkshopDiagramType; label: string }[] = [
+  { value: 'flow', label: 'Flow' },
+  { value: 'matrix', label: 'Matrix' },
+  { value: 'quadrant', label: 'Quadrant' },
+  { value: 'layers', label: 'Layers' },
+]
+
+// A sensible empty scaffold when switching type or adding a diagram, so the
+// preview and the per-type editor have something to show immediately.
+function scaffoldForType(type: WorkshopDiagramType, prev: WorkshopDiagram): WorkshopDiagram {
+  const base: WorkshopDiagram = { type, ...(prev.title ? { title: prev.title } : {}), ...(prev.caption ? { caption: prev.caption } : {}) }
+  if (type === 'flow') return { ...base, steps: prev.steps?.length ? prev.steps : [{ label: '' }, { label: '' }] }
+  if (type === 'matrix') return { ...base, columns: prev.columns?.length ? prev.columns : ['Option A', 'Option B'], rows: prev.rows?.length ? prev.rows : [{ label: 'Criterion', cells: ['', ''] }] }
+  if (type === 'quadrant') return { ...base, xAxis: prev.xAxis ?? { low: 'Low', high: 'High' }, yAxis: prev.yAxis ?? { low: 'Low', high: 'High' }, points: prev.points?.length ? prev.points : [{ label: '', x: 0.5, y: 0.5 }] }
+  return { ...base, layers: prev.layers?.length ? prev.layers : [{ label: 'Layer', nodes: [''] }], ...(prev.connections?.length ? { connections: prev.connections } : {}) }
+}
+
+function FlowEditor({ d, onChange }: { d: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void }) {
+  const steps = d.steps ?? []
+  return (
+    <Field label="Steps">
+      <div className="space-y-1.5">
+        {steps.map((s, i) => (
+          <div key={i} className="flex items-start gap-1.5">
+            <div className="flex-1 space-y-1">
+              <input className={INPUT} value={s.label} placeholder="Step label" onChange={(e) => onChange({ ...d, steps: replaceAt(steps, i, { ...s, label: e.target.value }) })} />
+              <input className={INPUT} value={s.sublabel ?? ''} placeholder="Sublabel (optional)" onChange={(e) => onChange({ ...d, steps: replaceAt(steps, i, { ...s, sublabel: e.target.value || undefined }) })} />
+            </div>
+            <RowControls i={i} len={steps.length} onMove={(dir) => onChange({ ...d, steps: move(steps, i, dir) })} onRemove={() => onChange({ ...d, steps: removeAt(steps, i) })} />
+          </div>
+        ))}
+        <button type="button" className={ADD_BTN} onClick={() => onChange({ ...d, steps: [...steps, { label: '' }] })}>+ Step</button>
+      </div>
+    </Field>
+  )
+}
+
+function MatrixEditor({ d, onChange }: { d: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void }) {
+  const columns = d.columns ?? []
+  const rows = d.rows ?? []
+  // Keep every row's cells aligned to the column count.
+  const fit = (cells: string[]) => Array.from({ length: columns.length }, (_, k) => cells[k] ?? '')
+
+  const setColumns = (cols: string[]) =>
+    onChange({ ...d, columns: cols, rows: rows.map((r) => ({ ...r, cells: Array.from({ length: cols.length }, (_, k) => r.cells[k] ?? '') })) })
+
+  return (
+    <div className="space-y-2">
+      <StringListEditor label="Columns" items={columns} onChange={setColumns} placeholder="Column header" addLabel="Column" />
+      <Field label="Rows">
+        <div className="space-y-2">
+          {rows.map((r, i) => (
+            <div key={i} className="border border-[var(--m12-border)]/40 rounded p-2 space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <input className={INPUT} value={r.label} placeholder="Row label" onChange={(e) => onChange({ ...d, rows: replaceAt(rows, i, { ...r, label: e.target.value }) })} />
+                <RowControls i={i} len={rows.length} onMove={(dir) => onChange({ ...d, rows: move(rows, i, dir) })} onRemove={() => onChange({ ...d, rows: removeAt(rows, i) })} />
+              </div>
+              {columns.length > 0 && (
+                <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(columns.length, 3)}, minmax(0,1fr))` }}>
+                  {fit(r.cells).map((cell, ci) => (
+                    <input key={ci} className={INPUT} value={cell} placeholder={columns[ci] || `Cell ${ci + 1}`}
+                      onChange={(e) => onChange({ ...d, rows: replaceAt(rows, i, { ...r, cells: replaceAt(fit(r.cells), ci, e.target.value) }) })} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...d, rows: [...rows, { label: '', cells: Array.from({ length: columns.length }, () => '') }] })}>+ Row</button>
+        </div>
+      </Field>
+    </div>
+  )
+}
+
+function AxisEditor({ label, axis, onChange }: { label: string; axis?: { low: string; high: string }; onChange: (a: { low: string; high: string }) => void }) {
+  const a = axis ?? { low: '', high: '' }
+  return (
+    <Field label={label}>
+      <div className="grid grid-cols-2 gap-1.5">
+        <input className={INPUT} value={a.low} placeholder="Low" onChange={(e) => onChange({ ...a, low: e.target.value })} />
+        <input className={INPUT} value={a.high} placeholder="High" onChange={(e) => onChange({ ...a, high: e.target.value })} />
+      </div>
+    </Field>
+  )
+}
+
+function clamp01(n: number): number { return Math.max(0, Math.min(1, n)) }
+
+function QuadrantEditor({ d, onChange }: { d: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void }) {
+  const points = d.points ?? []
+  return (
+    <div className="space-y-2">
+      <AxisEditor label="X axis (horizontal)" axis={d.xAxis} onChange={(xAxis) => onChange({ ...d, xAxis })} />
+      <AxisEditor label="Y axis (vertical)" axis={d.yAxis} onChange={(yAxis) => onChange({ ...d, yAxis })} />
+      <Field label="Points (position 0 to 1)">
+        <div className="space-y-1.5">
+          {points.map((p, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <input className={`${INPUT} flex-1`} value={p.label} placeholder="Point label" onChange={(e) => onChange({ ...d, points: replaceAt(points, i, { ...p, label: e.target.value }) })} />
+              <input className={`${INPUT} w-16`} type="number" step={0.05} min={0} max={1} value={p.x} title="x (0=left, 1=right)" onChange={(e) => onChange({ ...d, points: replaceAt(points, i, { ...p, x: clamp01(Number(e.target.value)) }) })} />
+              <input className={`${INPUT} w-16`} type="number" step={0.05} min={0} max={1} value={p.y} title="y (0=bottom, 1=top)" onChange={(e) => onChange({ ...d, points: replaceAt(points, i, { ...p, y: clamp01(Number(e.target.value)) }) })} />
+              <RowControls i={i} len={points.length} onMove={(dir) => onChange({ ...d, points: move(points, i, dir) })} onRemove={() => onChange({ ...d, points: removeAt(points, i) })} />
+            </div>
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...d, points: [...points, { label: '', x: 0.5, y: 0.5 }] })}>+ Point</button>
+        </div>
+      </Field>
+    </div>
+  )
+}
+
+function LayersEditor({ d, onChange }: { d: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void }) {
+  const layers = d.layers ?? []
+  const connections = d.connections ?? []
+  return (
+    <div className="space-y-2">
+      <Field label="Layers (bands)">
+        <div className="space-y-2">
+          {layers.map((ly, i) => (
+            <div key={i} className="border border-[var(--m12-border)]/40 rounded p-2 space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <input className={INPUT} value={ly.label} placeholder="Layer label" onChange={(e) => onChange({ ...d, layers: replaceAt(layers, i, { ...ly, label: e.target.value }) })} />
+                <RowControls i={i} len={layers.length} onMove={(dir) => onChange({ ...d, layers: move(layers, i, dir) })} onRemove={() => onChange({ ...d, layers: removeAt(layers, i) })} />
+              </div>
+              <StringListEditor label="Nodes" items={ly.nodes ?? []} placeholder="Node label" addLabel="Node"
+                onChange={(nodes) => onChange({ ...d, layers: replaceAt(layers, i, { ...ly, nodes }) })} />
+            </div>
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...d, layers: [...layers, { label: '', nodes: [''] }] })}>+ Layer</button>
+        </div>
+      </Field>
+      <Field label="Connections (by node label, optional)">
+        <div className="space-y-1.5">
+          {connections.map((cn, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <input className={`${INPUT} flex-1`} value={cn.from} placeholder="From node" onChange={(e) => onChange({ ...d, connections: replaceAt(connections, i, { ...cn, from: e.target.value }) })} />
+              <span className="text-[10px] text-[var(--m12-text-muted)]">→</span>
+              <input className={`${INPUT} flex-1`} value={cn.to} placeholder="To node" onChange={(e) => onChange({ ...d, connections: replaceAt(connections, i, { ...cn, to: e.target.value }) })} />
+              <input className={`${INPUT} flex-1`} value={cn.label ?? ''} placeholder="Label" onChange={(e) => onChange({ ...d, connections: replaceAt(connections, i, { ...cn, label: e.target.value || undefined }) })} />
+              <RowControls i={i} len={connections.length} onMove={(dir) => onChange({ ...d, connections: move(connections, i, dir) })} onRemove={() => onChange({ ...d, connections: removeAt(connections, i) })} />
+            </div>
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...d, connections: [...connections, { from: '', to: '' }] })}>+ Connection</button>
+        </div>
+      </Field>
+    </div>
+  )
+}
+
+// One diagram: type + title + caption + type-specific body + a live preview.
+function DiagramEditor({ diagram, onChange, onRemove }: {
+  diagram: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void; onRemove: () => void
+}) {
+  return (
+    <div className="border border-[#2563EB]/25 bg-[#2563EB08] rounded-lg p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Diagram</span>
+        <select className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5 text-[11px] text-[var(--m12-text)] outline-none"
+          value={diagram.type} onChange={(e) => onChange(scaffoldForType(e.target.value as WorkshopDiagramType, diagram))}>
+          {DIAGRAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <button type="button" onClick={onRemove} className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-[#DC2626]/40 text-[#EF4444] hover:bg-[#DC262614]">Remove diagram</button>
+      </div>
+      <TextField label="Title" value={diagram.title ?? ''} placeholder="Diagram title" onChange={(v) => onChange({ ...diagram, title: v || undefined })} />
+      <TextField label="Caption" value={diagram.caption ?? ''} placeholder="One line explaining the diagram" onChange={(v) => onChange({ ...diagram, caption: v || undefined })} />
+      {diagram.type === 'flow' && <FlowEditor d={diagram} onChange={onChange} />}
+      {diagram.type === 'matrix' && <MatrixEditor d={diagram} onChange={onChange} />}
+      {diagram.type === 'quadrant' && <QuadrantEditor d={diagram} onChange={onChange} />}
+      {diagram.type === 'layers' && <LayersEditor d={diagram} onChange={onChange} />}
+      <div>
+        <div className={LABEL}>Preview</div>
+        <DiagramCard diagram={diagram} width={520} />
+      </div>
+    </div>
+  )
+}
+
+// A single diagram slot (used where the model requires exactly one, e.g. a key
+// decision's visual). Always present; cannot be removed, only retyped/edited.
+function SingleDiagramEditor({ diagram, onChange }: { diagram: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void }) {
+  return (
+    <div className="border border-[#2563EB]/25 bg-[#2563EB08] rounded-lg p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Decision visual</span>
+        <select className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5 text-[11px] text-[var(--m12-text)] outline-none"
+          value={diagram.type} onChange={(e) => onChange(scaffoldForType(e.target.value as WorkshopDiagramType, diagram))}>
+          {DIAGRAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+      </div>
+      <TextField label="Title" value={diagram.title ?? ''} placeholder="Diagram title" onChange={(v) => onChange({ ...diagram, title: v || undefined })} />
+      <TextField label="Caption" value={diagram.caption ?? ''} placeholder="One line explaining the diagram" onChange={(v) => onChange({ ...diagram, caption: v || undefined })} />
+      {diagram.type === 'flow' && <FlowEditor d={diagram} onChange={onChange} />}
+      {diagram.type === 'matrix' && <MatrixEditor d={diagram} onChange={onChange} />}
+      {diagram.type === 'quadrant' && <QuadrantEditor d={diagram} onChange={onChange} />}
+      {diagram.type === 'layers' && <LayersEditor d={diagram} onChange={onChange} />}
+      <div>
+        <div className={LABEL}>Preview</div>
+        <DiagramCard diagram={diagram} width={520} />
+      </div>
+    </div>
+  )
+}
+
+// Editor for an optional list of section-level diagrams.
+function DiagramListEditor({ diagrams, onChange }: { diagrams?: WorkshopDiagram[]; onChange: (d: WorkshopDiagram[]) => void }) {
+  const list = diagrams ?? []
+  return (
+    <Field label="Diagrams">
+      <div className="space-y-2">
+        {list.map((d, i) => (
+          <DiagramEditor key={i} diagram={d} onChange={(nd) => onChange(replaceAt(list, i, nd))} onRemove={() => onChange(removeAt(list, i))} />
+        ))}
+        <button type="button" className={ADD_BTN} onClick={() => onChange([...list, scaffoldForType('flow', { type: 'flow' })])}>+ Diagram</button>
+      </div>
+    </Field>
+  )
+}
+
+// ─── Sub-object editors ──────────────────────────────────────────────────────
+function OptionEditor({ o, onChange, onRemove, i, len, onMove }: {
+  o: FutureStateOption; onChange: (o: FutureStateOption) => void; onRemove: () => void
+  i: number; len: number; onMove: (dir: -1 | 1) => void
+}) {
+  return (
+    <div className={`${CARD} space-y-2`}>
+      <div className="flex items-center gap-1.5">
+        <input className={INPUT} value={o.label} placeholder="Option label" onChange={(e) => onChange({ ...o, label: e.target.value })} />
+        <RowControls i={i} len={len} onMove={onMove} onRemove={onRemove} />
+      </div>
+      <TextAreaField label="Summary" value={o.summary ?? ''} placeholder="One short sentence" onChange={(v) => onChange({ ...o, summary: v || undefined })} />
+      <div className="grid grid-cols-2 gap-2">
+        <StringListEditor label="Pros" color="#059669" items={o.pros ?? []} placeholder="Pro" addLabel="Pro" onChange={(pros) => onChange({ ...o, pros })} />
+        <StringListEditor label="Cons" color="#DC2626" items={o.cons ?? []} placeholder="Con" addLabel="Con" onChange={(cons) => onChange({ ...o, cons })} />
+      </div>
+    </div>
+  )
+}
+
+function DecisionEditor({ d, onChange, onRemove, i, len, onMove }: {
+  d: KeyDecision; onChange: (d: KeyDecision) => void; onRemove: () => void
+  i: number; len: number; onMove: (dir: -1 | 1) => void
+}) {
+  const rec = d.recommendedDecision ?? { recommendation: '', rationale: [] }
+  return (
+    <div className={`${CARD} space-y-2.5`}>
+      <div className="flex items-start gap-1.5">
+        <input className={`${INPUT} font-medium`} value={d.title} placeholder="Decision title" onChange={(e) => onChange({ ...d, title: e.target.value })} />
+        <RowControls i={i} len={len} onMove={onMove} onRemove={onRemove} />
+      </div>
+      <StringListEditor label="Context" color="#2563EB" items={d.context ?? []} placeholder="Why this matters" addLabel="Context point" onChange={(context) => onChange({ ...d, context })} />
+      <StringListEditor label="Leading questions" color="#D97706" items={d.leadingQuestions ?? []} placeholder="Question to walk the room" addLabel="Question" onChange={(leadingQuestions) => onChange({ ...d, leadingQuestions })} />
+      <div className="rounded-lg border border-[#2563EB]/40 bg-[#2563EB0F] p-2.5 space-y-2">
+        <div className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Recommended decision</div>
+        <TextAreaField value={rec.recommendation} placeholder="One short sentence" onChange={(v) => onChange({ ...d, recommendedDecision: { ...rec, recommendation: v } })} />
+        <StringListEditor label="Rationale" color="#3B82F6" items={rec.rationale ?? []} placeholder="Reasoning point" addLabel="Rationale point" onChange={(rationale) => onChange({ ...d, recommendedDecision: { ...rec, rationale } })} />
+        <Field label="Confidence">
+          <select className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5 text-[11px] text-[var(--m12-text)] outline-none"
+            value={rec.confidence ?? ''} onChange={(e) => onChange({ ...d, recommendedDecision: { ...rec, confidence: (e.target.value || undefined) as KeyDecision['recommendedDecision']['confidence'] } })}>
+            <option value="">Unset</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </Field>
+      </div>
+      <SingleDiagramEditor diagram={d.diagram ?? scaffoldForType('flow', { type: 'flow' })} onChange={(diagram) => onChange({ ...d, diagram })} />
+    </div>
+  )
+}
+
+function DivergenceEditor({ dv, onChange, onRemove, i, len, onMove }: {
+  dv: EvaluationDivergence; onChange: (dv: EvaluationDivergence) => void; onRemove: () => void
+  i: number; len: number; onMove: (dir: -1 | 1) => void
+}) {
+  const positions = dv.positions ?? []
+  return (
+    <div className={`${CARD} space-y-2`}>
+      <div className="flex items-center gap-1.5">
+        <input className={INPUT} value={dv.topic} placeholder="Divergence topic" onChange={(e) => onChange({ ...dv, topic: e.target.value })} />
+        <RowControls i={i} len={len} onMove={onMove} onRemove={onRemove} />
+      </div>
+      <Field label="Positions">
+        <div className="space-y-1.5">
+          {positions.map((p, pi) => (
+            <div key={pi} className="flex items-center gap-1.5">
+              <input className={`${INPUT} w-28`} value={p.workstreamCode} placeholder="Workstream" onChange={(e) => onChange({ ...dv, positions: replaceAt(positions, pi, { ...p, workstreamCode: e.target.value }) })} />
+              <input className={`${INPUT} flex-1`} value={p.stance} placeholder="Stance" onChange={(e) => onChange({ ...dv, positions: replaceAt(positions, pi, { ...p, stance: e.target.value }) })} />
+              <RowControls i={pi} len={positions.length} onMove={(dir) => onChange({ ...dv, positions: move(positions, pi, dir) })} onRemove={() => onChange({ ...dv, positions: removeAt(positions, pi) })} />
+            </div>
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...dv, positions: [...positions, { workstreamCode: '', stance: '' }] })}>+ Position</button>
+        </div>
+      </Field>
+      <TextAreaField label="Tension" value={dv.tension} placeholder="The architectural tension this creates" onChange={(v) => onChange({ ...dv, tension: v })} />
+    </div>
+  )
+}
+
+// ─── Per-kind editors ────────────────────────────────────────────────────────
+function OverviewEditor({ c, onChange }: { c: OverviewSectionContent; onChange: (c: OverviewSectionContent) => void }) {
+  return (
+    <div className="space-y-3">
+      <TextField label="Headline" value={c.headline} placeholder="Section headline" onChange={(v) => onChange({ ...c, headline: v })} />
+      <StringListEditor label="Talking points" color="#0891B2" items={c.talkingPoints ?? []} placeholder="Talking point" addLabel="Talking point" onChange={(talkingPoints) => onChange({ ...c, talkingPoints })} />
+      <TextAreaField label="Facilitator notes" rows={3} value={c.facilitatorNotes ?? ''} placeholder="Private note on how to run this section" onChange={(v) => onChange({ ...c, facilitatorNotes: v || undefined })} />
+      <DiagramListEditor diagrams={c.diagrams} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+    </div>
+  )
+}
+
+function WorkstreamEditor({ c, onChange }: { c: WorkstreamSectionContent; onChange: (c: WorkstreamSectionContent) => void }) {
+  const options = c.futureStateOptions ?? []
+  const decisions = c.keyDecisions ?? []
+  return (
+    <div className="space-y-3">
+      <TextField label="Workstream name" value={c.workstreamName ?? ''} placeholder="Value stream name" onChange={(v) => onChange({ ...c, workstreamName: v || undefined })} />
+      <StringListEditor label="Overall considerations" color="#2563EB" items={c.overallConsiderations ?? []} placeholder="Consideration" addLabel="Consideration" onChange={(overallConsiderations) => onChange({ ...c, overallConsiderations })} />
+      <StringListEditor label="Current state" color="#0891B2" items={c.currentState ?? []} placeholder="As-is point" addLabel="Current-state point" onChange={(currentState) => onChange({ ...c, currentState })} />
+
+      <Field label="Future-state options">
+        <div className="space-y-2">
+          {options.map((o, i) => (
+            <OptionEditor key={i} o={o} i={i} len={options.length}
+              onChange={(no) => onChange({ ...c, futureStateOptions: replaceAt(options, i, no) })}
+              onMove={(dir) => onChange({ ...c, futureStateOptions: move(options, i, dir) })}
+              onRemove={() => onChange({ ...c, futureStateOptions: removeAt(options, i) })} />
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...c, futureStateOptions: [...options, { label: '', pros: [], cons: [] }] })}>+ Option</button>
+        </div>
+      </Field>
+
+      <Field label="Key decisions">
+        <div className="space-y-2">
+          {decisions.map((d, i) => (
+            <DecisionEditor key={d.id || i} d={d} i={i} len={decisions.length}
+              onChange={(nd) => onChange({ ...c, keyDecisions: replaceAt(decisions, i, nd) })}
+              onMove={(dir) => onChange({ ...c, keyDecisions: move(decisions, i, dir) })}
+              onRemove={() => onChange({ ...c, keyDecisions: removeAt(decisions, i) })} />
+          ))}
+          <button type="button" className={ADD_BTN}
+            onClick={() => onChange({ ...c, keyDecisions: [...decisions, { id: `decision-${decisions.length + 1}`, title: '', context: [], leadingQuestions: [], recommendedDecision: { recommendation: '', rationale: [] }, diagram: scaffoldForType('flow', { type: 'flow' }) }] })}>+ Decision</button>
+        </div>
+      </Field>
+
+      <DiagramListEditor diagrams={c.diagrams} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+    </div>
+  )
+}
+
+function EvaluationEditor({ c, onChange }: { c: EvaluationSectionContent; onChange: (c: EvaluationSectionContent) => void }) {
+  const divergences = c.divergences ?? []
+  return (
+    <div className="space-y-3">
+      <Field label="Divergences">
+        <div className="space-y-2">
+          {divergences.map((dv, i) => (
+            <DivergenceEditor key={i} dv={dv} i={i} len={divergences.length}
+              onChange={(ndv) => onChange({ ...c, divergences: replaceAt(divergences, i, ndv) })}
+              onMove={(dir) => onChange({ ...c, divergences: move(divergences, i, dir) })}
+              onRemove={() => onChange({ ...c, divergences: removeAt(divergences, i) })} />
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...c, divergences: [...divergences, { topic: '', positions: [], tension: '' }] })}>+ Divergence</button>
+        </div>
+      </Field>
+      <div className="rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED0F] p-3 space-y-2">
+        <TextAreaField label="Overall recommendation" value={c.overallRecommendation} placeholder="One short sentence" onChange={(v) => onChange({ ...c, overallRecommendation: v })} />
+        <div className="grid grid-cols-2 gap-2">
+          <StringListEditor label="Pros" color="#059669" items={c.pros ?? []} placeholder="Pro" addLabel="Pro" onChange={(pros) => onChange({ ...c, pros })} />
+          <StringListEditor label="Cons" color="#DC2626" items={c.cons ?? []} placeholder="Con" addLabel="Con" onChange={(cons) => onChange({ ...c, cons })} />
+        </div>
+        <StringListEditor label="Tradeoffs" color="#D97706" items={c.tradeoffs ?? []} placeholder="Tradeoff" addLabel="Tradeoff" onChange={(tradeoffs) => onChange({ ...c, tradeoffs: tradeoffs.length ? tradeoffs : undefined })} />
+        <StringListEditor label="Rationale" color="#7C3AED" items={c.rationale ?? []} placeholder="Reasoning point" addLabel="Rationale point" onChange={(rationale) => onChange({ ...c, rationale })} />
+      </div>
+      <DiagramListEditor diagrams={c.diagrams} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+    </div>
+  )
+}
+
+// ─── Public component ────────────────────────────────────────────────────────
+export default function SectionContentEditor({ value, onChange }: {
+  value: SectionContent
+  onChange: (next: SectionContent) => void
+}) {
+  if (value.kind === 'overview') return <OverviewEditor c={value} onChange={onChange} />
+  if (value.kind === 'workstream') return <WorkstreamEditor c={value} onChange={onChange} />
+  return <EvaluationEditor c={value} onChange={onChange} />
+}

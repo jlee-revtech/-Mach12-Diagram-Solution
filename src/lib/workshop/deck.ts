@@ -33,8 +33,10 @@ function asArr(v: unknown): string[] {
 // Normalize a persisted content row into the CURRENT section-content shape so the
 // deck builder never receives a string where it expects an array. New-shape
 // content passes through unchanged; old rows render best-effort (regenerate to get
-// the full new structure + per-decision visuals).
-function normalizeSectionContent(content: SectionContent): SectionContent {
+// the full new structure + per-decision visuals). Exported so the prep-view editor
+// (SectionEditor / SectionContentEditor) reuses the SAME coercion the deck does,
+// keeping old rows from throwing "x.map is not a function" on render/edit.
+export function normalizeSectionContent(content: SectionContent): SectionContent {
   const c = content as unknown as Record<string, unknown>
   if (c.kind === 'workstream') {
     const legacyFocus = typeof c.focusedContext === 'string' ? [c.focusedContext as string] : []
