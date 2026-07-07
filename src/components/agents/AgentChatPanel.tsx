@@ -35,6 +35,7 @@ interface Props {
 export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, userId, onClose }: Props) {
   const [agentCode, setAgentCode] = useState(initialAgentCode || 'enterprise')
   const [messages, setMessages] = useState<Msg[]>([])
+  const [threadId, setThreadId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -46,6 +47,36 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
 
   useEffect(() => { if (initialAgentCode) setAgentCode(initialAgentCode) }, [initialAgentCode])
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }) }, [messages, status])
+
+  // Rehydrate the most recent conversation for this (org, agent) so chat is no
+  // longer ephemeral. Guarded against races when the agent is switched quickly.
+  useEffect(() => {
+    let cancelled = false
+    setThreadId(null)
+    setMessages([])
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/agents/threads?orgId=${encodeURIComponent(orgId)}&agentCode=${encodeURIComponent(agentCode)}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        })
+        if (!res.ok || cancelled) return
+        const data = (await res.json()) as { thread: { id: string } | null; messages: { role: 'user' | 'assistant'; content: { text?: string; citations?: Citation[]; recommendations?: Recommendation[] } }[] }
+        if (cancelled || !data.thread) return
+        setThreadId(data.thread.id)
+        setMessages(
+          (data.messages || []).map((m) => ({
+            role: m.role,
+            text: m.content?.text ?? '',
+            citations: m.content?.citations,
+            recommendations: m.content?.recommendations,
+          }))
+        )
+      } catch {
+        /* restore is best-effort */
+      }
+    })()
+    return () => { cancelled = true }
+  }, [orgId, agentCode])
 
   const agentMeta = agentCode === 'enterprise'
     ? { name: 'Enterprise Architect', tagline: 'Cross-workstream synthesis & routing', color: '#2563EB', icon: 'portfolio' as const }
@@ -63,7 +94,7 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
       const res = await fetch('/api/agents/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ agentCode, orgId, messages: next.map((m) => ({ role: m.role, content: m.text })) }),
+        body: JSON.stringify({ agentCode, orgId, userId, threadId, messages: next.map((m) => ({ role: m.role, content: m.text })) }),
       })
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}))
@@ -84,6 +115,7 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
           if (!evMatch || !dataMatch) continue
           const ev = evMatch[1]; const data = JSON.parse(dataMatch[1])
           if (ev === 'status') setStatus(data.label + '…')
+          else if (ev === 'thread') { if (data.threadId) setThreadId(data.threadId) }
           else if (ev === 'message') { setMessages((m) => [...m, { role: 'assistant', text: data.text, recommendations: data.recommendations, citations: data.citations }]); setStatus(null) }
           else if (ev === 'error') { setMessages((m) => [...m, { role: 'assistant', text: `⚠️ ${data.error}` }]); setStatus(null) }
         }
@@ -93,7 +125,7 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
     } finally {
       setBusy(false); setStatus(null)
     }
-  }, [input, busy, messages, agentCode, orgId])
+  }, [input, busy, messages, agentCode, orgId, threadId, userId])
 
   return (
     <>
