@@ -16,7 +16,7 @@ import type {
 import type { WorkshopAgendaItem } from '@/lib/workshop/types'
 import type { Workstream } from '@/lib/workstream/types'
 import { upsertAgendaContent, type AgendaContentRow } from '@/lib/supabase/workshops'
-import { normalizeSectionContent } from '@/lib/workshop/deck'
+import { normalizeSectionContent, sectionNotes } from '@/lib/workshop/deck'
 import { sectionMetaFor, CONFIDENCE_META } from './sectionMeta'
 import { DiagramCard } from './DiagramView'
 import SectionContentEditor, { type GenerateDiagramFn, type GenerateContentFn } from './SectionContentEditor'
@@ -263,7 +263,10 @@ export default function SectionEditor({
           blobs where an array is now expected) never throw "x.map is not a
           function"; this matches what the deck/walkthrough render. */}
       {view?.content ? (
-        <ContentBody content={normalizeSectionContent(view.content)} />
+        <>
+          <ContentBody content={normalizeSectionContent(view.content)} />
+          <NotesReadBlock notes={sectionNotes(view.content)} />
+        </>
       ) : !busy ? (
         <div className="text-[11px] text-[var(--m12-text-muted)] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-4 text-center">
           No content yet. Press <span className="text-[#3B82F6]">Generate content</span> to draft this section.
@@ -389,6 +392,23 @@ function KbGapCallout({ gap, workstream }: { gap: KbGap; workstream?: Workstream
           </AnimatePresence>
         </div>
       </div>
+    </div>
+  )
+}
+
+// "Notes & Considerations" read block, shown under the section content in prep.
+function NotesReadBlock({ notes }: { notes: string[] }) {
+  if (!notes || notes.length === 0) return null
+  return (
+    <div className="bg-[#D9770610] border border-[#D97706]/30 rounded-lg p-4 mt-3">
+      <div className="text-[10px] uppercase tracking-wide text-[#D97706] mb-1.5">Notes & Considerations</div>
+      <ul className="space-y-1">
+        {notes.map((t, i) => (
+          <li key={i} className="text-[11px] text-[var(--m12-text-secondary)] flex gap-2 leading-snug">
+            <span className="text-[#D97706]">▸</span><span>{t}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

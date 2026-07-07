@@ -204,6 +204,13 @@ export async function POST(req: NextRequest) {
     })
     if (!result) return json({ error: 'Failed to generate section content' }, 502)
 
+    // Carry the app-level "Notes & Considerations" through a regenerate (agent-core
+    // does not model it, so it would otherwise be lost on every regeneration).
+    const priorNotes = (priorContent as unknown as { notesAndConsiderations?: unknown })?.notesAndConsiderations
+    if (Array.isArray(priorNotes) && priorNotes.length) {
+      (result.content as unknown as { notesAndConsiderations?: unknown[] }).notesAndConsiderations = priorNotes
+    }
+
     // ─── App-side KB-gap injection (PLAN §5 step 7) ────────────────
     let kbGaps: KbGap[] = result.kbGaps || []
     if (kbGaps.length === 0 && knowledgeThin && sectionKind === 'workstream' && item.workstream_code) {

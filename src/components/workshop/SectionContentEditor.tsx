@@ -672,7 +672,32 @@ export default function SectionContentEditor({ value, onChange, generateDiagram,
   // Optional: wire an AI generator to show "Generate with AI" boxes for text content.
   generateContent?: GenerateContentFn
 }) {
-  if (value.kind === 'overview') return <OverviewEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
-  if (value.kind === 'workstream') return <WorkstreamEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
-  return <EvaluationEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+  const kindEditor =
+    value.kind === 'overview' ? <OverviewEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+    : value.kind === 'workstream' ? <WorkstreamEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+    : <EvaluationEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+
+  // "Notes & Considerations" is an app-level field carried on every kind. Edit it
+  // here uniformly; it renders in prep and as a slide in the Workshop Experience.
+  const notes = (value as unknown as { notesAndConsiderations?: string[] }).notesAndConsiderations ?? []
+  const setNotes = (n: string[]) => onChange({ ...(value as object), notesAndConsiderations: n.length ? n : undefined } as unknown as SectionContent)
+
+  return (
+    <div className="space-y-4">
+      {kindEditor}
+      <div className="pt-3 border-t border-[var(--m12-border)]/40 space-y-2">
+        <StringListEditor label="Notes & Considerations" color="#D97706" items={notes} placeholder="Note or consideration" addLabel="Note" onChange={setNotes} />
+        {generateContent && (
+          <AiContentBar
+            label="Generate notes & considerations with AI"
+            placeholder="e.g. Call out FAR/DFARS exposure, data migration gotchas, and change-management notes."
+            onRun={async (p) => {
+              const b = await generateContent({ target: 'bullets', prompt: p, context: 'notes and considerations for this section' })
+              if (b?.length) setNotes([...notes, ...b])
+            }}
+          />
+        )}
+      </div>
+    </div>
+  )
 }

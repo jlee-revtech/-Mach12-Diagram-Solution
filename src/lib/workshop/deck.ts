@@ -38,6 +38,8 @@ function asArr(v: unknown): string[] {
 // keeping old rows from throwing "x.map is not a function" on render/edit.
 export function normalizeSectionContent(content: SectionContent): SectionContent {
   const c = content as unknown as Record<string, unknown>
+  // App-level extension carried through on every kind (agent-core does not model it).
+  const notes = Array.isArray(c.notesAndConsiderations) ? { notesAndConsiderations: asArr(c.notesAndConsiderations) } : {}
   if (c.kind === 'workstream') {
     const legacyFocus = typeof c.focusedContext === 'string' ? [c.focusedContext as string] : []
     const keyDecisions = (Array.isArray(c.keyDecisions) ? c.keyDecisions : []).map((d) => {
@@ -73,6 +75,7 @@ export function normalizeSectionContent(content: SectionContent): SectionContent
       }),
       keyDecisions,
       ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      ...notes,
     } as unknown as SectionContent
   }
   if (c.kind === 'evaluation') {
@@ -85,6 +88,7 @@ export function normalizeSectionContent(content: SectionContent): SectionContent
       ...(c.tradeoffs != null ? { tradeoffs: asArr(c.tradeoffs) } : {}),
       rationale: asArr(c.rationale),
       ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      ...notes,
     } as unknown as SectionContent
   }
   // overview
@@ -94,7 +98,14 @@ export function normalizeSectionContent(content: SectionContent): SectionContent
     talkingPoints: asArr(c.talkingPoints),
     ...(c.facilitatorNotes ? { facilitatorNotes: String(c.facilitatorNotes) } : {}),
     ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+    ...notes,
   } as unknown as SectionContent
+}
+
+// Read the app-level "Notes & Considerations" bullets off any section content.
+export function sectionNotes(content: SectionContent): string[] {
+  const n = (content as unknown as Record<string, unknown>).notesAndConsiderations
+  return Array.isArray(n) ? n.filter((x) => x != null && x !== '').map((x) => String(x)) : []
 }
 
 export interface DeckWorkshop {
@@ -166,7 +177,11 @@ export async function loadFacilitationDeck(
     })
   }
 
-  const slides = buildFacilitationDeck({
+  // Use buildFacilitationDeck only for the leading title + agenda slides, then
+  // rebuild the body with the SAME buildSlides calls it makes internally, so we can
+  // inject a "Notes & Considerations" slide after each section that has notes and
+  // keep slideSections in lockstep (title + agenda are section-less nulls).
+  const baseDeck = buildFacilitationDeck({
     title: workshop.title,
     ...(workshop.customerName ? { customerName: workshop.customerName } : {}),
     ...(workshop.topic ? { topic: workshop.topic } : {}),
@@ -178,16 +193,19 @@ export async function loadFacilitationDeck(
     })),
   })
 
-  // slideSections: two leading nulls (title + agenda), then each section's
-  // agendaItemId repeated by that section's slide count. Recompute the counts
-  // with buildSlides using the SAME opts buildFacilitationDeck passes.
+  const slides: WorkshopSlide[] = baseDeck.slice(0, 2)
   const slideSections: (string | null)[] = [null, null]
   for (const s of sections) {
-    const count = buildSlides(s.content, {
+    const secSlides = buildSlides(s.content, {
       title: s.agendaTitle,
       ...(s.timeboxMinutes != null ? { timeboxMinutes: s.timeboxMinutes } : {}),
-    }).length
-    for (let i = 0; i < count; i++) slideSections.push(s.agendaItemId)
+    })
+    for (const sl of secSlides) { slides.push(sl); slideSections.push(s.agendaItemId) }
+    const notes = sectionNotes(s.content)
+    if (notes.length) {
+      slides.push({ kind: 'bullets', heading: 'Notes & Considerations', subheading: s.agendaTitle, bullets: notes })
+      slideSections.push(s.agendaItemId)
+    }
   }
 
   return { slides, slideSections, workshop, sections }
