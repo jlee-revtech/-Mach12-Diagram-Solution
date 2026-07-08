@@ -168,9 +168,14 @@ export async function loadFacilitationDeck(
   // Content rows keyed by agenda_item_id (only rows with non-null content matter).
   const contentByItem = new Map(contentRows.map((c) => [c.agenda_item_id, c]))
 
+  // Workstreams removed from the workshop are HIDDEN, not deleted: their agenda
+  // items + content stay in the DB but are excluded from the deck.
+  const activeCodes = new Set(ws.workstream_codes || [])
+
   // Build sections from agenda items (already in sort_order) that HAVE content.
   const sections: DeckSection[] = []
   for (const item of agenda) {
+    if (item.section_kind === 'workstream' && item.workstream_code && !activeCodes.has(item.workstream_code)) continue
     const row = contentByItem.get(item.id)
     if (!row?.content) continue
     sections.push({

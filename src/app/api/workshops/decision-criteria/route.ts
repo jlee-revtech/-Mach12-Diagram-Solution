@@ -76,8 +76,9 @@ export async function POST(req: NextRequest) {
     if (!ANTHROPIC_KEY) return json({ error: 'ANTHROPIC_API_KEY is not configured' }, 500)
 
     const db = serverModelDb()
-    const { data: ws } = await db.from('workshops').select('id, title, topic, customer_name').eq('id', workshopId).eq('organization_id', orgId).maybeSingle()
+    const { data: ws } = await db.from('workshops').select('id, title, topic, customer_name, workstream_codes').eq('id', workshopId).eq('organization_id', orgId).maybeSingle()
     if (!ws) return json({ error: 'Workshop not found for this organization' }, 404)
+    const activeCodes = new Set((ws.workstream_codes as string[] | null) || [])
 
     const [{ data: items }, { data: contentRows }, { data: captures }] = await Promise.all([
       db.from('workshop_agenda_items').select('id, title, section_kind, workstream_code, sort_order').eq('workshop_id', workshopId).order('sort_order', { ascending: true }),
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
       db.from('workshop_captures').select('capture_type, title, detail, owner, due_date, status').eq('workshop_id', workshopId),
     ])
     const titleById = new Map<string, string>((items || []).map((i: Row) => [i.id as string, (i.title as string) || 'Section']))
+    const wsCodeByItem = new Map<string, string | null>((items || []).map((i: Row) => [i.id as string, (i.workstream_code as string | null) ?? null]))
     const contentByItem = new Map<string, Row>((contentRows || []).map((r: Row) => [r.agenda_item_id as string, r]))
 
     const evalRow = contentByItem.get(agendaItemId)
@@ -97,6 +99,9 @@ export async function POST(req: NextRequest) {
 
     for (const r of (contentRows || []) as Row[]) {
       const c = (r.content ?? {}) as Row
+      // Skip hidden workstreams (removed from the workshop's active set).
+      const code = wsCodeByItem.get(r.agenda_item_id as string)
+      if (c.kind === 'workstream' && code && !activeCodes.has(code)) continue
       const label = titleById.get(r.agenda_item_id as string) || 'Section'
       // Notes & Considerations (every kind) are prioritized considerations.
       for (const n of asBullets(c.notesAndConsiderations)) considerations.push(`[${label}] ${n}`)

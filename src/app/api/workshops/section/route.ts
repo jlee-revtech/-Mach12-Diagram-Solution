@@ -146,9 +146,12 @@ export async function POST(req: NextRequest) {
         .from('workshop_agenda_content')
         .select('agenda_item_id, section_kind, content, version')
         .eq('workshop_id', workshopId)
+      // Exclude hidden workstreams (removed from the workshop's active set).
+      const activeCodes = new Set((ws.workstream_codes as string[] | null) || [])
       const wsRows = (rows || []).filter(
         (r): r is ContentRow =>
-          r.section_kind === 'workstream' && !!r.content && (r.content as SectionContent).kind === 'workstream',
+          r.section_kind === 'workstream' && !!r.content && (r.content as SectionContent).kind === 'workstream' &&
+          (!(r.content as WorkstreamSectionContent).workstreamCode || activeCodes.has((r.content as WorkstreamSectionContent).workstreamCode)),
       )
       const decisionsByCode = new Map<
         string,

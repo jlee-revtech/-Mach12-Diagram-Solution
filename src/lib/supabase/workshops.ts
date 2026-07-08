@@ -203,13 +203,32 @@ export async function replaceAgenda(
 
 export async function updateAgendaItem(
   id: string,
-  updates: Partial<{ status: AgendaStatus; title: string; objective: string; timebox_minutes: number; notes: string }>,
+  updates: Partial<{ status: AgendaStatus; title: string; objective: string; timebox_minutes: number; notes: string; sort_order: number }>,
 ): Promise<void> {
   await fetch(`${URL}/rest/v1/workshop_agenda_items?id=eq.${id}`, {
     method: 'PATCH',
     headers: headers('return=minimal'),
     body: JSON.stringify(updates),
   })
+}
+
+// Add a single agenda item without disturbing the rest (unlike replaceAgenda,
+// which deletes + recreates). Used to add a workstream section to a workshop.
+export async function addWorkshopAgendaItem(
+  workshopId: string,
+  data: {
+    title: string; objective?: string; section_kind?: SectionKind; workstream_code?: string
+    timebox_minutes?: number; sort_order?: number; status?: AgendaStatus; focus_type?: WorkshopFocus
+  },
+): Promise<WorkshopAgendaItem> {
+  const res = await fetch(`${URL}/rest/v1/workshop_agenda_items`, {
+    method: 'POST',
+    headers: headers('return=representation'),
+    body: JSON.stringify({ workshop_id: workshopId, status: 'pending', ...data }),
+  })
+  const arr = await res.json()
+  if (!res.ok) throw new Error((Array.isArray(arr) ? arr[0]?.message : arr?.message) || 'Failed to add agenda item')
+  return one(arr)
 }
 
 // ─── Scenarios ──────────────────────────────────────────────

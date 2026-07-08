@@ -7,7 +7,7 @@ import { listWorkstreams } from '@/lib/supabase/workstreams'
 import {
   getWorkshop, updateWorkshop, listAgenda, updateAgendaItem, updateWorkshopDuration,
   listMessages, addMessage, listCaptures, updateCapture, setParticipants,
-  listAgendaContent, restartWorkshop, archiveWorkshop, readWorkshopShare,
+  listAgendaContent, restartWorkshop, archiveWorkshop, readWorkshopShare, addWorkshopAgendaItem,
   type AgendaContentRow, type WorkshopShare,
 } from '@/lib/supabase/workshops'
 import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType } from '@/lib/workshop/types'
@@ -23,6 +23,7 @@ import SectionEditor from '@/components/workshop/SectionEditor'
 import BriefLoading from '@/components/workshop/BriefLoading'
 import TranscriptUploadDialog from '@/components/workshop/TranscriptUploadDialog'
 import WorkshopShareDialog from '@/components/workshop/WorkshopShareDialog'
+import ManageWorkstreamsDialog from '@/components/workshop/ManageWorkstreamsDialog'
 
 interface FacResult {
   say: string; nextQuestion?: string; coverage?: string; advanceAgenda?: boolean; pullSpecialist?: string; gaps?: string[]
@@ -68,6 +69,7 @@ export default function WorkshopRoomPage() {
   const [pickSpecialist, setPickSpecialist] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [manageWsOpen, setManageWsOpen] = useState(false)
   const [sectionsMenu, setSectionsMenu] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const voiceRef = useRef<TranscriptionProvider | null>(null)
@@ -154,6 +156,32 @@ export default function WorkshopRoomPage() {
     setDurationMinutes(minutes)
     if (ws) await updateWorkshopDuration(ws.id, minutes)
   }, [ws])
+
+  // Add/hide workstreams (non-destructive). Hiding just drops the code from the
+  // workshop's active set (agenda item + content are kept, filtered from view);
+  // adding a brand-new workstream creates a fresh section to author into.
+  const applyWorkstreams = useCallback(async (selectedCodes: string[]) => {
+    if (!ws) return
+    const current = ws.workstream_codes || []
+    const existingWsCodes = new Set(
+      agenda.filter((a) => a.section_kind === 'workstream' && a.workstream_code).map((a) => a.workstream_code),
+    )
+    const toAdd = selectedCodes.filter((c) => !current.includes(c))
+    const evalItem = agenda.find((a) => a.section_kind === 'evaluation')
+    const maxSort = agenda.reduce((m, a) => Math.max(m, a.sort_order), 0)
+    let insertAt = evalItem ? evalItem.sort_order : maxSort + 1
+    for (const code of toAdd) {
+      if (existingWsCodes.has(code)) continue // un-hiding: its section already exists
+      const wsName = streams.find((s) => s.code === code)?.name || code
+      await addWorkshopAgendaItem(ws.id, { title: wsName, section_kind: 'workstream', workstream_code: code, sort_order: insertAt, status: 'pending' })
+      insertAt += 1
+    }
+    // Keep the evaluation section last if new workstream sections pushed past it.
+    if (evalItem && insertAt !== evalItem.sort_order) await updateAgendaItem(evalItem.id, { sort_order: insertAt })
+    await updateWorkshop(ws.id, { workstream_codes: selectedCodes })
+    setWs((prev) => (prev ? { ...prev, workstream_codes: selectedCodes } : prev))
+    await load()
+  }, [ws, agenda, streams, load])
 
   // Persist the workshop-level guidance prompt (047). Threaded server-side as
   // `guidance` into every section generate and the brief; no body change needed
@@ -371,13 +399,23 @@ export default function WorkshopRoomPage() {
   // ─── Prep section-authoring derived state ───
   const contentByItem = new Map(content.map((c) => [c.agenda_item_id, c]))
   const wsByCode = (code?: string | null) => (code ? streams.find((s) => s.code === code) ?? null : null)
+  // Hidden workstreams (code removed from the workshop) keep their section + content
+  // in the DB but are filtered out of the prep view, the deck, and the roster.
+  const activeCodes = new Set(ws.workstream_codes || [])
+  const isVisibleItem = (a: WorkshopAgendaItem) =>
+    a.section_kind !== 'workstream' || !a.workstream_code || activeCodes.has(a.workstream_code)
+  const visibleAgenda = agenda.filter(isVisibleItem)
+  const visibleItemIds = new Set(visibleAgenda.map((a) => a.id))
   const selectedItem = agenda.find((a) => a.id === selectedItemId) ?? null
-  const evaluationItem = agenda.find((a) => a.section_kind === 'evaluation') ?? null
-  const hasWorkstreamContent = agenda.some(
+  const evaluationItem = visibleAgenda.find((a) => a.section_kind === 'evaluation') ?? null
+  const hasWorkstreamContent = visibleAgenda.some(
     (a) => a.section_kind === 'workstream' && !!contentByItem.get(a.id)?.content,
   )
-  // Enable the Workshop Experience once any section has authored content.
-  const hasAnyContent = content.some((c) => !!c.content)
+  // Enable the Workshop Experience once any visible section has authored content.
+  const hasAnyContent = content.some((c) => !!c.content && visibleItemIds.has(c.agenda_item_id))
+  // Workstream codes that already have authored content (for the manage dialog).
+  const wsCodeByItem = new Map(agenda.map((a) => [a.id, a.workstream_code]))
+  const codesWithContent = [...new Set(content.filter((c) => !!c.content).map((c) => wsCodeByItem.get(c.agenda_item_id)).filter((x): x is string => !!x))]
 
   return (
     <div className="min-h-screen bg-[var(--m12-bg)] flex flex-col">
@@ -403,6 +441,15 @@ export default function WorkshopRoomPage() {
           initialShare={readWorkshopShare(ws)}
           onClose={() => setShareOpen(false)}
           onChange={(share: WorkshopShare) => setWs((prev) => (prev ? { ...prev, settings: { ...(prev.settings || {}), share } } : prev))}
+        />
+      )}
+      {manageWsOpen && (
+        <ManageWorkstreamsDialog
+          streams={streams}
+          activeCodes={ws.workstream_codes || []}
+          codesWithContent={codesWithContent}
+          onClose={() => setManageWsOpen(false)}
+          onSave={applyWorkstreams}
         />
       )}
       <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--m12-border)]/40">
@@ -498,6 +545,10 @@ export default function WorkshopRoomPage() {
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setSectionsMenu(false)} />
                         <div className="absolute right-0 top-8 z-20 w-60 rounded-lg border border-[var(--m12-border)] bg-[var(--m12-bg-card)] shadow-xl py-1">
+                          <button onClick={() => { setSectionsMenu(false); setManageWsOpen(true) }} className={roomMenuItemCls}>
+                            ⚙&nbsp; Add or hide workstreams
+                          </button>
+                          <div className="my-1 border-t border-[var(--m12-border)]/50" />
                           <button onClick={() => { setSectionsMenu(false); downloadFacilitationPptx() }} disabled={!hasAnyContent || busy === 'deck'} className={roomMenuItemCls}>
                             ⤓&nbsp; {busy === 'deck' ? 'Preparing deck…' : 'Download facilitation deck (PPTX)'}
                           </button>
@@ -553,7 +604,7 @@ export default function WorkshopRoomPage() {
               </div>
 
               <div className="space-y-2">
-                {agenda.map((a, i) => (
+                {visibleAgenda.map((a, i) => (
                   <SectionCard
                     key={a.id}
                     item={a}
@@ -591,7 +642,7 @@ export default function WorkshopRoomPage() {
               )}
               <details open className="rounded-lg border border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)] px-3 py-2">
                 <summary className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] cursor-pointer">Workshop brief</summary>
-                <div className="mt-3"><BriefView ws={ws} agenda={agenda} onStart={() => setStatus('live')} /></div>
+                <div className="mt-3"><BriefView ws={ws} agenda={visibleAgenda} onStart={() => setStatus('live')} /></div>
               </details>
             </div>
 
@@ -627,7 +678,7 @@ export default function WorkshopRoomPage() {
           <div className="col-span-3 border-r border-[var(--m12-border)]/40 overflow-auto p-4">
             <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-3">Agenda</div>
             <div className="space-y-1.5">
-              {agenda.map((a) => (
+              {visibleAgenda.map((a) => (
                 <button key={a.id} onClick={() => setActive(a)} className="w-full text-left rounded-lg border px-3 py-2 transition-colors"
                   style={{ borderColor: a.status === 'active' ? '#2563EB' : 'var(--m12-border)', backgroundColor: a.status === 'active' ? '#2563EB14' : 'transparent', opacity: a.status === 'done' ? 0.5 : 1 }}>
                   <div className="flex items-center gap-2">
