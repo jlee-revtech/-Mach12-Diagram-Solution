@@ -143,10 +143,18 @@ for (const s of sources || []) {
   }
 }
 
-// Verdict = depth of stream-specific domain prose (dimension profile + skill +
-// govcon + industry + dassian), excluding cross-cutting and structural sources.
+// Verdict = depth of STREAM-SPECIFIC domain prose: the dimension profile, the
+// stream's own SAP/technical skills, its GovCon overlay, and its Dassian sources.
+//
+// L2 (industry blueprints) is deliberately EXCLUDED, even though it is domain
+// content. Blueprints are all-stream by design: counting them would push every
+// stream to "rich" the moment the first blueprint lands, and a metric that reports
+// success as a side effect of adding one all-stream source is not a metric. The L2
+// column still shows, so the industry layer's presence is visible; it just does not
+// buy a stream depth it does not have. Same reason crosscut, config, capModel,
+// accelerator, and criteria are excluded.
 function verdict(c) {
-  const domain = c.genres['dim'].length + c.genres['L0-skill'].length + c.genres['L1-govcon'].length + c.genres['L2-industry'].length + c.genres['L3-dassian'].length
+  const domain = c.genres['dim'].length + c.genres['L0-skill'].length + c.genres['L1-govcon'].length + c.genres['L3-dassian'].length
   if (domain === 0) return 'EMPTY'
   if (domain === 1) return 'thin'
   if (domain === 2) return 'medium'
@@ -175,7 +183,9 @@ if (!onlyDims) {
   }
   console.log('\nlegend: xc=cross-cutting (all-stream)  cfg=config-capability  cap=capability-model')
   console.log('        dim=8-dimension operating profile  L0=stream SAP/technical skill  L1=GovCon overlay')
-  console.log('        L2=industry blueprint  L3=Dassian  tpl=RevTech template (H1)  acc=accelerator (H2)  crit=kb_criteria rows')
+  console.log('        L2=industry blueprint (all-stream, EXCLUDED from the verdict)  L3=Dassian')
+  console.log('        tpl=RevTech template (H1)  acc=accelerator (H2)  crit=kb_criteria rows')
+  console.log('        verdict counts stream-specific domain prose only: dim + L0 + L1 + L3')
   console.log('\nverdict counts:', JSON.stringify(WORKSTREAMS.reduce((a, w) => { const v = verdict(cov[w.code]); a[v] = (a[v] || 0) + 1; return a }, {})))
 }
 
