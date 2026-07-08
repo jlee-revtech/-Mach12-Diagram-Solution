@@ -1,0 +1,347 @@
+[
+  {
+    "code": "R2R-001",
+    "workstream_code": "record-to-report",
+    "pillar": "Process",
+    "statement": "Every contract WBS that recognizes revenue carries a Results Analysis key (PRPS-ABGSL) whose RA version and valuation method implement cost-to-cost percentage of completion in controlling area A000.",
+    "rationale": "Cost-to-cost POC is the dominant ASC 606 input method on long-duration defense work and it is the only method that ties revenue back to ACDOCA actuals without a manual bridge. A WBS with no RA key silently recognizes nothing and the program's revenue lands in a spreadsheet. Remediate via r2r-configure-ra-key and r2r-ra-version.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List the results analysis keys defined in controlling area A000 with their RA versions and assigned valuation methods, and list the WBS elements that carry each key.",
+      "expect": "Each revenue-bearing WBS has a non-blank ABGSL; every key in use maps to an RA version whose valuation method is cost-to-cost POC; no revenue-bearing WBS has a blank RA key."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/ra-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-002",
+    "workstream_code": "record-to-report",
+    "pillar": "Technology",
+    "statement": "On every RA key whose recognition depends on the classic PS RA customer enhancement, TKKAS-RFLG4 is set to 'M' and is never cleared by configuration cleanup.",
+    "rationale": "TKKAS-RFLG4 is the source of the KNDE1 control flag inside EXIT_SAPLKKAG_001; it is the per-key opt-in for the whole enhancement chain. Clearing it disables revenue recognition silently, with no error and no dump, so the failure is only found when a period closes wrong.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For controlling area A000, list every RA key with its TKKAS rows and the value of the customer-enhancement control flag RFLG4, alongside whether the customer exit include for that enhancement is active.",
+      "expect": "Every enhancement-enabled RA key shows RFLG4 = 'M' on its TKKAS rows; no enhancement-enabled key has a blank RFLG4."
+    },
+    "severity": "must",
+    "source_ref": "field/rflg4-is-ra-opt-in",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-003",
+    "workstream_code": "record-to-report",
+    "pillar": "Technology",
+    "statement": "Every RA key defined in the controlling area also has a TKKAS_L row, so the key is visible and maintainable in the standard valuation-method maintenance view.",
+    "rationale": "The valuation-method maintenance view is rooted on TKKAS_L, not TKKAS. A key that exists in TKKAS but not TKKAS_L is invisible to the configurer, which invites someone to 'fix' the wrong flag and break the enhancement. Cloning a key means replicating TKKAS, TKKAD, TKKAR, TKKAZ and TKKAS_L together.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Compare the RA keys present in TKKAS for controlling area A000 against the RA keys present in TKKAS_L for the same controlling area and RA version.",
+      "expect": "The two sets are identical; no RA key appears in TKKAS without a matching TKKAS_L row."
+    },
+    "severity": "should",
+    "source_ref": "field/rflg4-is-ra-opt-in",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-004",
+    "workstream_code": "record-to-report",
+    "pillar": "Process",
+    "statement": "Each RA key carries a complete line-ID catalog covering cost (category K), revenue (category E) and at least one category-N line ID reserved for costs deliberately excluded from the POC base.",
+    "rationale": "A cost element with no line ID raises the 'cannot be assigned to a line ID' error and blocks the RA run; a cost element mapped to a category-K line ID is silently pulled into cost of sales and moves POC. The category-N line ID is the only supported way to keep a cost element assigned (no error) while keeping it out of the valuation. Remediate via r2r-configure-ra-key.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For controlling area A000, list the line IDs per RA key (TKKAR) with their category value, and the cost element masks routed to each line ID (TKKAZ).",
+      "expect": "Every key shows at least one K line ID, one E line ID, and one N line ID; no cost element posted to an RA-relevant WBS is unmapped."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/ra-cost-element-exclusion",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-005",
+    "workstream_code": "record-to-report",
+    "pillar": "Data",
+    "statement": "No RA key uses a wildcard catch-all cost element mask in TKKAZ that sweeps unlisted cost elements into the cost-of-sales base.",
+    "rationale": "Classic RA excludes unassigned cost elements gracefully, with no error, so a catch-all mask is not needed for stability; what it does instead is quietly capture every newly created cost element in its range (for example intercompany labor) into the POC numerator, which makes the recognition base drift as master data grows. The recognition base then flip-flops between periods and no one can explain it.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List every cost element mask (KOAMK) in TKKAZ for controlling area A000 by RA key, flagging masks that contain trailing wildcard characters covering more than a single cost element.",
+      "expect": "Masks are specific to the intended cost elements; any wildcard range is deliberate, documented, and does not span a cost element family the client intends to exclude."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/ra-cost-element-exclusion",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-006",
+    "workstream_code": "record-to-report",
+    "pillar": "Process",
+    "statement": "Where a cost element must be excluded from POC for one project but not another, the projects carry distinct RA keys rather than sharing one key with a per-project override.",
+    "rationale": "TKKAZ is keyed by RA key (ABGSL), never by WBS, so any cost element exclusion applies to every project that carries that key. Teams that discover this late have already changed recognition on programs they never touched. Scope the exclusion by giving the project its own RA key.",
+    "evidence": {
+      "how": "manual",
+      "question": "Which projects share each RA key today, and for each cost element exclusion in force, was every project on that key intended to be affected?",
+      "expect": "A documented mapping of RA key to project population, and a statement that each exclusion is intentional for the full population on that key."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/ra-cost-element-exclusion",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-007",
+    "workstream_code": "record-to-report",
+    "pillar": "Data",
+    "statement": "Every WBS element that carries an RA key also carries a Performance Obligation ID in the designated PS user field (PRPS-USR01), validated against an active entry in the POB check table.",
+    "rationale": "ASC 606 recognition happens at the performance obligation, not at the WBS; without a POB tag on each RA-bearing WBS there is no way to compute a unified percent complete across the obligation or to reconcile revenue to the remaining-performance-obligation disclosure. The field key label (TCN01-SWRT1) makes the field visible in the Project Builder without any custom UI.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List WBS elements where the RA key (PRPS-ABGSL) is set, showing the POB ID user field (PRPS-USR01), the field key (PRPS-SLWID), and whether the POB ID exists and is active in the POB check table.",
+      "expect": "Zero WBS with an RA key and a blank or inactive POB ID; the field key on those WBS has a non-blank label for the POB slot."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/pob-field",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-008",
+    "workstream_code": "record-to-report",
+    "pillar": "Data",
+    "statement": "The Dassian RAENH overlay follows one row convention: planned cost lives in the ADJ line-ID row's sap_eac field, planned revenue lives in the REV line-ID row's copb_cv field, and ADJ copb_cv is zero.",
+    "rationale": "The RAENH engine reads plan revenue from the REV row and plan cost from the ADJ row at run time. An external update that writes plan revenue onto the ADJ row leaves the engine reading a stale REV value, so displayed planned revenue and recognized revenue diverge with no error. A non-zero ADJ cos_var also drags the Dassian surplus/excess branch into the calculation and makes the math unexplainable.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For the current adjustment period, list the RAENH overlay rows by WBS and line ID showing copb_cv, sap_eac and cos_var1, grouped so ADJ rows and REV rows appear side by side.",
+      "expect": "Each WBS has one ADJ row with copb_cv = 0 and sap_eac = planned cost, and one REV row with copb_cv = planned revenue; no third line ID carries a plan value."
+    },
+    "severity": "must",
+    "source_ref": "skill/dassian-results-analysis",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-009",
+    "workstream_code": "record-to-report",
+    "pillar": "Data",
+    "statement": "The RAENH cost-of-sales snapshot table is populated for every RA-relevant WBS and period, with exactly one row per WBS and period, before the revenue engine runs.",
+    "rationale": "RAENH reads cost of sales from its snapshot table, not live from ACDOCA. An empty snapshot yields a zero cost adjustment and therefore zero recognized revenue, which reads as a broken engine rather than a missing input. The initialization association joins on period alone, so a duplicate row per period fans the result out.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For the current fiscal year and period, count the RAENH cost-of-sales snapshot rows per WBS element and list any WBS with an RA key that has zero rows or more than one row.",
+      "expect": "Exactly one snapshot row for every RA-key WBS in the period; no RA-key WBS missing a row; no WBS with duplicates."
+    },
+    "severity": "must",
+    "source_ref": "skill/dassian-results-analysis",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-010",
+    "workstream_code": "record-to-report",
+    "pillar": "Technology",
+    "statement": "The RAENH configuration tables are populated for the controlling area, including the enhancement status that selects the over-time (LTA) or point-in-time (PIT) processing branch per controlling area and RA version.",
+    "rationale": "The processing type is resolved from the RA key plus the controlling-area enhancement status, and it decides whether the engine reads the current RA result and applies a delta (over time) or recomputes plan revenue and plan cost from the overlay (point in time). A missing status row means the engine picks a branch nobody chose. Remediate via r2r-dassian-raenh.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For controlling area A000, list the RAENH configuration rows: the controlling-area entry, the CO version entry, the line-ID-to-account-group mapping, and the enhancement status per RA version.",
+      "expect": "All configuration levels exist for A000; the enhancement status is explicitly set (over time or point in time) and matches the accounting policy documented for that contract population."
+    },
+    "severity": "should",
+    "source_ref": "skill/dassian-results-analysis",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-011",
+    "workstream_code": "record-to-report",
+    "pillar": "Technology",
+    "statement": "Custom logic hooked into the RA customer exit acts only on the result-delta export structure or the RAENH overlay; it never attempts to modify the imported RA basis.",
+    "rationale": "SAP computes the RA result, including the POC percentage and the recognized values, before it calls the customer exit. Code that rewrites the imported basis has no effect at all, which costs weeks of bisecting. The only working levers are the RAENH overlay (read live at RA run time) and the result-delta export structure.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Read the source of the RA customer-exit include chain and report which of the exit's table parameters are written: the imported basis, the imported current result, the exported result delta, or the log.",
+      "expect": "No write to the imported basis structure; writes confined to the exported result-delta table and the log table; overlay reads only."
+    },
+    "severity": "should",
+    "source_ref": "skill/dassian-results-analysis",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-012",
+    "workstream_code": "record-to-report",
+    "pillar": "Process",
+    "statement": "The revenue recognition base equals the RA engine's own cost of sales by construction, established through RA configuration (line-ID and cost element mask design), not through a parallel cost total computed in custom code.",
+    "rationale": "When a custom recognition routine sums its own actual cost, its base can diverge from what RA treats as cost of sales, and the two flip-flop as cost elements are added or masks change. Excluding the unwanted cost elements in RA configuration makes both the RA result and the recognition base exclude them by construction, which ends the drift permanently.",
+    "evidence": {
+      "how": "manual",
+      "question": "Which cost elements are in the recognition base, and is that set defined by the RA line-ID configuration or by a filter inside custom code? Show the last three periods where the two totals were reconciled.",
+      "expect": "A single definition of the base, sourced from RA configuration; a reconciliation showing the custom routine's base equals RA's cost of sales to the cent for three consecutive periods."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/ra-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-013",
+    "workstream_code": "record-to-report",
+    "pillar": "Data",
+    "statement": "Every P&L account created for revenue exists as a complete mirrored set: chart-of-accounts row, company-code row, texts, and a cost element in the controlling area with the revenue category.",
+    "rationale": "There is no create BAPI for a G/L account, so accounts are built by mirroring a known-good template across SKA1, SKB1, SKAT, CSKA and CSKB. A revenue account without its controlling-area cost element (category 11) is postable in FI but invisible to CO, so RA never sees the revenue and the reconciliation to the universal journal fails. The cost element text table is not maintained on this release; skip it.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For the operating chart of accounts and company code 1710, list P&L revenue accounts and report for each whether a chart-level row, a company-code row, a text row, a chart-level cost element and a controlling-area cost element with its category exist.",
+      "expect": "Every revenue account is present at all five levels; the controlling-area cost element category is the revenue category in A000."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/ycoa-gl-account-mirror",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-014",
+    "workstream_code": "record-to-report",
+    "pillar": "Data",
+    "statement": "Every profit center used in postings is explicitly assigned to each company code it posts in, via the profit-center company-code assignment table.",
+    "rationale": "Profit-center accounting validation in the controlling area rejects a posting when the profit center master exists, is valid and unlocked, but has no assignment row for the posting company code; the sales or finance document fails with a 'no postings can be made' message that points at the master data instead of the assignment. Mirroring the full assignment set into every company code that will post removes an entire class of go-live defects.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List the profit centers assigned per company code in controlling area A000, and compare against the set of profit centers referenced by cost centers, WBS elements and sales document line items in each company code.",
+      "expect": "Every referenced profit center has an assignment row for the company code that references it; no company code has a materially smaller assignment set than its peers in the same controlling area."
+    },
+    "severity": "must",
+    "source_ref": "field/pca-cepc-bukrs-assignment",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-015",
+    "workstream_code": "record-to-report",
+    "pillar": "Process",
+    "statement": "The five R2R loops (journal-to-close, allocate-to-rate, settle-and-recognize, bill-and-collect interface, consolidate-and-report) each exist as a named process homed to this workstream, with its control points recorded.",
+    "rationale": "The DFARS accounting business system criteria are assessed against a process narrative, not a config table; if the architecture model has no process for allocate-to-rate, the rate calculation is living in a spreadsheet next to SAP and nobody has admitted it yet. Named processes are also what the auditor walks.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "processes",
+      "expect": "Five or more processes homed to record-to-report covering close, allocation and rate build-up, settlement and results analysis, the billing interface, and consolidation and external reporting, each with at least one control point."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/r2r-process-model",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-016",
+    "workstream_code": "record-to-report",
+    "pillar": "People",
+    "statement": "The government compliance owner exists as a persona distinct from the controller and sits outside the close chain, and the rates analyst is modeled as a separate persona from the cost accounting manager.",
+    "rationale": "Compliance opinions on pool architecture and allowability must be independent of close pressure, which is a reporting-line design decision, not a role name. Where the rates analyst and the cost accounting manager are one persona, pool structure changes get made without the compliance veto and surface later as a cost impact analysis nobody budgeted.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "personas",
+      "expect": "Distinct personas for the government compliance owner, the controller, the rates analyst and the cost accounting manager; the compliance persona's reporting line does not pass through the close owner."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/r2r-operating-model",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-017",
+    "workstream_code": "record-to-report",
+    "pillar": "Technology",
+    "statement": "Exactly one system is designated as the book of record for consolidated actuals, and every other candidate (legacy consolidation tool, legacy GovCon ERP, reconciliation platform) carries an explicit keep, retire or integrate disposition.",
+    "rationale": "Running two consolidation books guarantees a tie-out project that never ends and gives an auditor two versions of the same number. The disposition must be recorded per system in the architecture model, because coexistence during an acquisition is a legitimate answer and 'we never decided' is not.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "systems",
+      "expect": "One system flagged as the consolidated book of record; every other financial system in the landscape carries a keep, retire or integrate disposition with a target date or a stated coexistence rationale."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/r2r-landscape",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-018",
+    "workstream_code": "record-to-report",
+    "pillar": "Technology",
+    "statement": "The invoice submission boundary to the government payment portal is registered as an integration with a stated direction, payload format, and acknowledgement or status feedback path back into SAP.",
+    "rationale": "The portal speaks documented file and EDI formats with its own onboarding cycle, not a modern REST interface; teams that leave this as 'we will submit manually' improvise the process in hypercare and then cannot answer how rejection status returns to the billing document. Whether the choice is a feed or human submission, the status must come back into the system of record.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "integrations",
+      "expect": "An integration record for the payment-portal boundary showing direction, format, trigger, and how acceptance or rejection status is captured back against the billing document."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/r2r-landscape",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-019",
+    "workstream_code": "record-to-report",
+    "pillar": "Process",
+    "statement": "The G&A allocation base decision (total cost input, value added, or single element) is documented in the CAS Disclosure Statement and any change to it has a completed cost impact analysis before the configuration is built.",
+    "rationale": "The base choice shifts G&A burden between material-heavy and labor-heavy programs and is one of the most consequential decisions in the whole implementation. A change in cost accounting practice triggers advance notification to the cognizant contracting officer and a cost impact analysis; consultants who redesign pools without budgeting that lead time cause real damage.",
+    "evidence": {
+      "how": "manual",
+      "question": "What G&A base is disclosed today, is the SAP costing sheet and allocation design consistent with it, and if the design changes the base, where is the cost impact analysis and the notification plan?",
+      "expect": "The disclosed base matches the built base; any deviation has a dated cost impact analysis and a notification plan with an owner."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/cas-pool-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-020",
+    "workstream_code": "record-to-report",
+    "pillar": "People",
+    "statement": "The toxic-pair separations are enforced in role design: RA configuration is separated from RA execution, period control is separated from journal posting, and allocation cycle maintenance is separated from cycle execution.",
+    "rationale": "Each pair lets one person move a reported number and conceal it: change the recognition method then run it, backdate into a closed period, or redirect indirect cost between pools to move a billing rate. These are the pairs that show up first in a segregation-of-duties ruleset and in the accounting business system determination.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the segregation-of-duties ruleset output for these three pairs across all production users, including firefighter or emergency-access holders, for the last quarter.",
+      "expect": "Zero users hold both sides of any pair in production; emergency access to either side is logged and reviewed by someone outside the close chain."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/r2r-security",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-021",
+    "workstream_code": "record-to-report",
+    "pillar": "Data",
+    "statement": "Inception-to-date project cost by WBS and cost element is loaded at cutover so cost-to-cost POC continues without restarting from zero.",
+    "rationale": "Cost-to-cost POC is a ratio of cumulative actual cost to estimate at completion. Without the ITD cost load, POC restarts at zero on day one and every in-flight program understates recognized revenue in the first period after go-live. A mid-fiscal-year cutover compounds this by forcing a stub-period incurred cost submission assembled from two systems.",
+    "evidence": {
+      "how": "manual",
+      "question": "What is the plan for loading inception-to-date cost by WBS and cost element, and has a parallel RA run against the legacy result been scheduled before cutover?",
+      "expect": "An ITD load object in the migration sequence positioned after WBS creation and before the first RA run, plus a documented parallel-run comparison with an acceptance tolerance."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/r2r-migration-sequence",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-022",
+    "workstream_code": "record-to-report",
+    "pillar": "Technology",
+    "statement": "The rate monitor and the unallowable-cost screening report are registered as RICEFW objects with named owners, rather than living as analyst spreadsheets.",
+    "rationale": "Pool totals must be readable as cost center group totals in the universal journal and applied burden must post through costing sheets; if the rate calculation is a spreadsheet fed by SAP, the tie-out nightmare that the S/4 program was bought to kill survives it. Registering both as RICEFW forces an owner, a test, and a transport path.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "ricefw",
+      "expect": "RICEFW entries exist for the indirect rate monitor and the unallowable-cost screening report, each with an owning persona and a stated source (embedded CDS analytics over the universal journal, not an extract)."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/r2r-analytics",
+    "version": "2026.1"
+  },
+  {
+    "code": "R2R-023",
+    "workstream_code": "record-to-report",
+    "pillar": "Process",
+    "statement": "The incurred cost submission schedules are generated from governed universal-journal extracts, and direct cost by contract reconciles to amounts billed within a stated tolerance before submission.",
+    "rationale": "The submission format is unavoidable, but maintaining it as a parallel ledger is a choice. Generating the schedules from extracts and cross-footing them internally finds the reconciliation break before the auditor does, and it means the executive who signs the certificate can explain every number without reference to a spreadsheet's history.",
+    "evidence": {
+      "how": "manual",
+      "question": "How were the last submission's schedules produced, and can direct cost by contract be tied to billed amounts within tolerance from system extracts alone?",
+      "expect": "A documented extract-to-schedule mapping, a tolerance, and a signed tie-out that did not require manual re-keying of contract-level totals."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/govcon-ics",
+    "version": "2026.1"
+  }
+]

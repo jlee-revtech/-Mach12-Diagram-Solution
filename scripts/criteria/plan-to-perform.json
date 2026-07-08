@@ -1,0 +1,272 @@
+[
+  {
+    "code": "P2PF-001",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Data",
+    "statement": "Level 1 of every project is a synthetic root WBS whose identifier equals the project definition name, and the first user-meaningful level (level 2) is the billing element, flagged with PRPS-FAKKZ set.",
+    "rationale": "Sales orders cannot be assigned to a project definition; they can only be assigned to a WBS row flagged as a billing element, so a project without an L1 root and an L2 billing element cannot carry contract revenue. The synthetic root also gives the customer validation a level-2 identifier of the shape it expects, which templates copied from a flat structure never have.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List project definitions with their level-1 WBS identifier and the level-2 WBS elements, showing the billing element flag, the account assignment flag and the planning element flag per level.",
+      "expect": "Every project's level-1 WBS identifier equals its project definition name and carries no billing, account or planning flags; the billing element flag appears at level 2 on every revenue-bearing branch."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/ps-wbs-levels",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-002",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Data",
+    "statement": "Every WBS identifier at levels 2, 3 and 4 matches the RevTech numbering convention (a prefix character, a dash, a four-character block, then dot-separated two, three and three character sections) and passes the customer validation that runs after the standard coding-mask check.",
+    "rationale": "The RevTech project systems validation fires after SAP's own coding-mask check, so a mask that accepts an identifier can still be rejected by the validation. Source data with four-character codes at the deepest level will not fit the three-character slot; substitute or use a running sequence per parent rather than truncating into collisions.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List WBS elements by hierarchy level with their external (masked) identifier, and report any level-2, level-3 or level-4 identifier that does not match the expected section pattern for its level.",
+      "expect": "Zero identifiers deviate from the pattern at their level; level 1 is exempt and equals the project definition."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/ps-validation",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-003",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Technology",
+    "statement": "Every project coding mask contains at least one section separator drawn from the configured separator character set, and the mask has at least as many sections as the deepest identifier it must accept.",
+    "rationale": "A separator-free mask sends the project number un-edit routine into infinite recursion and the work process dies inside project definition create with a roll-area dump that names nothing useful. Too few sections in the mask produces the 'number of project sections does not agree with project mask' error at the create BAPI, which reads as a data problem and is a configuration problem.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List the project coding masks by prefix with their mask string, and list the configured section separator characters from the global project control parameters.",
+      "expect": "Every mask in use contains at least one configured separator; the section count of each mask is greater than or equal to the section count of the deepest identifier that prefix must carry."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/ps-coding-masks",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-004",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Data",
+    "statement": "User interfaces display the masked external identifier from the dedicated edit columns, while cost and actuals joins filter on the raw internal identifier resolved through the object number.",
+    "rationale": "A coding mask creates two forms of every identifier. The universal journal stores the internal, separator-free form; the readable masked form lives in dedicated edit columns. Conversion exits are unreliable here (one returns blank for maskless template projects, the other can dump), so the edit columns are the source for display and the internal form is the source for cost reads. Getting this backwards means either ugly screens or silently missing cost.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Read the source of the custom cost-reading and project-display objects and report which project and WBS identifier fields they select: the raw internal fields, the masked edit fields, or a conversion exit.",
+      "expect": "Cost reads filter on the internal identifier resolved via the object number; display layers read the edit columns; no object depends on a conversion exit for correctness."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/ps-coding-masks",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-005",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Technology",
+    "statement": "Bulk WBS loads externalize the plan to a staging table and run in a background job using the canonical sequence: PS initialization, then the multi-WBS create BAPI in batches, then PS precommit, then transaction commit.",
+    "rationale": "The initialization and precommit pair is required (it refreshes the PS buffers and writes the hierarchy GUIDs) and is not what the standard create BAPI calls internally. Driving the create BAPIs from a dialog work process blows the roll-area ceiling on any real project, and hardcoding thousands of plan rows into a report blows it at program load. Parent and left-sibling pointers are precomputed offline so batches work naturally.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the WBS loader: where the plan rows are staged, how the job is submitted, the BAPI call sequence per batch, and where the per-row result is logged.",
+      "expect": "A staging table holds the plan with parent and left-sibling pointers; the loader runs as a background job; each batch runs initialization, multi-create, precommit and commit; results are logged to a table rather than to a spool."
+    },
+    "severity": "should",
+    "source_ref": "field/ps-mass-load-pattern",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-006",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Technology",
+    "statement": "The project profile assigns a field key whose label table exposes exactly the user fields the program needs, and the Performance Obligation identifier occupies a user field slot that is empty across the existing WBS population.",
+    "rationale": "Relabeling a free user-field slot in the field key label table makes the field appear immediately in the Project Builder on every WBS that already carries that key, with no reassignment and no custom UI. Choosing a slot that is already populated (a heavily used slot with an existing label) either loses data or forces a WBS-wide reassignment nobody scoped. Blank labels hide the slot entirely.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List the field keys assigned to WBS elements with their per-slot labels, and report the population count of each user field slot across the operative WBS.",
+      "expect": "The slot chosen for the Performance Obligation identifier has a non-blank label on every field key the RA-bearing WBS use, and had a zero or near-zero population before the program began writing to it."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/ps-user-field-keys",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-007",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Data",
+    "statement": "Each work-authorized branch of the project has exactly one control account WBS, identified by the Dassian account-type marker, with work packages beneath it.",
+    "rationale": "The control account is where scope, schedule and budget intersect and where a control account manager is accountable; the planning engine and the earned value engine both key on the account-type marker to distinguish control accounts from work packages. A branch with no control account has no owner for its variance; a branch with several has no defensible span of control, which a surveillance activity reads as a paper system.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For the program's project, list the WBS elements with the Dassian account-type marker, showing which are control accounts and which are work packages, and count control accounts per branch and per control account manager.",
+      "expect": "Exactly one control account per work-authorized branch, with work packages beneath it; the control account count per manager is defensible rather than in the hundreds."
+    },
+    "severity": "must",
+    "source_ref": "skill/dassian-project-management",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-008",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Technology",
+    "statement": "Time-phased plan rows are written only through the Dassian plan-data insert and update function modules; nothing inserts or updates the plan header and detail tables directly.",
+    "rationale": "The insert function module hooks the work-package change log and the work authorization enhancement; a direct insert bypasses both, so the plan exists but its provenance does not, and the change log a surveillance data trace depends on has a hole in it. Updates must be delete-and-reinsert through the update function module, never a direct update, for the same reason.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Read the source of every custom loader, wrapper or report that writes Dassian time-phased plan data, and report whether it calls the plan-data insert or update function module or issues direct table statements.",
+      "expect": "Only function-module calls; zero direct INSERT, UPDATE or MODIFY statements against the plan header or plan detail tables."
+    },
+    "severity": "must",
+    "source_ref": "skill/dassian-ppc-plan-load",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-009",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Data",
+    "statement": "Resource forecast rows in the time-phased plan are keyed by work center plus activity type, and the separate Dassian resource counter field is left at its default.",
+    "rationale": "A Dassian resource forecast is keyed by work center and activity type; the resource-name field is a different numeric counter that is normally left at its initial value. Populating the counter instead of the work center produces plan rows that look loaded, cost correctly, and roll up against no capacity, so the resource picture the estimate at completion depends on is empty.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For the program's plan versions, list the plan header rows showing the work center field, the activity type, the cost element and the resource counter field, and count rows where the work center is blank.",
+      "expect": "Every labor plan row carries a work center that exists in the work center master and an activity type offered by that work center's cost center; the resource counter stays at its default."
+    },
+    "severity": "should",
+    "source_ref": "field/eac-resource-forecast",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-010",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Technology",
+    "statement": "The plan version families are kept distinct (baseline, estimate at completion, and revenue or price-to-win), and the plan-type discriminator correctly separates cost-to-date rows from forecast rows within the estimate-at-completion family.",
+    "rationale": "The three version families overlap in one physical plan table, so the version code and the plan-type discriminator are the only things separating a baseline from a forecast from a revenue plan. Inside the estimate-at-completion family the discriminator distinguishes actual cost to date from remaining forecast; getting it wrong double counts the estimate. Revenue rows are legitimate on the same table and are filtered by their own plan type.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List the distinct plan version and plan type combinations present in the Dassian plan header table for the program, with row counts and total value per combination.",
+      "expect": "Baseline, estimate-at-completion and revenue versions are separately identifiable; within the estimate-at-completion version, cost-to-date and forecast rows carry different plan types; no combination is unexplained."
+    },
+    "severity": "should",
+    "source_ref": "skill/dassian-ppc-plan-load",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-011",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Process",
+    "statement": "No charge number is open before a work authorization document exists for it; status release is tied to the work authorization workflow, not granted by master data maintenance.",
+    "rationale": "Work authorization before charging is the control that keeps unauthorized scope from starting, and it is one of the first things tested in a control account manager interview. Retrofitting the discipline onto live charge codes after go-live never fully succeeds, because the charge history already exists. The person who creates the WBS must not be the person who releases it.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the work authorization workflow, the system control that blocks status release without it, and a sample of five released control accounts traced back to their signed authorization documents.",
+      "expect": "A workflow-enforced release, a role split between WBS master data maintenance and status release, and five clean traces with no released account lacking an authorization."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/evms-controls",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-012",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Process",
+    "statement": "Baseline change control, freeze-period enforcement, and the management reserve and undistributed budget logs exist as named processes homed to this workstream, each with a control point and an accountable persona.",
+    "rationale": "Freeze-period enforcement must be a system control, not a training topic: it has to be blocked, not discouraged. Management reserve is contractor-controlled budget inside the contract budget base but outside the performance measurement baseline, and it never moves into overrun; that arithmetic only stays clean if every move is a logged transaction with an approver.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "processes",
+      "expect": "Processes homed to plan-to-perform for baseline change control, freeze-period exception handling, management reserve and undistributed budget logging, and the monthly earned value close, each with a control point and an owning persona."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/evms-controls",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-013",
+    "workstream_code": "plan-to-perform",
+    "pillar": "People",
+    "statement": "Control account managers are modeled as personas from the functional home organizations (engineering, manufacturing, supply chain), not as planning and controls staff, and the compliance analyst persona holds no data entry rights on the programs it surveils.",
+    "rationale": "The control account manager owns the work, which is exactly why the responsibility assignment matrix and the manager's training are the planning and controls organization's problem rather than its headcount. An analyst who both enters earned value and surveils it is self-reviewing, and the interview will find it.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "personas",
+      "expect": "Control account manager personas mapped to functional organizations with a matrix line to programs; a distinct compliance or surveillance persona whose permissions are display-only on live programs."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/p2perform-operating-model",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-014",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Technology",
+    "statement": "The external schedule tool remains the schedule of record and is registered as an integration mapping schedule activities to work packages, not to WBS elements.",
+    "rationale": "Rebuilding the integrated master schedule inside SAP is a signature failure, and mapping at the wrong grain (activity to WBS rather than activity to work package) means earned value and schedule never reconcile. The WBS lives once, in the project system; the planning engine time-phases against it; the schedule tool statuses against the work packages.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "integrations",
+      "expect": "An integration record for the schedule tool showing direction, cadence, and a mapping grain of schedule activity to work package; no integration attempts to master the schedule inside SAP."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/cost-schedule-integration",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-015",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Process",
+    "statement": "Actual cost of work performed ties to the universal journal at control account level every month before any deliverable leaves the building, under a written reconciliation contract with the finance workstream.",
+    "rationale": "Finance fulfills the actuals and the rates; program controls owns everything above the actuals line. When the earned value data and the universal journal disagree, the finding lands on the accounting system even though the auditor never opened the planning workbench. The tie-out has to be a report, not a project.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the reconciliation contract signed by the finance controller and the planning and controls director, and the last three monthly tie-outs of actual cost of work performed to the universal journal at control account level.",
+      "expect": "A signed contract specifying timing, rate application and tolerance; three consecutive tie-outs at zero variance, produced as a standing report rather than assembled by hand."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/seam-r2r-p2perform",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-016",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Technology",
+    "statement": "Any company code selected to carry project structures has a configured settlement strategy for the project object type before the first WBS is created in it.",
+    "rationale": "A company code with an unconfigured settlement strategy for the project object type blocks WBS creation outright, and the message names the strategy rather than the company code, so the team debugs the project profile instead. Confirming the strategy exists before choosing the company code costs one query and saves a day.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For each company code that will carry project structures, report whether a settlement strategy is configured for the project object type, and identify company codes where it is missing.",
+      "expect": "Every company code in scope has a configured strategy; company codes without one are excluded from project structure design or remediated before the first load."
+    },
+    "severity": "may",
+    "source_ref": "field/ps-cocode-settlement-gap",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-017",
+    "workstream_code": "plan-to-perform",
+    "pillar": "People",
+    "statement": "Programs carrying export-controlled data are fenced by a per-project access control mechanism (the project system authorization customer exit or an equivalent access-control table enforced in the analytics layer), not by project profile alone.",
+    "rationale": "Standard project system authorization is coarse: profile, project type, controlling area. Per-program access control needs the customer exit or a checked access-control table, and the analytics layer must inherit it, because the most common leak path is an extract, not the transaction screen.",
+    "evidence": {
+      "how": "manual",
+      "question": "How is access to an export-controlled program's cost and schedule data restricted today, and does the restriction carry into the analytics and AI layers that read the same data?",
+      "expect": "A named per-project mechanism with a provisioning workflow that captures person-status attestation, and a row-level restriction on the analytics views over the same projects."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/ps-security",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PF-018",
+    "workstream_code": "plan-to-perform",
+    "pillar": "Data",
+    "statement": "The management reserve, undistributed budget and baseline change request logs are governed data objects in the system (Dassian change objects or client-first-keyed custom tables), never spreadsheets.",
+    "rationale": "The budget trace from contract budget base down to control account must survive migration and surveillance; a spreadsheet log cannot be traced and cannot be reproduced as of a past reporting date. Any custom table built to hold these logs carries client as the first field and as part of the key, without exception.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "data",
+      "expect": "Data objects declared for the reserve, undistributed budget and change request logs with a named system of record and an owning persona; no spreadsheet appears as the system of record."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/cds-client-key",
+    "version": "2026.1"
+  }
+]

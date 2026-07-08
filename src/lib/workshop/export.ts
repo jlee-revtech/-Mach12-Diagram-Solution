@@ -101,11 +101,11 @@ export async function exportRecapDocx(ws: Workshop, recap: WorkshopRecapData): P
 
   const children = [
     new Paragraph({ text: ws.title, heading: HeadingLevel.TITLE }),
-    new Paragraph({ children: [new TextRun({ text: [ws.customer_name, recap.headline].filter(Boolean).join(' — '), italics: true })] }),
+    new Paragraph({ children: [new TextRun({ text: [ws.customer_name, recap.headline].filter(Boolean).join(': '), italics: true })] }),
     new Paragraph({ text: '' }),
     P(recap.summary),
     ...list('Decisions', recap.decisions),
-    ...(recap.actions?.length ? [H('Actions'), ...recap.actions.map((a) => P(`${a.title}${a.owner ? ` — ${a.owner}` : ''}${a.due ? ` (due ${a.due})` : ''}`, { bullet: true }))] : []),
+    ...(recap.actions?.length ? [H('Actions'), ...recap.actions.map((a) => P(`${a.title}${a.owner ? ` (${a.owner})` : ''}${a.due ? ` (due ${a.due})` : ''}`, { bullet: true }))] : []),
     ...list('Deliverables', recap.deliverables),
     ...list('Risks', recap.risks),
     ...list('Open questions', recap.openQuestions),
@@ -113,6 +113,125 @@ export async function exportRecapDocx(ws: Workshop, recap: WorkshopRecapData): P
   ]
   const doc = new Document({ sections: [{ children }] })
   download(await Packer.toBlob(doc), `${safe(ws.title)}-recap.docx`)
+}
+
+// ─── Consulting deliverables (Workpackage K2) ────────────────────────────────
+// The same docx plumbing, reused (not forked) for the documents the workstream
+// agents and the Solution Architect generate. Sections carry markdown, so this
+// renders headings, bullets, tables, and paragraphs, then appends the provenance
+// appendix: which evidence slot was filled by which tool. In GovCon the appendix
+// is the point, not an afterthought.
+
+export interface DeliverableDoc {
+  title: string
+  dtype: string
+  workstream_code: string
+  subject?: string | null
+  status?: string | null
+  created_at?: string | null
+  content: { sections?: { key: string; title: string; content: string }[] }
+  evidence?: { key: string; tool: string; ok: boolean; reason?: string }[]
+}
+
+/** Split a markdown block into docx paragraphs and tables. */
+async function markdownToDocx(md: string) {
+  const { Paragraph, HeadingLevel, TextRun, Table, TableRow, TableCell, WidthType } = await import('docx')
+  type Child = InstanceType<typeof Paragraph> | InstanceType<typeof Table>
+  const out: Child[] = []
+  const lines = md.replace(/\r\n/g, '\n').split('\n')
+
+  // Strip inline markdown emphasis; docx runs carry the styling instead.
+  const clean = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/`(.+?)`/g, '$1').trim()
+  const cellsOf = (row: string) =>
+    row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => clean(c))
+  const isDivider = (row: string) => /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(row) && row.includes('-')
+
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    const t = line.trim()
+
+    // Table: a pipe row followed by a divider row.
+    if (t.startsWith('|') && i + 1 < lines.length && isDivider(lines[i + 1])) {
+      const header = cellsOf(t)
+      i += 2
+      const body: string[][] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        body.push(cellsOf(lines[i]))
+        i++
+      }
+      const width = { size: 100, type: WidthType.PERCENTAGE }
+      const mkRow = (cells: string[], bold: boolean) =>
+        new TableRow({
+          children: cells.map(
+            (c) =>
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: c, bold, size: 18 })] })],
+              })
+          ),
+        })
+      out.push(new Table({ width, rows: [mkRow(header, true), ...body.map((r) => mkRow(r, false))] }))
+      out.push(new Paragraph({ text: '' }))
+      continue
+    }
+
+    if (!t) {
+      i++
+      continue
+    }
+    if (t.startsWith('### ')) out.push(new Paragraph({ text: clean(t.slice(4)), heading: HeadingLevel.HEADING_3, spacing: { before: 160, after: 60 } }))
+    else if (t.startsWith('## ')) out.push(new Paragraph({ text: clean(t.slice(3)), heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 80 } }))
+    else if (t.startsWith('# ')) out.push(new Paragraph({ text: clean(t.slice(2)), heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 80 } }))
+    else if (/^[-*]\s+/.test(t)) out.push(new Paragraph({ children: [new TextRun({ text: clean(t.replace(/^[-*]\s+/, '')) })], bullet: { level: 0 } }))
+    else if (/^\d+[.)]\s+/.test(t)) out.push(new Paragraph({ children: [new TextRun({ text: clean(t) })], bullet: { level: 0 } }))
+    else out.push(new Paragraph({ children: [new TextRun({ text: clean(t) })], spacing: { after: 60 } }))
+    i++
+  }
+  return out
+}
+
+export async function exportDeliverableDocx(d: DeliverableDoc): Promise<void> {
+  const { Document, Packer, Paragraph, HeadingLevel, TextRun } = await import('docx')
+  const sections = d.content?.sections ?? []
+  const meta = [d.workstream_code, d.dtype, d.status].filter(Boolean).join(' | ')
+
+  const children: (InstanceType<typeof Paragraph> | Awaited<ReturnType<typeof markdownToDocx>>[number])[] = [
+    new Paragraph({ text: d.title, heading: HeadingLevel.TITLE }),
+    new Paragraph({ children: [new TextRun({ text: meta, italics: true })] }),
+    ...(d.subject ? [new Paragraph({ children: [new TextRun({ text: d.subject, italics: true })] })] : []),
+    new Paragraph({ text: '' }),
+  ]
+
+  for (const s of sections) {
+    children.push(new Paragraph({ text: s.title, heading: HeadingLevel.HEADING_1, spacing: { before: 260, after: 100 } }))
+    children.push(...(await markdownToDocx(s.content)))
+  }
+
+  const ev = d.evidence ?? []
+  if (ev.length) {
+    children.push(new Paragraph({ text: 'Provenance', heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 100 } }))
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `${ev.filter((e) => e.ok).length} of ${ev.length} evidence slots were filled. Every factual claim in this document traces to the evidence below.`,
+          }),
+        ],
+        spacing: { after: 100 },
+      })
+    )
+    for (const e of ev) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: `${e.key} (via ${e.tool}): ${e.ok ? 'gathered' : `NOT gathered, ${e.reason || 'unavailable'}`}` })],
+          bullet: { level: 0 },
+        })
+      )
+    }
+  }
+
+  const doc = new Document({ sections: [{ children }] })
+  download(await Packer.toBlob(doc), `${safe(d.title)}.docx`)
 }
 
 export async function exportRecapPptx(ws: Workshop, recap: WorkshopRecapData): Promise<void> {

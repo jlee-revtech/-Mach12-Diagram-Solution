@@ -3,9 +3,10 @@ import type { SapRealization } from '@jlee-revtech/agent-core'
 // SAP-realization implementation for the Super Consultant tool belt: an HTTP
 // client to SAP Solution Studio's /api/realization endpoint. This is what lets a
 // consultant agent in Solution Architecture Studio actually introspect / plan /
-// prepare / execute live SAP configuration — the execution engine lives in
-// Solution Studio (ADT classrun); this app reaches it over HTTP with a shared
-// secret. Absent config -> undefined -> the realization tools degrade gracefully.
+// prepare / execute live SAP configuration, and read back the executed-config log
+// that documents what was applied. The execution engine lives in Solution Studio
+// (ADT classrun); this app reaches it over HTTP with a shared secret. Absent
+// config -> undefined -> the realization tools degrade gracefully.
 
 interface RealizationConfig {
   url: string // Solution Studio /api/realization URL
@@ -34,6 +35,10 @@ export function createSapRealization(cfg: RealizationConfig): SapRealization {
     prepareConfig: (workstreamCode, activityKey, inputs) => call('prepare_config', { workstreamCode, activityKey, inputs }),
     executeConfig: (workstreamCode, activityKey, inputs, approvalToken, humanConfirmed) =>
       call('execute_config', { workstreamCode, activityKey, inputs, approvalToken, humanConfirmed }),
+    // Workpackage K3: the executed-configuration log, the provenance source for
+    // the config-workbook deliverable. Solution Studio returns an honest "no
+    // provenance available" string when its workbook store is unconfigured.
+    listConfigLog: (workstreamCode, limit) => call('list_config_log', { workstreamCode, limit }),
   }
 }
 

@@ -9,7 +9,11 @@
 //   3. import-config-catalog.mjs  (per-agent SAP config-capability sources)
 //   4. import-capabilities.ts     (L2/L3 value-stream capability model)
 //   5. import-skills.mjs          (cross-cutting scripts/skills/*.md)
-//   6. Retrieval smoke checks against the freshly-loaded kb
+//   6. import-dimension-profiles  (per-stream 8-dimension operating profiles)
+//   7. import-blueprints.mjs      (the 7 A&D industry blueprints, all-stream)
+//   8. import-accelerators.mjs    (the RevTech/Mach12 accelerator catalog, H2)
+//   9. import-criteria.mjs        (the RevTech template criteria, H1 -> kb_criteria)
+//  10. Retrieval smoke checks against the freshly-loaded kb
 //
 // Acceptance target: adding a knowledge bundle is "drop the file + edit ONE
 // mapping + run this one command". The importers are each idempotent (upsert by
@@ -75,6 +79,9 @@ step('import-config-catalog', 'node', ['scripts/import-config-catalog.mjs'], APP
 step('import-capabilities', 'node', ['scripts/import-capabilities.ts'], APP_DIR)
 step('import-skills', 'node', ['scripts/import-skills.mjs'], APP_DIR)
 step('import-dimension-profiles', 'node', ['scripts/import-dimension-profiles.mjs'], APP_DIR)
+step('import-blueprints', 'node', ['scripts/import-blueprints.mjs'], APP_DIR)
+step('import-accelerators', 'node', ['scripts/import-accelerators.mjs'], APP_DIR)
+step('import-criteria', 'node', ['scripts/import-criteria.mjs'], APP_DIR)
 
 // ─── Retrieval smoke checks ─────────────────────────────────────────────────
 async function smoke() {
@@ -96,6 +103,13 @@ async function smoke() {
     ['plan-to-produce', 'What order types and MRP settings does a make-to-order production run need?'],
     ['source-to-pay', 'How do FAR/DFARS flowdown clauses attach to a subcontract PO?'],
     [null, 'Which workstream owns EVMS and which one fulfills its cost data dependencies?'],
+    // The Phase 2 corpus: each probe should land on the source that answers it.
+    ['record-to-report', 'Which of the six DFARS contractor business systems does finance own, and what are the withholding consequences?'],
+    ['plan-to-produce', 'What are the ten MMAS standards and how does S/4HANA satisfy each?'],
+    ['acquire-to-retire', 'How does a defense OEM prime differ from a component supplier in property accountability?'],
+    ['offer-to-cash', 'When does TINA apply and what are the exceptions to certified cost or pricing data?'],
+    ['plan-to-perform', 'What does Contract Studio do and when should I position it against Deltek Costpoint?'],
+    [null, 'Who adjudicates the seam between offer-to-cash and record-to-report on performance obligations?'],
   ]
   console.log(`\n\x1b[1m▶ Retrieval smoke checks\x1b[0m ${'─'.repeat(37)}`)
   let answered = 0
@@ -114,6 +128,29 @@ async function smoke() {
     }
   }
   results.push({ label: 'smoke-checks', ok: answered === probes.length, ms: 0, detail: `${answered}/${probes.length} answered` })
+
+  // The RevTech template criteria (H1) live in kb_criteria, not kb_sources, so the
+  // retrieval probes above cannot see them. Check them directly: the conformance
+  // tool is useless if the criteria did not land.
+  try {
+    const { createClient } = await import('@supabase/supabase-js')
+    const sb = createClient(
+      process.env.KNOWLEDGE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.KNOWLEDGE_SUPABASE_SERVICE_KEY,
+      { auth: { persistSession: false } }
+    )
+    const { data, error } = await sb.from('kb_criteria').select('workstream_code, severity').eq('status', 'active').is('tenant_key', null)
+    if (error) throw new Error(error.message)
+    const byStream = {}
+    for (const r of data || []) byStream[r.workstream_code] = (byStream[r.workstream_code] || 0) + 1
+    const total = (data || []).length
+    console.log(`  [32m✓[0m kb_criteria: ${total} active template criteria across ${Object.keys(byStream).length} stream(s)`)
+    for (const [k, v] of Object.entries(byStream)) console.log(`      ${k}: ${v}`)
+    results.push({ label: 'criteria-check', ok: total > 0, ms: 0, detail: `${total} active criteria` })
+  } catch (e) {
+    console.log(`  [31m✗[0m kb_criteria check failed: ${e instanceof Error ? e.message : e}`)
+    results.push({ label: 'criteria-check', ok: false, ms: 0, detail: 'failed' })
+  }
 }
 
 if (!SKIP_SMOKE) await smoke()

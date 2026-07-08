@@ -8,6 +8,7 @@
 // Reads .env.local for KNOWLEDGE_SUPABASE_URL / _SERVICE_KEY / VOYAGE_API_KEY.
 
 import { createClient } from '@supabase/supabase-js'
+import { personaForCode, buildSolutionArchitectPersona, DEFAULT_AGENT_MODEL, DEEP_AGENT_MODEL } from '@jlee-revtech/agent-core'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,22 +41,28 @@ const VOYAGE_MODEL = process.env.VOYAGE_MODEL || 'voyage-3'
 // 3 cross-cutting platform agents. Codes MUST match cds-lineage agentConfigurator
 // and src/lib/workstream/catalog.ts. `skills` drives the chunk workstream tags.
 const WORKSTREAMS = [
-  { code: 'record-to-report', name: 'Record-to-Report (Finance / DCAA)', description: 'End-to-end financial accounting and reporting: GL, assets, cost, indirect rates, settlement, revenue recognition, and close.', tagline: 'GL, costing, rates, and rev-rec consultant', sapModules: ['FI-GL', 'FI-AA', 'CO-CCA', 'CO-PA', 'CO-PC', 'PS settlement', 'Group Reporting'], dassianModules: ['Cost Management (OH, costing sheets, FR)', 'Results Analysis (RAENH rev-rec)'], skills: ['sap-ad-commercial-defense-structure', 'dassian-results-analysis', 'dassian-cost-management', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development'], crossStream: 'Earned Value Management (EVMS) is owned by the Plan-to-Perform program-control consultant, not by you. Your role is to FULFILL the EVM data dependencies Plan-to-Perform specifies: actual cost of work performed (ACWP) from cost postings / ACDOCA, cost-element and settlement actuals, and the indirect/burden rates that feed the cost baseline. Provide these as the financial system of record and defer EVM methodology, the PMB, control accounts, EAC/ETC, and IPMR/533 reporting to Plan-to-Perform.', sort: 1 },
-  { code: 'plan-to-perform', name: 'Plan-to-Perform (Program & Portfolio Management)', description: 'EVMS-grade program and portfolio management: baseline, control accounts, work authorization, EAC/ETC, risk, and variance reporting.', tagline: 'EVMS, PMB, and EAC/ETC program-control consultant', sapModules: ['PS', 'PPM', 'CO', 'Group Reporting'], dassianModules: ['Project Mgmt (PPC, EVM, CAM, EAC/ETC, IPMR/533)'], skills: ['dassian-project-management', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development'], crossStream: 'You OWN Earned Value Management (EVMS): the performance measurement baseline (PMB), control accounts and CAM assignment, work authorization, BCWS/BCWP/ACWP, CPI/SPI, EAC/ETC, and IPMR/533 (CPR) reporting. You SPECIFY the cost and actuals dependencies that Record-to-Report fulfills (actual costs / ACWP, cost-element actuals, indirect and burden rates). Consume those as authoritative inputs and reconcile earned value to the financial actuals RTR provides rather than re-deriving them.', sort: 2 },
+  { code: 'record-to-report', name: 'Record-to-Report (Finance / DCAA)', description: 'End-to-end financial accounting and reporting: GL, assets, cost, indirect rates, settlement, revenue recognition, and close.', tagline: 'GL, costing, rates, and rev-rec consultant', sapModules: ['FI-GL', 'FI-AA', 'CO-CCA', 'CO-PA', 'CO-PC', 'PS settlement', 'Group Reporting'], dassianModules: ['Cost Management (OH, costing sheets, FR)', 'Results Analysis (RAENH rev-rec)'], skills: ['sap-ad-commercial-defense-structure', 'dassian-results-analysis', 'dassian-cost-management', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-cas-in-sap', 'govcon-dcaa-audit-readiness', 'govcon-dfars-business-systems'], crossStream: 'Earned Value Management (EVMS) is owned by the Plan-to-Perform program-control consultant, not by you. Your role is to FULFILL the EVM data dependencies Plan-to-Perform specifies: actual cost of work performed (ACWP) from cost postings / ACDOCA, cost-element and settlement actuals, and the indirect/burden rates that feed the cost baseline. Provide these as the financial system of record and defer EVM methodology, the PMB, control accounts, EAC/ETC, and IPMR/533 reporting to Plan-to-Perform.', sort: 1 },
+  { code: 'plan-to-perform', name: 'Plan-to-Perform (Program & Portfolio Management)', description: 'EVMS-grade program and portfolio management: baseline, control accounts, work authorization, EAC/ETC, risk, and variance reporting.', tagline: 'EVMS, PMB, and EAC/ETC program-control consultant', sapModules: ['PS', 'PPM', 'CO', 'Group Reporting'], dassianModules: ['Project Mgmt (PPC, EVM, CAM, EAC/ETC, IPMR/533)'], skills: ['dassian-project-management', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dfars-business-systems', 'govcon-pricing-tina'], crossStream: 'You OWN Earned Value Management (EVMS): the performance measurement baseline (PMB), control accounts and CAM assignment, work authorization, BCWS/BCWP/ACWP, CPI/SPI, EAC/ETC, and IPMR/533 (CPR) reporting. You SPECIFY the cost and actuals dependencies that Record-to-Report fulfills (actual costs / ACWP, cost-element actuals, indirect and burden rates). Consume those as authoritative inputs and reconcile earned value to the financial actuals RTR provides rather than re-deriving them.', sort: 2 },
   { code: 'design-to-release', name: 'Design-to-Release (Engineering / PLM)', description: 'Requirements through design, configuration management, engineering change, and BOM release with first article inspection.', tagline: 'Requirements, CM, and BOM-release consultant', sapModules: ['PLM', 'PP-BOM', 'ECM (engineering change)', 'QM (FAI)'], dassianModules: [], skills: ['sap-plm-design-to-release-ad', 'vibe-sap-recipes', 'sap-rap-development'], sort: 3 },
-  { code: 'plan-to-produce', name: 'Plan-to-Produce (Program Execution)', description: 'Production planning, MRP, capacity planning, shop-floor execution, quality inspection, and production-order settlement.', tagline: 'MRP, capacity, shop-floor, quality, and production consultant', sapModules: ['PP', 'PP-MRP', 'PP-CRP (capacity)', 'PP/DS', 'QM', 'LO-VC', 'PS', 'MM-IM'], dassianModules: ['Project Mgmt (EVM)', 'MPIA / BOM cost'], skills: ['sap-pp-capacity-planning', 'sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes', 'sap-rap-development'], sort: 4 },
-  { code: 'inventory-to-deliver', name: 'Inventory-to-Deliver (Logistics & Delivery)', description: 'Materials management, warehousing/EWM, inventory, and outbound delivery with DD250 acceptance.', tagline: 'Logistics, warehousing, and delivery consultant', sapModules: ['MM-IM', 'WM / EWM', 'LE (deliveries)', 'Handling Units', 'Batch / Serial', 'Physical Inventory'], dassianModules: ['DD250 / ABS'], skills: ['sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes', 'sap-rap-development'], sort: 5 },
-  { code: 'acquire-to-retire', name: 'Acquire-to-Retire (Asset / Property / GFP)', description: 'Government and contractor property accountability and fixed-asset lifecycle from acquisition through disposition.', tagline: 'GFP/CAP property and fixed-asset consultant', sapModules: ['FI-AA', 'MM-IM', 'PS'], dassianModules: ['GFP / property accountability'], skills: ['sap-government-property-a2r', 'vibe-sap-recipes', 'sap-rap-development'], sort: 6 },
+  { code: 'plan-to-produce', name: 'Plan-to-Produce (Program Execution)', description: 'Production planning, MRP, capacity planning, shop-floor execution, quality inspection, and production-order settlement.', tagline: 'MRP, capacity, shop-floor, quality, and production consultant', sapModules: ['PP', 'PP-MRP', 'PP-CRP (capacity)', 'PP/DS', 'QM', 'LO-VC', 'PS', 'MM-IM'], dassianModules: ['Project Mgmt (EVM)', 'MPIA / BOM cost'], skills: ['sap-pp-capacity-planning', 'sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-mmas', 'govcon-dfars-business-systems'], sort: 4 },
+  { code: 'inventory-to-deliver', name: 'Inventory-to-Deliver (Logistics & Delivery)', description: 'Materials management, warehousing/EWM, inventory, and outbound delivery with DD250 acceptance.', tagline: 'Logistics, warehousing, and delivery consultant', sapModules: ['MM-IM', 'WM / EWM', 'LE (deliveries)', 'Handling Units', 'Batch / Serial', 'Physical Inventory'], dassianModules: ['DD250 / ABS'], skills: ['sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-mmas', 'govcon-dfars-business-systems'], sort: 5 },
+  { code: 'acquire-to-retire', name: 'Acquire-to-Retire (Asset / Property / GFP)', description: 'Government and contractor property accountability and fixed-asset lifecycle from acquisition through disposition.', tagline: 'GFP/CAP property and fixed-asset consultant', sapModules: ['FI-AA', 'MM-IM', 'PS'], dassianModules: ['GFP / property accountability'], skills: ['sap-government-property-a2r', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dfars-business-systems'], sort: 6 },
   { code: 'sustainment-mro', name: 'Sustainment / MRO', description: 'Depot and field maintenance, repair, and overhaul with installed-base and warranty management.', tagline: 'Depot/field MRO and installed-base consultant', sapModules: ['PM / EAM', 'CS', 'PP (refurb)', 'MM'], dassianModules: [], skills: ['sap-ad-depot-mro', 'vibe-sap-recipes', 'sap-rap-development'], sort: 7 },
-  { code: 'source-to-pay', name: 'Source-to-Pay (Procurement & Subcontracts)', description: 'Supplier management, sourcing, subcontracting with FAR/DFARS flowdowns, and procure-to-pay.', tagline: 'Subcontracts, flowdowns, and P2P consultant', sapModules: ['MM', 'MM-PUR', 'MDG-S', 'Subcontracting', 'MM-IV', 'Ariba', 'FI-AP'], dassianModules: ['SCFM', 'Contracts (flowdowns, clause library)', 'PBP'], skills: ['dassian-contracts', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development'], sort: 8 },
-  { code: 'offer-to-cash', name: 'Offer-to-Cash (Capture, Contracts, Billing & Rev-Rec)', description: 'Sell-side lifecycle from capture and proposal through contract setup, CLIN/SLIN billing, deliveries acceptance, and revenue recognition.', tagline: 'Capture, contracts, billing, and rev-rec consultant', sapModules: ['SD', 'SD-BIL', 'RAR', 'DP90', 'PS'], dassianModules: ['Contracts (CLIN/SLIN/ACRN, mods, DD250)', 'PBP', 'Billing (BIL / DRB)', 'ABS', 'Results Analysis (RAENH)'], skills: ['dassian-contracts', 'dassian-cost-management', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development'], sort: 9 },
-  { code: 'hire-to-retire', name: 'Hire-to-Retire (Workforce / Clearances)', description: 'Workforce lifecycle: talent and clearances, records, compliant timekeeping, payroll, labor distribution, and offboarding.', tagline: 'Clearances, compliant timekeeping, and payroll consultant', sapModules: ['HCM / SF', 'PT (time)', 'PY (payroll)', 'CATS'], dassianModules: ['Labor / role-based costing', 'CATS approval'], skills: ['govcon-timekeeping-compliance', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development'], sort: 10 },
-  { code: 'security-authorization', name: 'Security & Authorization', description: 'Cross-stream role design, authorizations, segregation-of-duties, and access governance.', tagline: 'Roles, authorizations, and SoD consultant', sapModules: ['GRC', 'PFCG', 'SU24', 'IAG / IAM'], dassianModules: [], skills: ['sap-ad-security-itar', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development'], sort: 11 },
-  { code: 'analytics-reporting', name: 'Analytics & Reporting', description: 'Cross-stream embedded analytics, operational and management reporting, and planning.', tagline: 'Embedded analytics and reporting consultant', sapModules: ['Embedded Analytics', 'CDS analytical', 'SAC', 'Datasphere'], dassianModules: ['GPD / PACE reporting'], skills: ['sap-ad-program-analytics', 'vibe-sap-recipes', 'sap-rap-development'], sort: 12 },
+  { code: 'source-to-pay', name: 'Source-to-Pay (Procurement & Subcontracts)', description: 'Supplier management, sourcing, subcontracting with FAR/DFARS flowdowns, and procure-to-pay.', tagline: 'Subcontracts, flowdowns, and P2P consultant', sapModules: ['MM', 'MM-PUR', 'MDG-S', 'Subcontracting', 'MM-IV', 'Ariba', 'FI-AP'], dassianModules: ['SCFM', 'Contracts (flowdowns, clause library)', 'PBP'], skills: ['dassian-contracts', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dfars-business-systems', 'govcon-pricing-tina'], sort: 8 },
+  { code: 'offer-to-cash', name: 'Offer-to-Cash (Capture, Contracts, Billing & Rev-Rec)', description: 'Sell-side lifecycle from capture and proposal through contract setup, CLIN/SLIN billing, deliveries acceptance, and revenue recognition.', tagline: 'Capture, contracts, billing, and rev-rec consultant', sapModules: ['SD', 'SD-BIL', 'RAR', 'DP90', 'PS'], dassianModules: ['Contracts (CLIN/SLIN/ACRN, mods, DD250)', 'PBP', 'Billing (BIL / DRB)', 'ABS', 'Results Analysis (RAENH)'], skills: ['dassian-contracts', 'dassian-cost-management', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-pricing-tina', 'govcon-cas-in-sap', 'govcon-dfars-business-systems'], sort: 9 },
+  { code: 'hire-to-retire', name: 'Hire-to-Retire (Workforce / Clearances)', description: 'Workforce lifecycle: talent and clearances, records, compliant timekeeping, payroll, labor distribution, and offboarding.', tagline: 'Clearances, compliant timekeeping, and payroll consultant', sapModules: ['HCM / SF', 'PT (time)', 'PY (payroll)', 'CATS'], dassianModules: ['Labor / role-based costing', 'CATS approval'], skills: ['govcon-timekeeping-compliance', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dcaa-audit-readiness'], sort: 10 },
+  { code: 'security-authorization', name: 'Security & Authorization', description: 'Cross-stream role design, authorizations, segregation-of-duties, and access governance.', tagline: 'Roles, authorizations, and SoD consultant', sapModules: ['GRC', 'PFCG', 'SU24', 'IAG / IAM'], dassianModules: [], skills: ['sap-ad-security-itar', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dfars-business-systems'], sort: 11 },
+  { code: 'analytics-reporting', name: 'Analytics & Reporting', description: 'Cross-stream embedded analytics, operational and management reporting, and planning.', tagline: 'Embedded analytics and reporting consultant', sapModules: ['Embedded Analytics', 'CDS analytical', 'SAC', 'Datasphere'], dassianModules: ['GPD / PACE reporting'], skills: ['sap-ad-program-analytics', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dcaa-audit-readiness', 'govcon-dfars-business-systems'], sort: 12 },
   { code: 'development-technology', name: 'Development & Technology', description: 'Cross-stream RICEFW, RAP extensions, CDS modeling, integration, and clean-core engineering.', tagline: 'RICEFW, extensions, and clean-core consultant', sapModules: ['ABAP / RAP', 'BTP', 'CDS', 'Gateway / OData'], dassianModules: [], skills: ['sap-rap-development', 'vibe-sap-recipes', 'vibe-update-class-include'], sort: 13 },
 ]
 
-const personaFor = (w) => `You are a world-class SAP S/4HANA and Dassian Aerospace & Defense functional consultant specializing in the ${w.name} value stream. ${w.tagline}.
+// Personas are SINGLE-SOURCED from @jlee-revtech/agent-core (Workpackage J3).
+// `legacyPersonaFor` / `LEGACY_ENTERPRISE_PERSONA` below are the exact strings this
+// script used to seed. They are kept ONLY so a reseed can tell an unedited row (safe
+// to overwrite with the new 8-dimension persona) from a row Josh hand-edited (which
+// is preserved unless --force-personas is passed). Do not "improve" them: they are a
+// fingerprint, not a template.
+const legacyPersonaFor = (w) => `You are a world-class SAP S/4HANA and Dassian Aerospace & Defense functional consultant specializing in the ${w.name} value stream. ${w.tagline}.
 
 You advise across all four solution pillars for this workstream:
 - People / Personas: the roles and personas that operate this value stream
@@ -65,7 +72,7 @@ You advise across all four solution pillars for this workstream:
 
 Ground every answer in the SAP S/4HANA and Dassian baseline frameworks and in the customer's own model and knowledge base. Use the read-only tools to inspect the customer's actual processes, personas, data elements, systems, and integrations before answering, and prefer their real architecture over generic guidance. When you recommend changes, organize them across the four pillars, explain the rationale, and cite the knowledge sources you drew on. Be concrete and consulting-grade.${w.crossStream ? `\n\nCross-stream ownership & hand-offs:\n- ${w.crossStream}` : ''}`
 
-const ENTERPRISE_PERSONA = `You are the enterprise solution architect orchestrating a team of world-class SAP S/4HANA + Dassian A&D workstream consultants. The ten value-stream consultants are Record-to-Report, Plan-to-Perform, Design-to-Release, Plan-to-Produce, Inventory-to-Deliver, Acquire-to-Retire, Sustainment/MRO, Source-to-Pay, Offer-to-Cash, and Hire-to-Retire; three cross-cutting platform consultants cover Security & Authorization, Analytics & Reporting, and Development & Technology.
+const LEGACY_ENTERPRISE_PERSONA = `You are the enterprise solution architect orchestrating a team of world-class SAP S/4HANA + Dassian A&D workstream consultants. The ten value-stream consultants are Record-to-Report, Plan-to-Perform, Design-to-Release, Plan-to-Produce, Inventory-to-Deliver, Acquire-to-Retire, Sustainment/MRO, Source-to-Pay, Offer-to-Cash, and Hire-to-Retire; three cross-cutting platform consultants cover Security & Authorization, Analytics & Reporting, and Development & Technology.
 
 Route each question to the right workstream specialist(s) using the ask_workstream_agent tool, then synthesize their input into a single, coherent, enterprise-wide answer. Focus on cross-workstream hand-offs and integration seams (e.g. Source-to-Pay -> Record-to-Report, Plan-to-Perform -> Record-to-Report), and give recommendations across People, Process, Data, and Technology. Always cite which workstreams and knowledge sources informed your answer.`
 
@@ -127,22 +134,54 @@ async function main() {
   }
   console.log(`✓ catalog: ${WORKSTREAMS.length} workstreams`)
 
-  // 2) Seed per-workstream agents + enterprise orchestrator
+  // 2) Seed per-workstream agents + the Solution Architect.
+  //
+  // The chat route reads kb_workstream_agents.system_persona FIRST, so whatever is
+  // seeded here IS the production persona. Personas come from agent-core's builder
+  // (single source; the old inline duplicate is now only a fingerprint).
+  //
+  // Preserve Josh's hand-edits: overwrite a persona only when the stored text is
+  // exactly what a previous run of this script wrote (legacy or current). Anything
+  // else is a manual edit and is left alone unless --force-personas is passed.
+  const FORCE_PERSONAS = process.argv.includes('--force-personas')
+  const { data: existingAgents } = await db.from('kb_workstream_agents').select('code, system_persona')
+  const storedPersona = new Map((existingAgents || []).map((a) => [a.code, a.system_persona || '']))
+  let seeded = 0, preserved = 0
+
+  const personaUpdate = (code, generated, legacy) => {
+    const stored = storedPersona.get(code)
+    if (!stored || stored === legacy || stored === generated || FORCE_PERSONAS) return { system_persona: generated, changed: true }
+    console.warn(`  ! ${code}: system_persona was hand-edited; preserving it. Re-run with --force-personas to overwrite.`)
+    return { changed: false }
+  }
+
   for (const w of WORKSTREAMS) {
+    const generated = personaForCode(w.code)
+    if (!generated) throw new Error(`agent-core has no persona for "${w.code}" (taxonomy drift)`)
+    const pu = personaUpdate(w.code, generated, legacyPersonaFor(w))
+    pu.changed ? seeded++ : preserved++
     await db.from('kb_workstream_agents').upsert({
       code: w.code, display_name: w.name, tagline: w.tagline,
-      system_persona: personaFor(w), sap_modules: w.sapModules, dassian_modules: w.dassianModules,
-      knowledge_source_codes: w.skills, model: 'claude-sonnet-4-6', temperature: 0.4,
+      ...(pu.changed ? { system_persona: pu.system_persona } : {}),
+      sap_modules: w.sapModules, dassian_modules: w.dassianModules,
+      knowledge_source_codes: w.skills, model: DEFAULT_AGENT_MODEL, temperature: 0.4,
       is_orchestrator: false, sort_order: w.sort, updated_at: new Date().toISOString(),
     }, { onConflict: 'code' })
   }
+
+  // The orchestrator is now the Solution Architect: it holds the whole design, it
+  // does not merely route. It runs on the deep model (Workpackage C tiering).
+  const architectPersona = buildSolutionArchitectPersona()
+  const ap = personaUpdate('enterprise', architectPersona, LEGACY_ENTERPRISE_PERSONA)
+  ap.changed ? seeded++ : preserved++
   await db.from('kb_workstream_agents').upsert({
-    code: 'enterprise', display_name: 'Enterprise Architect (Orchestrator)', tagline: 'Cross-workstream synthesis & routing',
-    system_persona: ENTERPRISE_PERSONA, sap_modules: [], dassian_modules: [],
-    knowledge_source_codes: [...new Set(WORKSTREAMS.flatMap((w) => w.skills))], model: 'claude-sonnet-4-6',
+    code: 'enterprise', display_name: 'Solution Architect', tagline: 'Holds the whole design: seams, enterprise structure, blueprints, conformance',
+    ...(ap.changed ? { system_persona: ap.system_persona } : {}),
+    sap_modules: [], dassian_modules: [],
+    knowledge_source_codes: [...new Set(WORKSTREAMS.flatMap((w) => w.skills))], model: DEEP_AGENT_MODEL,
     temperature: 0.4, is_orchestrator: true, sort_order: 0, updated_at: new Date().toISOString(),
   }, { onConflict: 'code' })
-  console.log(`✓ agents: ${WORKSTREAMS.length} workstream agents + 1 orchestrator`)
+  console.log(`✓ agents: ${WORKSTREAMS.length} workstream agents + the Solution Architect (${seeded} persona(s) seeded, ${preserved} preserved)`)
 
   // 3) Import skill bundles -> kb_sources + chunks
   const dirs = readdirSync(SKILLS_DIR, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)

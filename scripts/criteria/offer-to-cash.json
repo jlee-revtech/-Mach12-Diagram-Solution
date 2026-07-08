@@ -1,0 +1,287 @@
+[
+  {
+    "code": "O2C-001",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Data",
+    "statement": "Sales documents assign to a WBS element flagged as a billing element (PRPS-FAKKZ set), never to a project definition and never to a level-1 structural root.",
+    "rationale": "A sales order cannot be assigned to a project definition; the assignment is rejected with a 'WBS element does not exist' error that points nowhere useful. The billing element is the single cost object the performance obligation settles against, so putting it anywhere other than the intended level breaks both revenue recognition and the cost trace.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List sales document items that carry a project or WBS account assignment, showing the assigned WBS element, its hierarchy level, and whether its billing element flag is set.",
+      "expect": "Every project-assigned sales document item points to a WBS with the billing element flag set at the intended hierarchy level; zero items point at a level-1 root or a project definition."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/ps-wbs-levels",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-002",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Data",
+    "statement": "No SD condition line requires a rate that overflows the condition rate field (an eleven-digit, two-decimal amount capping a line near one billion in the document currency); over-cap lines are quantity-scaled so the net value stays exact.",
+    "rationale": "The condition rate field is the bottleneck in the whole chain: the BAPI structures and the pricing result fields are all wider. With a per-unit calculation type and a quantity of one, the rate equals the line's full extended value, so any line at or above the cap fails the all-or-nothing contract create with an unhelpful currency conversion message. Raising the line quantity by the smallest whole multiplier keeps the net exact and leaves under-cap lines untouched. Scaling the pricing unit does not help; it only makes the required rate larger.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List sales contract line items with their extended value, condition quantity, condition rate and pricing unit, flagging lines whose rate exceeds the condition rate field capacity or whose net value does not equal quantity multiplied by rate.",
+      "expect": "No line has a rate above the field capacity; for every scaled line, net value equals quantity multiplied by rate to the cent; unscaled lines carry a multiplier of one."
+    },
+    "severity": "must",
+    "source_ref": "field/sd-kbetr-currency-cap",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-003",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Process",
+    "statement": "Pricing is applied to leaf line items only (a subline, or a contract line item with no sublines); parent contract line items are created unpriced and post a net value of zero.",
+    "rationale": "Pricing a parent and its sublines double counts the contract net value, which on a large award produces a document total that is visibly and embarrassingly wrong. Parents are still created so the line item structure survives to the invoice, they simply carry no condition. The rule must live in the payload builder, not in a reviewer's head.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For a sales contract, list the line item hierarchy showing each item's net value and whether it has child items, then compare the sum of leaf net values to the document net value.",
+      "expect": "Every item with children has a net value of zero; the sum of leaf net values equals the document net value; the item count matches the full contract line structure including unpriced parents."
+    },
+    "severity": "must",
+    "source_ref": "skill/mach12-sd-contract-sync",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-004",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Technology",
+    "statement": "The wrapper that pushes a contract into SD explicitly applies condition values after creation and issues its own transaction commit in a session separate from any managed action handler.",
+    "rationale": "The standard contract create BAPI does not apply manual condition values, so line items are created and net value posts as zero no matter how the pricing procedure and calculation type are configured. Chasing the calculation type, manual-entry priority, access sequence or quantity is a dead end. Separately, a BAPI that commits internally cannot run inside a managed transactional handler, so the wrapper must run in its own session.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Read the source of the SD contract create wrapper and report whether it calls a change or condition-maintenance step after the create BAPI, and whether the commit runs outside the transactional handler.",
+      "expect": "A post-create condition application step exists; the commit is explicit and runs in a session outside any managed action handler; the wrapper adds a condition only when the extended value is greater than zero."
+    },
+    "severity": "should",
+    "source_ref": "skill/mach12-sd-contract-sync",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-005",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Data",
+    "statement": "Funding exists as structured data at the accounting classification and subline level in the contract master, not as a custom field bolted onto the sales document header.",
+    "rationale": "Incremental funding is the norm on cost-type work: the contract value and the funded value diverge, a single subline can be funded from several accounting classifications, and billing must consume funding in the order the payment instructions prescribe. The moment a Z field on the header is the funding record, the first multi-classification funding modification collapses the design, and the limitation-of-funds report cannot run against actuals plus commitments.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For a sample of incrementally funded contracts, list the funding records showing contract line item, subline, accounting classification code, funded amount and effective modification, and compare the funded total to the contract value.",
+      "expect": "Funding is held per accounting classification and subline in the contract master; funded value and contract value are separately reportable; no funding amount lives only on a sales document header field."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/contract-structure",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-006",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Process",
+    "statement": "Contract modifications are entered as versioned modification objects that snapshot the prior line item structure; nobody edits the contract master directly to reflect a modification.",
+    "rationale": "The conformed contract is the government's record and the system of execution must be reconcilable to it. Direct edits destroy the audit trail and the tie-out, and the mod-to-master drift becomes invisible until someone diffs the contract brief against the system. Versioning the structure per modification is the only mechanism that survives a modification history spanning years.",
+    "evidence": {
+      "how": "manual",
+      "question": "Pull the ten largest contracts' conformed documents from the government record alongside the system's contract master, and diff the line item, subline and funding structure. Then show how the last five modifications were entered.",
+      "expect": "The diff is empty or the deltas are explained by modifications still in flight; every modification in the last quarter exists as a versioned modification object with a snapshot, not as an edit."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/mod-engine",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-007",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Process",
+    "statement": "Exactly one engine posts revenue (either the standard revenue accounting and reporting engine or the Dassian results analysis enhancement), and the other is configured read-only or is not installed.",
+    "rationale": "Two posting engines against the same performance obligation produce two revenue numbers and a reconciliation nobody owns. The enhancement route recognizes through standard results analysis settlement rather than a separate journal, which is why it coexists cleanly with classic RA but not with a second posting engine. Pick the primary and make the other read-only before the first contract master loads.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Report which revenue engines are active: list the revenue accounting performance obligations and their posting status, and list the results analysis keys with an active customer-exit enhancement, then identify any WBS or contract appearing in both.",
+      "expect": "One engine posts; no contract or WBS is recognized by both; if both components are installed, the secondary produces no postings."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/revrec-engine-choice",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-008",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Data",
+    "statement": "The alignment of contract line item to WBS billing element to performance obligation is decided at contract setup and follows one documented rule (one to one, or a stated grouping rule), never a per-contract judgment made after go-live.",
+    "rationale": "This single decision drives most downstream pain in the stream. Designing performance obligations after go-live forces manual revenue allocation forever, because the WBS structures are already frozen in shapes that cannot carry the obligation granularity. The rule must be signed jointly by contracts and the controller, since it binds both the billing structure and the revenue structure.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For active contracts, list contract line items with the WBS billing element they map to and the performance obligation identifier carried on that WBS, and count line items that map to more than one obligation or to none.",
+      "expect": "Every priced contract line item maps to exactly one performance obligation through exactly one billing element, or the deviation matches the documented grouping rule."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/clin-wbs-pob-alignment",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-009",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Technology",
+    "statement": "The dynamic item processor profile used for resource-related billing separates labor from other direct costs and material in its cost element groupings and source selection.",
+    "rationale": "Resource-related billing depends entirely on the profile's material determination and source selection. Get the cost element groupings wrong and cost-type invoices misclassify labor against other direct costs, which is exactly what an auditor finds when tracing a single voucher end to end. The profile is design, not configuration cleanup.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Read the dynamic item processor profile used for project-based billing and list its characteristics, sources, and the cost element groups mapped to each billing material.",
+      "expect": "Distinct cost element groups for labor, other direct costs, material and subcontract; each maps to its own billing material; source selection covers actual costs from the project."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/billing-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-010",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Technology",
+    "statement": "Copy control from contract to order to billing document preserves the contract line item and subline identity through to the invoice line and into the payment portal payload.",
+    "rationale": "Copy control is precisely where line item identity gets silently lost, and the loss is invisible until a payment request is rejected for a line item mismatch. Testing that the identity survives to the invoice line is a five-minute check that prevents the most common rejection cause in the first live billing week.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Trace a sample contract through order and billing document, reporting whether the contract line item and subline reference appear on the billing document line and on the generated portal payload.",
+      "expect": "The line item and subline reference are present and identical at every hop, including the payload; no billing line carries a blank or defaulted reference."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/billing-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-011",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Data",
+    "statement": "The government buying offices are modeled as partner functions on the business partner (administering office, issuing office, ship-to, paying office), so portal routing is derived from master data rather than typed at submission.",
+    "rationale": "Routing to the wrong office is the top rejection cause at the payment portal, which makes office data quality a billing design topic rather than a data cleanup afterthought. Modeling each office as a partner function means the payload derives its routing from the contract, and a wrong office is a master-data defect that can be found before submission.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For the customers used on active government contracts, list the partner functions maintained per sales area and report contracts missing any of the administering, issuing, ship-to or paying office assignments.",
+      "expect": "Every active government contract resolves all four offices from partner functions; no contract requires manual entry of routing data at submission."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/billing-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-012",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Process",
+    "statement": "The full lifecycle (capture, proposal, negotiation, award, contract setup, funding, execution, billing, revenue, modifications, closeout) exists as named processes homed to this workstream, each carrying its control point.",
+    "rationale": "Each stage has a control point where the government can later find the contractor noncompliant, so each is an audit boundary rather than a workflow step. A model with no closeout process is a client with a closeout backlog they have not admitted, and a model with no modification process is a client whose contract master has already drifted.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "processes",
+      "expect": "Processes homed to offer-to-cash across the full lifecycle including modifications and closeout, each with at least one control point and an owning persona."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/o2c-process-model",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-013",
+    "workstream_code": "offer-to-cash",
+    "pillar": "People",
+    "statement": "The certifying official who releases a payment request is a persona distinct from the billing preparer, and the contracts organization's reporting line does not pass through the programs it administers.",
+    "rationale": "Payment requests carry a certifying official's signature and false submissions create personal and corporate liability, so the release step is a human act with an identifiable owner. Contracts is deliberately independent of programs at primes for the same reason: the notices and certifications it signs must not be authored by the organization whose performance they describe.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "personas",
+      "expect": "Distinct personas for billing preparer and certifying official, and for contract administrator and program manager; the contracts persona's reporting line terminates outside the program organization."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/o2c-operating-model",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-014",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Technology",
+    "statement": "The payment portal and the contract document repository are registered as integrations with direction, payload format, trigger, and how acceptance or rejection status returns to the source document.",
+    "rationale": "The portal is a documented file and electronic data interchange boundary with its own onboarding and test cycle, not a modern interface, and the document repository is the authoritative source the modification synchronization process reads. Leaving either unregistered means nobody owns the rejection loop or the modification pull, and both become hypercare improvisations.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "integrations",
+      "expect": "Integration records for the payment portal (outbound payment requests, inbound status) and the contract document repository (inbound conformed contracts and modifications), each with format, trigger and acknowledgement handling."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/o2c-landscape",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-015",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Process",
+    "statement": "Every unbilled dollar sits in a named category with a clearing mechanism (rate variance, fee withhold, retainage, over-ceiling or over-funding, timing, or in dispute), produced as a system output rather than a quarterly spreadsheet.",
+    "rationale": "An unbilled balance that cannot be placed in the category table is the finding. Migrating unbilled as a single plug balance guarantees an unexplainable number at the first audit, and a spreadsheet decomposition guarantees a heroic quarter-end. The categorization is a report over billing position, project actuals and receivables.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the current unbilled trial balance decomposed by category and age, produced from the system, and name the clearing mechanism and expected clearing period for the three largest buckets.",
+      "expect": "Every dollar categorized, produced by a report rather than by hand; nothing older than the current rate-settlement cycle is uncategorized."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/unbilled-decomposition",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-016",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Process",
+    "statement": "The monthly close sequence locks the estimate at completion before the revenue run, and the sequence is enforced by the close calendar rather than by convention.",
+    "rationale": "Cost-to-cost revenue is a function of the estimate at completion, so a revenue run against an unlocked estimate produces a number that changes after it is reported. Running revenue before the lock is a signature failure that produces monthly restatements and destroys the controller's credibility with the external auditor.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the close calendar with the estimate lock and the revenue run as sequenced, dated tasks, and show the last three months where the revenue run started after the lock.",
+      "expect": "The lock precedes the revenue run in the calendar and in the last three actual closes, with no post-run estimate changes reopened into the same period."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/seam-o2c-r2r",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-017",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Data",
+    "statement": "Cumulative funding is reconciled to the government's own modification record before the migration load, not to the legacy system's balance.",
+    "rationale": "The legacy funding tracker is often already wrong, so loading it forward carries the error into the new system with a fresh coat of credibility. Reconciling to the authoritative modification history first is the only way the limitation-of-funds report means anything on day one. The same discipline applies to progress payment unliquidated balances: if they are not loaded, the first delivery invoice liquidates against nothing and overbills.",
+    "evidence": {
+      "how": "manual",
+      "question": "How was cumulative funding reconciled before load, against which source, and how were in-flight progress payment unliquidated balances and payment events treated at cutover?",
+      "expect": "A reconciliation to the government's modification record with variances resolved before load; explicit cutover treatment for unliquidated balances and in-flight payment events."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/o2c-migration-sequence",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-018",
+    "workstream_code": "offer-to-cash",
+    "pillar": "Technology",
+    "statement": "The payment portal payload builder and the voucher pre-submission quality check are registered as RICEFW objects with named owners and a validation against paid historical vouchers.",
+    "rationale": "Anything submitted to the government (voucher logic, acceptance document content, progress payment calculation) is validated against paid history and signed off by the certifying official, not merely tested in a quality environment. Registering both as RICEFW forces an owner, a test plan and a transport path, and makes the validation an artifact instead of an assurance.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "ricefw",
+      "expect": "RICEFW entries for the portal payload build and the pre-submission quality check, each with an owning persona and a test approach that regenerates historical paid vouchers."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/o2c-analytics",
+    "version": "2026.1"
+  },
+  {
+    "code": "O2C-019",
+    "workstream_code": "offer-to-cash",
+    "pillar": "People",
+    "statement": "The delegation-of-authority matrix (who may sign what dollar value) is mirrored one to one in the modification approval workflow, and no user both enters and approves a modification.",
+    "rationale": "System workflow that does not mirror the delegation matrix is either blocking authorized people or authorizing unauthorized ones, and both surface in the contract file review. Entering and approving the same modification is the classic unauthorized-change pair, mitigated by tying the approval role to the delegation matrix rather than to a job title.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the delegation-of-authority matrix and the modification approval workflow side by side, plus the last quarter's approvals with entering and approving user for each.",
+      "expect": "Workflow thresholds match the matrix; zero modifications where the entering user is also the approving user."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/o2c-security",
+    "version": "2026.1"
+  }
+]

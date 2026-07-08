@@ -1,4 +1,4 @@
-# SAP Enhancement Specification Authoring — Functional & Technical (Clean-Core Aligned)
+# SAP Enhancement Specification Authoring, Functional & Technical (Clean-Core Aligned)
 
 Cross-cutting skill for every workstream consultant. When a requirement cannot be met by
 standard SAP or configuration, you produce a **Functional Specification (FS)** and a
@@ -12,13 +12,13 @@ supports and give a RICEFW code so it is traceable.
 Never jump straight to custom code. Walk this ladder and record where the requirement lands
 and why the higher rungs were rejected:
 
-1. **Standard SAP** — a delivered app, transaction, or released API already does it.
-2. **Configuration / customizing** — SPRO / IMG, condition technique, output management,
+1. **Standard SAP**, a delivered app, transaction, or released API already does it.
+2. **Configuration / customizing**, SPRO / IMG, condition technique, output management,
    BRF+ decisions, standard Flexible Workflow scenarios.
-3. **Clean-core extensibility** — key-user extensibility, developer extensibility (ABAP
+3. **Clean-core extensibility**, key-user extensibility, developer extensibility (ABAP
    Cloud / RAP), or side-by-side extensibility on SAP BTP, using **released** objects and
    extension points only.
-4. **Custom development** — only when 1–3 cannot meet the requirement. Still built
+4. **Custom development**, only when 1-3 cannot meet the requirement. Still built
    clean-core-aligned (customer namespace, released APIs, upgrade-stable), never by
    modifying SAP objects.
 
@@ -47,71 +47,70 @@ every enhancement:
   so an SAP upgrade cannot break the enhancement. Run ATC with the cloud-readiness variant.
 - **Classic extensibility is a documented last resort.** Implicit/explicit enhancements,
   classic BAdIs/user-exits, customer-exit function modules, and direct-table Z development
-  are only for on-prem where no clean-core path exists — and must be justified, isolated,
+  are only for on-prem where no clean-core path exists, and must be justified, isolated,
   and flagged as technical debt in the TS.
 
 ## RICEFW + modern enhancement taxonomy
 
 Classify every enhancement and carry the code through FS → TS → build → test:
-**R**eports, **I**nterfaces, **C**onversions, **E**nhancements, **F**orms, **W**orkflow —
-plus the modern additions in scope here: **custom tables / data models**, **custom OData
+**R**eports, **I**nterfaces, **C**onversions, **E**nhancements, **F**orms, **W**orkflow, plus the modern additions in scope here: **custom tables / data models**, **custom OData
 services**, **custom web apps (Fiori / React)**, and **integrations (iPaaS)**.
 
 ---
 
-## Functional Specification (FS) — structure
+## Functional Specification (FS), structure
 
-1. **Header & traceability** — title, RICEFW code, workstream / value stream, owning
+1. **Header & traceability**, title, RICEFW code, workstream / value stream, owning
    process step (link to the process-model leaf), author, status, version.
-2. **Business context & objective** — the business outcome, who benefits, why it matters
+2. **Business context & objective**, the business outcome, who benefits, why it matters
    (tie to the value stream and, for A&D/GovCon, to FAR/DFARS/CAS/DCAA/EVMS/ITAR where
    relevant).
-3. **Gap & fit-to-standard analysis** — what standard SAP does today, why it is insufficient,
+3. **Gap & fit-to-standard analysis**, what standard SAP does today, why it is insufficient,
    which rung of the decision ladder this lands on and why higher rungs were rejected.
-4. **Functional requirements** — itemized, numbered, each independently testable
+4. **Functional requirements**, itemized, numbered, each independently testable
    (REQ-01, REQ-02 …). Separate "must / should / could".
-5. **Process flow** — as-is and to-be; actors, roles, personas, and hand-offs; where the
+5. **Process flow**, as-is and to-be; actors, roles, personas, and hand-offs; where the
    enhancement fires in the flow.
-6. **Data** — inputs and outputs; the master and transactional objects and specific fields
+6. **Data**, inputs and outputs; the master and transactional objects and specific fields
    touched; sources and targets; data volumes.
-7. **Business rules, calculations & determinations** — logic in business language
+7. **Business rules, calculations & determinations**, logic in business language
    (formulas, decision tables, derivations, defaulting, validations).
-8. **UI / UX expectations** — screens, fields, actions, list vs object page, offline,
+8. **UI / UX expectations**, screens, fields, actions, list vs object page, offline,
    mobile, accessibility, languages (if a UI is in scope).
-9. **Integrations & dependencies** — upstream/downstream systems, events, other RICEFW
+9. **Integrations & dependencies**, upstream/downstream systems, events, other RICEFW
    items, sequencing.
-10. **Security & authorizations** — roles, authorization objects, segregation-of-duties,
+10. **Security & authorizations**, roles, authorization objects, segregation-of-duties,
     data-level restrictions, export-control/clearance segregation.
-11. **Non-functional** — volumes, performance/response, availability, retention, audit.
-12. **Acceptance criteria** — testable pass/fail conditions mapped to each requirement.
+11. **Non-functional**, volumes, performance/response, availability, retention, audit.
+12. **Acceptance criteria**, testable pass/fail conditions mapped to each requirement.
 13. **Assumptions, risks, and out-of-scope.**
 
-## Technical Specification (TS) — common structure
+## Technical Specification (TS), common structure
 
-1. **Solution overview & clean-core approach** — the extensibility tier chosen (key-user /
+1. **Solution overview & clean-core approach**, the extensibility tier chosen (key-user /
    developer / side-by-side) and why; the released APIs / extension points used.
-2. **Architecture** — components and layers (data → logic → service → UI → integration),
+2. **Architecture**, components and layers (data → logic → service → UI → integration),
    the systems involved, and where each piece runs (S/4 stack vs BTP).
-3. **Objects & governance** — every object to build with customer-namespace naming,
+3. **Objects & governance**, every object to build with customer-namespace naming,
    package, software component, and transport / gCTS / BTP deployment target.
-4. **Data model** — tables / CDS entities, semantic keys, **client field first and key on
+4. **Data model**, tables / CDS entities, semantic keys, **client field first and key on
    every custom table/CDS/table-function**, fields, data elements/domains, associations,
    value helps.
-5. **Logic** — algorithms and pseudocode, determinations/validations/actions, error and
+5. **Logic**, algorithms and pseudocode, determinations/validations/actions, error and
    exception handling, message classes.
-6. **Services & interfaces** — API signatures, released APIs consumed, service definitions
+6. **Services & interfaces**, API signatures, released APIs consumed, service definitions
    and bindings, contract (request/response, idempotency, paging).
-7. **Security** — authorization objects and checks, CDS access control (DCL), roles
+7. **Security**, authorization objects and checks, CDS access control (DCL), roles
    (PFCG/IAG), BTP XSUAA scopes/role collections, principal propagation.
-8. **Performance & scalability** — data volumes, indexing, pushdown to HANA (code-to-data),
+8. **Performance & scalability**, data volumes, indexing, pushdown to HANA (code-to-data),
    pagination, async where heavy.
-9. **Transport & deployment** — transport strategy, dependencies/sequence, feature flags,
+9. **Transport & deployment**, transport strategy, dependencies/sequence, feature flags,
    environment promotion.
-10. **Testing** — ABAP Unit / unit tests, ATC (cloud-ready variant), integration tests,
+10. **Testing**, ABAP Unit / unit tests, ATC (cloud-ready variant), integration tests,
     UAT scripts, test data. Reference the workstream's test-plan approach.
-11. **Monitoring & operations** — logging (Application Log / BTP logging), alerting, job
+11. **Monitoring & operations**, logging (Application Log / BTP logging), alerting, job
     scheduling, error queues, support runbook.
-12. **Fallback / rollback** — how to disable or revert safely.
+12. **Fallback / rollback**, how to disable or revert safely.
 
 ---
 

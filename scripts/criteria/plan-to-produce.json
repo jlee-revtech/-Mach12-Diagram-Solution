@@ -1,0 +1,272 @@
+[
+  {
+    "code": "P2PR-001",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Process",
+    "statement": "Every production order type used on contract hardware creates orders that carry a WBS account assignment and consume valuated project stock (special stock Q) segregated by that WBS.",
+    "rationale": "Contract-specific cost segregation is the legal basis for billing the government, not an accounting nicety, so the process design must make wrong-contract charging structurally hard. An order type that permits an unassigned order lets shop cost land on plant stock and the material accounting business system loses its audit trail. Remediate via p2pr-ordertypes.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List the production order types configured in the plant, showing their account assignment defaults, and sample recent production orders to report how many carry a WBS account assignment versus none.",
+      "expect": "Every order type used for contract hardware defaults to WBS account assignment; the sampled orders show zero contract-hardware orders without a WBS; components are issued from special stock Q keyed by the same WBS."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/project-stock-strategy",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-002",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Data",
+    "statement": "Every custom BOM explosion divides the component quantity (STPO-MENGE) by the header base quantity (STKO-BMENG) before multiplying by parent demand, and joins MAST to STKO to STAS to STPO to isolate one alternative.",
+    "rationale": "STPO-MENGE is denominated per STKO-BMENG parent units, not per one parent. Most BOMs have a base quantity of one so the error hides; a BOM loaded by a batch loader with base quantity 1000 then produces demand that is 1000 times too large, and the pegging, inventory and POC calculations downstream explode. STPO is not keyed by alternative directly, so skipping STAS returns items from every alternative.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List material BOM headers whose base quantity is not 1, with their material, plant and alternative, and identify the custom table functions, AMDPs or reports that read STPO for demand explosion.",
+      "expect": "Every custom explosion object joins STKO and divides by the base quantity with a guard for zero or null, and bridges MAST to STPO through STAS on the alternative."
+    },
+    "severity": "must",
+    "source_ref": "field/stpo-menge-bmeng",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-003",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Technology",
+    "statement": "Any AMDP or SQLScript that reads stock quantities references the compatibility views (NSDM_V_MARD, NSDM_V_MARC, NSDM_V_MCHB and their siblings), never the physical stock tables.",
+    "rationale": "On S/4HANA the physical stock tables still exist but hold zero or stale rows; stock is computed live from the material document table. ABAP SQL routes to the compatibility view transparently, SQLScript does not, so identical logic returns hundreds of rows in ABAP and zero rows in an AMDP. The failure looks like a filter bug and costs days.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Read the source of every custom table function and AMDP method in the custom package that touches stock quantities, and report which table or view name appears in the USING clause and the FROM clause.",
+      "expect": "Only compatibility view names appear; no AMDP references a physical stock table directly."
+    },
+    "severity": "must",
+    "source_ref": "field/amdp-mard-compat-view",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-004",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Data",
+    "statement": "Every work center is linked through its costing assignment to a cost center and the activity types that cost center actually offers, and each of those cost center and activity type combinations has a maintained activity price.",
+    "rationale": "A work center with no costing link produces operations that confirm hours but cost nothing, so labor never reaches the WBS and the actual cost of work performed feed is short. An activity type whose plan price was never set (or was left at a nominal fraction of a cent) posts an allocation of almost nothing, which reads as missing cost rather than missing configuration. Remediate via p2pr-workcenter.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List work centers in the plant with their costing assignment rows showing controlling area, cost center, activity type and unit, and for each combination report whether an activity price exists for the current fiscal year and version.",
+      "expect": "Every work center used on contract routings has at least one costing assignment row; every referenced cost center and activity type combination has a realistic (not nominal) activity price for the current year."
+    },
+    "severity": "must",
+    "source_ref": "field/cc-at-rate-wc-load",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-005",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Data",
+    "statement": "Bottleneck work centers carry a capacity header whose available capacity reflects real operating time, a measured utilization percentage, and the actual number of individual capacities on the floor.",
+    "rationale": "Available capacity is operating time multiplied by utilization multiplied by the number of individual capacities. If utilization is a guess and the individual capacity count does not match the machines on the floor, every capacity report downstream is fiction, and no amount of finite scheduling sophistication rescues it. Fix the master data before climbing the capacity maturity ladder.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For the named bottleneck work centers, list the capacity header showing shift start and end, break time, utilization percentage and number of individual capacities, and report whether operations scheduled against them generate capacity requirements.",
+      "expect": "Utilization is not the untouched default, individual capacities match the physical machine count, and capacity requirements are being generated (which requires lead time scheduling, not basic dates, on those orders)."
+    },
+    "severity": "should",
+    "source_ref": "skill/sap-pp-capacity-planning",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-006",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Process",
+    "statement": "Contract hardware materials default to lot-for-lot (exact) lot sizing, and every minimum, fixed or economic order quantity is a deliberate exception with a recorded rationale.",
+    "rationale": "The material accounting standards treat minimum and economic order quantities as something the system must handle with a valid rationale, because a lot size that overbuilds against one contract's requirement is a cost the government did not authorize. Lot-for-lot is the defensible default on engineer-to-order hardware.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For materials with plant MRP data in the contract-hardware plants, list the lot size procedure, MRP type and MRP controller, grouped by lot size procedure with counts.",
+      "expect": "The dominant lot size on contract hardware is lot-for-lot; every other lot size procedure appears on a bounded, named set of materials with a documented reason."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/mrp-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-007",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Process",
+    "statement": "A written borrow and payback policy exists, and every cross-contract part transfer in the last period has documented part cost, loan date and payback date, with actual payback in like parts.",
+    "rationale": "When one contract takes a part pegged to another, that is a loan, and the material accounting standards require a written policy plus documented cost and dates. World-class shops generate payback proposals from pegging data and route them through approval workflow; weak shops discover their borrows at audit time. The consultant's test question is simply to ask for last month's cross-contract transfers and their documentation, and silence means a finding is latent.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the borrow and payback policy document and last month's cross-contract transfers with the part cost, loan date, payback date and payback evidence for each.",
+      "expect": "A current policy document, a system-generated transfer list (not a spreadsheet), and complete documentation for every transfer including paybacks executed in like parts."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/gpd-pmmo-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-008",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Process",
+    "statement": "Backflushing is enabled only on assemblies whose BOM accuracy has been demonstrated against the accuracy bar, and low-volume engineer-to-order work keeps discrete component issue.",
+    "rationale": "Backflush issues components automatically at confirmation based on the BOM, so it is efficient and dangerous in equal measure: with an inaccurate BOM it silently charges the wrong material to the contract and corrupts the inventory record. Backflush is earned, not switched on; sequencing BOM accuracy work before backflush is the difference between a clean go-live and phantom inventory at scale.",
+    "evidence": {
+      "how": "manual",
+      "question": "Which assemblies are backflushed today, what BOM accuracy was measured on each before backflush was enabled, and what is the review cadence that would turn it off again?",
+      "expect": "A named list of backflushed assemblies, each with a measured accuracy result above the bar and a stated review cadence; no backflush on low-volume engineer-to-order structures."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/charging-accuracy",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-009",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Data",
+    "statement": "Change documents are switched on and retained for BOM items and routing operations, because they are the raw material for the accuracy and manual-override evidence packages.",
+    "rationale": "The accuracy metrics and the manual-override reporting standard are evidenced from change history. If change documents were never activated, or were purged inside the retention window, the first post-go-live business system review runs on screenshots and the metrics package cannot be reconstructed for a period the auditor names.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "Confirm that change document recording is active for BOM item and routing operation objects, and report the oldest retained change document header date for each.",
+      "expect": "Change recording active for both objects, with retained history covering at least the full records-retention window the contract requires."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/mmas-evidence",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-010",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Process",
+    "statement": "The end-to-end flow from contract demand through master schedule, MRP, planned order, production order, issue, confirmation and goods receipt exists as named processes homed to this workstream, and daily MRP exception review is one of them.",
+    "rationale": "The material accounting system is assessed as a traceable chain, and the auditor traces a part along it in one sitting. Exception monitoring in particular must be a named daily process with an accountable role: when controllers stop working exceptions the output stops being trusted, planners return to spreadsheets, and the valid time-phased requirements premise underneath the whole system quietly dies.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "processes",
+      "expect": "Processes homed to plan-to-produce covering master scheduling, MRP execution, exception review (daily cadence, named owner), order conversion and release, shop execution and confirmation, and month-end settlement, each with control points."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/p2produce-process-model",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-011",
+    "workstream_code": "plan-to-produce",
+    "pillar": "People",
+    "statement": "The MRP controller, master scheduler and material-accounting compliance lead exist as distinct personas, and the quality organization's reporting line does not pass through operations.",
+    "rationale": "Usage decisions and material review board dispositions must be independent of the organization measured on delivery, which is a quality management system requirement, not a preference. Where the compliance lead is the same person as the production control director, the borrow and payback policy is written by the person who benefits from bending it.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "personas",
+      "expect": "Separate personas for MRP controller, master scheduler, manufacturing engineer, quality engineer and compliance lead; the quality persona's reporting line terminates outside the operations chain."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/p2produce-operating-model",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-012",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Technology",
+    "statement": "Where a manufacturing execution system is in the landscape, the boundary is declared: the execution system runs the operation, SAP owns the order, the cost and the inventory truth, and no second labor truth exists.",
+    "rationale": "Two labor truths is an audit finding waiting to happen, because the timekeeping and labor distribution chain must trace a single confirmation to the universal journal. Leaving the boundary undeclared produces a hybrid where the execution system holds as-built genealogy and also thinks it holds cost, and neither system reconciles.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "systems",
+      "expect": "The execution system carries a keep or integrate disposition with an explicit boundary statement; SAP is designated for order, cost and inventory; the labor reconciliation path from time collection to confirmation is named."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/mes-boundary",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-013",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Data",
+    "statement": "Reporting on project stock reads the project stock views and the project stock valuation table, never plant or storage-location stock alone.",
+    "rationale": "Special stock Q keys quantity and value by WBS. A report built on storage-location stock silently misses every project-stock quantity, so the shop believes it has nothing and the planner believes the report. The valuation of project stock lives in its own table, so a value report built on the standard material valuation table is equally wrong.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "data",
+      "expect": "Data objects for project stock quantity and project stock valuation are declared distinct from plant and storage-location stock, and the reports that consume them are mapped to the project stock objects."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/project-stock-strategy",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-014",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Process",
+    "statement": "Inspection types are active at the points the contract requires (goods receipt of purchased material, in-process during production, receipt from production), and results recording is separated from usage decision authority on critical characteristics.",
+    "rationale": "An inspector who accepts their own work is the oldest control weakness in quality management, and the quality clauses flowed down from the contract make the inspection design a contract requirement rather than a preference. Notification catalogs designed with the engineers who will trend them are the difference between analyzable nonconformance data and free text nobody can trend. Remediate via p2pr-qm.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "List the active inspection types by material and plant for the contract-hardware population, and list the users authorized to record results versus the users authorized to make usage decisions.",
+      "expect": "Inspection types active at goods receipt, in process, and receipt from production where the contract requires them; no user holds both results recording and usage decision authority on critical or first-article characteristics."
+    },
+    "severity": "must",
+    "source_ref": "revtech-template/qm-design",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-015",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Technology",
+    "statement": "A plant is not treated as usable for production configuration until its skeleton is complete: plant master, storage locations, purchasing organization assignment, MRP controllers, order type and plant parameters, and plant-level material data.",
+    "rationale": "Order creation, MRP and goods movements each fail with different, unhelpful messages when one skeleton element is missing, and teams burn days chasing the message instead of the gap. Standing the skeleton up as a single checked step before any order-type or MRP configuration begins removes an entire debugging class. Remediate via p2pf-create-plant, then p2pr-mrp.",
+    "evidence": {
+      "how": "sap_query",
+      "query": "For the target plant, report whether the plant master, storage locations, purchasing organization assignment, MRP controller keys, order type dependent parameters and plant-level material data all exist.",
+      "expect": "Every skeleton element exists before the first production order type or MRP activation step is executed."
+    },
+    "severity": "may",
+    "source_ref": "field/plant-skeleton",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-016",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Process",
+    "statement": "The accuracy metrics package (bill of material, master schedule, routing and inventory record accuracy, manual overrides, exception aging) is generated as a system artifact and snapshotted immutably at each close.",
+    "rationale": "Auditors ask to see the metric as it was reported in a named past month, and an embedded live view cannot reconstruct that. Designing the evidence after go-live means the first business system review runs on screenshots. Sampling method, override logging and the monthly snapshot must be built as system artifacts during the project.",
+    "evidence": {
+      "how": "manual",
+      "question": "Show the last three months of accuracy metrics with the sampling method behind them, and demonstrate retrieving the metric exactly as it was reported two closes ago.",
+      "expect": "System-generated metrics with a documented risk-weighted sampling method, and an immutable monthly snapshot that reproduces a prior period's reported values without recomputation."
+    },
+    "severity": "may",
+    "source_ref": "revtech-template/mmas-evidence",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-017",
+    "workstream_code": "plan-to-produce",
+    "pillar": "Data",
+    "statement": "The engineering-to-manufacturing BOM handoff has a written contract: who converts, how phantoms and effectivity are carried, which change object governs, and the service level from engineering release to plannable structure.",
+    "rationale": "This is the most failure-prone seam in the stream. Every day of lag between engineering release and a plannable manufacturing BOM becomes shop-floor markup, and markup is exactly what erodes the BOM accuracy metric the material accounting system is graded on. An informal seam guarantees the shop builds to stale structures.",
+    "evidence": {
+      "how": "manual",
+      "question": "Who converts the engineering BOM to the manufacturing BOM, how is change-number effectivity carried into SAP, and what is the measured mean lag from engineering release to plannable BOM over the last quarter?",
+      "expect": "A named owner on each side, a change object carrying effectivity, and a measured lag with a service level that the manufacturing engineer accepts."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/seam-d2r-to-p2produce",
+    "version": "2026.1"
+  },
+  {
+    "code": "P2PR-018",
+    "workstream_code": "plan-to-produce",
+    "pillar": "People",
+    "statement": "Material review board disposition authority is a named, delegated authorization held by identified persons, never a broad role granted to everyone in quality.",
+    "rationale": "Use-as-is and repair dispositions on government hardware frequently require government concurrence under the contract's quality clauses, so the disposition is a representation, not an internal decision. A broad role means the person who signs cannot be identified afterwards, which is precisely what the surveillance activity tests.",
+    "evidence": {
+      "how": "sas_query",
+      "entity": "personas",
+      "expect": "A material review board persona exists distinct from the quality engineer and the production supervisor, with disposition authority modeled as a delegated, named authorization rather than a departmental role."
+    },
+    "severity": "should",
+    "source_ref": "revtech-template/qm-design",
+    "version": "2026.1"
+  }
+]
