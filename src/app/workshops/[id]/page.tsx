@@ -68,6 +68,7 @@ export default function WorkshopRoomPage() {
   const [pickSpecialist, setPickSpecialist] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [sectionsMenu, setSectionsMenu] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const voiceRef = useRef<TranscriptionProvider | null>(null)
   const speakerRef = useRef('')
@@ -470,41 +471,47 @@ export default function WorkshopRoomPage() {
             {/* Left: brief summary + section cards */}
             <div className="col-span-5 border-r border-[var(--m12-border)]/40 overflow-auto p-5 space-y-4">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)]">Sections</div>
+                <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] shrink-0">Sections</div>
+                <div className="flex items-center gap-1.5">
+                  <select value={durationMinutes} onChange={(e) => saveDuration(Number(e.target.value))} title="Workshop length" aria-label="Workshop length"
+                    className="h-7 px-2 rounded-md border border-[var(--m12-border)]/60 bg-[var(--m12-bg)] text-[11px] text-[var(--m12-text)] outline-none focus:border-[#2563EB]">
+                    {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
+                  </select>
                   <button
                     onClick={() => router.push(`/workshops/${ws.id}/present`)}
                     disabled={!hasAnyContent}
                     title={hasAnyContent ? 'Open the full-screen Workshop Experience' : 'Generate at least one section first'}
-                    className="text-[10px] px-2 py-1 rounded font-medium text-white bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-40 disabled:hover:bg-[#2563EB]"
+                    className="inline-flex items-center gap-1 h-7 px-3 rounded-md text-[11px] font-medium text-white bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-40 disabled:hover:bg-[#2563EB] whitespace-nowrap transition-colors"
                   >
-                    ▶ Enter Workshop Experience
+                    ▶ Workshop Experience
                   </button>
-                  <button
-                    onClick={downloadFacilitationPptx}
-                    disabled={!hasAnyContent || busy === 'deck'}
-                    title={hasAnyContent ? 'Download the facilitation deck as PowerPoint' : 'Generate at least one section first'}
-                    className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-40"
-                  >
-                    {busy === 'deck' ? 'Preparing…' : '⤓ Download facilitation deck (PPTX)'}
-                  </button>
-                  <button
-                    onClick={() => setShareOpen(true)}
-                    title="Create a public, read-only share link for the workshop prep"
-                    className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)]"
-                  >
-                    🔗 Share prep
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select value={durationMinutes} onChange={(e) => saveDuration(Number(e.target.value))} title="Workshop length" aria-label="Workshop length"
-                    className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded px-2 py-1 text-[10px] text-[var(--m12-text)] outline-none">
-                    {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
-                  </select>
-                  <button onClick={generateBrief} disabled={busy === 'brief'} title="Regenerate the brief + agenda for the current length"
-                    className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">
-                    {busy === 'brief' ? 'Preparing…' : 'Regenerate brief'}
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setSectionsMenu((v) => !v)}
+                      title="More actions"
+                      aria-label="More actions"
+                      className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium border border-[var(--m12-border)]/60 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] whitespace-nowrap"
+                    >
+                      More <span className="text-[9px] leading-none">▾</span>
+                    </button>
+                    {sectionsMenu && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setSectionsMenu(false)} />
+                        <div className="absolute right-0 top-8 z-20 w-60 rounded-lg border border-[var(--m12-border)] bg-[var(--m12-bg-card)] shadow-xl py-1">
+                          <button onClick={() => { setSectionsMenu(false); downloadFacilitationPptx() }} disabled={!hasAnyContent || busy === 'deck'} className={roomMenuItemCls}>
+                            ⤓&nbsp; {busy === 'deck' ? 'Preparing deck…' : 'Download facilitation deck (PPTX)'}
+                          </button>
+                          <button onClick={() => { setSectionsMenu(false); setShareOpen(true) }} className={roomMenuItemCls}>
+                            🔗&nbsp; Share prep (public link)
+                          </button>
+                          <div className="my-1 border-t border-[var(--m12-border)]/50" />
+                          <button onClick={() => { setSectionsMenu(false); generateBrief() }} disabled={busy === 'brief'} className={roomMenuItemCls}>
+                            ↻&nbsp; {busy === 'brief' ? 'Regenerating brief…' : 'Regenerate brief + agenda'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
