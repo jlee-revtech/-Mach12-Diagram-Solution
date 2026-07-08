@@ -90,7 +90,7 @@ export function normalizeSectionContent(content: SectionContent): SectionContent
       rationale: asArr(c.rationale),
       ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
       // App-level decision-criteria synthesis (carried through unchanged).
-      ...(typeof c.recommendedDecision === 'string' && c.kind === 'evaluation' ? { recommendedDecision: c.recommendedDecision } : {}),
+      ...(c.recommendedDecision != null ? { recommendedDecision: c.recommendedDecision } : {}),
       ...(Array.isArray(c.decisionCriteria) ? { decisionCriteria: c.decisionCriteria } : {}),
       ...(Array.isArray(c.actions) ? { actions: c.actions } : {}),
       ...(Array.isArray(c.nextSteps) ? { nextSteps: asArr(c.nextSteps) } : {}),
@@ -215,8 +215,8 @@ export async function loadFacilitationDeck(
     // Evaluation section: the synthesized decision-criteria deliverable as slides.
     if (s.content.kind === 'evaluation') {
       const { recommendedDecision, decisionCriteria, actions, nextSteps } = readSynthesis(s.content)
-      if (recommendedDecision) {
-        slides.push({ kind: 'context', heading: 'Recommended Decision', subheading: s.agendaTitle, blocks: [{ body: recommendedDecision }] })
+      if (recommendedDecision.length) {
+        slides.push({ kind: 'bullets', heading: 'Recommended Decision', subheading: s.agendaTitle, bullets: recommendedDecision })
         slideSections.push(s.agendaItemId)
       }
       if (decisionCriteria.length) {

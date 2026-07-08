@@ -25,7 +25,7 @@ const TOOL = {
   input_schema: {
     type: 'object',
     properties: {
-      recommendedDecision: { type: 'string', description: 'One or two crisp sentences: the recommended decision, grounded in the criteria and considerations.' },
+      recommendedDecision: { type: 'array', items: STR, minItems: 3, maxItems: 6, description: 'The recommended decision as 3 to 6 short, crisp bullets (one idea each), grounded in the criteria and considerations. Not a paragraph.' },
       decisionCriteria: {
         type: 'array',
         minItems: 6,
@@ -137,7 +137,7 @@ ${capLines.length ? capLines.map((x) => `- ${x}`).join('\n') : '- (none captured
     const system = `You are a world-class SAP S/4HANA + Dassian Aerospace & Defense enterprise architect closing out a Solution Architecture Evaluation. Synthesize a crisp, decision-ready deliverable: the recommended decision, a FOCUSED set of prioritized decision criteria, the consolidated actions, and the next steps / follow-ups. Weight the Considerations most heavily: the criteria must reflect and prioritize them, reinforced by the decisions, options, and captured items. Consolidate related considerations into a single criterion (aim for 6 to 12 criteria total, not one per consideration). Always produce actions and next steps, deriving them from the decisions and open items even when few were captured explicitly. Be specific and A&D-aware. Keep every item short. Never use em-dashes or en-dashes; use commas, colons, parentheses, or periods.`
     const user = `${context}
 
-Produce: (1) the recommended decision; (2) a focused set of 6 to 12 prioritized decision criteria (high/medium/low, each with a short rationale and the considerations that informed it); (3) the consolidated actions; (4) the sequenced next steps / follow-ups.`
+Produce: (1) the recommended decision as 3 to 6 short bullets (one idea each, not a paragraph); (2) a focused set of 6 to 12 prioritized decision criteria (high/medium/low, each with a short rationale and the considerations that informed it); (3) the consolidated actions; (4) the sequenced next steps / follow-ups.`
 
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY })
     const resp = await anthropic.messages.create({
@@ -151,12 +151,12 @@ Produce: (1) the recommended decision; (2) a focused set of 6 to 12 prioritized 
     })
     const block = resp.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
     if (!block?.input) return json({ error: 'The model did not return a synthesis. Try again.' }, 502)
-    const synth = stripDashes(block.input as { recommendedDecision?: string; decisionCriteria?: unknown[]; actions?: unknown[]; nextSteps?: unknown[] })
+    const synth = stripDashes(block.input as { recommendedDecision?: unknown[]; decisionCriteria?: unknown[]; actions?: unknown[]; nextSteps?: unknown[] })
 
     // ─── Merge onto the evaluation content + persist (bump version) ───
     const merged = {
       ...(evalRow.content as Row),
-      ...(synth.recommendedDecision ? { recommendedDecision: synth.recommendedDecision } : {}),
+      ...(Array.isArray(synth.recommendedDecision) && synth.recommendedDecision.length ? { recommendedDecision: synth.recommendedDecision } : {}),
       decisionCriteria: synth.decisionCriteria ?? [],
       actions: synth.actions ?? [],
       nextSteps: synth.nextSteps ?? [],

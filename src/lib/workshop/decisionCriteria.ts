@@ -17,7 +17,7 @@ export interface DecisionCriterion {
 export interface SynthAction { title: string; owner?: string; due?: string }
 
 export interface EvaluationSynthesis {
-  recommendedDecision: string
+  recommendedDecision: string[]
   decisionCriteria: DecisionCriterion[]
   actions: SynthAction[]
   nextSteps: string[]
@@ -25,10 +25,23 @@ export interface EvaluationSynthesis {
 
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 
+// The recommended decision is bullets. New rows carry a string[]; an older row may
+// carry a single paragraph string, which we split into sentence bullets.
+function readRecommendedDecision(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String).map((s) => s.trim()).filter(Boolean)
+  if (typeof v === 'string' && v.trim()) {
+    const s = v.trim()
+    // Prefer explicit line breaks; else split a legacy paragraph into sentences.
+    const parts = /\n/.test(s) ? s.split(/\n+/) : s.split(/(?<=[.;])\s+/)
+    return parts.map((x) => x.replace(/^[-•▸]\s*/, '').trim()).filter(Boolean)
+  }
+  return []
+}
+
 export function readSynthesis(content: unknown): EvaluationSynthesis {
   const c = (content ?? {}) as Record<string, unknown>
   return {
-    recommendedDecision: typeof c.recommendedDecision === 'string' ? c.recommendedDecision : '',
+    recommendedDecision: readRecommendedDecision(c.recommendedDecision),
     decisionCriteria: arr(c.decisionCriteria).map((d) => {
       const o = (d ?? {}) as Record<string, unknown>
       return {
@@ -52,7 +65,7 @@ export function readSynthesis(content: unknown): EvaluationSynthesis {
 
 export function hasSynthesis(content: unknown): boolean {
   const s = readSynthesis(content)
-  return !!s.recommendedDecision || s.decisionCriteria.length + s.actions.length + s.nextSteps.length > 0
+  return s.recommendedDecision.length + s.decisionCriteria.length + s.actions.length + s.nextSteps.length > 0
 }
 
 const ORDER: Record<CriterionPriority, number> = { high: 0, medium: 1, low: 2 }
