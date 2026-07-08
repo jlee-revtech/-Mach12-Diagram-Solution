@@ -17,6 +17,7 @@ export interface DecisionCriterion {
 export interface SynthAction { title: string; owner?: string; due?: string }
 
 export interface EvaluationSynthesis {
+  recommendedDecision: string
   decisionCriteria: DecisionCriterion[]
   actions: SynthAction[]
   nextSteps: string[]
@@ -27,6 +28,7 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 export function readSynthesis(content: unknown): EvaluationSynthesis {
   const c = (content ?? {}) as Record<string, unknown>
   return {
+    recommendedDecision: typeof c.recommendedDecision === 'string' ? c.recommendedDecision : '',
     decisionCriteria: arr(c.decisionCriteria).map((d) => {
       const o = (d ?? {}) as Record<string, unknown>
       return {
@@ -50,7 +52,7 @@ export function readSynthesis(content: unknown): EvaluationSynthesis {
 
 export function hasSynthesis(content: unknown): boolean {
   const s = readSynthesis(content)
-  return s.decisionCriteria.length + s.actions.length + s.nextSteps.length > 0
+  return !!s.recommendedDecision || s.decisionCriteria.length + s.actions.length + s.nextSteps.length > 0
 }
 
 const ORDER: Record<CriterionPriority, number> = { high: 0, medium: 1, low: 2 }

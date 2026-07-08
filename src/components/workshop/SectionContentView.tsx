@@ -235,12 +235,18 @@ function EvaluationBody({ c }: { c: EvaluationSectionContent }) {
 // The synthesized decision-criteria deliverable (from considerations, notes,
 // decisions, and captures across the workshop). Rendered on the evaluation section.
 export function DecisionCriteriaBody({ content }: { content: unknown }) {
-  const { decisionCriteria, actions, nextSteps } = readSynthesis(content)
-  if (decisionCriteria.length === 0 && actions.length === 0 && nextSteps.length === 0) return null
+  const { recommendedDecision, decisionCriteria, actions, nextSteps } = readSynthesis(content)
+  if (!recommendedDecision && decisionCriteria.length === 0 && actions.length === 0 && nextSteps.length === 0) return null
   const sorted = sortByPriority(decisionCriteria)
   return (
     <div className="rounded-lg border border-[#0891B2]/40 bg-[#0891B20D] p-4 space-y-3">
       <div className="text-[11px] uppercase tracking-wide text-[#0891B2] font-semibold">Decision Criteria</div>
+      {recommendedDecision && (
+        <div className="rounded-lg border border-[#0891B2]/50 bg-[var(--m12-bg-card)] p-3">
+          <div className="text-[10px] uppercase tracking-wide text-[#0891B2] mb-1">Recommended decision</div>
+          <div className="text-[12px] text-[var(--m12-text)] font-medium leading-snug">{recommendedDecision}</div>
+        </div>
+      )}
       {sorted.length > 0 ? (
         <div className="space-y-2">
           {sorted.map((d, i) => {

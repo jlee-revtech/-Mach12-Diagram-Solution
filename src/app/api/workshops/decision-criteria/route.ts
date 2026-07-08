@@ -21,13 +21,16 @@ const asBullets = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : 
 
 const TOOL = {
   name: 'decision_criteria',
-  description: 'Return the synthesized decision-criteria deliverable: prioritized criteria, consolidated actions, and next steps.',
+  description: 'Return the synthesized decision deliverable: the recommended decision, prioritized criteria, consolidated actions, and next steps / follow-ups.',
   input_schema: {
     type: 'object',
     properties: {
+      recommendedDecision: { type: 'string', description: 'One or two crisp sentences: the recommended decision, grounded in the criteria and considerations.' },
       decisionCriteria: {
         type: 'array',
-        description: 'The criteria the architecture decision should be evaluated against, PRIORITIZED. Derive them primarily from the Considerations, reinforced by the decisions and captured items.',
+        minItems: 6,
+        maxItems: 12,
+        description: 'A FOCUSED set (6 to 12) of the most important criteria the architecture decision should be evaluated against, PRIORITIZED. Consolidate related considerations into one criterion rather than one per consideration. Derive them primarily from the Considerations, reinforced by the decisions and captured items.',
         items: {
           type: 'object',
           properties: {
@@ -41,12 +44,13 @@ const TOOL = {
       },
       actions: {
         type: 'array',
-        description: 'Consolidated actions across the sections and captures. Owner/due only if stated.',
+        minItems: 1,
+        description: 'Consolidated actions across the sections and captures (and implied by the decisions). Owner/due only if stated. Always produce at least a few.',
         items: { type: 'object', properties: { title: STR, owner: STR, due: STR }, required: ['title'] },
       },
-      nextSteps: { type: 'array', items: STR, description: 'Concrete, sequenced next steps.' },
+      nextSteps: { type: 'array', items: STR, minItems: 1, description: 'Concrete, sequenced next steps / follow-ups. Always produce at least a few.' },
     },
-    required: ['decisionCriteria', 'actions', 'nextSteps'],
+    required: ['recommendedDecision', 'decisionCriteria', 'actions', 'nextSteps'],
   },
 } as const
 
@@ -130,15 +134,15 @@ ${options.length ? options.map((x) => `- ${x}`).join('\n') : '- (none)'}
 CAPTURED ITEMS (actions, decisions, risks, next steps):
 ${capLines.length ? capLines.map((x) => `- ${x}`).join('\n') : '- (none captured)'}`
 
-    const system = `You are a world-class SAP S/4HANA + Dassian Aerospace & Defense enterprise architect closing out a Solution Architecture Evaluation. Synthesize a crisp, decision-ready DECISION CRITERIA deliverable. Weight the Considerations most heavily: the criteria must reflect and prioritize them, reinforced by the decisions, options, and captured items. Then consolidate the Actions and the Next Steps. Be specific and A&D-aware. Keep every item short. Never use em-dashes or en-dashes; use commas, colons, parentheses, or periods.`
+    const system = `You are a world-class SAP S/4HANA + Dassian Aerospace & Defense enterprise architect closing out a Solution Architecture Evaluation. Synthesize a crisp, decision-ready deliverable: the recommended decision, a FOCUSED set of prioritized decision criteria, the consolidated actions, and the next steps / follow-ups. Weight the Considerations most heavily: the criteria must reflect and prioritize them, reinforced by the decisions, options, and captured items. Consolidate related considerations into a single criterion (aim for 6 to 12 criteria total, not one per consideration). Always produce actions and next steps, deriving them from the decisions and open items even when few were captured explicitly. Be specific and A&D-aware. Keep every item short. Never use em-dashes or en-dashes; use commas, colons, parentheses, or periods.`
     const user = `${context}
 
-Produce the decision criteria (prioritized high/medium/low, each with a short rationale and the considerations that informed it), the consolidated actions, and the sequenced next steps.`
+Produce: (1) the recommended decision; (2) a focused set of 6 to 12 prioritized decision criteria (high/medium/low, each with a short rationale and the considerations that informed it); (3) the consolidated actions; (4) the sequenced next steps / follow-ups.`
 
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY })
     const resp = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 2600,
+      max_tokens: 8000,
       temperature: 0.3,
       system,
       tools: [{ name: TOOL.name, description: TOOL.description, input_schema: TOOL.input_schema as unknown as Anthropic.Tool['input_schema'] }],
@@ -147,11 +151,12 @@ Produce the decision criteria (prioritized high/medium/low, each with a short ra
     })
     const block = resp.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
     if (!block?.input) return json({ error: 'The model did not return a synthesis. Try again.' }, 502)
-    const synth = stripDashes(block.input as { decisionCriteria?: unknown[]; actions?: unknown[]; nextSteps?: unknown[] })
+    const synth = stripDashes(block.input as { recommendedDecision?: string; decisionCriteria?: unknown[]; actions?: unknown[]; nextSteps?: unknown[] })
 
     // ─── Merge onto the evaluation content + persist (bump version) ───
     const merged = {
       ...(evalRow.content as Row),
+      ...(synth.recommendedDecision ? { recommendedDecision: synth.recommendedDecision } : {}),
       decisionCriteria: synth.decisionCriteria ?? [],
       actions: synth.actions ?? [],
       nextSteps: synth.nextSteps ?? [],
