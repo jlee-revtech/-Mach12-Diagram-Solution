@@ -83,6 +83,15 @@ function wrapText(text: string, fontSize: number, maxWidth: number, maxLines: nu
   return lines.filter((_, i) => i < maxLines)
 }
 
+// Truncate a single line to fit maxWidth px, adding an ellipsis when it overflows.
+function ellipsize(text: string, fontSize: number, maxWidth: number): string {
+  const t = String(text ?? '')
+  if (estTextWidth(t, fontSize) <= maxWidth) return t
+  let s = t
+  while (s && estTextWidth(`${s}…`, fontSize) > maxWidth) s = s.slice(0, -1)
+  return `${s.trimEnd()}…`
+}
+
 // One <text> with tspan lines centered on (cx, topY). Line height = fontSize*1.25.
 function textLines(
   lines: string[],
@@ -448,17 +457,35 @@ function renderMatrix(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
 // ─── quadrant ─────────────────────────────────────────────────────────────────
 // A square plot; two axes cross at center; the four low/high labels sit at the
 // axis ends; faint quadrant fills; points plotted at (x,y) in 0..1 (y up).
-function renderQuadrant(d: WorkshopDiagram, width: number, f: Frame): SvgResult {
+function renderQuadrant(d: WorkshopDiagram, requestedWidth: number, f: Frame): SvgResult {
   const points = (d.points ?? []).filter((p) => p && typeof p.x === 'number' && typeof p.y === 'number')
   const hasAxes = !!(d.xAxis || d.yAxis)
-  if (points.length === 0 && !hasAxes) return renderEmpty(d, width, f, 'No plot data to show')
+  if (points.length === 0 && !hasAxes) return renderEmpty(d, requestedWidth, f, 'No plot data to show')
 
-  // Reserve gutters for the axis-end labels around a square plot area.
-  const GUT = 62
+  const AX_FS = 11
+  const LBL_FS = 11
+
+  // Size the left/right gutters to the horizontal axis-end labels (wrapped) so they
+  // never clip off the frame; then grow the SVG so plot + both gutters always fit.
+  const GUT_MIN = 56
+  const GUT_MAX = 170
+  const wrapAx = (t?: string) => (t && t.trim() ? wrapText(t.trim(), AX_FS, GUT_MAX - 14, 2) : [])
+  const xLowLines = wrapAx(d.xAxis?.low)
+  const xHighLines = wrapAx(d.xAxis?.high)
+  const gutFor = (lines: string[]) =>
+    lines.length
+      ? Math.min(GUT_MAX, Math.max(GUT_MIN, Math.ceil(Math.max(0, ...lines.map((l) => estTextWidth(l, AX_FS)))) + 14))
+      : GUT_MIN
+  const leftGut = gutFor(xLowLines)
+  const rightGut = gutFor(xHighLines)
+
+  const PLOT_TARGET = 380
+  const naturalWidth = f.padX * 2 + leftGut + rightGut + PLOT_TARGET
+  const width = Math.min(1100, Math.max(requestedWidth, Math.ceil(naturalWidth)))
   const availW = width - f.padX * 2
-  const plot = Math.min(availW - GUT * 2, 420)
-  const plotX = f.padX + (availW - plot) / 2
-  const plotY = f.contentTop + 8
+  const plot = Math.max(220, Math.min(PLOT_TARGET + 80, availW - leftGut - rightGut))
+  const plotX = f.padX + leftGut + Math.max(0, (availW - leftGut - rightGut - plot) / 2)
+  const plotY = f.contentTop + AX_FS + 8 // room for the top y-axis label
   const cx = plotX + plot / 2
   const cy = plotY + plot / 2
 
@@ -478,41 +505,61 @@ function renderQuadrant(d: WorkshopDiagram, width: number, f: Frame): SvgResult 
   fills.forEach((q) => {
     out += `<rect x="${q.x.toFixed(1)}" y="${q.y.toFixed(1)}" width="${half.toFixed(1)}" height="${half.toFixed(1)}" fill="${q.c}" fill-opacity="0.7" />`
   })
-  // Plot frame.
   out += roundRect(plotX, plotY, plot, plot, 8, 'none', BRAND.borderStrong, 1.25)
-  // Axes crossing at center (pure H + V lines).
   out += `<line x1="${plotX.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(plotX + plot).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="${BRAND.slate}" stroke-width="1.25" />`
   out += `<line x1="${cx.toFixed(1)}" y1="${plotY.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(plotY + plot).toFixed(1)}" stroke="${BRAND.slate}" stroke-width="1.25" />`
 
-  // Axis-end labels.
-  const AX_FS = 11
-  if (d.xAxis?.low) out += textLine(d.xAxis.low, plotX - 6, cy + AX_FS * 0.35, AX_FS, BRAND.slate, { anchor: 'end', weight: 600 })
-  if (d.xAxis?.high) out += textLine(d.xAxis.high, plotX + plot + 6, cy + AX_FS * 0.35, AX_FS, BRAND.slate, { anchor: 'start', weight: 600 })
-  if (d.yAxis?.high) out += textLine(d.yAxis.high, cx, plotY - 8, AX_FS, BRAND.slate, { anchor: 'middle', weight: 600 })
-  if (d.yAxis?.low) out += textLine(d.yAxis.low, cx, plotY + plot + AX_FS + 6, AX_FS, BRAND.slate, { anchor: 'middle', weight: 600 })
+  // Axis-end labels, kept inside the sized gutters (x wraps, centered on the axis).
+  const lh = AX_FS * 1.25
+  if (xLowLines.length) out += textLines(xLowLines, plotX - 8, cy - (xLowLines.length * lh) / 2, AX_FS, BRAND.slate, { anchor: 'end', weight: 600 })
+  if (xHighLines.length) out += textLines(xHighLines, plotX + plot + 8, cy - (xHighLines.length * lh) / 2, AX_FS, BRAND.slate, { anchor: 'start', weight: 600 })
+  if (d.yAxis?.high) out += textLine(ellipsize(String(d.yAxis.high), AX_FS, plot - 12), cx, plotY - 8, AX_FS, BRAND.slate, { anchor: 'middle', weight: 600 })
+  if (d.yAxis?.low) out += textLine(ellipsize(String(d.yAxis.low), AX_FS, plot - 12), cx, plotY + plot + AX_FS + 8, AX_FS, BRAND.slate, { anchor: 'middle', weight: 600 })
 
-  // Points. Anchor labels away from the plot edge based on which quadrant the
-  // point is in, so labels do not spill off or overlap the frame.
+  // Dots first (so labels + leaders sit on top).
   const R = 6
-  const LBL_FS = 11
   points.forEach((p) => {
-    const x = px(p.x)
-    const y = py(p.y)
-    out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${R}" fill="${BRAND.blue}" stroke="${BRAND.surface}" stroke-width="1.5" />`
-    const label = String(p.label ?? '')
-    if (!label) return
-    const rightHalf = p.x >= 0.5
-    const anchor: 'start' | 'end' = rightHalf ? 'end' : 'start'
-    const lx = rightHalf ? x - R - 5 : x + R + 5
-    const ly = y + LBL_FS * 0.35
-    // Opaque chip behind the label so it stays legible over fills/axes.
-    const lw = estTextWidth(label, LBL_FS) + 8
-    const chipX = rightHalf ? lx - lw : lx
-    out += roundRect(chipX, y - (LBL_FS + 5) / 2, lw, LBL_FS + 5, 3, BRAND.surface, BRAND.border, 1)
-    out += textLine(label, lx - (rightHalf ? 4 : -4), ly, LBL_FS, BRAND.ink, { anchor, weight: 600 })
+    out += `<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.y).toFixed(1)}" r="${R}" fill="${BRAND.blue}" stroke="${BRAND.surface}" stroke-width="1.5" />`
   })
 
-  const height = plotY + plot + AX_FS + 20 + f.captionH
+  // Labels with greedy vertical de-collision + orthogonal leader lines, so clustered
+  // points never render their labels on top of each other.
+  const chipH = LBL_FS + 6
+  const placed: { x1: number; y1: number; x2: number; y2: number }[] = []
+  const hit = (a: { x1: number; y1: number; x2: number; y2: number }) =>
+    placed.some((c) => a.x1 < c.x2 && a.x2 > c.x1 && a.y1 < c.y2 && a.y2 > c.y1)
+  const minY = plotY + 1
+  const maxY = plotY + plot - chipH - 1
+  const labeled = points.map((p, i) => ({ p, i })).filter((o) => String(o.p.label ?? '').trim())
+  labeled.sort((a, b) => py(a.p.y) - py(b.p.y) || px(a.p.x) - px(b.p.x))
+  labeled.forEach(({ p }) => {
+    const x = px(p.x)
+    const y = py(p.y)
+    const rightHalf = p.x >= 0.5
+    const label = ellipsize(String(p.label), LBL_FS, 150)
+    const lw = estTextWidth(label, LBL_FS) + 10
+    const gap = R + 6
+    let chipX = rightHalf ? x - gap - lw : x + gap
+    chipX = Math.max(f.padX + 1, Math.min(width - f.padX - lw - 1, chipX))
+    const baseY = Math.max(minY, Math.min(maxY, y - chipH / 2))
+    let chipY = baseY
+    for (let t = 1; t <= 60 && hit({ x1: chipX, y1: chipY, x2: chipX + lw, y2: chipY + chipH }); t++) {
+      const off = Math.ceil(t / 2) * (chipH + 3) * (t % 2 ? 1 : -1)
+      chipY = Math.max(minY, Math.min(maxY, baseY + off))
+    }
+    const chipCenterY = chipY + chipH / 2
+    const chipInnerX = rightHalf ? chipX + lw : chipX
+    // Orthogonal leader only when the chip was nudged off the dot's line.
+    if (Math.abs(chipCenterY - y) > 3) {
+      const midX = rightHalf ? Math.min(chipInnerX + 8, x) : Math.max(chipInnerX - 8, x)
+      out += `<path d="M ${x.toFixed(1)} ${y.toFixed(1)} H ${midX.toFixed(1)} V ${chipCenterY.toFixed(1)} H ${chipInnerX.toFixed(1)}" fill="none" stroke="${BRAND.borderStrong}" stroke-width="1" />`
+    }
+    out += roundRect(chipX, chipY, lw, chipH, 3, BRAND.surface, BRAND.border, 1)
+    out += textLine(label, rightHalf ? chipX + lw - 5 : chipX + 5, chipCenterY + LBL_FS * 0.35, LBL_FS, BRAND.ink, { anchor: rightHalf ? 'end' : 'start', weight: 600 })
+    placed.push({ x1: chipX, y1: chipY, x2: chipX + lw, y2: chipY + chipH })
+  })
+
+  const height = plotY + plot + AX_FS + 22 + f.captionH
   return shell(out, width, Math.ceil(height), d, f)
 }
 
