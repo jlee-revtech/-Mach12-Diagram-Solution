@@ -18,6 +18,7 @@ import type {
   WorkshopDiagram, WorkshopDiagramType,
 } from '@jlee-revtech/agent-core'
 import { DiagramCard } from './DiagramView'
+import { readSynthesis, type CriterionPriority } from '@/lib/workshop/decisionCriteria'
 
 // Host-supplied AI generator: turns a prompt (plus the current diagram + context)
 // into a fresh WorkshopDiagram. The host owns the fetch + auth (it has workshopId
@@ -658,7 +659,68 @@ function EvaluationEditor({ c, onChange, gen, genContent }: { c: EvaluationSecti
         <StringListEditor label="Tradeoffs" color="#D97706" items={c.tradeoffs ?? []} placeholder="Tradeoff" addLabel="Tradeoff" onChange={(tradeoffs) => onChange({ ...c, tradeoffs: tradeoffs.length ? tradeoffs : undefined })} />
         <StringListEditor label="Rationale" color="#7C3AED" items={c.rationale ?? []} placeholder="Reasoning point" addLabel="Rationale point" onChange={(rationale) => onChange({ ...c, rationale })} />
       </div>
+      <DecisionCriteriaEditor c={c} onChange={onChange} />
       <DiagramListEditor diagrams={c.diagrams} gen={gen} context={c.overallRecommendation || undefined} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+    </div>
+  )
+}
+
+// Editable synthesized deliverable on the evaluation section: the recommended
+// decision (bullets), the prioritized criteria, actions, and next steps. These are
+// app-level fields on the content, written back via a cast. Editing them here (and
+// re-synthesizing) both write the same fields.
+function DecisionCriteriaEditor({ c, onChange }: { c: EvaluationSectionContent; onChange: (c: EvaluationSectionContent) => void }) {
+  const s = readSynthesis(c)
+  const set = (patch: Record<string, unknown>) => onChange({ ...(c as object), ...patch } as unknown as EvaluationSectionContent)
+  const criteria = s.decisionCriteria
+  const actions = s.actions
+  return (
+    <div className="rounded-lg border border-[#0891B2]/40 bg-[#0891B20D] p-3 space-y-3">
+      <div className="text-[11px] uppercase tracking-wide text-[#0891B2] font-semibold">Decision Criteria</div>
+
+      <StringListEditor label="Recommended decision" color="#0891B2" items={s.recommendedDecision} placeholder="Decision point" addLabel="Point"
+        onChange={(recommendedDecision) => set({ recommendedDecision })} />
+
+      <Field label="Criteria (prioritized)">
+        <div className="space-y-2">
+          {criteria.map((d, i) => (
+            <div key={i} className={`${CARD} space-y-1.5`}>
+              <div className="flex items-center gap-1.5">
+                <input className={INPUT} value={d.criterion} placeholder="Criterion" onChange={(e) => set({ decisionCriteria: replaceAt(criteria, i, { ...d, criterion: e.target.value }) })} />
+                <select aria-label="Priority" title="Priority" className={DIAGRAM_SELECT} value={d.priority ?? 'medium'}
+                  onChange={(e) => set({ decisionCriteria: replaceAt(criteria, i, { ...d, priority: e.target.value as CriterionPriority }) })}>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <RowControls i={i} len={criteria.length} onMove={(dir) => set({ decisionCriteria: move(criteria, i, dir) })} onRemove={() => set({ decisionCriteria: removeAt(criteria, i) })} />
+              </div>
+              <input className={INPUT} value={d.rationale ?? ''} placeholder="Rationale (why it matters, how to weigh it)"
+                onChange={(e) => set({ decisionCriteria: replaceAt(criteria, i, { ...d, rationale: e.target.value || undefined }) })} />
+              <StringListEditor label="Informed by" items={d.sources ?? []} placeholder="Consideration or section" addLabel="Source"
+                onChange={(sources) => set({ decisionCriteria: replaceAt(criteria, i, { ...d, sources: sources.length ? sources : undefined }) })} />
+            </div>
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => set({ decisionCriteria: [...criteria, { criterion: '', priority: 'medium' as CriterionPriority }] })}>+ Criterion</button>
+        </div>
+      </Field>
+
+      <Field label="Actions">
+        <div className="space-y-1.5">
+          {actions.map((a, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <input className={`${INPUT} flex-1`} value={a.title} placeholder="Action" onChange={(e) => set({ actions: replaceAt(actions, i, { ...a, title: e.target.value }) })} />
+              <input className={`${INPUT} w-28`} value={a.owner ?? ''} placeholder="Owner" onChange={(e) => set({ actions: replaceAt(actions, i, { ...a, owner: e.target.value || undefined }) })} />
+              <input className={`${INPUT} w-24`} value={a.due ?? ''} placeholder="Due" onChange={(e) => set({ actions: replaceAt(actions, i, { ...a, due: e.target.value || undefined }) })} />
+              <RowControls i={i} len={actions.length} onMove={(dir) => set({ actions: move(actions, i, dir) })} onRemove={() => set({ actions: removeAt(actions, i) })} />
+            </div>
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => set({ actions: [...actions, { title: '' }] })}>+ Action</button>
+        </div>
+      </Field>
+
+      <StringListEditor label="Next steps" color="#059669" items={s.nextSteps} placeholder="Next step" addLabel="Next step"
+        onChange={(nextSteps) => set({ nextSteps })} />
     </div>
   )
 }
