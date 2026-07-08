@@ -74,6 +74,7 @@ step('import-vibe-skills', 'node', ['scripts/import-vibe-skills.mjs'], APP_DIR)
 step('import-config-catalog', 'node', ['scripts/import-config-catalog.mjs'], APP_DIR)
 step('import-capabilities', 'node', ['scripts/import-capabilities.ts'], APP_DIR)
 step('import-skills', 'node', ['scripts/import-skills.mjs'], APP_DIR)
+step('import-dimension-profiles', 'node', ['scripts/import-dimension-profiles.mjs'], APP_DIR)
 
 // ─── Retrieval smoke checks ─────────────────────────────────────────────────
 async function smoke() {

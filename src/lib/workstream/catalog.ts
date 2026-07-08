@@ -82,7 +82,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 3,
     sapModules: ['PLM', 'PP-BOM', 'ECM (engineering change)', 'QM (FAI)'],
     dassianModules: [],
-    knowledgeSourceCodes: ['vibe-sap-recipes', 'sap-rap-development'],
+    knowledgeSourceCodes: ['sap-plm-design-to-release-ad', 'vibe-sap-recipes', 'sap-rap-development'],
     agentTagline: 'Requirements, CM, and BOM-release consultant',
   },
   {
@@ -118,7 +118,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 6,
     sapModules: ['FI-AA', 'MM-IM', 'PS'],
     dassianModules: ['GFP / property accountability'],
-    knowledgeSourceCodes: ['vibe-sap-recipes', 'sap-rap-development'],
+    knowledgeSourceCodes: ['sap-government-property-a2r', 'vibe-sap-recipes', 'sap-rap-development'],
     agentTagline: 'GFP/CAP property and fixed-asset consultant',
   },
   {
@@ -130,7 +130,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 7,
     sapModules: ['PM / EAM', 'CS', 'PP (refurb)', 'MM'],
     dassianModules: [],
-    knowledgeSourceCodes: ['vibe-sap-recipes', 'sap-rap-development'],
+    knowledgeSourceCodes: ['sap-ad-depot-mro', 'vibe-sap-recipes', 'sap-rap-development'],
     agentTagline: 'Depot/field MRO and installed-base consultant',
   },
   {
@@ -167,7 +167,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 10,
     sapModules: ['HCM / SF', 'PT (time)', 'PY (payroll)', 'CATS'],
     dassianModules: ['Labor / role-based costing', 'CATS approval'],
-    knowledgeSourceCodes: ['sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development'],
+    knowledgeSourceCodes: ['govcon-timekeeping-compliance', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development'],
     agentTagline: 'Clearances, compliant timekeeping, and payroll consultant',
   },
   // ─── Cross-cutting platform agents (serve every value stream) ─
@@ -180,7 +180,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 11,
     sapModules: ['GRC', 'PFCG', 'SU24', 'IAG / IAM'],
     dassianModules: [],
-    knowledgeSourceCodes: ['sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development'],
+    knowledgeSourceCodes: ['sap-ad-security-itar', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development'],
     agentTagline: 'Roles, authorizations, and SoD consultant',
     isPlatform: true,
   },
@@ -193,7 +193,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 12,
     sapModules: ['Embedded Analytics', 'CDS analytical', 'SAC', 'Datasphere'],
     dassianModules: ['GPD / PACE reporting'],
-    knowledgeSourceCodes: ['vibe-sap-recipes', 'sap-rap-development'],
+    knowledgeSourceCodes: ['sap-ad-program-analytics', 'vibe-sap-recipes', 'sap-rap-development'],
     agentTagline: 'Embedded analytics and reporting consultant',
     isPlatform: true,
   },
