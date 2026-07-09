@@ -3,6 +3,7 @@
 // stay out of the server bundle).
 
 import type { WorkshopRecapData, WorkshopSlide, WorkshopSlideBlock } from '@jlee-revtech/agent-core'
+import { renderDocumentHtml } from '@jlee-revtech/agent-core'
 import type PptxGenJSType from 'pptxgenjs'
 import type { Workshop } from '@/lib/workshop/types'
 import { renderWorkshopDiagramSvg } from '@/lib/workshop/diagramSvg'
@@ -232,6 +233,22 @@ export async function exportDeliverableDocx(d: DeliverableDoc): Promise<void> {
 
   const doc = new Document({ sections: [{ children }] })
   download(await Packer.toBlob(doc), `${safe(d.title)}.docx`)
+}
+
+/** Download a deliverable (typed or free-form) as a standalone, brand-styled HTML
+ *  file. Uses the shared agent-core renderer so HTML and DOCX stay in step. */
+export function exportDeliverableHtml(d: DeliverableDoc): void {
+  const ev = d.evidence ?? []
+  const footer = ev.length
+    ? `Provenance: ${ev.filter((e) => e.ok).length} of ${ev.length} evidence slots filled. ${d.workstream_code} / ${d.dtype}.`
+    : `${d.workstream_code} / ${d.dtype}.`
+  const html = renderDocumentHtml({
+    title: d.title,
+    subtitle: [d.workstream_code, d.subject].filter(Boolean).join(': ') || undefined,
+    sections: (d.content?.sections ?? []).map((s) => ({ title: s.title, content: s.content })),
+    footer,
+  })
+  download(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safe(d.title)}.html`)
 }
 
 export async function exportRecapPptx(ws: Workshop, recap: WorkshopRecapData): Promise<void> {

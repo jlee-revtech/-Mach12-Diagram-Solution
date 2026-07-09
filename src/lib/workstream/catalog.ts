@@ -58,7 +58,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 1,
     sapModules: ['FI-GL', 'FI-AA', 'CO-CCA', 'CO-PA', 'CO-PC', 'PS settlement', 'Group Reporting'],
     dassianModules: ['Cost Management (OH, costing sheets, FR)', 'Results Analysis (RAENH rev-rec)'],
-    knowledgeSourceCodes: ['sap-ad-commercial-defense-structure', 'dassian-results-analysis', 'dassian-cost-management', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-cas-in-sap', 'govcon-dcaa-audit-readiness', 'govcon-dfars-business-systems'],
+    knowledgeSourceCodes: ['dassian-labor-costing-alc', 'sap-ad-commercial-defense-structure', 'dassian-results-analysis', 'dassian-cost-management', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-cas-in-sap', 'govcon-dcaa-audit-readiness', 'govcon-dfars-business-systems'],
     agentTagline: 'GL, costing, rates, and rev-rec consultant',
   },
   {
@@ -167,7 +167,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 10,
     sapModules: ['HCM / SF', 'PT (time)', 'PY (payroll)', 'CATS'],
     dassianModules: ['Labor / role-based costing', 'CATS approval'],
-    knowledgeSourceCodes: ['govcon-timekeeping-compliance', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dcaa-audit-readiness'],
+    knowledgeSourceCodes: ['dassian-labor-costing-alc', 'govcon-timekeeping-compliance', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dcaa-audit-readiness'],
     agentTagline: 'Clearances, compliant timekeeping, and payroll consultant',
   },
   // ─── Cross-cutting platform agents (serve every value stream) ─
