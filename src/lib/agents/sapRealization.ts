@@ -39,6 +39,10 @@ export function createSapRealization(cfg: RealizationConfig): SapRealization {
     // the config-workbook deliverable. Solution Studio returns an honest "no
     // provenance available" string when its workbook store is unconfigured.
     listConfigLog: (workstreamCode, limit) => call('list_config_log', { workstreamCode, limit }),
+    // Create a transport (Customizing for config, Workbench for dev objects) and
+    // get back its TRKORR. Human confirmation is enforced on both sides.
+    createTransport: (workstreamCode, kind, description, humanConfirmed, target) =>
+      call('create_transport', { workstreamCode, kind, description, humanConfirmed, target }),
   }
 }
 

@@ -84,6 +84,7 @@ const TOOL_LABELS: Record<string, string> = {
   list_activities: 'Listing SAP configuration activities',
   list_config_log: 'Reading the executed-configuration log',
   compose_config_plan: 'Composing a SAP configuration plan',
+  create_transport: 'Creating a transport request',
   prepare_config: 'Preparing a configuration change',
   execute_config: 'Executing a configuration change',
 }
