@@ -20,6 +20,13 @@ export default function SetupPage() {
     if (!loading && !user) router.push('/auth')
   }, [user, loading, router])
 
+  // If the user already has an active org (or it resolves after a token
+  // refresh), leave setup. Without this, a bounced user is stranded here
+  // even though their org loaded moments later.
+  useEffect(() => {
+    if (!loading && user && organization) router.replace('/')
+  }, [user, organization, loading, router])
+
   const handleCreate = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)

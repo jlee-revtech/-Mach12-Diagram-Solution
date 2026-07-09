@@ -40,13 +40,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = useCallback(async (userId: string, accessToken: string) => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const headers = apiHeaders(accessToken)
+    let headers = apiHeaders(accessToken)
 
     // Fetch profile
-    const profRes = await fetch(
+    let profRes = await fetch(
       `${url}/rest/v1/profiles?id=eq.${userId}&select=*`,
       { headers }
     )
+    if (profRes.status === 401) {
+      // Stale access token (typical when returning to the app after the
+      // token expired): refresh once and retry. Bailing here left
+      // organization=null and bounced the user to /setup.
+      const { data } = await createClient().auth.refreshSession()
+      const freshToken = data.session?.access_token
+      if (!freshToken) return
+      headers = apiHeaders(freshToken)
+      profRes = await fetch(
+        `${url}/rest/v1/profiles?id=eq.${userId}&select=*`,
+        { headers }
+      )
+    }
     if (!profRes.ok) return
     const profArr = await profRes.json()
     if (!profArr.length) return
@@ -110,30 +123,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient()
     let initialDone = false
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        if (session?.user && session.access_token) {
-          await fetchProfile(session.user.id, session.access_token).catch(err => console.error('[auth] profile error:', err))
-        } else {
-          setProfile(null)
-          setOrganization(null)
-          setOrganizations([])
-        }
-        if (!initialDone) {
-          initialDone = true
-          setLoading(false)
-        }
-      }
-    )
-
-    const timeout = setTimeout(() => {
+    const finishInitial = () => {
       if (!initialDone) {
         initialDone = true
         setLoading(false)
       }
-    }, 2000)
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        // Defer out of the callback: supabase-js holds its auth lock while
+        // this callback runs, and fetchProfile may call auth.refreshSession(),
+        // which would deadlock inside the lock.
+        setTimeout(() => {
+          void (async () => {
+            setSession(session)
+            setUser(session?.user ?? null)
+            if (session?.user && session.access_token) {
+              await fetchProfile(session.user.id, session.access_token).catch(err => console.error('[auth] profile error:', err))
+            } else {
+              setProfile(null)
+              setOrganization(null)
+              setOrganizations([])
+            }
+            finishInitial()
+          })()
+        }, 0)
+      }
+    )
+
+    // Fallback: if no auth event lands quickly, resolve the session ourselves
+    // BEFORE declaring loading done. Flipping loading=false while the org was
+    // still unresolved is what bounced returning users to /setup.
+    const timeout = setTimeout(() => {
+      void (async () => {
+        if (initialDone) return
+        try {
+          const { data: { session: current } } = await supabase.auth.getSession()
+          if (current?.user && !initialDone) {
+            setSession(current)
+            setUser(current.user)
+            await fetchProfile(current.user.id, current.access_token).catch(err => console.error('[auth] profile error:', err))
+          }
+        } catch (err) {
+          console.error('[auth] session fallback error:', err)
+        }
+        finishInitial()
+      })()
+    }, 2500)
 
     return () => {
       subscription.unsubscribe()
