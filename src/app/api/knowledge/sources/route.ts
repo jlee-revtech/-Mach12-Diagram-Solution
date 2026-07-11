@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
 // POST: create or update a customer knowledge document, then ingest (chunk +
 // embed) it. Body: { code, title, description?, body, workstreamCodes?,
-// tenantKey?, kind? }.
+// tenantKey?, kind?, origin? }.
 export async function POST(req: NextRequest) {
   try {
     const db = knowledgeAdmin()
@@ -32,12 +32,13 @@ export async function POST(req: NextRequest) {
     if (!b.code || !b.title || !b.body) {
       return NextResponse.json({ error: 'code, title, and body are required' }, { status: 400 })
     }
+    const origin = b.origin === 'upload' ? 'upload' : 'diagram-app'
     const row = {
       code: b.code,
       title: b.title,
       description: b.description ?? null,
       kind: b.kind ?? 'customer-doc',
-      origin: 'diagram-app' as const,
+      origin,
       tenant_key: b.tenantKey ?? null,
       workstream_codes: b.workstreamCodes ?? [],
       version: b.version ?? null,
@@ -48,13 +49,21 @@ export async function POST(req: NextRequest) {
     }
     // Upsert on (code, tenant_key). Two partial unique indexes back this; match
     // on the existing row when present, else insert.
-    const existing = await db.from('kb_sources').select('id')
+    const existing = await db.from('kb_sources').select('id, origin')
       .eq('code', b.code)
       .is('tenant_key', b.tenantKey ?? null)
       .maybeSingle()
 
     let sourceId: string
     if (existing.data?.id) {
+      // Never let an app-authored doc silently overwrite an imported baseline
+      // skill (those are owned by the vibe-skills importer).
+      if (existing.data.origin === 'solution-studio') {
+        return NextResponse.json(
+          { error: `Code "${b.code}" belongs to a baseline skill. Choose a different code.` },
+          { status: 409 }
+        )
+      }
       sourceId = existing.data.id
       const { error } = await db.from('kb_sources').update(row).eq('id', sourceId)
       if (error) throw new Error(error.message)
@@ -68,5 +77,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ id: sourceId, ...ingest })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'save failed' }, { status: 500 })
+  }
+}
+
+// DELETE ?id=<sourceId>: remove an app-authored source (chunks cascade).
+// Baseline skills imported from Solution Studio are protected; re-running the
+// importer is their lifecycle.
+export async function DELETE(req: NextRequest) {
+  try {
+    const db = knowledgeAdmin()
+    const id = new URL(req.url).searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+
+    const { data: source, error } = await db.from('kb_sources').select('id, origin').eq('id', id).maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!source) return NextResponse.json({ error: 'Source not found' }, { status: 404 })
+    if (source.origin === 'solution-studio') {
+      return NextResponse.json({ error: 'Baseline skills cannot be deleted here.' }, { status: 403 })
+    }
+
+    const { error: delErr } = await db.from('kb_sources').delete().eq('id', id)
+    if (delErr) throw new Error(delErr.message)
+    return NextResponse.json({ ok: true })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'delete failed' }, { status: 500 })
   }
 }
