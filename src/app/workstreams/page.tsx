@@ -101,6 +101,14 @@ export default function WorkstreamsPage() {
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 3.5A1.5 1.5 0 014.5 2H13v10.5H4.5A1.5 1.5 0 003 14V3.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M13 12.5H4.5A1.5 1.5 0 003 14" stroke="currentColor" strokeWidth="1.3" /></svg>
               Knowledge
             </button>
+            <button
+              onClick={() => router.push('/deliverables')}
+              title="Documents — consulting deliverables the agents produced (HTML, Word, PowerPoint)"
+              className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L13 5v9.5H4V1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M9.5 1.5V5H13" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M6 8.5h5M6 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+              Documents
+            </button>
             {workstreams.length > 0 && (
               <>
                 <button

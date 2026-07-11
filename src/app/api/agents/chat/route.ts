@@ -76,7 +76,7 @@ const TOOL_LABELS: Record<string, string> = {
   check_template_conformance: 'Scoring the design against the RevTech template criteria',
   list_deliverable_types: 'Reviewing the document types available',
   generate_deliverable: 'Drafting a consulting document from the evidence',
-  create_document: 'Composing an HTML and Word document',
+  create_document: 'Composing the document (HTML, Word, PowerPoint)',
   generate_solution_blueprint: 'Composing the Solution Architecture Document',
   compose_cross_stream_program: 'Sequencing a cross-stream realization program',
   log_knowledge_gap: 'Recording a knowledge gap',

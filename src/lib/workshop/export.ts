@@ -251,6 +251,159 @@ export function exportDeliverableHtml(d: DeliverableDoc): void {
   download(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safe(d.title)}.html`)
 }
 
+// ─── Consulting deliverable → PowerPoint ─────────────────────────────────────
+// The third output format for agent documents (HTML and Word above). One slide
+// per document section; long sections spill onto continuation slides and markdown
+// tables render as real PowerPoint tables, chunked with a repeated header so no
+// slide overflows. Same Mach12.ai brand frame as the workshop decks.
+
+type PptxDocBlock =
+  | { kind: 'h3'; text: string }
+  | { kind: 'bullet'; text: string }
+  | { kind: 'para'; text: string }
+  | { kind: 'table'; header: string[]; rows: string[][] }
+
+/** Parse a section's markdown into slide-renderable blocks. Inline emphasis is
+ *  stripped; pptx runs carry the styling. */
+function markdownToPptxBlocks(md: string): PptxDocBlock[] {
+  const clean = (s: string) =>
+    s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/`(.+?)`/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim()
+  const cellsOf = (row: string) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => clean(c))
+  const isDivider = (row: string) => /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(row) && row.includes('-')
+  const lines = (md || '').replace(/\r\n/g, '\n').split('\n')
+  const out: PptxDocBlock[] = []
+  let i = 0
+  while (i < lines.length) {
+    const t = lines[i].trim()
+    if (t.startsWith('|') && i + 1 < lines.length && isDivider(lines[i + 1])) {
+      const header = cellsOf(t)
+      i += 2
+      const rows: string[][] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        rows.push(cellsOf(lines[i]))
+        i++
+      }
+      out.push({ kind: 'table', header, rows })
+      continue
+    }
+    if (!t) { i++; continue }
+    if (/^#{1,4}\s+/.test(t)) out.push({ kind: 'h3', text: clean(t.replace(/^#{1,4}\s+/, '')) })
+    else if (/^[-*]\s+/.test(t)) out.push({ kind: 'bullet', text: clean(t.replace(/^[-*]\s+/, '')) })
+    else if (/^\d+[.)]\s+/.test(t)) out.push({ kind: 'bullet', text: clean(t) })
+    else out.push({ kind: 'para', text: clean(t) })
+    i++
+  }
+  return out
+}
+
+export async function exportDeliverablePptx(d: DeliverableDoc): Promise<void> {
+  const PptxGenJS = (await import('pptxgenjs')).default
+  const pptx = new PptxGenJS()
+  pptx.defineLayout({ name: 'W', width: 13.333, height: 7.5 })
+  pptx.layout = 'W'
+  const BLUE = '2563EB', DARK = '0F172A', GREY = '475569'
+  const assets = await loadBrandAssets()
+  const footerContext = [d.workstream_code, 'Consulting document'].filter(Boolean).join('  ·  ')
+
+  // Title slide
+  const t = pptx.addSlide()
+  t.background = { color: 'FFFFFF' }
+  addBrandLockup(t, assets)
+  if (assets.bar) t.addImage({ data: assets.bar, x: 0.6, y: 2.15, w: 2.4, h: 0.08 })
+  t.addText(d.title, { x: 0.6, y: 2.4, w: 12.1, h: 1.4, fontSize: 32, bold: true, color: DARK, valign: 'top', fit: 'shrink' })
+  t.addText([d.workstream_code, d.subject].filter(Boolean).join('  ·  '), { x: 0.6, y: 3.9, w: 12.1, h: 0.6, fontSize: 16, color: BLUE, fit: 'shrink' })
+  addBrandFooter(t, assets, { context: 'Consulting document' })
+
+  const MAX_Y = 6.85
+  const BODY_X = 0.7, BODY_W = 12.0
+
+  // A fresh content slide with the section heading (and "(cont.)" past the first).
+  const newSlide = (heading: string, cont: boolean) => {
+    const s = pptx.addSlide()
+    s.background = { color: 'FFFFFF' }
+    addBrandFooter(s, assets, { context: footerContext })
+    s.addText(cont ? `${heading} (cont.)` : heading, { x: 0.6, y: 0.4, w: 12.1, h: 0.7, fontSize: 22, bold: true, color: DARK, fit: 'shrink' })
+    return s
+  }
+
+  // Rough per-block line estimate at ~110 chars per rendered line, fontSize 13.
+  const linesOf = (b: PptxDocBlock) =>
+    b.kind === 'table' ? 0 : Math.max(1, Math.ceil(b.text.length / 110)) + (b.kind === 'h3' ? 1 : 0)
+  const LINE_H = 0.3
+  const LINES_PER_SLIDE = Math.floor((MAX_Y - 1.3) / LINE_H) // ≈ 18
+
+  const runFor = (b: Exclude<PptxDocBlock, { kind: 'table' }>) => {
+    if (b.kind === 'h3') return { text: b.text, options: { bold: true, color: DARK, fontSize: 15, paraSpaceBefore: 10, paraSpaceAfter: 4, breakLine: true } }
+    if (b.kind === 'bullet') return { text: b.text, options: { bullet: true, color: DARK, fontSize: 13, paraSpaceAfter: 5, breakLine: true } }
+    return { text: b.text, options: { color: GREY, fontSize: 13, paraSpaceAfter: 8, breakLine: true } }
+  }
+
+  const TABLE_ROWS_PER_SLIDE = 9
+
+  for (const section of d.content?.sections ?? []) {
+    const heading = section.title || 'Section'
+    const blocks = markdownToPptxBlocks(section.content)
+    if (!blocks.length) continue
+
+    let cont = false
+    let pendingText: Exclude<PptxDocBlock, { kind: 'table' }>[] = []
+    let pendingLines = 0
+
+    const flushText = () => {
+      if (!pendingText.length) return
+      const s = newSlide(heading, cont)
+      cont = true
+      s.addText(pendingText.map(runFor), { x: BODY_X, y: 1.3, w: BODY_W, h: MAX_Y - 1.3, valign: 'top', fit: 'shrink' })
+      pendingText = []
+      pendingLines = 0
+    }
+
+    for (const b of blocks) {
+      if (b.kind === 'table') {
+        flushText()
+        for (let r = 0; r < Math.max(1, b.rows.length); r += TABLE_ROWS_PER_SLIDE) {
+          const s = newSlide(heading, cont)
+          cont = true
+          const chunk = b.rows.slice(r, r + TABLE_ROWS_PER_SLIDE)
+          const mkCell = (text: string, bold: boolean) => ({
+            text,
+            options: { bold, fontSize: 11, color: bold ? DARK : GREY, fill: { color: bold ? 'F1F5F9' : 'FFFFFF' } },
+          })
+          s.addTable([b.header.map((c) => mkCell(c, true)), ...chunk.map((row) => row.map((c) => mkCell(c, false)))], {
+            x: 0.6, y: 1.3, w: 12.13,
+            border: { type: 'solid', pt: 0.5, color: 'CBD5E1' },
+            valign: 'top',
+            autoPage: false,
+          })
+        }
+        continue
+      }
+      const l = linesOf(b)
+      if (pendingLines + l > LINES_PER_SLIDE) flushText()
+      pendingText.push(b)
+      pendingLines += l
+    }
+    flushText()
+  }
+
+  // Provenance: in GovCon the evidence trail is part of the document.
+  const ev = d.evidence ?? []
+  if (ev.length) {
+    const s = newSlide('Provenance', false)
+    const runs = [
+      { text: `${ev.filter((e) => e.ok).length} of ${ev.length} evidence slots were filled. Every factual claim traces to the evidence below.`, options: { color: GREY, fontSize: 13, paraSpaceAfter: 10, breakLine: true } },
+      ...ev.map((e) => ({
+        text: `${e.key} (via ${e.tool}): ${e.ok ? 'gathered' : `NOT gathered, ${e.reason || 'unavailable'}`}`,
+        options: { bullet: true, color: e.ok ? DARK : GREY, fontSize: 12, paraSpaceAfter: 4, breakLine: true },
+      })),
+    ]
+    s.addText(runs, { x: BODY_X, y: 1.3, w: BODY_W, h: MAX_Y - 1.3, valign: 'top', fit: 'shrink' })
+  }
+
+  const out = (await pptx.write({ outputType: 'blob' })) as Blob
+  download(out, `${safe(d.title)}.pptx`)
+}
+
 export async function exportRecapPptx(ws: Workshop, recap: WorkshopRecapData): Promise<void> {
   const PptxGenJS = (await import('pptxgenjs')).default
   const pptx = new PptxGenJS()

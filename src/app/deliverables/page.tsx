@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
-import { exportDeliverableDocx, exportDeliverableHtml, type DeliverableDoc } from '@/lib/workshop/export'
+import { exportDeliverableDocx, exportDeliverableHtml, exportDeliverablePptx, type DeliverableDoc } from '@/lib/workshop/export'
 import VersionBadge from '@/components/VersionBadge'
 
 interface DeliverableRow extends DeliverableDoc {
@@ -247,6 +247,13 @@ export default function DeliverablesPage() {
                       className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                     >
                       Download HTML
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportDeliverablePptx(current)}
+                      className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Download PowerPoint
                     </button>
                     <button
                       type="button"
