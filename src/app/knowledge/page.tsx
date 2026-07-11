@@ -243,7 +243,7 @@ export default function KnowledgePage() {
                   {result.extraction.pages ? ` · ${result.extraction.pages} ${result.extraction.format === 'pptx' ? 'slides' : result.extraction.format === 'xlsx' ? 'sheets' : 'pages'}` : ''}
                   {` · ${Math.round(result.extraction.chars / 1000)}k characters extracted`}
                   {result.extraction.usedVision ? ' · no text layer, analyzed the PDF visually' : ''}
-                  {result.extraction.truncated ? ' · analysis used the first ~180k characters' : ''}
+                  {result.extraction.truncated ? ' · very large document, analysis used the first ~300k characters' : ''}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <input value={result.draft.code} onChange={(e) => setDraft({ code: e.target.value.replace(/[^a-z0-9-]/gi, '-').toLowerCase() })} placeholder="code" className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none" />

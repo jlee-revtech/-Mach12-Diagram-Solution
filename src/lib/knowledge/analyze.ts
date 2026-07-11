@@ -16,7 +16,10 @@ export interface SkillDraft {
 }
 
 const MODEL = process.env.KNOWLEDGE_ANALYSIS_MODEL || 'claude-sonnet-4-6'
-const MAX_INPUT_CHARS = 180_000
+// ~75k tokens of document in, up to 32k tokens of skill out (env-overridable,
+// model ceiling is 64k). Long outputs require the streaming API.
+const MAX_INPUT_CHARS = 300_000
+const MAX_OUTPUT_TOKENS = Math.min(64_000, Number(process.env.KNOWLEDGE_ANALYSIS_MAX_TOKENS) || 32_000)
 
 const DRAFT_TOOL: Anthropic.Tool = {
   name: 'save_skill_draft',
@@ -41,7 +44,7 @@ const DRAFT_TOOL: Anthropic.Tool = {
       },
       skill_markdown: {
         type: 'string',
-        description: 'The plain-language skill body in markdown. This is what the consultant agents will retrieve and read.',
+        description: 'The deep, comprehensive plain-language skill body in markdown. This is what the consultant agents will retrieve and read, so it must be able to stand in for the document itself.',
       },
     },
     required: ['code', 'title', 'description', 'doc_type', 'workstreams', 'skill_markdown'],
@@ -55,15 +58,17 @@ function systemPrompt(): string {
   return `You are a senior SAP S/4HANA consultant curating the shared knowledge base that powers the Mach12 workstream consultant agents (used by both the Solution Architecture Studio and SAP Solution Studio). A user uploaded a document. Distill it into a knowledge skill the agents can retrieve and apply.
 
 Rules for the skill body (skill_markdown):
+- Be DEEP and THOROUGH. The skill must be able to stand in for the document: a consultant who reads only the skill should lose nothing that matters. Depth scales with the document; a dense 80-page design document deserves a long, detailed skill, not a page of highlights. Never compress away substance to save space.
 - Plain language. Write so a consultant who has never seen the document immediately understands it.
 - Only facts that are actually in the document. Never fabricate, never pad. If something is ambiguous, say so.
-- Preserve the specifics that matter: names, organizations, systems, numbers, rates, dates, table/field names, decisions, owners. Specifics are what make retrieval useful.
+- Preserve ALL the specifics: names, organizations, systems, numbers, rates, dates, table/field names, transaction codes, decisions, owners, deadlines. Reproduce rate tables, matrices, and mappings as markdown tables. Capture procedures and process flows step by step, in order. Specifics are what make retrieval useful.
 - Structure it with these markdown sections (omit a section only if the document truly has nothing for it):
   ## What this covers
   ## Key facts
   ## How to apply
   ## Gotchas and constraints
   ## Open questions
+- For long or multi-topic documents, add subsections (###) under Key facts and How to apply, one per topic, chapter, or process area, so retrieval chunks stay coherent.
 - "How to apply" means: how an SAP workstream consultant agent should use this knowledge when advising on design, configuration, or data decisions.
 - Do not use em-dashes anywhere. Use commas, colons, or separate sentences.
 - Do not include credentials, API keys, or connection secrets even if the document contains them; note their existence instead.
@@ -107,14 +112,17 @@ export async function analyzeDocument(input: AnalyzeInput): Promise<{ draft: Ski
     })
   }
 
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: 8000,
-    system: systemPrompt(),
-    tools: [DRAFT_TOOL],
-    tool_choice: { type: 'tool', name: 'save_skill_draft' },
-    messages: [{ role: 'user', content }],
-  })
+  // Streaming is required for long outputs; accumulate to the final message.
+  const res = await client.messages
+    .stream({
+      model: MODEL,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      system: systemPrompt(),
+      tools: [DRAFT_TOOL],
+      tool_choice: { type: 'tool', name: 'save_skill_draft' },
+      messages: [{ role: 'user', content }],
+    })
+    .finalMessage()
 
   const toolUse = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
   if (!toolUse) throw new Error('Analysis returned no skill draft.')
