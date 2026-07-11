@@ -1,11 +1,19 @@
 'use client'
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import { FileText, Maximize, Minus, Plus } from 'lucide-react'
 import { useSIPOCStore, type SystemEdge } from '@/lib/sipoc/store'
 import type { LogicalSystem } from '@/lib/sipoc/types'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 
 type SortMode = 'volume' | 'name' | 'type'
+
+// Fixed light-theme hexes for SVG fills/strokes (SVG attrs cannot take Tailwind classes)
+const SVG_NODE_FILL = '#ffffff'
+const SVG_TEXT = '#1b1b1b'
+const SVG_TEXT_MUTED = '#595959'
+const SVG_TEXT_FAINT = '#9ca3af'
+const SVG_BORDER = '#e2e2e2'
 
 function getSystemColor(s: LogicalSystem): string {
   const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
@@ -240,15 +248,15 @@ export default function NeighborhoodView() {
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <aside className="w-[260px] shrink-0 border-r border-[var(--m12-border)]/30 bg-[var(--m12-bg-card)] flex flex-col">
-        <div className="p-3 border-b border-[var(--m12-border)]/20 space-y-2">
+      <aside className="w-[260px] shrink-0 border-r border-border bg-white flex flex-col">
+        <div className="p-3 border-b border-border space-y-2">
           <input
             value={filter}
             onChange={e => setFilter(e.target.value)}
             placeholder="Search systems..."
-            className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+            className="w-full h-8 px-3 rounded-lg border border-border bg-surface-input text-[12px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
           />
-          <div className="flex gap-1 bg-[var(--m12-bg)] rounded-md p-0.5">
+          <div className="flex gap-1 bg-surface-muted rounded-md p-0.5">
             {([
               { id: 'volume', label: 'Volume' },
               { id: 'name', label: 'Name' },
@@ -257,10 +265,10 @@ export default function NeighborhoodView() {
               <button
                 key={s.id}
                 onClick={() => setSortMode(s.id)}
-                className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1 rounded transition-colors ${
+                className={`flex-1 text-[10px] uppercase tracking-wider font-mono font-bold py-1 rounded transition-colors ${
                   sortMode === s.id
-                    ? 'bg-[var(--m12-bg-card)] text-[var(--m12-text)]'
-                    : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                    ? 'bg-brand-500 text-white'
+                    : 'text-text-secondary hover:bg-white'
                 }`}
               >{s.label}</button>
             ))}
@@ -268,7 +276,7 @@ export default function NeighborhoodView() {
         </div>
         <div className="flex-1 overflow-y-auto py-1">
           {sortedSystems.length === 0 ? (
-            <div className="text-[10px] text-[var(--m12-text-muted)] italic text-center py-8">No systems match</div>
+            <div className="text-[10px] text-text-tertiary italic text-center py-8">No systems match</div>
           ) : (
             sortedSystems.map(s => {
               const counts = connectionCounts.get(s.id) || { inCount: 0, outCount: 0, total: 0 }
@@ -280,16 +288,16 @@ export default function NeighborhoodView() {
                   onClick={() => setSelectedId(s.id)}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
                     isSelected
-                      ? 'bg-[#2563EB]/10 border-l-2 border-[#2563EB]'
-                      : 'border-l-2 border-transparent hover:bg-[var(--m12-bg)]'
+                      ? 'bg-brand-50 border-l-2 border-brand-500'
+                      : 'border-l-2 border-transparent hover:bg-surface-muted'
                   }`}
                 >
                   <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
                   <div className="flex-1 min-w-0">
-                    <div className={`text-[11px] font-medium truncate ${isSelected ? 'text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)]'}`}>{s.name}</div>
-                    <div className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">{getSystemTypeLabel(s)}</div>
+                    <div className={`text-[11px] font-medium truncate ${isSelected ? 'text-text-primary' : 'text-text-secondary'}`}>{s.name}</div>
+                    <div className="text-[10px] text-text-tertiary font-mono uppercase tracking-wider">{getSystemTypeLabel(s)}</div>
                   </div>
-                  <div className="shrink-0 text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+                  <div className="shrink-0 text-[10px] text-text-tertiary font-mono">
                     ↓{counts.inCount} ↑{counts.outCount}
                   </div>
                 </button>
@@ -302,81 +310,76 @@ export default function NeighborhoodView() {
       {/* Main canvas */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="shrink-0 flex items-center gap-3 px-4 py-2.5 border-b border-[var(--m12-border)]/30 bg-[var(--m12-bg-card)]/40">
+        <div className="shrink-0 flex items-center gap-3 px-4 py-2.5 border-b border-border bg-white">
           {selected ? (
             <>
-              <div className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase tracking-widest">Focused</div>
+              <div className="text-[10px] text-text-tertiary font-mono uppercase tracking-widest">Focused</div>
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: getSystemColor(selected) }} />
-                <span className="text-sm font-semibold text-[var(--m12-text)]">{selected.name}</span>
-                <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase">{getSystemTypeLabel(selected)}</span>
+                <span className="text-body-md font-semibold text-text-primary">{selected.name}</span>
+                <span className="text-[10px] font-mono text-text-tertiary uppercase">{getSystemTypeLabel(selected)}</span>
               </div>
-              <div className="h-5 w-px bg-[var(--m12-border)]/40" />
-              <div className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+              <div className="h-5 w-px bg-border" />
+              <div className="text-[10px] text-text-tertiary font-mono">
                 {neighborhood.upstream.length - neighborhood.bidirectional.size} UPSTREAM
                 {' · '}
                 {neighborhood.downstream.length} DOWNSTREAM
-                {neighborhood.bidirectional.size > 0 && <> · <span className="text-[#C4B5FD]">{neighborhood.bidirectional.size} BIDIRECTIONAL</span></>}
+                {neighborhood.bidirectional.size > 0 && <> · <span className="text-purple-600">{neighborhood.bidirectional.size} BIDIRECTIONAL</span></>}
               </div>
             </>
           ) : (
-            <div className="text-[11px] text-[var(--m12-text-muted)] italic">Select a system from the sidebar</div>
+            <div className="text-[11px] text-text-tertiary italic">Select a system from the sidebar</div>
           )}
           <div className="flex-1" />
           <button
             onClick={() => setShowIps(!showIps)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider border transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-mono uppercase tracking-wider border transition-colors ${
               showIps
-                ? 'bg-[#2563EB]/10 border-[#2563EB]/40 text-[#93C5FD]'
-                : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[var(--m12-border)] hover:text-[var(--m12-text-secondary)]'
+                ? 'bg-brand-50 border-blue-200 text-brand-600'
+                : 'border-border text-text-secondary hover:bg-surface-muted'
             }`}
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1" />
-              <path d="M3 4h4M3 6h2.5" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
-            </svg>
+            <FileText size={10} />
             {showIps ? 'Hide' : 'Show'} Info Products
           </button>
           <button
             onClick={resetView}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[var(--m12-border)] hover:text-[var(--m12-text-secondary)] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium font-mono uppercase tracking-wider border border-border text-text-secondary hover:bg-surface-muted transition-colors"
             title="Reset zoom, pan, and node positions"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M1 1h3v3M6 1h3v3M1 6v3h3M9 6v3H6" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-            </svg>
+            <Maximize size={10} />
             Reset
           </button>
           <div className="flex items-center gap-1 ml-2">
             <button
               onClick={() => setZoom(z => Math.max(0.3, z - 0.2))}
-              className="w-7 h-7 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors"
+              className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-muted transition-colors"
               title="Zoom out"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              <Minus size={12} />
             </button>
-            <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <span className="text-[10px] text-text-tertiary font-mono w-10 text-center">{Math.round(zoom * 100)}%</span>
             <button
               onClick={() => setZoom(z => Math.min(2.5, z + 0.2))}
-              className="w-7 h-7 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors"
+              className="w-7 h-7 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-muted transition-colors"
               title="Zoom in"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              <Plus size={12} />
             </button>
           </div>
         </div>
-        <div className="shrink-0 px-4 py-1.5 border-b border-[var(--m12-border)]/20 bg-[var(--m12-bg)]/30 text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] italic">
+        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-surface-muted text-[10px] text-text-tertiary font-mono italic">
           Drag nodes to reposition · Drag canvas to pan · Scroll to zoom · Click a neighbor to re-focus
         </div>
 
         {/* Canvas */}
         <div
-          className="flex-1 overflow-hidden relative bg-[var(--m12-bg)]"
+          className="flex-1 overflow-hidden relative bg-surface-muted"
           onWheel={handleWheel}
           style={{ cursor: panning ? 'grabbing' : 'default' }}
         >
           {!selected ? (
-            <div className="h-full flex items-center justify-center text-[var(--m12-text-muted)] text-sm italic">
+            <div className="h-full flex items-center justify-center text-text-tertiary text-body-sm italic">
               {network.systems.length === 0 ? 'No systems with SIPOC data yet.' : 'Select a system to view its connections.'}
             </div>
           ) : neighborhood.upstream.length === 0 && neighborhood.downstream.length === 0 ? (
@@ -385,8 +388,8 @@ export default function NeighborhoodView() {
                 <div className="w-12 h-12 rounded-md" style={{ backgroundColor: getSystemColor(selected) }} />
               </div>
               <div>
-                <div className="text-base font-semibold text-[var(--m12-text)]">{selected.name}</div>
-                <div className="text-xs text-[var(--m12-text-muted)] mt-1">This system has no connections to other systems in the map.</div>
+                <div className="text-heading-sm font-semibold text-text-primary">{selected.name}</div>
+                <div className="text-body-sm text-text-secondary mt-1">This system has no connections to other systems in the map.</div>
               </div>
             </div>
           ) : (
@@ -402,7 +405,7 @@ export default function NeighborhoodView() {
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
                 </marker>
                 <pattern id="nb-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--m12-border)" strokeWidth="0.3" opacity="0.25" />
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke={SVG_BORDER} strokeWidth="0.3" opacity="0.25" />
                 </pattern>
               </defs>
               <rect width="100%" height="100%" fill="url(#nb-grid)" />
@@ -546,7 +549,7 @@ function SystemNode({ system, x, y, w, h, focused, bidirectional, onClick, onMou
         width={w}
         height={h}
         rx="8"
-        fill="var(--m12-bg-card)"
+        fill={SVG_NODE_FILL}
         stroke={focused ? '#2563EB' : color}
         strokeWidth={focused ? 3 : 1.5}
       />
@@ -565,11 +568,11 @@ function SystemNode({ system, x, y, w, h, focused, bidirectional, onClick, onMou
         />
       )}
       <rect width="4" height={h} rx="2" fill={color} />
-      <text x="14" y="22" fontSize="12" fontWeight="600" fill="var(--m12-text)">
+      <text x="14" y="22" fontSize="12" fontWeight="600" fill={SVG_TEXT}>
         {system.name.length > 22 ? system.name.slice(0, 20) + '…' : system.name}
       </text>
       {tmpl && (
-        <text x="14" y="37" fontSize="8" fill="var(--m12-text-muted)" fontFamily="monospace" letterSpacing="0.5">
+        <text x="14" y="37" fontSize="8" fill={SVG_TEXT_MUTED} fontFamily="monospace" letterSpacing="0.5">
           {tmpl.label.toUpperCase()}
         </text>
       )}
@@ -616,8 +619,8 @@ function EdgeLabel({ edge, x, y, showIps, emphasized }: {
         width={labelW}
         height={labelH}
         rx="4"
-        fill="var(--m12-bg-card)"
-        stroke="var(--m12-border)"
+        fill={SVG_NODE_FILL}
+        stroke={SVG_BORDER}
         strokeWidth="0.5"
         opacity={emphasized ? 0.98 : 0.92}
       />
@@ -626,7 +629,7 @@ function EdgeLabel({ edge, x, y, showIps, emphasized }: {
         const nodes: React.ReactNode[] = []
         shown.forEach((l3, i) => {
           nodes.push(
-            <text key={`cap-${i}`} x={padding} y={yOff} fontSize="9" fontWeight="600" fill="var(--m12-text)">
+            <text key={`cap-${i}`} x={padding} y={yOff} fontSize="9" fontWeight="600" fill={SVG_TEXT}>
               {l3.capability.name.length > 30 ? l3.capability.name.slice(0, 28) + '…' : l3.capability.name}
             </text>
           )
@@ -635,7 +638,7 @@ function EdgeLabel({ edge, x, y, showIps, emphasized }: {
             const ipsShown = emphasized ? l3.ips : l3.ips.slice(0, 2)
             ipsShown.forEach((ip, j) => {
               nodes.push(
-                <text key={`ip-${i}-${j}`} x={padding + 8} y={yOff} fontSize="8" fill="var(--m12-text-muted)">
+                <text key={`ip-${i}-${j}`} x={padding + 8} y={yOff} fontSize="8" fill={SVG_TEXT_MUTED}>
                   • {ip.name.length > 30 ? ip.name.slice(0, 28) + '…' : ip.name}
                 </text>
               )
@@ -643,7 +646,7 @@ function EdgeLabel({ edge, x, y, showIps, emphasized }: {
             })
             if (!emphasized && l3.ips.length > 2) {
               nodes.push(
-                <text key={`ipmore-${i}`} x={padding + 8} y={yOff} fontSize="8" fill="var(--m12-text-faint)" fontStyle="italic">
+                <text key={`ipmore-${i}`} x={padding + 8} y={yOff} fontSize="8" fill={SVG_TEXT_FAINT} fontStyle="italic">
                   +{l3.ips.length - 2} more
                 </text>
               )
@@ -653,7 +656,7 @@ function EdgeLabel({ edge, x, y, showIps, emphasized }: {
         })
         if (hidden > 0) {
           nodes.push(
-            <text key="more" x={padding} y={yOff} fontSize="8" fill="var(--m12-text-faint)" fontStyle="italic">
+            <text key="more" x={padding} y={yOff} fontSize="8" fill={SVG_TEXT_FAINT} fontStyle="italic">
               +{hidden} more L3{hidden === 1 ? '' : 's'} (hover to expand)
             </text>
           )

@@ -13,14 +13,14 @@ export default function ProcessPresence({ users, myClientId }: { users: ProcessC
         <div
           key={u.clientId}
           title={u.name + (u.editingNodeId ? ' · editing' : '')}
-          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-[var(--m12-bg)]"
+          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-white"
           style={{ background: u.color }}
         >
           {initial(u.name)}
         </div>
       ))}
       {others.length > 5 && (
-        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-[var(--m12-text-secondary)] bg-[var(--m12-bg-card)] ring-2 ring-[var(--m12-bg)]">
+        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-text-secondary bg-surface-muted ring-2 ring-white">
           +{others.length - 5}
         </div>
       )}

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { X, Search, Plus, Crosshair, Trash2, MessageSquare } from 'lucide-react'
+import { Button, EmptyState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import { anchorKey } from '@/lib/sipoc/types'
 import type { SipocComment, SipocRegion } from '@/lib/sipoc/types'
@@ -127,10 +129,8 @@ function ThreadRow({ group, expanded, onToggle, onHover, onLeaveHover, onJump }:
 
   return (
     <div
-      className={`rounded-lg border transition-colors ${
-        expanded
-          ? 'border-[var(--m12-border)]/60 bg-[var(--m12-bg-card)]'
-          : 'border-[var(--m12-border)]/25 bg-[var(--m12-bg-card)]/60 hover:border-[var(--m12-border)]/45'
+      className={`rounded-lg border border-border bg-white transition-all ${
+        expanded ? 'shadow-card' : 'hover:shadow-card'
       } ${group.resolved ? 'opacity-70' : ''}`}
       onMouseEnter={onHover}
       onMouseLeave={onLeaveHover}
@@ -147,35 +147,35 @@ function ThreadRow({ group, expanded, onToggle, onHover, onLeaveHover, onJump }:
           >
             <div className="flex items-center gap-2 mb-1">
               <span
-                className="text-[8px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-white"
+                className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded text-white"
                 style={{ backgroundColor: region.color }}
               >
                 {group.region} · {region.label}
               </span>
               {group.resolved && (
-                <span className="text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-status-green-bg text-status-green">
                   Resolved
                 </span>
               )}
-              <span className="ml-auto text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+              <span className="ml-auto text-[11px] text-text-tertiary">
                 {group.comments.length}
               </span>
             </div>
-            <div className="text-[11px] font-semibold text-[var(--m12-text)] leading-tight truncate">
+            <div className="text-body-sm font-semibold text-text-primary leading-tight truncate">
               {cap?.name || 'Unknown capability'}
               {artifactName && (
-                <span className="text-[var(--m12-text-muted)] font-normal"> → {artifactName}</span>
+                <span className="text-text-tertiary font-normal"> → {artifactName}</span>
               )}
             </div>
             {!expanded && (
               <div className="mt-1.5 flex items-center gap-1.5">
-                <span className="text-[10px] font-medium text-[var(--m12-text-secondary)] truncate">
+                <span className="text-[11px] font-medium text-text-secondary truncate">
                   {group.latest.author_name}:
                 </span>
-                <span className="text-[10px] text-[var(--m12-text-muted)] truncate flex-1">
+                <span className="text-[11px] text-text-tertiary truncate flex-1">
                   {group.latest.body}
                 </span>
-                <span className="text-[9px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] shrink-0">
+                <span className="text-[11px] text-text-tertiary shrink-0">
                   {relTime(group.latest.created_at)}
                 </span>
               </div>
@@ -187,16 +187,23 @@ function ThreadRow({ group, expanded, onToggle, onHover, onLeaveHover, onJump }:
             <div className="px-3 pb-3 space-y-2.5">
               {/* Jump to anchor + resolve toggle */}
               <div className="flex items-center gap-2 -mt-1">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<Crosshair size={12} />}
                   onClick={(e) => { e.stopPropagation(); onJump() }}
-                  className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-2 py-1 rounded border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:border-[var(--m12-border)] transition-colors"
                   title="Highlight on canvas"
                 >
                   Show on diagram
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`ml-auto ${
+                    group.resolved
+                      ? 'text-amber-700 hover:text-amber-700 hover:bg-amber-50'
+                      : 'text-status-green hover:text-status-green hover:bg-status-green-bg'
+                  }`}
                   onClick={(e) => {
                     e.stopPropagation()
                     if (group.resolved) {
@@ -208,17 +215,12 @@ function ThreadRow({ group, expanded, onToggle, onHover, onLeaveHover, onJump }:
                       )
                     }
                   }}
-                  className={`ml-auto text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-2 py-1 rounded border transition-colors ${
-                    group.resolved
-                      ? 'border-amber-500/40 text-amber-500 hover:bg-amber-500/10'
-                      : 'border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10'
-                  }`}
                 >
                   {group.resolved ? 'Reopen' : 'Resolve'}
-                </button>
+                </Button>
               </div>
               {group.resolved && group.resolvedBy && (
-                <div className="text-[9px] text-emerald-500/70 font-[family-name:var(--font-space-mono)]">
+                <div className="text-[11px] text-status-green">
                   Resolved by {group.resolvedBy}
                 </div>
               )}
@@ -226,26 +228,26 @@ function ThreadRow({ group, expanded, onToggle, onHover, onLeaveHover, onJump }:
               {/* Comments */}
               <div className="space-y-2">
                 {group.comments.map(c => (
-                  <div key={c.id} className="rounded-md bg-[var(--m12-bg)]/40 border border-[var(--m12-border)]/15 px-2.5 py-1.5">
+                  <div key={c.id} className="rounded-lg bg-surface-muted/60 border border-border px-2.5 py-1.5">
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="text-[10px] font-semibold text-[var(--m12-text)]">{c.author_name}</span>
-                      <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]" title={fullTime(c.created_at)}>
+                      <span className="text-body-sm font-medium text-text-primary">{c.author_name}</span>
+                      <span className="text-[11px] text-text-tertiary" title={fullTime(c.created_at)}>
                         {relTime(c.created_at)}
                       </span>
                       {!readOnly && (
-                        <button
-                          type="button"
-                          onClick={() => { if (confirm('Delete this comment?')) removeComment(c.id) }}
-                          className="ml-auto text-[var(--m12-text-faint)] hover:text-red-400 transition-colors"
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          icon={<Trash2 size={12} />}
+                          aria-label="Delete comment"
                           title="Delete (owner)"
-                        >
-                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                            <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                          </svg>
-                        </button>
+                          className="ml-auto h-6 w-6 text-text-tertiary hover:text-red-600 hover:bg-red-50"
+                          onClick={() => { if (confirm('Delete this comment?')) removeComment(c.id) }}
+                        />
                       )}
                     </div>
-                    <div className="text-[11px] text-[var(--m12-text-secondary)] whitespace-pre-wrap break-words">
+                    <div className="text-body-sm text-text-secondary whitespace-pre-wrap break-words">
                       {c.body}
                     </div>
                   </div>
@@ -259,23 +261,24 @@ function ThreadRow({ group, expanded, onToggle, onHover, onLeaveHover, onJump }:
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full text-[11px] px-2 py-1 rounded-md bg-[var(--m12-bg)]/50 border border-[var(--m12-border)]/30 text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+                  className="w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary placeholder:text-text-tertiary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none"
                 />
                 <textarea
                   value={reply}
                   onChange={e => setReply(e.target.value)}
-                  placeholder="Reply…"
+                  placeholder="Reply..."
                   rows={2}
-                  className="w-full text-[12px] px-2 py-1 rounded-md bg-[var(--m12-bg)]/50 border border-[var(--m12-border)]/30 text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 resize-none"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary placeholder:text-text-tertiary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none resize-none"
                 />
                 <div className="flex items-center justify-end">
-                  <button
+                  <Button
                     type="submit"
+                    variant="primary"
+                    size="sm"
                     disabled={!name.trim() || !reply.trim() || busy}
-                    className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold px-2.5 py-1 rounded-md bg-[#2563EB] text-white hover:bg-[#2563EB]/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    {busy ? 'Posting…' : 'Reply'}
-                  </button>
+                    {busy ? 'Posting...' : 'Reply'}
+                  </Button>
                 </div>
               </form>
             </div>
@@ -339,34 +342,34 @@ function NewCommentComposer({ onCancel }: { onCancel: () => void }) {
   }
 
   return (
-    <div className="rounded-lg border-2 border-[#2563EB]/40 bg-[#2563EB]/5 overflow-hidden">
+    <div className="rounded-lg border-2 border-brand-300 bg-brand-50 overflow-hidden">
       <div className="flex">
         <div className="w-1 shrink-0" style={{ backgroundColor: region.color }} />
         <div className="flex-1 min-w-0 px-3 py-2.5">
           <div className="flex items-center gap-2 mb-1.5">
             <span
-              className="text-[8px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-white"
+              className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded text-white"
               style={{ backgroundColor: region.color }}
             >
               {pendingNewAnchor.region} · {region.label}
             </span>
-            <span className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#2563EB]/80">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-brand-600">
               New comment
             </span>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="ml-auto text-[var(--m12-text-faint)] hover:text-[var(--m12-text)] transition-colors"
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon={<X size={12} />}
+              aria-label="Cancel"
               title="Cancel"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-              </svg>
-            </button>
+              className="ml-auto h-6 w-6"
+              onClick={onCancel}
+            />
           </div>
-          <div className="text-[11px] font-semibold text-[var(--m12-text)] leading-tight truncate mb-2">
+          <div className="text-body-sm font-semibold text-text-primary leading-tight truncate mb-2">
             {cap?.name || 'Unknown'}
-            {artifactName && <span className="text-[var(--m12-text-muted)] font-normal"> → {artifactName}</span>}
+            {artifactName && <span className="text-text-tertiary font-normal"> → {artifactName}</span>}
           </div>
           <form onSubmit={submit} className="space-y-1.5">
             <input
@@ -375,31 +378,28 @@ function NewCommentComposer({ onCancel }: { onCancel: () => void }) {
               onChange={e => setName(e.target.value)}
               placeholder="Your name"
               autoFocus={!commenterName}
-              className="w-full text-[11px] px-2 py-1 rounded-md bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+              className="w-full h-9 px-3 rounded-lg border border-border bg-white text-body-sm text-text-primary placeholder:text-text-tertiary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none"
             />
             <textarea
               value={body}
               onChange={e => setBody(e.target.value)}
-              placeholder="Comment…"
+              placeholder="Comment..."
               autoFocus={!!commenterName}
               rows={3}
-              className="w-full text-[12px] px-2 py-1 rounded-md bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 resize-none"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-white text-body-sm text-text-primary placeholder:text-text-tertiary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none resize-none"
             />
             <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-2 py-1 rounded text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
-              >
+              <Button variant="ghost" size="sm" onClick={onCancel} type="button">
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="primary"
+                size="sm"
                 disabled={!name.trim() || !body.trim() || busy}
-                className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold px-2.5 py-1 rounded-md bg-[#2563EB] text-white hover:bg-[#2563EB]/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {busy ? 'Posting…' : 'Post'}
-              </button>
+                {busy ? 'Posting...' : 'Post'}
+              </Button>
             </div>
           </form>
         </div>
@@ -492,40 +492,38 @@ export default function CommentsRail() {
   if (!open) return null
 
   return (
-    <div className="fixed top-0 right-0 bottom-0 z-40 w-[380px] max-w-[92vw] bg-[var(--m12-bg-card)] border-l border-[var(--m12-border)]/40 shadow-2xl flex flex-col">
+    <div className="fixed top-0 right-0 bottom-0 z-40 w-[380px] max-w-[92vw] bg-white border-l border-border shadow-modal flex flex-col animate-slide-in-right">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-[var(--m12-border)]/30 shrink-0">
+      <div className="px-4 py-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2 mb-2">
-          <div className="text-sm font-bold text-[var(--m12-text)]">Comments</div>
-          <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)]">
+          <h2 className="text-heading-sm font-display text-text-primary">Comments</h2>
+          <span className="text-[11px] text-text-tertiary">
             {groups.length} thread{groups.length === 1 ? '' : 's'}
             {totalUnresolved > 0 && (
-              <span className="ml-1 text-amber-500">· {totalUnresolved} unresolved</span>
+              <span className="ml-1 text-status-yellow">· {totalUnresolved} unresolved</span>
             )}
           </span>
-          <button
-            onClick={() => setOpen(false)}
-            className="ml-auto text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={14} />}
+            aria-label="Close"
             title="Close"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+            className="ml-auto"
+            onClick={() => setOpen(false)}
+          />
         </div>
 
         {/* Search */}
         <div className="relative">
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--m12-text-faint)]">
-            <circle cx="5" cy="5" r="3" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search comments…"
-            className="w-full text-[11px] pl-7 pr-2 py-1.5 rounded-md bg-[var(--m12-bg)]/50 border border-[var(--m12-border)]/30 text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+            placeholder="Search comments..."
+            className="w-full h-9 pl-8 pr-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary placeholder:text-text-tertiary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none"
           />
         </div>
 
@@ -539,12 +537,12 @@ export default function CommentsRail() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider px-2 py-1 rounded-md border transition-colors ${
+                className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded-md border transition-colors ${
                   active
-                    ? 'border-transparent text-white'
-                    : 'border-[var(--m12-border)]/30 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]'
+                    ? `border-transparent text-white ${color ? '' : 'bg-brand-500'}`
+                    : 'border-border text-text-secondary hover:bg-surface-muted hover:text-text-primary'
                 }`}
-                style={active ? { backgroundColor: color || '#2563EB' } : undefined}
+                style={active && color ? { backgroundColor: color } : undefined}
               >
                 {label}
               </button>
@@ -552,7 +550,7 @@ export default function CommentsRail() {
           })}
           <button
             onClick={() => setSort(s => s === 'recent' ? 'capability' : 'recent')}
-            className="ml-auto text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-2 py-1 rounded-md border border-[var(--m12-border)]/30 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
+            className="ml-auto text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded-md border border-border text-text-secondary hover:bg-surface-muted hover:text-text-primary transition-colors"
             title="Toggle sort"
           >
             Sort: {sort === 'recent' ? 'recent' : 'by cap'}
@@ -561,17 +559,14 @@ export default function CommentsRail() {
       </div>
 
       {/* New-comment CTA / pick-anchor banner */}
-      <div className="px-4 py-2 border-b border-[var(--m12-border)]/20 shrink-0">
+      <div className="px-4 py-2 border-b border-border shrink-0">
         {pickingAnchor && !pendingNewAnchor ? (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#2563EB]/10 border border-[#2563EB]/40 text-[10px] text-[var(--m12-text)]">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0 text-[#2563EB]">
-              <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.3" />
-              <circle cx="6" cy="6" r="1.5" fill="currentColor" />
-            </svg>
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-brand-50 border border-brand-200 text-[11px] text-text-primary">
+            <Crosshair size={12} className="shrink-0 text-brand-600" />
             <span className="flex-1">Click any region of the diagram to anchor your comment.</span>
             <button
               onClick={() => setPickingAnchor(false)}
-              className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]"
+              className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-text-tertiary hover:bg-surface-muted transition-colors"
             >
               ESC
             </button>
@@ -581,26 +576,30 @@ export default function CommentsRail() {
         ) : (
           <button
             onClick={() => { setPickingAnchor(true); setSelectedThreadKey(null) }}
-            className="w-full flex items-center justify-center gap-1.5 text-[10px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider px-3 py-2 rounded-md border border-dashed border-[var(--m12-border)]/50 text-[var(--m12-text-muted)] hover:border-[#2563EB]/50 hover:text-[#2563EB] transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wider px-3 py-2 rounded-lg border border-dashed border-border text-text-secondary hover:border-brand-500/50 hover:text-brand-600 transition-colors"
           >
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-              <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
+            <Plus size={12} className="shrink-0" />
             New comment
           </button>
         )}
       </div>
 
       {/* Thread list */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0 bg-surface-muted/40">
         {sorted.length === 0 ? (
-          <div className="text-[11px] text-[var(--m12-text-muted)] italic text-center py-10">
-            {search.trim()
-              ? 'No comments match your search.'
-              : filter === 'unresolved'
-              ? 'No open threads. Nice work!'
-              : 'No comments yet.'}
-          </div>
+          <EmptyState
+            variant="inline"
+            compact
+            icon={<MessageSquare size={20} />}
+            title={
+              search.trim()
+                ? 'No comments match your search'
+                : filter === 'unresolved'
+                ? 'No open threads'
+                : 'No comments yet'
+            }
+            description={filter === 'unresolved' && !search.trim() ? 'Nice work!' : undefined}
+          />
         ) : (
           sorted.map(g => (
             <ThreadRow

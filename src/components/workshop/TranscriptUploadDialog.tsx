@@ -5,8 +5,10 @@
 // facilitation, capture, and recap exactly as if it had been recorded live.
 
 import { useMemo, useRef, useState } from 'react'
+import { Upload, X } from 'lucide-react'
 import { parseTranscript } from '@/lib/workshop/parseTranscript'
 import { addMessages } from '@/lib/supabase/workshops'
+import { Button } from '@/components/common'
 
 export default function TranscriptUploadDialog({
   workshopId, onClose, onImported,
@@ -56,30 +58,28 @@ export default function TranscriptUploadDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[42rem] max-w-[94vw] max-h-[88vh] flex flex-col bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--m12-border)]/40">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-[42rem] max-w-[94vw] max-h-[88vh] flex flex-col bg-white rounded-xl shadow-card-hover overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-[var(--m12-text)]">Upload transcript</h3>
-            <div className="text-[11px] text-[var(--m12-text-muted)]">Paste or upload a transcript; it is added to the workshop as if recorded live.</div>
+            <h3 className="text-heading-sm font-display text-text-primary">Upload transcript</h3>
+            <div className="text-[11px] text-text-tertiary">Paste or upload a transcript; it is added to the workshop as if recorded live.</div>
           </div>
-          <button type="button" onClick={onClose} title="Close" aria-label="Close" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-          </button>
+          <Button variant="ghost" size="sm" iconOnly icon={<X size={14} />} title="Close" aria-label="Close" onClick={onClose} />
         </div>
 
-        {error && <div className="mx-5 mt-3 text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
+        {error && <div className="mx-5 mt-3 text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <button type="button" onClick={() => fileRef.current?.click()} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">
+            <Button variant="secondary" size="sm" icon={<Upload size={12} />} onClick={() => fileRef.current?.click()}>
               Choose file (.txt, .vtt, .srt, .md)
-            </button>
+            </Button>
             <input ref={fileRef} type="file" accept=".txt,.vtt,.srt,.md,.text,text/plain" className="hidden" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
-            {fileName && <span className="text-[10px] text-[var(--m12-text-muted)] truncate max-w-[16rem]">{fileName}</span>}
+            {fileName && <span className="text-[11px] text-text-tertiary truncate max-w-[16rem]">{fileName}</span>}
             <div className="ml-auto flex items-center gap-1.5">
-              <label className="text-[10px] text-[var(--m12-text-muted)]">Unnamed speaker</label>
-              <input value={defaultSpeaker} onChange={(e) => setDefaultSpeaker(e.target.value)} className="w-28 bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] outline-none" placeholder="Participant" />
+              <label className="text-label uppercase text-text-secondary">Unnamed speaker</label>
+              <input value={defaultSpeaker} onChange={(e) => setDefaultSpeaker(e.target.value)} className="w-28 h-8 px-2 rounded-lg border border-border bg-surface-input text-[11px] text-text-primary focus:outline-none focus:border-brand-500" placeholder="Participant" />
             </div>
           </div>
 
@@ -88,34 +88,34 @@ export default function TranscriptUploadDialog({
             onChange={(e) => { setText(e.target.value); setFileName(null) }}
             rows={12}
             placeholder={'Paste a transcript here, or choose a file.\n\nWorks with "Speaker: text" lines, WebVTT (.vtt), and SubRip (.srt). Lines without a speaker use the name above.'}
-            className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] outline-none resize-none font-mono leading-relaxed"
+            className="w-full bg-surface-input border border-border rounded-lg px-3 py-2 text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none resize-none font-mono leading-relaxed"
           />
 
           {parsed.length > 0 && (
-            <div className="rounded-lg border border-[var(--m12-border)]/40 bg-[var(--m12-bg)] p-3">
+            <div className="rounded-lg border border-border bg-surface-muted p-3">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-[11px] text-[var(--m12-text-secondary)]">{parsed.length} line{parsed.length === 1 ? '' : 's'} parsed{speakers.length ? `, ${speakers.length} speaker${speakers.length === 1 ? '' : 's'}` : ''}</div>
-                {speakers.length > 0 && <div className="text-[10px] text-[var(--m12-text-muted)] truncate max-w-[20rem]">{speakers.join(', ')}</div>}
+                <div className="text-[11px] text-text-secondary">{parsed.length} line{parsed.length === 1 ? '' : 's'} parsed{speakers.length ? `, ${speakers.length} speaker${speakers.length === 1 ? '' : 's'}` : ''}</div>
+                {speakers.length > 0 && <div className="text-[11px] text-text-tertiary truncate max-w-[20rem]">{speakers.join(', ')}</div>}
               </div>
               <div className="max-h-40 overflow-y-auto space-y-1">
                 {parsed.slice(0, 30).map((p, i) => (
                   <div key={i} className="text-[11px] leading-snug">
-                    <span className="text-[#3B82F6] font-medium">{p.speaker}:</span> <span className="text-[var(--m12-text-secondary)]">{p.content}</span>
+                    <span className="text-brand-600 font-medium">{p.speaker}:</span> <span className="text-text-secondary">{p.content}</span>
                   </div>
                 ))}
-                {parsed.length > 30 && <div className="text-[10px] text-[var(--m12-text-muted)]">…and {parsed.length - 30} more</div>}
+                {parsed.length > 30 && <div className="text-[11px] text-text-tertiary">...and {parsed.length - 30} more</div>}
               </div>
             </div>
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-[var(--m12-border)]/40 flex items-center gap-2">
-          <div className="text-[11px] text-[var(--m12-text-muted)]">Appends to the existing transcript. Nothing is overwritten.</div>
+        <div className="px-5 py-3 border-t border-border flex items-center gap-2">
+          <div className="text-[11px] text-text-tertiary">Appends to the existing transcript. Nothing is overwritten.</div>
           <div className="ml-auto flex items-center gap-2">
-            <button type="button" onClick={onClose} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">Cancel</button>
-            <button type="button" onClick={importNow} disabled={busy || parsed.length === 0} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50">
-              {busy ? 'Importing…' : `Add ${parsed.length || ''} to transcript`}
-            </button>
+            <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" size="sm" onClick={importNow} loading={busy} disabled={busy || parsed.length === 0}>
+              {busy ? 'Importing...' : `Add ${parsed.length || ''} to transcript`}
+            </Button>
           </div>
         </div>
       </div>

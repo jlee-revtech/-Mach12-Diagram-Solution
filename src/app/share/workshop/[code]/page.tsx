@@ -11,11 +11,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { Lock } from 'lucide-react'
 import type { SectionContent } from '@jlee-revtech/agent-core'
 import type { WorkshopBriefData, WorkshopAgendaItem, SectionKind } from '@/lib/workshop/types'
 import { sectionMetaFor } from '@/components/workshop/sectionMeta'
 import SectionContentView from '@/components/workshop/SectionContentView'
 import CommentAnchor, { CommentsProvider, type ShareComment, type CommentsApi } from '@/components/workshop/CommentAnchor'
+import { LoadingState } from '@/components/common'
+import { Mach12Logo } from '@/components/brand/Mach12Logo'
 
 interface ShareData {
   workshop: { id: string; title: string; customer_name: string | null; topic: string | null; objective: string | null; duration_minutes: number | null; status: string; brief: WorkshopBriefData | null }
@@ -76,13 +79,13 @@ export default function WorkshopSharePage() {
 
   const commentsApi = useMemo<CommentsApi>(() => ({ byAnchor, add, authorName, setAuthorName }), [byAnchor, add, authorName, setAuthorName])
 
-  if (loading) return <Centered><div className="text-sm text-[var(--m12-text-muted)]">Loading…</div></Centered>
+  if (loading) return <Centered><LoadingState variant="inline" label="Loading…" /></Centered>
   if (error || !data) {
     return (
       <Centered>
         <div className="text-center max-w-md">
-          <div className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">This link is not available</div>
-          <p className="text-sm text-[var(--m12-text-muted)]">{error || 'The share link may have been turned off.'}</p>
+          <div className="font-display text-heading-sm text-text-primary mb-2">This link is not available</div>
+          <p className="text-body-sm text-text-secondary">{error || 'The share link may have been turned off.'}</p>
         </div>
       </Centered>
     )
@@ -95,32 +98,45 @@ export default function WorkshopSharePage() {
 
   return (
     <CommentsProvider value={commentsApi}>
-      <div className="min-h-screen bg-[var(--m12-bg)]">
+      <div className="min-h-screen bg-surface-muted">
+        {/* Top bar — minimal white read-only chrome */}
+        <div className="sticky top-0 z-10 h-14 bg-white border-b border-border flex items-center px-4 gap-3">
+          <div className="flex items-center gap-2">
+            <Mach12Logo size={24} />
+            <span className="text-gradient font-display font-bold text-body-md tracking-wide">MACH12</span>
+          </div>
+          <span className="text-body-sm text-text-tertiary">/</span>
+          <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded bg-status-blue-bg text-status-blue shrink-0">
+            Workshop Prep
+          </span>
+          <span className="text-body-md font-semibold text-text-primary truncate">{workshop.title}</span>
+          <div className="flex-1" />
+          <span className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider shrink-0">
+            <Lock size={10} />
+            Read-Only
+          </span>
+        </div>
+
         <div className="max-w-3xl mx-auto px-6 py-8">
           {/* Header */}
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-gradient text-lg font-bold font-[family-name:var(--font-orbitron)] tracking-wide">MACH12</span>
-            <span className="text-[var(--m12-text-muted)]">/</span>
-            <span className="text-[10px] uppercase tracking-wider text-[#3B82F6] border border-[#3B82F6]/40 rounded-full px-2 py-0.5">Shared workshop prep, read only</span>
-          </div>
-          <h1 className="text-xl font-semibold text-[var(--m12-text)] mt-3">{workshop.title}</h1>
-          <div className="flex items-center gap-2 text-xs text-[var(--m12-text-muted)] mt-1">
+          <h1 className="text-heading-lg text-text-primary">{workshop.title}</h1>
+          <div className="flex items-center gap-2 text-body-sm text-text-secondary mt-1">
             {workshop.customer_name && <span>{workshop.customer_name}</span>}
             {workshop.duration_minutes ? <span>· {workshop.duration_minutes} min</span> : null}
           </div>
-          {workshop.topic && <p className="text-sm text-[var(--m12-text-secondary)] leading-relaxed mt-3">{workshop.topic}</p>}
+          {workshop.topic && <p className="text-body-md text-text-secondary leading-relaxed mt-3">{workshop.topic}</p>}
 
-          <div className="mt-4 rounded-lg border border-[#2563EB]/30 bg-[#2563EB0A] px-3 py-2 text-[11px] text-[var(--m12-text-secondary)]">
+          <div className="mt-4 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-[11px] text-text-secondary">
             Hover any bullet or item and click the 💬 icon to leave a comment. Your name is remembered on this device.
           </div>
 
           {/* Brief */}
           {b && (
             <div className="mt-8 space-y-6">
-              <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)]">Workshop brief</div>
+              <div className="text-[11px] uppercase tracking-wider text-text-tertiary">Workshop brief</div>
               {b.summary && (
                 <div className="group flex items-start gap-1">
-                  <p className="flex-1 text-sm text-[var(--m12-text-secondary)] leading-relaxed">{b.summary}</p>
+                  <p className="flex-1 text-body-md text-text-secondary leading-relaxed">{b.summary}</p>
                   <CommentAnchor anchor="brief:summary" label={b.summary} />
                 </div>
               )}
@@ -129,13 +145,13 @@ export default function WorkshopSharePage() {
                 <Section title="Agenda">
                   <div className="space-y-1.5">
                     {b.agenda.map((a, i) => (
-                      <div key={i} className="group flex items-start gap-3 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2">
-                        <span className="text-[10px] text-[var(--m12-text-muted)] mt-0.5 w-5">{i + 1}</span>
+                      <div key={i} className="group flex items-start gap-3 bg-white border border-border rounded-lg px-3 py-2">
+                        <span className="text-[10px] text-text-tertiary mt-0.5 w-5">{i + 1}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs text-[var(--m12-text)]">{a.title}</div>
-                          {a.objective && <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">{a.objective}</div>}
+                          <div className="text-body-sm text-text-primary">{a.title}</div>
+                          {a.objective && <div className="text-[10px] text-text-tertiary mt-0.5">{a.objective}</div>}
                         </div>
-                        {a.timeboxMinutes ? <span className="text-[9px] text-[var(--m12-text-muted)] shrink-0">{a.timeboxMinutes}m</span> : null}
+                        {a.timeboxMinutes ? <span className="text-[10px] text-text-tertiary shrink-0">{a.timeboxMinutes}m</span> : null}
                         <CommentAnchor anchor={`brief:agenda:${i}`} label={a.title} />
                       </div>
                     ))}
@@ -145,7 +161,7 @@ export default function WorkshopSharePage() {
               {b.preRead && (
                 <Section title="Pre-read">
                   <div className="group flex items-start gap-1">
-                    <p className="flex-1 text-xs text-[var(--m12-text-secondary)] leading-relaxed whitespace-pre-wrap">{b.preRead}</p>
+                    <p className="flex-1 text-body-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{b.preRead}</p>
                     <CommentAnchor anchor="brief:preRead" label={b.preRead.slice(0, 200)} />
                   </div>
                 </Section>
@@ -159,20 +175,20 @@ export default function WorkshopSharePage() {
           {/* Sections */}
           {sections.length > 0 && (
             <div className="mt-10 space-y-6">
-              <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)]">Sections</div>
+              <div className="text-[11px] uppercase tracking-wider text-text-tertiary">Sections</div>
               {sections.map((a) => {
                 const row = contentByItem.get(a.id)!
                 const meta = sectionMetaFor(a.section_kind)
                 return (
-                  <div key={a.id} className="border-t border-[var(--m12-border)]/40 pt-5">
+                  <div key={a.id} className="border-t border-border pt-5">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[8px] uppercase tracking-wide px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: `${meta.color}1A`, color: meta.color }}>
+                      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: `${meta.color}1A`, color: meta.color }}>
                         <span>{meta.icon}</span>{meta.label}
                       </span>
-                      {a.timebox_minutes ? <span className="text-[10px] text-[var(--m12-text-muted)]">{a.timebox_minutes}m</span> : null}
+                      {a.timebox_minutes ? <span className="text-[10px] text-text-tertiary">{a.timebox_minutes}m</span> : null}
                     </div>
                     <div className="group flex items-start gap-1 mb-3">
-                      <h3 className="flex-1 text-sm font-semibold text-[var(--m12-text)] leading-snug">{a.title}</h3>
+                      <h3 className="flex-1 text-body-md font-semibold text-text-primary leading-snug">{a.title}</h3>
                       <CommentAnchor anchor={`${a.id}:title`} label={a.title} />
                     </div>
                     {row.content && <SectionContentView content={row.content} anchorBase={a.id} />}
@@ -182,7 +198,7 @@ export default function WorkshopSharePage() {
             </div>
           )}
 
-          <div className="mt-12 pt-5 border-t border-[var(--m12-border)]/40 text-[10px] text-[var(--m12-text-faint)]">
+          <div className="mt-12 pt-5 border-t border-border text-[10px] text-text-tertiary">
             Shared read-only from Mach12.ai Solution Architecture Studio. Comments are visible to everyone with this link.
           </div>
         </div>
@@ -192,11 +208,11 @@ export default function WorkshopSharePage() {
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-screen bg-[var(--m12-bg)] flex items-center justify-center px-6">{children}</div>
+  return <div className="min-h-screen bg-surface-muted flex items-center justify-center px-6">{children}</div>
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div><div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">{title}</div>{children}</div>
+  return <div><div className="text-[11px] uppercase tracking-wider text-text-tertiary mb-2">{title}</div>{children}</div>
 }
 
 function List({ title, items, marker, color, anchorPrefix }: { title: string; items?: string[]; marker: string; color: string; anchorPrefix: string }) {
@@ -205,7 +221,7 @@ function List({ title, items, marker, color, anchorPrefix }: { title: string; it
     <Section title={title}>
       <ul className="space-y-1">
         {items.map((t, i) => (
-          <li key={i} className="group text-xs text-[var(--m12-text-secondary)] flex gap-2 leading-snug">
+          <li key={i} className="group text-body-sm text-text-secondary flex gap-2 leading-snug">
             <span style={{ color }}>{marker}</span>
             <span className="flex-1">{t}</span>
             <CommentAnchor anchor={`${anchorPrefix}:${i}`} label={t} />

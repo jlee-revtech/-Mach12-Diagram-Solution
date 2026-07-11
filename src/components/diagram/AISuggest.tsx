@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { Loader2, Plus, Sparkles } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useDiagramStore } from '@/lib/diagram/store'
 
 export default function AISuggest() {
@@ -75,25 +77,29 @@ export default function AISuggest() {
   return (
     <div className="mt-4">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-[10px] uppercase tracking-widest text-[#06B6D4] font-[family-name:var(--font-space-mono)] font-bold">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">
+          <Sparkles size={12} className="text-amber-500" />
           AI Suggestions
         </div>
       </div>
 
       {!fetched && !loading && (
-        <button
+        <Button
+          variant="ai"
+          size="sm"
+          fullWidth
+          icon={<Sparkles size={12} />}
           onClick={handleSuggest}
-          className="w-full bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/40 hover:border-[#06B6D4]/40 rounded-lg px-3 py-2.5 text-xs text-[var(--m12-text-muted)] hover:text-[#06B6D4] transition-colors flex items-center justify-center gap-2"
+          className="!h-auto py-2 whitespace-normal text-left"
         >
-          <span className="text-[#06B6D4] font-bold font-[family-name:var(--font-space-mono)] text-[10px]">AI</span>
           Suggest data elements for {sourceNode.data.label} → {targetNode.data.label}
-        </button>
+        </Button>
       )}
 
       {loading && (
         <div className="flex items-center justify-center gap-2 py-3">
-          <div className="w-3 h-3 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[10px] text-[var(--m12-text-muted)]">Getting suggestions...</span>
+          <Loader2 size={14} className="animate-spin text-brand-500" />
+          <span className="text-[10px] text-text-tertiary">Getting suggestions...</span>
         </div>
       )}
 
@@ -101,7 +107,7 @@ export default function AISuggest() {
         <div className="space-y-1.5">
           <button
             onClick={handleAcceptAll}
-            className="w-full text-[10px] text-[#06B6D4] hover:text-[#22D3EE] font-medium py-1 transition-colors"
+            className="w-full text-[10px] text-brand-600 hover:text-brand-700 font-medium py-1 transition-colors"
           >
             Accept all ({suggestions.length})
           </button>
@@ -109,26 +115,26 @@ export default function AISuggest() {
             <button
               key={i}
               onClick={() => handleAccept(s)}
-              className="w-full flex items-center gap-2 bg-[var(--m12-bg)] hover:bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/30 hover:border-[#06B6D4]/40 rounded-lg px-3 py-2 text-left transition-colors group"
+              className="w-full flex items-center gap-2 bg-surface-muted hover:bg-brand-50 border border-border hover:border-brand-200 rounded-lg px-3 py-2 text-left transition-colors group"
             >
-              <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] shrink-0 opacity-50 group-hover:opacity-100" />
+              <Sparkles size={12} className="text-amber-500 shrink-0 opacity-60 group-hover:opacity-100" />
               <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-[var(--m12-text-secondary)] group-hover:text-[var(--m12-text)] truncate">
+                <div className="text-[11px] text-text-secondary group-hover:text-text-primary truncate">
                   {s.name}
                 </div>
-                <div className="text-[9px] text-[var(--m12-border)] group-hover:text-[var(--m12-text-muted)]">
+                <div className="text-[10px] text-text-tertiary">
                   {s.elementType?.replace('_', ' ')}
-                  {s.description && ` — ${s.description}`}
+                  {s.description && ` - ${s.description}`}
                 </div>
               </div>
-              <span className="text-[10px] text-[var(--m12-border)] group-hover:text-[#06B6D4] shrink-0">+</span>
+              <Plus size={12} className="text-text-tertiary group-hover:text-brand-600 shrink-0" />
             </button>
           ))}
         </div>
       )}
 
       {fetched && suggestions.length === 0 && !loading && (
-        <div className="text-[10px] text-[var(--m12-border)] text-center py-2">
+        <div className="text-[10px] text-text-tertiary text-center py-2">
           All suggestions accepted
         </div>
       )}

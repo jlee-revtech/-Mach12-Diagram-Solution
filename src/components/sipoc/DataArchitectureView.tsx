@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { X, ChevronRight, ArrowRight, Network } from 'lucide-react'
+import { Button, EmptyState } from '@/components/common'
 import { useSIPOCStore, type IPLineage, type SystemUsage } from '@/lib/sipoc/store'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 import NeighborhoodView from './NeighborhoodView'
@@ -8,15 +10,19 @@ import MatrixView from './MatrixView'
 
 // ─── Small reusable UI ──────────────────────────────────
 function Chip({ name, color, tone }: { name: string; color?: string; tone?: 'system' | 'persona' | 'tag' | 'cap' }) {
-  const style = color && tone === 'tag'
-    ? { backgroundColor: color, color: '#fff' }
-    : { backgroundColor: color + '22', color }
   if (tone === 'cap') {
-    return <span className="inline-flex items-center text-[10px] bg-[#2563EB]/10 border border-[#2563EB]/30 text-[#93C5FD] rounded px-1.5 py-0.5">{name}</span>
+    return <span className="inline-flex items-center text-[10px] bg-brand-50 border border-blue-200 text-brand-600 rounded px-1.5 py-0.5">{name}</span>
+  }
+  if (tone === 'tag' && color) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5" style={{ backgroundColor: color, color: '#fff' }}>
+        {name}
+      </span>
+    )
   }
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5" style={tone === 'tag' ? style : { backgroundColor: 'var(--m12-bg)', color: 'var(--m12-text-secondary)', border: '1px solid var(--m12-border)' }}>
-      {color && tone !== 'tag' && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />}
+    <span className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 bg-surface-muted text-text-secondary border border-border">
+      {color && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />}
       {name}
     </span>
   )
@@ -25,27 +31,23 @@ function Chip({ name, color, tone }: { name: string; color?: string; tone?: 'sys
 function SystemChip({ name, color, systemType }: { name: string; color?: string | null; systemType?: string }) {
   const tmpl = SYSTEM_TEMPLATES.find(t => t.type === systemType)
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-md px-2 py-0.5 text-[var(--m12-text-secondary)]">
+    <span className="inline-flex items-center gap-1.5 text-[10px] bg-surface-muted border border-border rounded-md px-2 py-0.5 text-text-secondary">
       <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: color || tmpl?.color || '#64748B' }} />
       {name}
-      {tmpl && <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase">{tmpl.label}</span>}
+      {tmpl && <span className="text-[10px] text-text-tertiary font-mono uppercase">{tmpl.label}</span>}
     </span>
   )
 }
 
 function Arrow() {
-  return (
-    <svg width="16" height="12" viewBox="0 0 16 12" fill="none" className="shrink-0 text-[var(--m12-text-faint)] opacity-60">
-      <path d="M0 6h12M10 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
+  return <ArrowRight size={14} className="shrink-0 text-text-tertiary opacity-60" />
 }
 
 function SectionLabel({ label, count, color }: { label: string; count: number; color: string }) {
   return (
     <div className="flex items-center gap-1.5 shrink-0">
-      <span className="text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold" style={{ color }}>{label}</span>
-      <span className="text-[8px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1 text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{count}</span>
+      <span className="text-[10px] font-mono uppercase tracking-wider font-bold" style={{ color }}>{label}</span>
+      <span className="text-[10px] bg-surface-muted border border-border rounded px-1 text-text-tertiary font-mono">{count}</span>
     </div>
   )
 }
@@ -55,21 +57,19 @@ function LineageRow({ lineage }: { lineage: IPLineage }) {
   const [expanded, setExpanded] = useState(false)
   const l = lineage
   return (
-    <div className="border border-[var(--m12-border)]/30 rounded-lg bg-[var(--m12-bg-card)] overflow-hidden">
+    <div className="border border-border rounded-lg bg-white overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--m12-bg)] transition-colors"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-muted transition-colors"
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`text-[var(--m12-text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}>
-          <path d="M3 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ChevronRight size={10} className={`text-text-tertiary transition-transform ${expanded ? 'rotate-90' : ''}`} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-[var(--m12-text)] truncate">{l.ip.name}</span>
-            {l.ip.category && <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase">{l.ip.category}</span>}
+            <span className="text-body-md font-semibold text-text-primary truncate">{l.ip.name}</span>
+            {l.ip.category && <span className="text-[10px] font-mono text-text-tertiary uppercase">{l.ip.category}</span>}
             {l.tags.map(t => <Chip key={t.id} name={t.name} color={t.color} tone="tag" />)}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px] text-[var(--m12-text-muted)]">
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px] text-text-tertiary">
             <span>{l.sourceSystems.length} source</span>
             <span>·</span>
             <span>{l.feedingSystems.length} feeding</span>
@@ -84,10 +84,10 @@ function LineageRow({ lineage }: { lineage: IPLineage }) {
       </button>
 
       {expanded && (
-        <div className="border-t border-[var(--m12-border)]/20 px-4 py-3 space-y-3 bg-[var(--m12-bg)]/40">
+        <div className="border-t border-border px-4 py-3 space-y-3 bg-surface-muted/40">
           {/* System flow: sources → feeding → processing → destinations */}
           <div>
-            <div className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] font-bold mb-1.5">System Flow</div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary font-bold mb-1.5">System Flow</div>
             <div className="flex items-center gap-2 flex-wrap">
               {/* Sources */}
               {l.sourceSystems.length > 0 && <>
@@ -126,15 +126,15 @@ function LineageRow({ lineage }: { lineage: IPLineage }) {
           {/* Capabilities */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <div className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] font-bold mb-1">Consumed By ({l.consumedBy.length})</div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary font-bold mb-1">Consumed By ({l.consumedBy.length})</div>
               <div className="flex flex-wrap gap-1">
-                {l.consumedBy.length > 0 ? l.consumedBy.map(c => <Chip key={c.id} name={c.name} tone="cap" />) : <span className="text-[10px] text-[var(--m12-text-faint)] italic">—</span>}
+                {l.consumedBy.length > 0 ? l.consumedBy.map(c => <Chip key={c.id} name={c.name} tone="cap" />) : <span className="text-[10px] text-text-tertiary italic">-</span>}
               </div>
             </div>
             <div>
-              <div className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] font-bold mb-1">Produced By ({l.producedBy.length})</div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary font-bold mb-1">Produced By ({l.producedBy.length})</div>
               <div className="flex flex-wrap gap-1">
-                {l.producedBy.length > 0 ? l.producedBy.map(c => <Chip key={c.id} name={c.name} tone="cap" />) : <span className="text-[10px] text-[var(--m12-text-faint)] italic">—</span>}
+                {l.producedBy.length > 0 ? l.producedBy.map(c => <Chip key={c.id} name={c.name} tone="cap" />) : <span className="text-[10px] text-text-tertiary italic">-</span>}
               </div>
             </div>
           </div>
@@ -142,20 +142,20 @@ function LineageRow({ lineage }: { lineage: IPLineage }) {
           {/* Personas + Dimensions */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <div className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] font-bold mb-1">Suppliers / Consumers</div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary font-bold mb-1">Suppliers / Consumers</div>
               <div className="flex flex-wrap gap-1">
                 {[...l.supplierPersonas, ...l.consumerPersonas.filter(c => !l.supplierPersonas.some(s => s.id === c.id))].map(p => (
                   <Chip key={p.id} name={p.name} color={p.color} tone="persona" />
                 ))}
-                {l.supplierPersonas.length + l.consumerPersonas.length === 0 && <span className="text-[10px] text-[var(--m12-text-faint)] italic">—</span>}
+                {l.supplierPersonas.length + l.consumerPersonas.length === 0 && <span className="text-[10px] text-text-tertiary italic">-</span>}
               </div>
             </div>
             <div>
-              <div className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] font-bold mb-1">Dimensions ({l.dimensions.length})</div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary font-bold mb-1">Dimensions ({l.dimensions.length})</div>
               <div className="flex flex-wrap gap-1">
                 {l.dimensions.length > 0 ? l.dimensions.map(d => (
-                  <span key={d.id} className="text-[10px] text-[var(--m12-text-secondary)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1.5 py-0.5">{d.name}</span>
-                )) : <span className="text-[10px] text-[var(--m12-text-faint)] italic">—</span>}
+                  <span key={d.id} className="text-[10px] text-text-secondary bg-surface-muted border border-border rounded px-1.5 py-0.5">{d.name}</span>
+                )) : <span className="text-[10px] text-text-tertiary italic">-</span>}
               </div>
             </div>
           </div>
@@ -170,21 +170,21 @@ function SystemCard({ usage }: { usage: SystemUsage }) {
   const tmpl = SYSTEM_TEMPLATES.find(t => t.type === usage.system.system_type)
   const totalIps = usage.asSource.length + usage.asFeeding.length + usage.asDestination.length
   return (
-    <div className="border border-[var(--m12-border)]/30 rounded-lg bg-[var(--m12-bg-card)] overflow-hidden">
-      <div className="px-4 py-3 border-b border-[var(--m12-border)]/20 flex items-center gap-3" style={{ borderLeftWidth: 4, borderLeftColor: usage.system.color || tmpl?.color || '#64748B' }}>
+    <div className="border border-border rounded-lg bg-white shadow-card overflow-hidden">
+      <div className="px-4 py-3 border-b border-border flex items-center gap-3" style={{ borderLeftWidth: 4, borderLeftColor: usage.system.color || tmpl?.color || '#64748B' }}>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-[var(--m12-text)]">{usage.system.name}</div>
-          {tmpl && <div className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">{tmpl.label} · {tmpl.description}</div>}
+          <div className="text-body-md font-semibold text-text-primary">{usage.system.name}</div>
+          {tmpl && <div className="text-[10px] text-text-tertiary font-mono uppercase tracking-wider">{tmpl.label} · {tmpl.description}</div>}
         </div>
         <div className="text-right shrink-0">
-          <div className="text-lg font-bold text-[var(--m12-text)]">{totalIps}</div>
-          <div className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">IP Flows</div>
+          <div className="text-lg font-bold font-display text-text-primary">{totalIps}</div>
+          <div className="text-[10px] text-text-tertiary font-mono uppercase">IP Flows</div>
         </div>
       </div>
       <div className="px-4 py-3 space-y-2 text-[11px]">
         {usage.asSource.length > 0 && (
           <div>
-            <span className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#F97316] font-bold mr-2">Sources</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[#F97316] font-bold mr-2">Sources</span>
             <div className="inline-flex flex-wrap gap-1 mt-0.5">
               {usage.asSource.map(ip => <Chip key={ip.id} name={ip.name} />)}
             </div>
@@ -192,7 +192,7 @@ function SystemCard({ usage }: { usage: SystemUsage }) {
         )}
         {usage.asFeeding.length > 0 && (
           <div>
-            <span className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#EAB308] font-bold mr-2">Feeds</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[#EAB308] font-bold mr-2">Feeds</span>
             <div className="inline-flex flex-wrap gap-1 mt-0.5">
               {usage.asFeeding.map(ip => <Chip key={ip.id} name={ip.name} />)}
             </div>
@@ -200,7 +200,7 @@ function SystemCard({ usage }: { usage: SystemUsage }) {
         )}
         {usage.asProcessing.length > 0 && (
           <div>
-            <span className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#2563EB] font-bold mr-2">Processes</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[#2563EB] font-bold mr-2">Processes</span>
             <div className="inline-flex flex-wrap gap-1 mt-0.5">
               {usage.asProcessing.map(e => <Chip key={e.capability.id} name={`${e.capability.name} (${e.ips.length})`} tone="cap" />)}
             </div>
@@ -208,7 +208,7 @@ function SystemCard({ usage }: { usage: SystemUsage }) {
         )}
         {usage.asDestination.length > 0 && (
           <div>
-            <span className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#10B981] font-bold mr-2">Receives</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[#10B981] font-bold mr-2">Receives</span>
             <div className="inline-flex flex-wrap gap-1 mt-0.5">
               {usage.asDestination.map(ip => <Chip key={ip.id} name={ip.name} />)}
             </div>
@@ -251,35 +251,26 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
   }), [arch])
 
   return (
-    <div className="fixed inset-0 bg-[var(--m12-bg)]/95 backdrop-blur-sm z-50 flex flex-col">
+    <div className="fixed inset-0 bg-surface-muted z-50 flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)] shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-white shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#06B6D4] to-[#2563EB] flex items-center justify-center">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <rect x="1" y="1" width="5" height="5" rx="1" stroke="white" strokeWidth="1.2"/>
-              <rect x="10" y="1" width="5" height="5" rx="1" stroke="white" strokeWidth="1.2"/>
-              <rect x="5.5" y="10" width="5" height="5" rx="1" stroke="white" strokeWidth="1.2"/>
-              <path d="M3.5 6v1.5M12.5 6v1.5M8 7.5v2.5M3.5 7.5h9" stroke="white" strokeWidth="1"/>
-            </svg>
+          <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center">
+            <Network size={16} />
           </div>
           <div>
-            <div className="text-sm font-semibold text-[var(--m12-text)]">Data & System Architecture</div>
-            <div className="text-[10px] text-[var(--m12-text-muted)]">
+            <div className="text-heading-sm font-display text-text-primary">Data & System Architecture</div>
+            <div className="text-body-sm text-text-secondary">
               {arch.ipLineages.length} information products · {systemsList.length} systems · {arch.flows.length} flows
             </div>
           </div>
         </div>
-        <button onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors">
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </button>
+        <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose} icon={<X size={18} />} />
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--m12-border)]/30 bg-[var(--m12-bg-card)]/40 shrink-0">
-        <div className="flex gap-1 bg-[var(--m12-bg)] rounded-lg p-0.5">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-white shrink-0">
+        <div className="flex gap-1 bg-surface-muted rounded-lg p-0.5">
           {[
             { id: 'neighborhood' as const, label: 'Neighborhood' },
             { id: 'matrix' as const, label: 'Matrix' },
@@ -289,10 +280,10 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 px-3 rounded-md transition-colors ${
+              className={`py-1.5 px-3 rounded text-body-sm font-medium transition-colors ${
                 tab === t.id
-                  ? 'bg-[var(--m12-bg-card)] text-[var(--m12-text)] shadow-sm'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-text-secondary hover:bg-white'
               }`}
             >
               {t.label}
@@ -304,7 +295,7 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
             value={filter}
             onChange={e => setFilter(e.target.value)}
             placeholder="Filter by IP, system, tag..."
-            className="bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-1.5 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 w-64"
+            className="h-8 px-3 rounded-lg border border-border bg-surface-input text-[12px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 w-64"
           />
         )}
       </div>
@@ -323,9 +314,10 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
           {tab === 'lineage' && (
             <div className="space-y-2 max-w-5xl mx-auto">
               {filteredLineages.length === 0 ? (
-                <div className="text-center py-16 text-[var(--m12-text-muted)] text-sm italic">
-                  {arch.ipLineages.length === 0 ? 'No information products defined yet.' : 'No matches.'}
-                </div>
+                <EmptyState
+                  variant="inline"
+                  title={arch.ipLineages.length === 0 ? 'No information products defined yet' : 'No matches'}
+                />
               ) : (
                 filteredLineages.map(l => <LineageRow key={l.ip.id} lineage={l} />)
               )}
@@ -334,7 +326,9 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
           {tab === 'systems' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-6xl mx-auto">
               {systemsList.length === 0 ? (
-                <div className="col-span-full text-center py-16 text-[var(--m12-text-muted)] text-sm italic">No systems defined yet.</div>
+                <div className="col-span-full">
+                  <EmptyState variant="inline" title="No systems defined yet" />
+                </div>
               ) : (
                 systemsList.map(u => <SystemCard key={u.system.id} usage={u} />)
               )}

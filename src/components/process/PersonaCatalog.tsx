@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { Trash2, X } from 'lucide-react'
+import { Button, LoadingState } from '@/components/common'
 import { listPersonas, createPersona, deletePersona } from '@/lib/supabase/capability-maps'
 import {
   listProcessRoles, createProcessRole, deleteProcessRole,
@@ -12,7 +14,9 @@ import type { Persona } from '@/lib/sipoc/types'
 import type { ProcessRole, PersonaRoleLink } from '@/lib/process/types'
 import type { Workstream } from '@/lib/workstream/types'
 
-// Persona Catalog: Persona → Roles (many-to-many). A persona is made up of
+const INPUT_CLASSES = 'h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none'
+
+// Persona Catalog: Persona -> Roles (many-to-many). A persona is made up of
 // multiple roles; a role can belong to multiple personas; and a role can be
 // instantiated as a swimlane in a process model.
 export default function PersonaCatalog({ orgId }: { orgId: string }) {
@@ -74,48 +78,58 @@ export default function PersonaCatalog({ orgId }: { orgId: string }) {
     await removePersonaRole(personaId, roleId).catch(() => load())
   }
 
-  if (loading) return <div className="py-24 text-center text-sm text-[var(--m12-text-muted)]">Loading persona catalog…</div>
+  if (loading) return <LoadingState label="Loading persona catalog..." />
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Personas (main) */}
       <div className="lg:col-span-2">
         <div className="flex items-center gap-2 mb-3">
-          <h2 className="text-sm font-semibold text-[var(--m12-text)]">Personas</h2>
-          <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">({personas.length})</span>
+          <h2 className="text-label uppercase text-text-secondary">Personas</h2>
+          <span className="text-[11px] text-text-tertiary tabular-nums">({personas.length})</span>
         </div>
         <div className="flex gap-2 mb-4">
-          <input value={newPersona} onChange={e => setNewPersona(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddPersona() }} placeholder="New persona name…" aria-label="New persona" className="flex-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60" />
-          <button onClick={handleAddPersona} disabled={busy || !newPersona.trim()} className="bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-50 text-white text-sm font-medium rounded-lg px-4 transition-colors">Add</button>
+          <input value={newPersona} onChange={e => setNewPersona(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddPersona() }} placeholder="New persona name..." aria-label="New persona" className={`flex-1 ${INPUT_CLASSES}`} />
+          <Button onClick={handleAddPersona} disabled={busy || !newPersona.trim()}>Add</Button>
         </div>
         <div className="space-y-2">
-          {personas.length === 0 && <div className="text-xs text-[var(--m12-text-muted)] py-6 text-center border border-dashed border-[var(--m12-border)]/50 rounded-xl">No personas yet.</div>}
+          {personas.length === 0 && (
+            <div className="text-body-sm text-text-tertiary py-6 text-center rounded-lg border border-dashed border-border">No personas yet.</div>
+          )}
           {personas.map(p => {
             const assigned = rolesFor(p.id)
             const assignedIds = new Set(assigned.map(r => r.id))
             const available = roles.filter(r => !assignedIds.has(r.id))
             return (
-              <div key={p.id} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-xl px-4 py-3">
+              <div key={p.id} className="bg-white rounded-lg border border-border shadow-card px-4 py-3">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color || '#6366F1' }} />
-                  <span className="text-sm font-semibold text-[var(--m12-text)]">{p.name}</span>
+                  <span className="text-body-sm font-semibold text-text-primary">{p.name}</span>
                   <div className="ml-auto flex items-center gap-2">
                     <WorkstreamPicker orgId={orgId} value={p.workstream_id} workstreams={workstreams} onChange={(wsId) => handleSetPersonaWorkstream(p.id, wsId)} className="w-48" />
-                    <button onClick={() => handleDeletePersona(p.id)} title="Delete persona" className="text-[var(--m12-border)] hover:text-red-400">
-                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5.5 4V3a1 1 0 011-1h1a1 1 0 011 1v1M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      icon={<Trash2 size={14} />}
+                      aria-label="Delete persona"
+                      title="Delete persona"
+                      onClick={() => handleDeletePersona(p.id)}
+                    />
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {assigned.length === 0 && <span className="text-[10px] text-[var(--m12-text-muted)]">No roles assigned.</span>}
+                  {assigned.length === 0 && <span className="text-[11px] text-text-tertiary">No roles assigned.</span>}
                   {assigned.map(r => (
-                    <span key={r.id} className="group inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: r.color || '#0EA5E9', borderColor: `${r.color || '#0EA5E9'}55`, background: `${r.color || '#0EA5E9'}12` }}>
+                    <span key={r.id} className="group inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: r.color || '#2563EB', borderColor: `${r.color || '#2563EB'}55`, background: `${r.color || '#2563EB'}12` }}>
                       {r.name}
-                      <button onClick={() => handleUnlink(p.id, r.id)} className="opacity-50 group-hover:opacity-100 hover:text-red-400">×</button>
+                      <button type="button" onClick={() => handleUnlink(p.id, r.id)} aria-label={`Remove ${r.name}`} className="opacity-50 group-hover:opacity-100 hover:text-status-red">
+                        <X size={10} />
+                      </button>
                     </span>
                   ))}
                   {available.length > 0 && (
-                    <select value="" onChange={e => handleLink(p.id, e.target.value)} aria-label="Assign role" className="text-[10px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-1.5 py-0.5 text-[var(--m12-text-muted)] focus:outline-none">
+                    <select value="" onChange={e => handleLink(p.id, e.target.value)} aria-label="Assign role" className="text-[10px] bg-surface-input border border-border rounded px-1.5 py-0.5 text-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-500/30">
                       <option value="">+ role</option>
                       {available.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
@@ -130,23 +144,31 @@ export default function PersonaCatalog({ orgId }: { orgId: string }) {
       {/* Roles library (side) */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <h2 className="text-sm font-semibold text-[var(--m12-text)]">Roles</h2>
-          <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">({roles.length})</span>
+          <h2 className="text-label uppercase text-text-secondary">Roles</h2>
+          <span className="text-[11px] text-text-tertiary tabular-nums">({roles.length})</span>
         </div>
         <div className="flex gap-2 mb-4">
-          <input value={newRole} onChange={e => setNewRole(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddRole() }} placeholder="New role name…" aria-label="New role" className="flex-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#8B5CF6]/60" />
-          <button onClick={handleAddRole} disabled={busy || !newRole.trim()} className="bg-[#8B5CF6] hover:bg-[#A78BFA] disabled:opacity-50 text-white text-sm font-medium rounded-lg px-4 transition-colors">Add</button>
+          <input value={newRole} onChange={e => setNewRole(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddRole() }} placeholder="New role name..." aria-label="New role" className={`flex-1 min-w-0 ${INPUT_CLASSES}`} />
+          <Button onClick={handleAddRole} disabled={busy || !newRole.trim()}>Add</Button>
         </div>
         <div className="space-y-1.5">
-          {roles.length === 0 && <div className="text-xs text-[var(--m12-text-muted)] py-6 text-center border border-dashed border-[var(--m12-border)]/50 rounded-xl">No roles yet. Roles can be added to personas and used as swimlanes.</div>}
+          {roles.length === 0 && (
+            <div className="text-body-sm text-text-tertiary py-6 text-center rounded-lg border border-dashed border-border">No roles yet. Roles can be added to personas and used as swimlanes.</div>
+          )}
           {roles.map(r => (
-            <div key={r.id} className="group flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2">
+            <div key={r.id} className="group flex items-center gap-2 bg-white rounded-lg border border-border shadow-card px-3 py-2">
               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: r.color || '#8B5CF6' }} />
-              <span className="text-xs text-[var(--m12-text)] flex-1 truncate">{r.name}</span>
-              <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{personaCountFor(r.id)} persona{personaCountFor(r.id) === 1 ? '' : 's'}</span>
-              <button onClick={() => handleDeleteRole(r.id)} title="Delete role" className="text-[var(--m12-border)] hover:text-red-400">
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5.5 4V3a1 1 0 011-1h1a1 1 0 011 1v1M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </button>
+              <span className="text-body-sm text-text-primary flex-1 truncate">{r.name}</span>
+              <span className="text-[10px] text-text-tertiary tabular-nums">{personaCountFor(r.id)} persona{personaCountFor(r.id) === 1 ? '' : 's'}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon={<Trash2 size={14} />}
+                aria-label="Delete role"
+                title="Delete role"
+                onClick={() => handleDeleteRole(r.id)}
+              />
             </div>
           ))}
         </div>

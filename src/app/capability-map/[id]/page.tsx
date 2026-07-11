@@ -13,7 +13,8 @@ import AIBulkLoadPanel from '@/components/sipoc/AIBulkLoadPanel'
 import AIAutoFillBlankL3sPanel from '@/components/sipoc/AIAutoFillBlankL3sPanel'
 import DataArchitectureView from '@/components/sipoc/DataArchitectureView'
 import VersionBadge from '@/components/VersionBadge'
-import { useTheme } from '@/lib/theme-context'
+import { Button, LoadingState } from '@/components/common'
+import { ArrowLeft, Share2, Network, Download, Sparkles, FileText, Plus, X, Pencil } from 'lucide-react'
 import { createCapabilityMapShare, listCapabilityMapShares, deleteCapabilityMapShare, type CapabilityMapShare } from '@/lib/supabase/capability-maps'
 import { useCapabilityMapCollab } from '@/lib/collab/useCapabilityMapCollab'
 import { CapabilityMapCollabProvider } from '@/lib/collab/CapabilityMapCollabContext'
@@ -45,7 +46,6 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [showAutoFill, setShowAutoFill] = useState(false)
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
-  const { theme, toggleTheme } = useTheme()
   const [shareOpen, setShareOpen] = useState(false)
   const [shares, setShares] = useState<CapabilityMapShare[]>([])
   const [shareLoading, setShareLoading] = useState(false)
@@ -219,33 +219,33 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
 
   if (authLoading || !user || loading || !map) {
     return (
-      <div className="fixed inset-0 bg-[var(--m12-bg)] flex items-center justify-center">
-        <div className="text-[var(--m12-text-muted)] text-sm">Loading...</div>
+      <div className="fixed inset-0 bg-surface-muted flex items-center justify-center">
+        <LoadingState variant="inline" label="Loading capability map..." />
       </div>
     )
   }
 
   return (
     <CapabilityMapCollabProvider users={collab.users} myClientId={collab.myClientId}>
-    <div className="fixed inset-0 bg-[var(--m12-bg)] flex flex-col">
+    <div className="fixed inset-0 bg-surface-muted flex flex-col">
       {/* Top bar */}
-      <div className="h-12 border-b border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)] flex items-center px-4 gap-4 shrink-0">
+      <div className="h-14 border-b border-border bg-white flex items-center px-4 gap-3 shrink-0">
         {/* Back button */}
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          aria-label="Back to home"
           onClick={() => router.push('/')}
-          className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+          icon={<ArrowLeft size={16} />}
+        />
 
         {/* Branding */}
-        <span className="text-gradient text-sm font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
+        <span className="text-gradient text-sm font-bold font-display tracking-wide">
           MACH12
         </span>
         <VersionBadge />
-        <span className="text-[var(--m12-text-muted)] text-xs">/</span>
+        <span className="text-text-tertiary text-body-sm">/</span>
 
         {/* Title (inline editable) */}
         {editingTitle ? (
@@ -255,22 +255,22 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
             onBlur={handleTitleBlur}
             onKeyDown={e => e.key === 'Enter' && handleTitleBlur()}
             autoFocus
-            className="bg-transparent border-b border-[#2563EB] text-base font-semibold text-[var(--m12-text)] py-0.5 focus:outline-none max-w-[400px]"
+            aria-label="Map title"
+            className="bg-transparent border-b border-brand-500 text-heading-sm font-semibold text-text-primary py-0.5 focus:outline-none max-w-[400px]"
           />
         ) : (
           <button
+            type="button"
             onClick={() => setEditingTitle(true)}
-            className="flex items-center gap-1.5 group text-base font-semibold text-[var(--m12-text)] hover:text-[#2563EB] transition-colors truncate max-w-[400px]"
+            className="flex items-center gap-1.5 group text-heading-sm font-semibold text-text-primary hover:text-brand-600 transition-colors truncate max-w-[400px]"
           >
             {map.title}
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="opacity-0 group-hover:opacity-60 transition-opacity shrink-0">
-              <path d="M8.5 1.5l2 2M1.5 8.5l-.5 2.5 2.5-.5L9.5 4.5l-2-2-6 6z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <Pencil size={12} className="opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
           </button>
         )}
 
         {/* View label */}
-        <span className="text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-1 rounded-md">
+        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-600 bg-brand-50 px-2.5 py-1 rounded-md">
           Capability Map
         </span>
 
@@ -285,129 +285,103 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
 
         {/* Share (read-only link) */}
         <div ref={shareRef} className="relative">
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleOpenShare}
-            className="flex items-center gap-1.5 border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            icon={<Share2 size={12} />}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M4 7.5a2 2 0 01-2-2v0a2 2 0 012-2h1M8 4.5a2 2 0 012 2v0a2 2 0 01-2 2H7M4 6h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
             Share
-          </button>
+          </Button>
           {shareOpen && (
-            <div className="absolute right-0 top-full mt-1 z-50 w-80 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-xl shadow-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[var(--m12-border)]/20">
-                <div className="text-xs font-semibold text-[var(--m12-text)]">Read-Only Share Link</div>
-                <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">Anyone with the link can view this map (no login required).</div>
+            <div className="absolute right-0 top-full mt-1 z-50 w-80 bg-white border border-border rounded-lg shadow-dropdown overflow-hidden animate-slide-in-up">
+              <div className="px-4 py-3 border-b border-border">
+                <div className="text-body-sm font-semibold text-text-primary">Read-Only Share Link</div>
+                <div className="text-[10px] text-text-tertiary mt-0.5">Anyone with the link can view this map (no login required).</div>
               </div>
               <div className="p-3 space-y-2">
                 {shares.filter(s => !s.expires_at || new Date(s.expires_at) > new Date()).map(s => (
-                  <div key={s.id} className="flex items-center gap-2 bg-[var(--m12-bg)] rounded-lg px-3 py-2">
+                  <div key={s.id} className="flex items-center gap-2 bg-surface-muted rounded-lg px-3 py-2">
                     <input
                       readOnly
+                      aria-label="Share link URL"
                       value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/${s.code}`}
-                      className="flex-1 bg-transparent text-[10px] text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)] truncate focus:outline-none"
+                      className="flex-1 bg-transparent text-[10px] text-text-secondary font-mono truncate focus:outline-none"
                       onClick={e => (e.target as HTMLInputElement).select()}
                     />
                     <button
+                      type="button"
                       onClick={() => handleCopyLink(s.code)}
-                      className="shrink-0 text-[9px] font-medium text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                      className="shrink-0 text-[10px] font-medium text-brand-600 hover:text-brand-500 transition-colors"
                     >
                       {shareCopied ? 'Copied!' : 'Copy'}
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleRevokeShare(s.id)}
-                      className="shrink-0 text-[var(--m12-text-muted)] hover:text-red-400 transition-colors"
+                      className="shrink-0 text-text-tertiary hover:text-red-600 transition-colors"
                       title="Revoke this link"
                     >
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                      </svg>
+                      <X size={12} />
                     </button>
                   </div>
                 ))}
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
+                  fullWidth
                   onClick={handleCreateShare}
-                  disabled={shareLoading}
-                  className="w-full flex items-center justify-center gap-1.5 bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                  loading={shareLoading}
+                  icon={<Plus size={12} />}
                 >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M5 2v6M2 5h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                  </svg>
                   {shareLoading ? 'Generating...' : 'Generate New Link'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
         </div>
 
         {/* Data Architecture button */}
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => setShowDataArch(true)}
-          className="flex items-center gap-1.5 bg-gradient-to-r from-[#06B6D4]/20 to-[#2563EB]/20 border border-[#06B6D4]/30 hover:border-[#06B6D4]/50 text-[#06B6D4] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          icon={<Network size={12} />}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <rect x="0.5" y="0.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
-            <rect x="7.5" y="0.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
-            <rect x="4" y="7.5" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1" />
-            <path d="M2.5 4.5v1.5M9.5 4.5v1.5M6 6v1.5M2.5 6h7" stroke="currentColor" strokeWidth="0.8" />
-          </svg>
           Data Architecture
-        </button>
+        </Button>
 
         {/* Easy button: full capability-map Excel export */}
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={handleExportAll}
-          title="Download the full capability map (L1 → L2 → L3 → SIPOC, IPs, data elements, use cases) as a structured Excel workbook"
-          className="flex items-center gap-1.5 bg-gradient-to-r from-[#10B981]/20 to-[#06B6D4]/20 border border-[#10B981]/30 hover:border-[#10B981]/50 text-[#10B981] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          title="Download the full capability map (L1 to L2 to L3 to SIPOC, IPs, data elements, use cases) as a structured Excel workbook"
+          icon={<Download size={12} />}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 1.5v6M3.5 5L6 7.5 8.5 5M2 9.5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
           Export to Excel
-        </button>
+        </Button>
 
         {/* AI auto-fill blank L3s */}
-        <button
+        <Button
+          variant="ai"
+          size="sm"
           onClick={() => setShowAutoFill(true)}
           title="Auto-generate SIPOC for every L3 with no inputs/outputs"
-          className="flex items-center gap-1.5 bg-gradient-to-r from-[#8B5CF6]/20 to-[#2563EB]/20 border border-[#8B5CF6]/30 hover:border-[#8B5CF6]/50 text-[#8B5CF6] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          icon={<Sparkles size={12} />}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="currentColor" />
-          </svg>
           Fill Blank L3s
-        </button>
+        </Button>
 
         {/* Executive summary button */}
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => setShowExecSummary(true)}
-          className="flex items-center gap-1.5 bg-gradient-to-r from-[#8B5CF6]/20 to-[#2563EB]/20 border border-[#8B5CF6]/30 hover:border-[#8B5CF6]/50 text-[#8B5CF6] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          icon={<FileText size={12} />}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11L6 9.5L3 11L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="currentColor" />
-          </svg>
           Executive Summary
-        </button>
-
-        {/* Theme toggle */}
-        <button
-          onClick={toggleTheme}
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:border-[var(--m12-border)] transition-colors"
-        >
-          {theme === 'dark' ? (
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.76 3.76l1.06 1.06M11.18 11.18l1.06 1.06M3.76 12.24l1.06-1.06M11.18 4.82l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M13.5 9.5a5.5 5.5 0 01-7-7 5.5 5.5 0 107 7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          )}
-        </button>
+        </Button>
       </div>
 
       {/* Main content: MAP + SIPOC drawer */}

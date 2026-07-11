@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { X } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useDiagramStore } from '@/lib/diagram/store'
 import { useSIPOCStore } from '@/lib/sipoc/store'
@@ -119,68 +121,68 @@ export default function ImportL3Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}
     >
       <div
-        className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl w-[820px] max-w-[92vw] max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-xl shadow-card-hover w-[820px] max-w-[92vw] max-h-[80vh] overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-[var(--m12-border)]/30 flex items-center justify-between shrink-0">
+        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between shrink-0">
           <div>
-            <div className="text-[10px] font-[family-name:var(--font-space-mono)] uppercase tracking-widest font-bold text-[#06B6D4]">
+            <div className="text-heading-sm font-display text-text-primary">
               Import L3 SIPOC
             </div>
-            <div className="text-xs text-[var(--m12-text-muted)] mt-0.5">
+            <div className="text-body-sm text-text-secondary mt-0.5">
               Pick a capability map, then an L3 to insert as a Group on this diagram.
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors"
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={16} />}
+            aria-label="Close"
             title="Close (Esc)"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-          </button>
+            onClick={onClose}
+          />
         </div>
 
         {/* Body: two columns */}
         <div className="flex-1 grid grid-cols-2 overflow-hidden">
           {/* Maps column */}
-          <div className="flex flex-col border-r border-[var(--m12-border)]/30 min-h-0">
+          <div className="flex flex-col border-r border-border min-h-0">
             <div className="px-4 pt-3 pb-2 shrink-0">
-              <div className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-widest font-bold text-[var(--m12-text-muted)] mb-1.5">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary mb-1.5">
                 Capability Maps
               </div>
               <input
                 value={mapFilter}
                 onChange={e => setMapFilter(e.target.value)}
                 placeholder="Filter maps..."
-                className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-md px-2.5 py-1.5 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#06B6D4]/60"
+                className="w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none"
               />
             </div>
             <div className="flex-1 overflow-y-auto px-2 pb-2">
               {loadingMaps ? (
-                <div className="text-[11px] italic text-[var(--m12-text-faint)] px-2 py-3">Loading...</div>
+                <div className="text-[11px] italic text-text-tertiary px-2 py-3">Loading...</div>
               ) : filteredMaps.length === 0 ? (
-                <div className="text-[11px] italic text-[var(--m12-text-faint)] px-2 py-3">No maps</div>
+                <div className="text-[11px] italic text-text-tertiary px-2 py-3">No maps</div>
               ) : (
                 filteredMaps.map(m => (
                   <button
                     key={m.id}
                     onClick={() => setSelectedMapId(m.id)}
-                    className={`w-full text-left px-2.5 py-2 rounded-md text-xs transition-colors mb-0.5 ${
+                    className={`w-full text-left px-2.5 py-2 rounded-md text-body-sm transition-colors mb-0.5 ${
                       selectedMapId === m.id
-                        ? 'bg-[#06B6D4]/15 text-[var(--m12-text)] font-medium'
-                        : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'
+                        ? 'bg-brand-50 text-brand-700 font-medium'
+                        : 'text-text-secondary hover:bg-surface-muted'
                     }`}
                   >
                     <div className="truncate">{m.title}</div>
                     {m.description && (
-                      <div className="text-[10px] text-[var(--m12-text-faint)] truncate mt-0.5">{m.description}</div>
+                      <div className="text-[10px] text-text-tertiary truncate mt-0.5">{m.description}</div>
                     )}
                   </button>
                 ))
@@ -191,7 +193,7 @@ export default function ImportL3Dialog({
           {/* L3 column */}
           <div className="flex flex-col min-h-0">
             <div className="px-4 pt-3 pb-2 shrink-0">
-              <div className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-widest font-bold text-[var(--m12-text-muted)] mb-1.5">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary mb-1.5">
                 L3 Functionalities
               </div>
               <input
@@ -199,28 +201,28 @@ export default function ImportL3Dialog({
                 onChange={e => setCapFilter(e.target.value)}
                 placeholder={selectedMapId ? 'Filter L3s...' : 'Pick a map first'}
                 disabled={!selectedMapId}
-                className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-md px-2.5 py-1.5 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#06B6D4]/60 disabled:opacity-40"
+                className="w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none disabled:opacity-40"
               />
             </div>
             <div className="flex-1 overflow-y-auto px-2 pb-2">
               {!selectedMapId ? (
-                <div className="text-[11px] italic text-[var(--m12-text-faint)] px-2 py-3">
+                <div className="text-[11px] italic text-text-tertiary px-2 py-3">
                   Select a map on the left to see its L3 functionalities.
                 </div>
               ) : loadingCaps ? (
-                <div className="text-[11px] italic text-[var(--m12-text-faint)] px-2 py-3">Loading...</div>
+                <div className="text-[11px] italic text-text-tertiary px-2 py-3">Loading...</div>
               ) : filteredCaps.length === 0 ? (
-                <div className="text-[11px] italic text-[var(--m12-text-faint)] px-2 py-3">No L3s in this map</div>
+                <div className="text-[11px] italic text-text-tertiary px-2 py-3">No L3s in this map</div>
               ) : (
                 filteredCaps.map(c => (
                   <button
                     key={c.id}
                     onClick={() => setSelectedCapId(c.id)}
                     onDoubleClick={() => { setSelectedCapId(c.id); handleImport() }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors mb-0.5 flex items-center gap-2 ${
+                    className={`w-full text-left px-2.5 py-1.5 rounded-md text-body-sm transition-colors mb-0.5 flex items-center gap-2 ${
                       selectedCapId === c.id
-                        ? 'bg-[#06B6D4]/15 text-[var(--m12-text)] font-medium'
-                        : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'
+                        ? 'bg-brand-50 text-brand-700 font-medium'
+                        : 'text-text-secondary hover:bg-surface-muted'
                     }`}
                   >
                     {c.color && (
@@ -235,22 +237,21 @@ export default function ImportL3Dialog({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-[var(--m12-border)]/30 flex items-center justify-between shrink-0">
-          <div className="text-[10px] text-red-400 truncate">{error || ''}</div>
+        <div className="px-5 py-3 border-t border-border flex items-center justify-between shrink-0">
+          <div className="text-[10px] text-status-red truncate">{error || ''}</div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md text-xs font-medium text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors"
-            >
+            <Button variant="ghost" size="sm" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              onClick={handleImport}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={importing}
               disabled={!selectedCapId || importing}
-              className="bg-[#06B6D4] hover:bg-[#22D3EE] disabled:opacity-40 disabled:hover:bg-[#06B6D4] text-white px-4 py-1.5 rounded-md text-xs font-medium transition-colors"
+              onClick={handleImport}
             >
               {importing ? 'Importing...' : 'Import as Group'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

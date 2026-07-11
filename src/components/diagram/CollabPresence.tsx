@@ -13,11 +13,11 @@ export function PresenceBadge({ users, connected }: { users: CollabUser[]; conne
   if (users.length === 0) return null
 
   return (
-    <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 bg-[var(--m12-bg-card)]/90 backdrop-blur-sm border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5">
-      <div className={`w-2 h-2 rounded-full ${connected ? 'bg-[#10B981]' : 'bg-[#EF4444]'}`} />
+    <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 bg-white border border-border rounded-lg px-3 py-1.5 shadow-card">
+      <div className={`w-2 h-2 rounded-full ${connected ? 'bg-status-green' : 'bg-status-red'}`} />
 
       {users.length === 0 ? (
-        <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+        <span className="text-[10px] text-text-tertiary font-mono">
           {connected ? 'Connected' : 'Offline'}
         </span>
       ) : (
@@ -27,17 +27,17 @@ export function PresenceBadge({ users, connected }: { users: CollabUser[]; conne
               key={u.id}
               title={u.name}
               style={{ backgroundColor: u.color }}
-              className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
+              className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
             >
               {u.name.charAt(0).toUpperCase()}
             </div>
           ))}
           {users.length > 5 && (
-            <span className="text-[10px] text-[var(--m12-text-muted)] ml-1">
+            <span className="text-[10px] text-text-tertiary ml-1">
               +{users.length - 5}
             </span>
           )}
-          <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] ml-1">
+          <span className="text-[10px] text-text-tertiary font-mono ml-1">
             {users.length} collaborator{users.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -72,7 +72,7 @@ export function RemoteCursors({ users }: { users: CollabUser[] }) {
             </svg>
             <div
               style={{ backgroundColor: u.color }}
-              className="absolute left-4 top-3 px-1.5 py-0.5 rounded text-[9px] font-medium text-white whitespace-nowrap shadow-lg"
+              className="absolute left-4 top-3 px-1.5 py-0.5 rounded text-[10px] font-medium text-white whitespace-nowrap shadow-card"
             >
               {u.name}
             </div>

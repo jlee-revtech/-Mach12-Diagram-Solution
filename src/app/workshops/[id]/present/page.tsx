@@ -9,6 +9,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { Pencil, X } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { loadFacilitationDeck, type LoadedDeck, type DeckSection } from '@/lib/workshop/deck'
 import { exportFacilitationPptx } from '@/lib/workshop/export'
@@ -314,11 +316,11 @@ export default function WorkshopPresentPage() {
           <button
             onClick={startEditSection}
             disabled={!currentSectionId}
-            className="text-[11px] px-2.5 py-1 rounded border transition-colors disabled:opacity-30"
+            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded border transition-colors disabled:opacity-30"
             style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.7)', backgroundColor: 'transparent' }}
             title={currentSectionId ? "Edit this section's text and diagrams by hand" : 'Title and agenda slides cannot be edited'}
           >
-            ✎ Edit
+            <Pencil size={11} /> Edit
           </button>
           <button
             onClick={() => setShowNotes((v) => !v)}
@@ -448,23 +450,23 @@ export default function WorkshopPresentPage() {
           walkthrough, and PPTX all update together. */}
       {editDraft && (
         <div className="absolute inset-0 z-30 flex justify-end">
-          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!savingEdit) setEditDraft(null) }} />
-          <div className="relative w-full max-w-md h-full flex flex-col shadow-2xl border-l border-[var(--m12-border)]" style={{ backgroundColor: 'var(--m12-bg)' }}>
-            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--m12-border)]/60 shrink-0">
+          <div className="absolute inset-0 bg-black/40" onClick={() => { if (!savingEdit) setEditDraft(null) }} />
+          <div className="relative w-full max-w-md h-full flex flex-col bg-white border-l border-border shadow-modal animate-slide-in-right">
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border shrink-0">
               <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Edit section</div>
-                <div className="text-sm font-semibold text-[var(--m12-text)] truncate">{currentSection?.agendaTitle ?? 'Section'}</div>
-                <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">No AI. Your edits flow into the deck and the PPTX.</div>
+                <div className="text-[10px] uppercase tracking-wide text-brand-600">Edit section</div>
+                <div className="text-heading-sm font-display text-text-primary truncate">{currentSection?.agendaTitle ?? 'Section'}</div>
+                <div className="text-[11px] text-text-tertiary mt-0.5">No AI. Your edits flow into the deck and the PPTX.</div>
               </div>
-              <button type="button" onClick={() => { if (!savingEdit) setEditDraft(null) }} title="Close (Esc)" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] text-lg leading-none px-1">✕</button>
+              <Button variant="ghost" size="sm" iconOnly icon={<X size={14} />} title="Close (Esc)" aria-label="Close" onClick={() => { if (!savingEdit) setEditDraft(null) }} />
             </div>
-            {editErr && <div className="mx-4 mt-3 text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{editErr}</div>}
+            {editErr && <div className="mx-4 mt-3 text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{editErr}</div>}
             <div className="flex-1 overflow-auto p-4">
               <SectionContentEditor value={editDraft} onChange={setEditDraft} generateDiagram={generateDiagram} generateContent={generateContent} />
             </div>
-            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--m12-border)]/60 shrink-0">
-              <button type="button" onClick={() => setEditDraft(null)} disabled={savingEdit} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Cancel</button>
-              <button type="button" onClick={saveEditSection} disabled={savingEdit} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save changes'}</button>
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border shrink-0">
+              <Button variant="secondary" size="sm" onClick={() => setEditDraft(null)} disabled={savingEdit}>Cancel</Button>
+              <button type="button" onClick={saveEditSection} disabled={savingEdit} className="text-[12px] px-3 py-1.5 rounded-lg font-medium text-white bg-status-green hover:bg-green-700 disabled:opacity-50 transition-colors">{savingEdit ? 'Saving...' : 'Save changes'}</button>
             </div>
           </div>
         </div>

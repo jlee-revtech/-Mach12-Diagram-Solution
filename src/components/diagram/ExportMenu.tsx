@@ -1,16 +1,25 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import {
+  Braces,
+  Download,
+  FileImage,
+  FileText,
+  PenTool,
+  Sparkles,
+  Workflow,
+} from 'lucide-react'
 import { useDiagramStore } from '@/lib/diagram/store'
 import { exportPng, exportSvg, exportPdf, exportJson, exportBpmn } from '@/lib/export'
 import TechSpecDialog from './TechSpecDialog'
 
 const EXPORT_OPTIONS = [
-  { key: 'png', label: 'PNG Image', desc: 'High-res raster image', icon: '🖼' },
-  { key: 'svg', label: 'SVG Vector', desc: 'Scalable vector graphic', icon: '◇' },
-  { key: 'pdf', label: 'PDF Document', desc: 'Print-ready document', icon: '📄' },
-  { key: 'json', label: 'JSON Schema', desc: 'Machine-readable data', icon: '{ }' },
-  { key: 'bpmn', label: 'BPMN 2.0 XML', desc: 'For SAP Signavio / Camunda', icon: '⬡' },
+  { key: 'png', label: 'PNG Image', desc: 'High-res raster image', icon: FileImage },
+  { key: 'svg', label: 'SVG Vector', desc: 'Scalable vector graphic', icon: PenTool },
+  { key: 'pdf', label: 'PDF Document', desc: 'Print-ready document', icon: FileText },
+  { key: 'json', label: 'JSON Schema', desc: 'Machine-readable data', icon: Braces },
+  { key: 'bpmn', label: 'BPMN 2.0 XML', desc: 'For SAP Signavio / Camunda', icon: Workflow },
 ] as const
 
 export default function ExportMenu() {
@@ -68,38 +77,37 @@ export default function ExportMenu() {
       <button
         onClick={() => setOpen(!open)}
         title="Export Diagram"
-        className="flex items-center justify-center w-8 h-8 rounded-lg text-[var(--m12-text-secondary)] hover:bg-[var(--m12-border)]/60 hover:text-[var(--m12-text)] transition-colors"
+        className="flex items-center justify-center w-8 h-8 rounded-lg text-text-secondary hover:bg-surface-muted hover:text-text-primary transition-colors"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M8 2v8M5 7l3 3 3-3M3 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Download size={16} />
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-2 w-56 bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl py-1.5 z-50">
-          <div className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+        <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-lg shadow-dropdown border border-border py-1 animate-slide-in-up z-50">
+          <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">
             Generate
           </div>
           <button
             type="button"
             onClick={() => { setOpen(false); setTechSpecOpen(true) }}
-            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--m12-border)]/30 transition-colors text-left group"
+            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-surface-muted transition-colors text-left group"
           >
-            <span className="text-sm w-5 text-center text-[#06B6D4]">
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" className="inline"><path d="M9 1.5H4a1 1 0 00-1 1v11a1 1 0 001 1h8a1 1 0 001-1V5.5L9 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M9 1.5V5.5h4M5.5 8.5h5M5.5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            <span className="w-5 flex items-center justify-center text-brand-600">
+              <FileText size={15} />
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-[var(--m12-text-secondary)] group-hover:text-[var(--m12-text)]">
+              <div className="text-body-sm font-medium text-text-secondary group-hover:text-text-primary">
                 Technical Spec
-                <span className="ml-1.5 text-[8px] font-bold text-[#06B6D4] align-middle font-[family-name:var(--font-space-mono)]">AI</span>
+                <span className="ml-1.5 text-[10px] font-bold text-brand-600 align-middle font-mono">AI</span>
               </div>
-              <div className="text-[10px] text-[#374A5E] group-hover:text-[var(--m12-text-muted)]">
+              <div className="text-[10px] text-text-tertiary">
                 Integration functional &amp; technical doc
               </div>
             </div>
+            <Sparkles size={12} className="text-amber-500 shrink-0" />
           </button>
-          <div className="my-1 mx-3 border-t border-[var(--m12-border)]/40" />
-          <div className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+          <div className="my-1 mx-3 border-t border-border" />
+          <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">
             Export As
           </div>
           {EXPORT_OPTIONS.map((opt) => (
@@ -107,19 +115,19 @@ export default function ExportMenu() {
               key={opt.key}
               onClick={() => handleExport(opt.key)}
               disabled={exporting !== null}
-              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--m12-border)]/30 transition-colors text-left group"
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-surface-muted transition-colors text-left group"
             >
-              <span className="text-sm w-5 text-center opacity-60 group-hover:opacity-100">
-                {opt.icon}
+              <span className="w-5 flex items-center justify-center text-text-tertiary group-hover:text-text-secondary">
+                <opt.icon size={15} />
               </span>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-[var(--m12-text-secondary)] group-hover:text-[var(--m12-text)]">
+                <div className="text-body-sm font-medium text-text-secondary group-hover:text-text-primary">
                   {opt.label}
                   {exporting === opt.key && (
-                    <span className="ml-2 text-[#06B6D4]">...</span>
+                    <span className="ml-2 text-brand-600">...</span>
                   )}
                 </div>
-                <div className="text-[10px] text-[#374A5E] group-hover:text-[var(--m12-text-muted)]">
+                <div className="text-[10px] text-text-tertiary">
                   {opt.desc}
                 </div>
               </div>

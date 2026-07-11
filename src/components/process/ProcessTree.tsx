@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import { ChevronRight, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useProcessStore } from '@/lib/process/store'
 import type { ProcessNodeTreeNode } from '@/lib/process/types'
 import { levelLabel, levelColor, MAX_PROCESS_LEVEL, LIFECYCLE_LABEL } from '@/lib/process/types'
 import ProcessAIPanel from './ProcessAIPanel'
 
-// Navigable value-chain hierarchy: L1 Scenario → L2 Process Group → L3 Process.
+// Navigable value-chain hierarchy: L1 Scenario -> L2 Process Group -> L3 Process.
 // Inline add / rename / delete. Selecting a leaf surfaces it for the (Phase 2)
 // BPMN editor; selecting any node lets you add children one level down.
 export default function ProcessTree() {
@@ -46,30 +47,28 @@ export default function ProcessTree() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--m12-border)]/40">
-        <span className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">
           Process Hierarchy
         </span>
         {!readOnly && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={() => setAiOpen(true)}
               title="Generate hierarchy with AI"
-              className="flex items-center gap-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#0EA5E9] hover:text-[#38BDF8] transition-colors"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors"
             >
-              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                <path d="M7 1.5l1.3 3.2 3.2 1.3-3.2 1.3L7 10.5 5.7 7.3 2.5 6l3.2-1.3L7 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
-              </svg>
+              <Sparkles size={11} />
               AI
             </button>
             <button
+              type="button"
               onClick={() => { setAddingUnder('root'); setDraftName('') }}
               title="Add scenario (L1)"
-              className="text-[var(--m12-border)] hover:text-[#0EA5E9] transition-colors"
+              className="h-6 w-6 rounded inline-flex items-center justify-center text-text-secondary hover:bg-surface-muted hover:text-brand-600 transition-colors"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              <Plus size={14} />
             </button>
           </div>
         )}
@@ -78,7 +77,7 @@ export default function ProcessTree() {
 
       <div className="flex-1 overflow-y-auto py-1">
         {tree.length === 0 && addingUnder !== 'root' && (
-          <div className="px-3 py-8 text-center text-xs text-[var(--m12-text-muted)]">
+          <div className="px-3 py-8 text-center text-body-sm text-text-tertiary">
             {readOnly ? 'No scenarios defined.' : 'No scenarios yet. Add an L1 scenario to begin.'}
           </div>
         )}
@@ -107,8 +106,8 @@ export default function ProcessTree() {
               onChange={e => setDraftName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAddRoot(); if (e.key === 'Escape') { setAddingUnder(null); setDraftName('') } }}
               onBlur={() => { if (!draftName.trim()) setAddingUnder(null) }}
-              placeholder="Scenario name…"
-              className="w-full bg-[var(--m12-bg)] border border-[#0EA5E9]/50 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none"
+              placeholder="Scenario name..."
+              className="w-full h-8 px-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
             />
           </div>
         )}
@@ -159,21 +158,21 @@ function TreeRow({
       <div
         onClick={() => onSelect(node.id)}
         className={`group flex items-center gap-1.5 pr-2 py-1.5 cursor-pointer transition-colors ${
-          isSelected ? 'bg-[#0EA5E9]/10' : 'hover:bg-[var(--m12-bg)]'
+          isSelected ? 'bg-brand-50' : 'hover:bg-surface-muted'
         }`}
         style={{ paddingLeft: 8 + depth * 14 }}
       >
         {hasChildren ? (
           <button
+            type="button"
             onClick={e => { e.stopPropagation(); setExpanded(!expanded) }}
-            className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] shrink-0"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+            className="text-text-tertiary hover:text-text-secondary shrink-0"
           >
-            <svg width="9" height="9" viewBox="0 0 10 10" fill="none" className={`transition-transform ${expanded ? 'rotate-90' : ''}`}>
-              <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <ChevronRight size={12} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
           </button>
         ) : (
-          <span className="w-[9px] shrink-0" />
+          <span className="w-3 shrink-0" />
         )}
 
         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: accent }} />
@@ -186,30 +185,31 @@ function TreeRow({
             onClick={e => e.stopPropagation()}
             onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setNameDraft(node.name); setEditing(false) } }}
             onBlur={commitRename}
-            className="flex-1 bg-[var(--m12-bg)] border border-[var(--m12-border)] rounded px-1.5 py-0.5 text-xs text-[var(--m12-text)] focus:outline-none"
+            aria-label="Node name"
+            className="flex-1 min-w-0 px-1.5 py-0.5 rounded border border-border bg-surface-input text-body-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
           />
         ) : (
-          <span className={`flex-1 truncate text-xs ${isSelected ? 'text-[var(--m12-text)] font-medium' : 'text-[var(--m12-text-secondary)]'}`}>
+          <span className={`flex-1 truncate text-body-sm ${isSelected ? 'text-brand-700 font-medium' : 'text-text-secondary'}`}>
             {node.name}
           </span>
         )}
 
         {node.variant_label && (
-          <span className="text-[8px] uppercase tracking-wider text-[#F59E0B] font-[family-name:var(--font-space-mono)] shrink-0">
+          <span className="text-[10px] uppercase tracking-wider text-status-yellow font-mono shrink-0">
             {node.variant_label}
           </span>
         )}
         {node.lifecycle && (
-          <span className="text-[8px] uppercase tracking-wider text-[#8B5CF6] font-[family-name:var(--font-space-mono)] shrink-0">
+          <span className="text-[10px] uppercase tracking-wider text-purple-600 font-mono shrink-0">
             {LIFECYCLE_LABEL[node.lifecycle]}
           </span>
         )}
         {node.is_leaf && !hasChildren && (
-          <span className="text-[8px] uppercase tracking-wider text-[#10B981] font-[family-name:var(--font-space-mono)] shrink-0">
+          <span className="text-[10px] uppercase tracking-wider text-status-green font-mono shrink-0">
             BPMN
           </span>
         )}
-        <span className="text-[8px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] shrink-0">
+        <span className="text-[10px] uppercase tracking-wider text-text-tertiary font-mono shrink-0">
           {levelLabel(node.level)}
         </span>
 
@@ -217,32 +217,29 @@ function TreeRow({
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             {canAddChild && (
               <button
+                type="button"
                 onClick={e => { e.stopPropagation(); setAddingUnder(node.id); setDraftName(''); setExpanded(true) }}
                 title={`Add ${levelLabel(node.level + 1)}`}
-                className="text-[var(--m12-border)] hover:text-[#0EA5E9]"
+                className="text-text-tertiary hover:text-brand-600 transition-colors"
               >
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                  <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
+                <Plus size={12} />
               </button>
             )}
             <button
+              type="button"
               onClick={e => { e.stopPropagation(); setNameDraft(node.name); setEditing(true) }}
               title="Rename"
-              className="text-[var(--m12-border)] hover:text-[#2563EB]"
+              className="text-text-tertiary hover:text-brand-600 transition-colors"
             >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <path d="M9 2l3 3-6 6H3V8l6-6z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-              </svg>
+              <Pencil size={12} />
             </button>
             <button
+              type="button"
               onClick={e => { e.stopPropagation(); handleDelete() }}
               title="Delete"
-              className="text-[var(--m12-border)] hover:text-red-400"
+              className="text-text-tertiary hover:text-red-600 transition-colors"
             >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <path d="M3 4h8M5.5 4V3a1 1 0 011-1h1a1 1 0 011 1v1M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <Trash2 size={12} />
             </button>
           </div>
         )}
@@ -272,8 +269,8 @@ function TreeRow({
             onChange={e => setDraftName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') onAddChild(node); if (e.key === 'Escape') setAddingUnder(null) }}
             onBlur={() => { if (!draftName.trim()) setAddingUnder(null) }}
-            placeholder={`${levelLabel(node.level + 1)} name…`}
-            className="w-full bg-[var(--m12-bg)] border border-[#0EA5E9]/50 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none"
+            placeholder={`${levelLabel(node.level + 1)} name...`}
+            className="w-full h-8 px-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
           />
         </div>
       )}

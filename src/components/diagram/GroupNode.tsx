@@ -76,7 +76,7 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
               minWidth={300}
               minHeight={200}
               lineClassName="!border-[#06B6D4]/30"
-              handleClassName="!w-2.5 !h-2.5 !bg-[#06B6D4] !border-[var(--m12-bg-card)] !border-2 !rounded-sm"
+              handleClassName="!w-2.5 !h-2.5 !bg-[#06B6D4] !border-[var(--m12-node-bg)] !border-2 !rounded-sm"
             />
           </div>
         )}
@@ -114,11 +114,11 @@ function GroupNodeComponent({ id, data, selected }: NodeProps & { data: SystemGr
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
               onClick={(e) => e.stopPropagation()}
-              className="bg-transparent border-b border-[#06B6D4] text-[var(--m12-text)] text-xs font-semibold outline-none min-w-[80px]"
+              className="bg-transparent border-b border-[#06B6D4] text-text-primary text-xs font-semibold outline-none min-w-[80px]"
               style={{ pointerEvents: 'auto' }}
             />
           ) : (
-            <span style={{ color }} className="text-xs font-bold uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
+            <span style={{ color }} className="text-xs font-bold uppercase tracking-wider font-mono">
               {data.label}
             </span>
           )}

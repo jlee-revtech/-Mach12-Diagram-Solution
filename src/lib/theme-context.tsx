@@ -1,6 +1,15 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect } from 'react'
+
+/**
+ * Theme context, retired to light-only when the app adopted the Tesseract
+ * XPM design system (a light-chrome system; canvas colors come from the
+ * --m12-* runtime variables in globals.css).
+ *
+ * The provider keeps the old API surface so existing call sites compile,
+ * scrubs any persisted dark preference, and always reports 'light'.
+ */
 
 type Theme = 'light' | 'dark'
 
@@ -15,31 +24,13 @@ const ThemeContext = createContext<ThemeContextType>({
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
-
-  // Load persisted theme on mount. Defaults to light for new users;
-  // any prior preference (including dark) is restored from localStorage.
   useEffect(() => {
-    const stored = localStorage.getItem('m12-theme') as Theme | null
-    if (stored === 'light' || stored === 'dark') {
-      setTheme(stored)
-      document.documentElement.classList.toggle('dark', stored === 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [])
-
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark'
-      localStorage.setItem('m12-theme', next)
-      document.documentElement.classList.toggle('dark', next === 'dark')
-      return next
-    })
+    localStorage.removeItem('m12-theme')
+    document.documentElement.classList.remove('dark')
   }, [])
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme: 'light', toggleTheme: () => {} }}>
       {children}
     </ThemeContext.Provider>
   )

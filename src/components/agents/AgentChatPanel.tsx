@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { Bot, Network, Send, Sparkles, User, X } from 'lucide-react'
 import type { Workstream } from '@/lib/workstream/types'
 import type { Recommendation, Citation } from '@/lib/agents/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import { WORKSTREAM_BY_CODE } from '@/lib/workstream/catalog'
 import DataArchitectureDialog from '@/components/process/DataArchitectureDialog'
+import { Button } from '@/components/common'
 
 interface Msg {
   role: 'user' | 'assistant'
@@ -89,7 +91,7 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
     setMessages(next)
     setInput('')
     setBusy(true)
-    setStatus('Thinking…')
+    setStatus('Thinking...')
     try {
       const res = await fetch('/api/agents/chat', {
         method: 'POST',
@@ -114,7 +116,7 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
           const dataMatch = block.match(/^data: (.+)$/m)
           if (!evMatch || !dataMatch) continue
           const ev = evMatch[1]; const data = JSON.parse(dataMatch[1])
-          if (ev === 'status') setStatus(data.label + '…')
+          if (ev === 'status') setStatus(data.label + '...')
           else if (ev === 'thread') { if (data.threadId) setThreadId(data.threadId) }
           else if (ev === 'message') { setMessages((m) => [...m, { role: 'assistant', text: data.text, recommendations: data.recommendations, citations: data.citations }]); setStatus(null) }
           else if (ev === 'error') { setMessages((m) => [...m, { role: 'assistant', text: `⚠️ ${data.error}` }]); setStatus(null) }
@@ -129,28 +131,27 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
 
   return (
     <>
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[var(--m12-bg-card)] border-l border-[var(--m12-border)]/60 shadow-2xl flex flex-col">
+    <div className="fixed right-0 top-0 h-full z-50 w-full max-w-md bg-white border-l border-border shadow-modal flex flex-col animate-slide-in-right">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--m12-border)]/40">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${agentMeta.color}1A`, color: agentMeta.color }}>
-          <WorkstreamIcon icon={agentMeta.icon} size={18} />
-        </div>
+      <div className="h-14 flex-shrink-0 flex items-center gap-3 px-4 border-b border-border">
+        <Sparkles size={18} className="text-amber-500 shrink-0" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-[var(--m12-text)] truncate">{agentMeta.name}</div>
-          <div className="text-[10px] text-[var(--m12-text-muted)] truncate">{agentMeta.tagline}</div>
+          <div className="text-body-md font-semibold text-text-primary truncate">{agentMeta.name}</div>
+          {agentMeta.tagline && <div className="text-[10px] text-text-tertiary truncate">{agentMeta.tagline}</div>}
         </div>
-        <button onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]" title="Close">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-        </button>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${agentMeta.color}1A`, color: agentMeta.color }}>
+          <WorkstreamIcon icon={agentMeta.icon} size={16} />
+        </div>
+        <Button variant="ghost" size="sm" iconOnly icon={<X size={14} />} title="Close" aria-label="Close" onClick={onClose} />
       </div>
 
       {/* Agent picker */}
-      <div className="px-4 py-2 border-b border-[var(--m12-border)]/30">
+      <div className="px-4 py-2 border-b border-border">
         <select
           value={agentCode}
           onChange={(e) => { setAgentCode(e.target.value); setMessages([]) }}
           aria-label="Choose consultant agent"
-          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-2 py-1.5 text-xs text-[var(--m12-text)] focus:outline-none"
+          className="w-full h-9 px-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
         >
           <option value="enterprise">Enterprise Architect (orchestrator)</option>
           {workstreams.map((w) => <option key={w.id} value={w.code}>{w.name}</option>)}
@@ -160,73 +161,98 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
             type="button"
             onClick={() => setArchOpen(true)}
             title="Generate a data-architecture diagram from this workstream's L3 process flows and assigned capabilities"
-            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium text-white transition-colors"
+            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-medium text-white transition-colors hover:opacity-90"
             style={{ backgroundColor: agentMeta.color }}
           >
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><rect x="9" y="2.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><rect x="5.5" y="9.5" width="5" height="4" rx="0.6" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 6.5v1.5a1 1 0 001 1h5a1 1 0 001-1V6.5M8 9.3V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
+            <Network size={12} />
             Generate data architecture
           </button>
         )}
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
-          <div className="text-center py-10 text-[11px] text-[var(--m12-text-muted)]">
-            Ask about data architecture, integrations, process design, or persona mapping for this value stream. The agent reads your live model and the SAP / Dassian knowledge base.
+          <div className="flex flex-col items-center text-center py-10">
+            <Sparkles size={24} className="text-amber-500 mb-3" />
+            <div className="text-[11px] text-text-tertiary max-w-xs">
+              Ask about data architecture, integrations, process design, or persona mapping for this value stream. The agent reads your live model and the SAP / Dassian knowledge base.
+            </div>
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
-            <div className={`inline-block text-left rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap max-w-[92%] ${m.role === 'user' ? 'bg-[#2563EB]/15 text-[var(--m12-text)]' : 'bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 text-[var(--m12-text-secondary)]'}`}>
-              {m.text}
+          <div key={i} className={`flex gap-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center ${m.role === 'user' ? 'bg-brand-500 text-white' : 'bg-amber-100'}`}>
+              {m.role === 'user' ? <User size={14} /> : <Bot size={14} className="text-amber-700" />}
             </div>
-            {m.recommendations && m.recommendations.length > 0 && (
-              <div className="mt-2 space-y-1.5">
-                {m.recommendations.map((r, j) => (
-                  <div key={j} className="bg-[var(--m12-bg)] border-l-2 rounded-r-lg px-3 py-2 text-left" style={{ borderColor: PILLAR_COLOR[r.pillar] || '#2563EB' }}>
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded" style={{ color: PILLAR_COLOR[r.pillar], backgroundColor: `${PILLAR_COLOR[r.pillar]}1A` }}>{r.pillar}</span>
-                      <span className="text-[11px] font-semibold text-[var(--m12-text)]">{r.title}</span>
+            <div className={`min-w-0 max-w-[85%] ${m.role === 'user' ? 'text-right' : ''}`}>
+              <div className={`inline-block text-left rounded-lg px-3 py-2 text-body-sm leading-relaxed whitespace-pre-wrap animate-slide-in-up ${m.role === 'user' ? 'bg-brand-500 text-white rounded-tr-sm' : 'bg-white border border-border rounded-tl-sm text-text-secondary'}`}>
+                {m.text}
+              </div>
+              {m.recommendations && m.recommendations.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {m.recommendations.map((r, j) => (
+                    <div key={j} className="bg-surface-muted border-l-2 rounded-r-lg px-3 py-2 text-left" style={{ borderColor: PILLAR_COLOR[r.pillar] || '#2563EB' }}>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded" style={{ color: PILLAR_COLOR[r.pillar], backgroundColor: `${PILLAR_COLOR[r.pillar]}1A` }}>{r.pillar}</span>
+                        <span className="text-[11px] font-semibold text-text-primary">{r.title}</span>
+                      </div>
+                      <div className="text-[11px] text-text-secondary">{r.detail}</div>
+                      {r.rationale && <div className="text-[10px] text-text-tertiary mt-0.5 italic">{r.rationale}</div>}
                     </div>
-                    <div className="text-[11px] text-[var(--m12-text-secondary)]">{r.detail}</div>
-                    {r.rationale && <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5 italic">{r.rationale}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-            {m.citations && m.citations.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {m.citations.map((c, j) => (
-                  <span key={j} className="text-[9px] text-[var(--m12-text-muted)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-1.5 py-0.5" title={c.sourceTitle}>
-                    {c.sourceTitle || c.sourceCode}
-                  </span>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+              {m.citations && m.citations.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {m.citations.map((c, j) => (
+                    <span key={j} className="text-[10px] text-text-tertiary bg-surface-muted border border-border rounded px-1.5 py-0.5" title={c.sourceTitle}>
+                      {c.sourceTitle || c.sourceCode}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ))}
         {status && (
-          <div className="flex items-center gap-2 text-[11px] text-[var(--m12-text-muted)]">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="animate-spin"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="10" strokeLinecap="round" /></svg>
-            {status}
+          <div className="flex gap-2">
+            <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center bg-amber-100">
+              <Bot size={14} className="text-amber-700" />
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-lg rounded-tl-sm bg-white border border-border px-3 py-2">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-brand-300 animate-bounce" />
+                <span className="w-2 h-2 rounded-full bg-brand-300 animate-bounce [animation-delay:150ms]" />
+                <span className="w-2 h-2 rounded-full bg-brand-300 animate-bounce [animation-delay:300ms]" />
+              </span>
+              <span className="text-[11px] text-text-tertiary">{status}</span>
+            </div>
           </div>
         )}
       </div>
 
       {/* Composer */}
-      <div className="border-t border-[var(--m12-border)]/40 p-3">
+      <div className="px-4 py-3 border-t border-border flex-shrink-0">
         <div className="flex gap-2 items-end">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder={`Ask the ${agentMeta.name}…`}
+            placeholder={`Ask the ${agentMeta.name}...`}
             rows={2}
             disabled={busy}
-            className="flex-1 resize-none bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60 disabled:opacity-60"
+            className="flex-1 min-h-[40px] max-h-24 px-3 py-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary resize-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none disabled:opacity-60"
           />
-          <button onClick={send} disabled={busy || !input.trim()} className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors shrink-0">Send</button>
+          <button
+            onClick={send}
+            disabled={busy || !input.trim()}
+            title="Send"
+            aria-label="Send"
+            className="h-10 w-10 rounded-lg bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-30 flex items-center justify-center shrink-0 transition-colors"
+          >
+            <Send size={16} />
+          </button>
         </div>
       </div>
     </div>

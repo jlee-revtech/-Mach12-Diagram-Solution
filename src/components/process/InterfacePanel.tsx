@@ -1,10 +1,14 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { ArrowLeft, ArrowLeftRight, ArrowRight, Plus, X } from 'lucide-react'
+import { Button, LoadingState } from '@/components/common'
 import { useProcessStore } from '@/lib/process/store'
 import { listProcessInterfaces, createProcessInterface, deleteProcessInterface } from '@/lib/supabase/process-models'
 import type { ProcessInterface, InterfaceDirection } from '@/lib/process/types'
 import { INTEGRATION_TECHS, INTERFACE_FREQUENCIES } from '@/lib/process/types'
+
+const FIELD_CLASSES = 'h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none'
 
 // Per-process integration register (inbound/outbound system interfaces).
 export default function InterfacePanel({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }) {
@@ -24,7 +28,7 @@ export default function InterfacePanel({ nodeId, readOnly }: { nodeId: string; r
   const load = useCallback(async () => { setLoading(true); setItems(await listProcessInterfaces(nodeId)); setLoading(false) }, [nodeId])
   useEffect(() => { load() }, [load])
 
-  const sysName = (id: string | null) => (id ? systems.find(s => s.id === id)?.name || '(system)' : '—')
+  const sysName = (id: string | null) => (id ? systems.find(s => s.id === id)?.name || '(system)' : 'None')
 
   const handleAdd = async () => {
     if ((!sourceId && !targetId) || busy) return
@@ -42,65 +46,73 @@ export default function InterfacePanel({ nodeId, readOnly }: { nodeId: string; r
   const handleDelete = async (id: string) => { setItems(i => i.filter(x => x.id !== id)); await deleteProcessInterface(id).catch(() => load()) }
 
   return (
-    <div className="px-4 py-3 border-t border-[var(--m12-border)]/40">
+    <div className="px-4 py-3 border-t border-border">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+        <span className="text-label uppercase text-text-secondary">
           Interfaces {items.length > 0 && `(${items.length})`}
         </span>
         {!readOnly && !adding && (
-          <button onClick={() => setAdding(true)} className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#0EA5E9] hover:text-[#38BDF8]">+ Add</button>
+          <Button variant="ghost" size="sm" icon={<Plus size={12} />} onClick={() => setAdding(true)}>Add</Button>
         )}
       </div>
 
       {loading ? (
-        <div className="text-[11px] text-[var(--m12-text-muted)]">Loading…</div>
+        <LoadingState variant="inline" compact label="Loading interfaces..." />
       ) : items.length === 0 && !adding ? (
-        <span className="text-[11px] text-[var(--m12-text-muted)]">No interfaces documented.</span>
+        <span className="text-[11px] text-text-tertiary">No interfaces documented.</span>
       ) : (
         <div className="space-y-1 mb-2">
           {items.map(it => (
-            <div key={it.id} className="group flex items-center gap-2 text-[11px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-1">
-              <span className="text-[var(--m12-text-secondary)]">{sysName(it.source_system_id)}</span>
-              <span className="text-[#0EA5E9]">{it.direction === 'inbound' ? '←' : it.direction === 'bidirectional' ? '↔' : '→'}</span>
-              <span className="text-[var(--m12-text-secondary)]">{sysName(it.target_system_id)}</span>
-              <span className="flex-1 text-[10px] text-[var(--m12-text-muted)] truncate">
+            <div key={it.id} className="group flex items-center gap-2 text-[11px] bg-surface-muted border border-border rounded px-2 py-1">
+              <span className="text-text-secondary">{sysName(it.source_system_id)}</span>
+              <span className="text-brand-600 inline-flex shrink-0">
+                {it.direction === 'inbound' ? <ArrowLeft size={12} /> : it.direction === 'bidirectional' ? <ArrowLeftRight size={12} /> : <ArrowRight size={12} />}
+              </span>
+              <span className="text-text-secondary">{sysName(it.target_system_id)}</span>
+              <span className="flex-1 text-[10px] text-text-tertiary truncate">
                 {[it.integration_tech, it.frequency, it.interface_ref].filter(Boolean).join(' · ')}
               </span>
-              {!readOnly && <button onClick={() => handleDelete(it.id)} aria-label="Delete" className="opacity-50 group-hover:opacity-100 text-[var(--m12-border)] hover:text-red-400">×</button>}
+              {!readOnly && (
+                <button type="button" onClick={() => handleDelete(it.id)} aria-label="Delete" className="opacity-50 group-hover:opacity-100 text-text-tertiary hover:text-status-red">
+                  <X size={12} />
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
 
       {adding && !readOnly && (
-        <div className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg p-2.5 space-y-2">
+        <div className="bg-surface-muted border border-border rounded-lg p-2.5 space-y-2">
           <div className="flex gap-2">
-            <select value={sourceId} onChange={e => setSourceId(e.target.value)} aria-label="Source system" className="flex-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none">
-              <option value="">Source…</option>
+            <select value={sourceId} onChange={e => setSourceId(e.target.value)} aria-label="Source system" className={`flex-1 min-w-0 ${FIELD_CLASSES}`}>
+              <option value="">Source...</option>
               {systems.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <select value={direction} onChange={e => setDirection(e.target.value as InterfaceDirection)} aria-label="Direction" className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none">
+            <select value={direction} onChange={e => setDirection(e.target.value as InterfaceDirection)} aria-label="Direction" className={FIELD_CLASSES}>
               <option value="outbound">→</option><option value="inbound">←</option><option value="bidirectional">↔</option>
             </select>
-            <select value={targetId} onChange={e => setTargetId(e.target.value)} aria-label="Target system" className="flex-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none">
-              <option value="">Target…</option>
+            <select value={targetId} onChange={e => setTargetId(e.target.value)} aria-label="Target system" className={`flex-1 min-w-0 ${FIELD_CLASSES}`}>
+              <option value="">Target...</option>
               {systems.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div className="flex gap-2">
-            <select value={tech} onChange={e => setTech(e.target.value)} aria-label="Integration tech" className="flex-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none">
-              <option value="">Tech…</option>
+            <select value={tech} onChange={e => setTech(e.target.value)} aria-label="Integration tech" className={`flex-1 min-w-0 ${FIELD_CLASSES}`}>
+              <option value="">Tech...</option>
               {INTEGRATION_TECHS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-            <select value={frequency} onChange={e => setFrequency(e.target.value)} aria-label="Frequency" className="flex-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none">
-              <option value="">Frequency…</option>
+            <select value={frequency} onChange={e => setFrequency(e.target.value)} aria-label="Frequency" className={`flex-1 min-w-0 ${FIELD_CLASSES}`}>
+              <option value="">Frequency...</option>
               {INTERFACE_FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
-            <input value={ref} onChange={e => setRef(e.target.value)} aria-label="Interface ref" placeholder="Ref" className="w-20 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] font-[family-name:var(--font-space-mono)] focus:outline-none" />
+            <input value={ref} onChange={e => setRef(e.target.value)} aria-label="Interface ref" placeholder="Ref" className={`w-24 font-mono ${FIELD_CLASSES}`} />
           </div>
           <div className="flex gap-2">
-            <button onClick={handleAdd} disabled={busy || (!sourceId && !targetId)} className="flex-1 bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-50 text-white text-[11px] font-medium rounded py-1.5 transition-colors">{busy ? 'Adding…' : 'Add'}</button>
-            <button onClick={() => setAdding(false)} className="px-3 text-[11px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]">Cancel</button>
+            <Button size="sm" className="flex-1" loading={busy} disabled={!sourceId && !targetId} onClick={handleAdd}>
+              {busy ? 'Adding...' : 'Add'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>Cancel</Button>
           </div>
         </div>
       )}

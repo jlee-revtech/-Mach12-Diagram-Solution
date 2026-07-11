@@ -8,6 +8,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Pencil, RefreshCw, Sparkles } from 'lucide-react'
+import { Button } from '@/components/common'
 import type {
   SectionContent, ClarifyingQuestion, KbGap,
   SectionGenerationResult, SectionKind,
@@ -292,24 +294,24 @@ export default function SectionEditor({
   if (draft) {
     return (
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3 sticky top-0 z-10 bg-[var(--m12-bg)] pb-2 -mt-1 pt-1">
+        <div className="flex items-start justify-between gap-3 sticky top-0 z-10 bg-surface-muted pb-2 -mt-1 pt-1">
           <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wide text-[#3B82F6] mb-0.5">Editing content</div>
-            <h3 className="text-sm font-semibold text-[var(--m12-text)] leading-snug">{item.title}</h3>
-            <p className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">Edits are yours, no AI. They save automatically and flow into the Workshop Experience and the deck.</p>
+            <div className="text-[10px] uppercase tracking-wide text-brand-600 mb-0.5">Editing content</div>
+            <h3 className="font-display text-heading-sm text-text-primary leading-snug">{item.title}</h3>
+            <p className="text-[11px] text-text-tertiary mt-0.5">Edits are yours, no AI. They save automatically and flow into the Workshop Experience and the deck.</p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <SaveStatusPill status={saveStatus} onRetry={retrySave} />
-            <button type="button" onClick={revertEditing} disabled={saveStatus === 'saving'} title="Discard changes made since you opened the editor" className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Revert</button>
-            <button type="button" onClick={finishEditing} disabled={saveStatus === 'saving'} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">Done</button>
+            <Button variant="secondary" size="sm" onClick={revertEditing} disabled={saveStatus === 'saving'} title="Discard changes made since you opened the editor">Revert</Button>
+            <button type="button" onClick={finishEditing} disabled={saveStatus === 'saving'} className="text-[12px] px-3 py-1.5 rounded-lg font-medium text-white bg-status-green hover:bg-green-700 disabled:opacity-50 transition-colors">Done</button>
           </div>
         </div>
-        {error && <div className="text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
+        {error && <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
         <SectionContentEditor value={draft} onChange={setDraft} generateDiagram={generateDiagram} generateContent={generateContent} />
-        <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-[var(--m12-border)]/40">
+        <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-border">
           <SaveStatusPill status={saveStatus} onRetry={retrySave} />
-          <button type="button" onClick={revertEditing} disabled={saveStatus === 'saving'} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] disabled:opacity-50">Revert</button>
-          <button type="button" onClick={finishEditing} disabled={saveStatus === 'saving'} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#059669] hover:bg-[#10B981] disabled:opacity-50">Done</button>
+          <Button variant="secondary" size="sm" onClick={revertEditing} disabled={saveStatus === 'saving'}>Revert</Button>
+          <button type="button" onClick={finishEditing} disabled={saveStatus === 'saving'} className="text-[12px] px-3 py-1.5 rounded-lg font-medium text-white bg-status-green hover:bg-green-700 disabled:opacity-50 transition-colors">Done</button>
         </div>
       </div>
     )
@@ -322,47 +324,47 @@ export default function SectionEditor({
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span
-              className="text-[8px] uppercase tracking-wide px-1.5 py-0.5 rounded flex items-center gap-1"
+              className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded flex items-center gap-1"
               style={{ backgroundColor: `${meta.color}1A`, color: meta.color }}
             >
               <span>{meta.icon}</span>{meta.label}
             </span>
-            {item.timebox_minutes ? <span className="text-[10px] text-[var(--m12-text-muted)]">{item.timebox_minutes}m</span> : null}
-            {view?.version ? <span className="text-[9px] text-[var(--m12-text-muted)]">v{view.version}</span> : null}
+            {item.timebox_minutes ? <span className="text-[10px] text-text-tertiary">{item.timebox_minutes}m</span> : null}
+            {view?.version ? <span className="text-[10px] text-text-tertiary font-mono">v{view.version}</span> : null}
           </div>
-          <h3 className="text-sm font-semibold text-[var(--m12-text)] leading-snug">{item.title}</h3>
-          {item.objective && <p className="text-[11px] text-[var(--m12-text-muted)] mt-0.5">{item.objective}</p>}
+          <h3 className="font-display text-heading-sm text-text-primary leading-snug">{item.title}</h3>
+          {item.objective && <p className="text-[11px] text-text-tertiary mt-0.5">{item.objective}</p>}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {view?.content && (
-            <button
-              type="button"
+            <Button
+              variant="secondary" size="sm"
+              icon={<Pencil size={12} />}
               onClick={startEditing}
               disabled={busy}
               title="Hand-edit this section's text and diagrams (no AI)"
-              className="border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-2.5 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50"
             >
-              ✎ Edit
-            </button>
+              Edit
+            </Button>
           )}
-          <button
+          <Button
+            variant="primary" size="sm"
             onClick={generate}
             disabled={busy}
             title={feedback.trim() ? 'Generate honoring your prompt below' : (view?.content ? 'Regenerate this section' : 'Generate this section')}
-            className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
           >
-            {busy ? 'Generating…' : view?.content ? 'Regenerate' : 'Generate content'}
-          </button>
+            {busy ? 'Generating...' : view?.content ? 'Regenerate' : 'Generate content'}
+          </Button>
         </div>
       </div>
 
       {item.section_kind === 'evaluation' && (
-        <div className="text-[10px] text-[var(--m12-text-muted)] bg-[var(--m12-bg-card)] border border-[#7C3AED]/30 rounded-lg px-3 py-2">
+        <div className="text-[11px] text-text-tertiary bg-white border border-[#7C3AED]/30 rounded-lg px-3 py-2">
           This section synthesizes across the workstream recommendations. Generate the workstream sections first, then generate this to reconcile where they diverge.
         </div>
       )}
 
-      {error && <div className="text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
+      {error && <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
       {/* Read-only render of the section content (shared with the public share
           page). It normalizes internally, so old-shape rows never throw. */}
@@ -374,8 +376,8 @@ export default function SectionEditor({
           )}
         </>
       ) : !busy ? (
-        <div className="text-[11px] text-[var(--m12-text-muted)] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-4 text-center">
-          No content yet. Press <span className="text-[#3B82F6]">Generate content</span> to draft this section.
+        <div className="text-[11px] text-text-tertiary bg-white border border-border rounded-lg px-3 py-4 text-center">
+          No content yet. Press <span className="text-brand-600">Generate content</span> to draft this section.
         </div>
       ) : null}
 
@@ -384,27 +386,27 @@ export default function SectionEditor({
         {view && view.clarifyingQuestions.length > 0 && (
           <motion.div
             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-            className="bg-[var(--m12-bg-card)] border border-[#D97706]/40 rounded-lg p-3 space-y-2.5 overflow-hidden"
+            className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2.5 overflow-hidden"
           >
-            <div className="text-[10px] uppercase tracking-wide text-[#D97706]">Clarifying questions</div>
+            <div className="text-[10px] uppercase tracking-wide text-amber-700">Clarifying questions</div>
             {view.clarifyingQuestions.map((q: ClarifyingQuestion) => (
               <div key={q.id}>
-                <div className="text-[11px] text-[var(--m12-text)] leading-snug">{q.question}</div>
-                {q.why && <div className="text-[10px] text-[var(--m12-text-muted)] mb-1">{q.why}</div>}
+                <div className="text-[11px] text-text-primary leading-snug">{q.question}</div>
+                {q.why && <div className="text-[10px] text-text-tertiary mb-1">{q.why}</div>}
                 <input
                   value={answers[q.id] || ''}
                   onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
                   placeholder="Your answer"
-                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded px-2 py-1 text-[11px] text-[var(--m12-text)] outline-none mt-1"
+                  className="w-full bg-surface-input border border-border rounded px-2 py-1 text-[11px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 mt-1"
                 />
               </div>
             ))}
             <button
               onClick={regenerateWithAnswers}
               disabled={busy}
-              className="text-[10px] px-2.5 py-1 rounded bg-[#D97706] hover:bg-[#F59E0B] disabled:opacity-50 text-white font-medium"
+              className="text-[11px] px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium transition-colors"
             >
-              {busy ? 'Regenerating…' : 'Regenerate with answers'}
+              {busy ? 'Regenerating...' : 'Regenerate with answers'}
             </button>
           </motion.div>
         )}
@@ -422,8 +424,8 @@ export default function SectionEditor({
       {/* Prompt box (req 9): usable to GENERATE (first draft) and to enrich/revise.
           Available before content exists, so the first generation honors it too.
           The header Generate button and the button here both submit this prompt. */}
-      <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-3">
-        <div className="text-[10px] uppercase tracking-wide text-[var(--m12-text-muted)] mb-1.5">
+      <div className="bg-white border border-border rounded-lg shadow-card p-3">
+        <div className="text-[10px] uppercase tracking-wide text-text-secondary mb-1.5">
           Prompt: generate or enrich this section, optional
         </div>
         <textarea
@@ -435,20 +437,21 @@ export default function SectionEditor({
               ? 'e.g. Make the recommended decision firmer and add a cost-plus vs fixed-price angle.'
               : 'e.g. Emphasize the make-vs-buy trade-off and keep talking points executive-level.'
           }
-          className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] outline-none resize-none mb-2"
+          className="w-full bg-surface-input border border-border rounded-lg px-3 py-2 text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none resize-none mb-2"
         />
         <button
           onClick={generate}
           disabled={busy || (!view?.content && !feedback.trim())}
-          className="text-[11px] px-2.5 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] disabled:opacity-50"
+          className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded border border-brand-200 text-brand-600 hover:bg-brand-50 disabled:opacity-50 transition-colors"
         >
+          <Sparkles size={11} />
           {busy
-            ? (view?.content ? 'Updating…' : 'Generating…')
+            ? (view?.content ? 'Updating...' : 'Generating...')
             : view?.content
               ? (feedback.trim() ? 'Update section' : 'Regenerate section')
               : 'Generate with prompt'}
         </button>
-        <div className="text-[9px] text-[var(--m12-text-muted)] mt-1.5 leading-snug">
+        <div className="text-[10px] text-text-tertiary mt-1.5 leading-snug">
           This section-level prompt is combined with the workshop-level guidance set in the Sections panel.
         </div>
       </div>
@@ -470,19 +473,19 @@ function KbGapCallout({ gap, workstream }: { gap: KbGap; workstream?: Workstream
     } catch { /* clipboard may be unavailable; no-op */ }
   }
   return (
-    <div className="bg-[#D9770614] border border-[#D97706]/40 rounded-lg p-3">
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
       <div className="flex items-start gap-2">
-        <span className="text-[#D97706] text-xs mt-0.5">⚑</span>
+        <span className="text-amber-600 text-body-sm mt-0.5">⚑</span>
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] text-[var(--m12-text)] font-medium">
+          <div className="text-[11px] text-text-primary font-medium">
             Knowledge base needs seeding: {gap.topic}{wsLabel ? ` for ${wsLabel}` : ''}
           </div>
-          {gap.rationale && <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5">{gap.rationale}</div>}
+          {gap.rationale && <div className="text-[10px] text-text-tertiary mt-0.5">{gap.rationale}</div>}
           <div className="flex items-center gap-2 mt-2">
-            <button onClick={() => setOpen((v) => !v)} className="text-[10px] text-[#D97706] hover:underline">
+            <button onClick={() => setOpen((v) => !v)} className="text-[10px] text-amber-700 hover:underline">
               {open ? 'Hide seeding steps' : 'Show seeding steps'}
             </button>
-            <button onClick={copy} className="text-[10px] px-2 py-0.5 rounded border border-[#D97706]/50 text-[#D97706] hover:bg-[#D9770614]">
+            <button onClick={copy} className="text-[10px] px-2 py-0.5 rounded border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors">
               {copied ? 'Copied' : 'Copy seeding steps'}
             </button>
           </div>
@@ -490,9 +493,9 @@ function KbGapCallout({ gap, workstream }: { gap: KbGap; workstream?: Workstream
             {open && (
               <motion.ol
                 initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                className="text-[10px] text-[var(--m12-text-secondary)] list-decimal list-inside space-y-0.5 mt-2 overflow-hidden"
+                className="text-[10px] text-text-secondary list-decimal list-inside space-y-0.5 mt-2 overflow-hidden"
               >
-                {steps.map((s, i) => <li key={i} className="leading-snug"><code className="text-[9.5px] text-[var(--m12-text)]">{s}</code></li>)}
+                {steps.map((s, i) => <li key={i} className="leading-snug"><code className="font-mono text-[10px] text-text-primary">{s}</code></li>)}
               </motion.ol>
             )}
           </AnimatePresence>
@@ -507,13 +510,13 @@ function SaveStatusPill({ status, onRetry }: { status: 'idle' | 'saving' | 'save
   if (status === 'idle') return null
   if (status === 'saving') {
     return (
-      <span className="text-[10px] text-[var(--m12-text-muted)] flex items-center gap-1">
-        <span className="inline-block w-2.5 h-2.5 border-2 border-[var(--m12-border)] border-t-[#2563EB] rounded-full animate-spin" />Saving…
+      <span className="text-[10px] text-text-tertiary flex items-center gap-1">
+        <span className="inline-block w-2.5 h-2.5 border-2 border-border border-t-brand-500 rounded-full animate-spin" />Saving...
       </span>
     )
   }
-  if (status === 'saved') return <span className="text-[10px] text-[#10B981] flex items-center gap-1">✓ All changes saved</span>
-  return <button type="button" onClick={onRetry} className="text-[10px] text-[#EF4444] hover:underline">Save failed, retry</button>
+  if (status === 'saved') return <span className="text-[10px] text-status-green flex items-center gap-1">✓ All changes saved</span>
+  return <button type="button" onClick={onRetry} className="text-[10px] text-red-600 hover:underline">Save failed, retry</button>
 }
 
 // Trigger for the Solution Architecture Evaluation: synthesize a decision-criteria
@@ -522,11 +525,12 @@ function SaveStatusPill({ status, onRetry }: { status: 'idle' | 'saving' | 'save
 function SynthesizeCriteriaButton({ content, busy, onSynthesize }: { content: SectionContent; busy: boolean; onSynthesize: () => void }) {
   const already = hasSynthesis(content)
   return (
-    <div className="rounded-lg border border-[#0891B2]/40 bg-[#0891B20D] p-3">
-      <div className="text-[11px] font-medium text-[var(--m12-text)] mb-0.5">Decision Criteria synthesis</div>
-      <div className="text-[10px] text-[var(--m12-text-muted)] mb-2">Reads the Considerations (prioritized), Notes, decisions, and captured actions across every section, then synthesizes a decision-criteria deliverable with Actions and Next Steps.</div>
-      <button type="button" onClick={onSynthesize} disabled={busy} className="text-[11px] px-2.5 py-1 rounded bg-[#0891B2] hover:bg-[#06B6D4] disabled:opacity-50 text-white font-medium">
-        {busy ? 'Synthesizing…' : already ? '↻ Re-synthesize decision criteria' : '✦ Synthesize decision criteria'}
+    <div className="rounded-lg border border-[#0891B2]/40 bg-[#0891B2]/5 p-3">
+      <div className="text-[11px] font-medium text-text-primary mb-0.5">Decision Criteria synthesis</div>
+      <div className="text-[10px] text-text-tertiary mb-2">Reads the Considerations (prioritized), Notes, decisions, and captured actions across every section, then synthesizes a decision-criteria deliverable with Actions and Next Steps.</div>
+      <button type="button" onClick={onSynthesize} disabled={busy} className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded bg-[#0891B2] hover:bg-[#06B6D4] disabled:opacity-50 text-white font-medium transition-colors">
+        {already ? <RefreshCw size={11} /> : <Sparkles size={11} />}
+        {busy ? 'Synthesizing...' : already ? 'Re-synthesize decision criteria' : 'Synthesize decision criteria'}
       </button>
     </div>
   )

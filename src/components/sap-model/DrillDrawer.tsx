@@ -1,15 +1,22 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { ChevronRight, X } from 'lucide-react'
 import type { DrillData, DrillItem, DrillTreeNode } from '@/lib/sap-model/types'
 import { ENTITY_META } from '@/lib/sap-model/entityMeta'
 
+// Canvas-scoped drill drawer. It intentionally mirrors the common DrillDrawer
+// visual language (white panel, border-l, shadow-modal, sticky header,
+// slide-in-right) but stays local: it overlays only the React Flow canvas
+// (absolute within the canvas container, no portal/backdrop) and carries the
+// entity-colored header + filter + tree API the org model needs.
+
 function ItemRow({ it, color }: { it: DrillItem; color: string }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-[var(--m12-border)]/20 hover:bg-[var(--m12-bg)]/40">
-      <span className="text-[11px] font-bold font-[family-name:var(--font-space-mono)] shrink-0" style={{ color }}>{it.code}</span>
-      {it.label && <span className="text-[11px] text-[var(--m12-text-secondary)] truncate">{it.label}</span>}
-      {it.meta && <span className="ml-auto text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] shrink-0">{it.meta}</span>}
+    <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border hover:bg-surface-muted/60">
+      <span className="text-[11px] font-bold font-mono shrink-0" style={{ color }}>{it.code}</span>
+      {it.label && <span className="text-[11px] text-text-secondary truncate">{it.label}</span>}
+      {it.meta && <span className="ml-auto text-[10px] text-text-tertiary font-mono shrink-0">{it.meta}</span>}
     </div>
   )
 }
@@ -26,9 +33,9 @@ function TreeNode({ node, depth, color, forceOpen }: { node: DrillTreeNode; dept
 
   if (node.kind === 'leaf') {
     return (
-      <div className="flex items-center gap-2 py-1 border-t border-[var(--m12-border)]/15 hover:bg-[var(--m12-bg)]/40" style={{ paddingLeft: pad + 16, paddingRight: 12 }}>
-        <span className="text-[11px] font-bold font-[family-name:var(--font-space-mono)] shrink-0" style={{ color }}>{node.code}</span>
-        {node.label && <span className="text-[11px] text-[var(--m12-text-secondary)] truncate">{node.label}</span>}
+      <div className="flex items-center gap-2 py-1 border-t border-border hover:bg-surface-muted/60" style={{ paddingLeft: pad + 16, paddingRight: 12 }}>
+        <span className="text-[11px] font-bold font-mono shrink-0" style={{ color }}>{node.code}</span>
+        {node.label && <span className="text-[11px] text-text-secondary truncate">{node.label}</span>}
       </div>
     )
   }
@@ -38,15 +45,13 @@ function TreeNode({ node, depth, color, forceOpen }: { node: DrillTreeNode; dept
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 w-full text-left py-1.5 border-t border-[var(--m12-border)]/20 hover:bg-[var(--m12-bg)]/50"
+        className="flex items-center gap-1.5 w-full text-left py-1.5 border-t border-border hover:bg-surface-muted/60"
         style={{ paddingLeft: pad, paddingRight: 12 }}
       >
-        <svg width="9" height="9" viewBox="0 0 10 10" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${isOpen ? 'rotate-90' : ''}`}>
-          <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span className="text-[11px] font-semibold text-[var(--m12-text)] truncate">{node.label || node.code}</span>
-        <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] truncate">{node.code}</span>
-        <span className="ml-auto text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] shrink-0">{countLeaves(node)}</span>
+        <ChevronRight size={10} className={`shrink-0 text-text-tertiary transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+        <span className="text-[11px] font-semibold text-text-primary truncate">{node.label || node.code}</span>
+        <span className="text-[10px] text-text-tertiary font-mono truncate">{node.code}</span>
+        <span className="ml-auto text-[10px] text-text-tertiary font-mono shrink-0">{countLeaves(node)}</span>
       </button>
       {isOpen && (node.children ?? []).map((c, i) => (
         <TreeNode key={c.code + ':' + depth + ':' + i} node={c} depth={depth + 1} color={color} forceOpen={forceOpen} />
@@ -84,22 +89,28 @@ export default function DrillDrawer({ data, onClose }: { data: DrillData; onClos
     : (filtered.groups ? filtered.groups.reduce((n, g) => n + g.items.length, 0) : filtered.items?.length) ?? 0
 
   return (
-    <div className="absolute top-0 right-0 z-20 h-full w-[360px] max-w-[88vw] bg-[var(--m12-bg-card)] border-l border-[var(--m12-border)]/60 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+    <div className="absolute top-0 right-0 z-20 h-full w-[360px] max-w-[88vw] bg-white border-l border-border shadow-modal flex flex-col animate-slide-in-right">
       {/* header */}
-      <div className="px-3.5 py-3 border-b border-[var(--m12-border)]/40" style={{ background: color + '0f' }}>
+      <div className="sticky top-0 px-3.5 py-3 border-b border-border" style={{ background: color + '0f' }}>
         <div className="flex items-start gap-2.5">
-          <div style={{ backgroundColor: color + '22', color }} className="flex items-center justify-center w-8 h-8 rounded-lg text-[10px] font-bold font-[family-name:var(--font-space-mono)] shrink-0">
+          <div style={{ backgroundColor: color + '22', color }} className="flex items-center justify-center w-8 h-8 rounded-lg text-[10px] font-bold font-mono shrink-0">
             {meta.abbr}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-[var(--m12-text)] truncate">{data.title}</span>
-              <span className="text-[11px] font-bold font-[family-name:var(--font-space-mono)] shrink-0" style={{ color }}>{data.count}</span>
+              <span className="text-body-sm font-semibold text-text-primary truncate">{data.title}</span>
+              <span className="text-[11px] font-bold font-mono shrink-0" style={{ color }}>{data.count}</span>
             </div>
-            {data.subtitle && <div className="text-[10px] text-[var(--m12-text-muted)] truncate mt-0.5">{data.subtitle}</div>}
+            {data.subtitle && <div className="text-[10px] text-text-tertiary truncate mt-0.5">{data.subtitle}</div>}
           </div>
-          <button type="button" onClick={onClose} title="Close" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] shrink-0 -mr-1">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            title="Close"
+            className="h-8 w-8 -mr-1 rounded inline-flex items-center justify-center text-text-secondary hover:bg-surface-muted hover:text-text-primary transition-colors shrink-0"
+          >
+            <X size={16} />
           </button>
         </div>
         {data.count > 12 && (
@@ -107,7 +118,7 @@ export default function DrillDrawer({ data, onClose }: { data: DrillData; onClos
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={data.tree ? 'Filter groups & profit centers…' : 'Filter…'}
-            className="mt-2.5 w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-md px-2.5 py-1.5 text-[11px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-muted)] outline-none focus:border-[var(--m12-border)]"
+            className="mt-2.5 w-full h-8 px-2.5 rounded-lg border border-border bg-surface-input text-[11px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
           />
         )}
       </div>
@@ -119,10 +130,10 @@ export default function DrillDrawer({ data, onClose }: { data: DrillData; onClos
         ) : filtered.groups ? (
           filtered.groups.map((g) => (
             <div key={g.name}>
-              <div className="sticky top-0 z-10 px-3 py-1.5 bg-[var(--m12-bg-card)] border-b border-[var(--m12-border)]/40 flex items-baseline gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)]">{g.name}</span>
-                {g.caption && <span className="text-[10px] text-[var(--m12-text-muted)] truncate">{g.caption}</span>}
-                <span className="ml-auto text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{g.items.length}</span>
+              <div className="sticky top-0 z-10 px-3 py-1.5 bg-white border-b border-border flex items-baseline gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary font-mono">{g.name}</span>
+                {g.caption && <span className="text-[10px] text-text-tertiary truncate">{g.caption}</span>}
+                <span className="ml-auto text-[10px] text-text-tertiary font-mono">{g.items.length}</span>
               </div>
               {g.items.map((it, i) => <ItemRow key={it.code + i} it={it} color={color} />)}
             </div>
@@ -130,10 +141,10 @@ export default function DrillDrawer({ data, onClose }: { data: DrillData; onClos
         ) : (
           (filtered.items ?? []).map((it, i) => <ItemRow key={it.code + i} it={it} color={color} />)
         )}
-        {shown === 0 && <div className="px-3 py-6 text-center text-[11px] text-[var(--m12-text-muted)]">No matches.</div>}
+        {shown === 0 && <div className="px-3 py-6 text-center text-[11px] text-text-tertiary">No matches.</div>}
       </div>
 
-      <div className="px-3 py-2 border-t border-[var(--m12-border)]/40 text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+      <div className="px-3 py-2 border-t border-border text-[10px] text-text-tertiary font-mono">
         {data.tree ? `${shown} profit centers in hierarchy` : `showing ${shown} of ${data.count}`}
       </div>
     </div>

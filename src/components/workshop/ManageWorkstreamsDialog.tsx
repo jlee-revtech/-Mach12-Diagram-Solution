@@ -6,8 +6,10 @@
 // Adding a brand-new workstream creates a fresh section to author content into.
 
 import { useMemo, useState } from 'react'
+import { X } from 'lucide-react'
 import type { Workstream } from '@/lib/workstream/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
+import { Button } from '@/components/common'
 
 export default function ManageWorkstreamsDialog({
   streams, activeCodes, codesWithContent, onClose, onSave,
@@ -36,23 +38,21 @@ export default function ManageWorkstreamsDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[34rem] max-w-[94vw] max-h-[85vh] flex flex-col bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--m12-border)]/40">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-[34rem] max-w-[94vw] max-h-[85vh] flex flex-col bg-white rounded-xl shadow-card-hover overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
-            <h3 className="text-sm font-semibold text-[var(--m12-text)]">Workstreams in this workshop</h3>
-            <div className="text-[11px] text-[var(--m12-text-muted)]">Add or hide workstreams. Hiding keeps the section and its content; nothing is deleted.</div>
+            <h3 className="text-heading-sm font-display text-text-primary">Workstreams in this workshop</h3>
+            <div className="text-[11px] text-text-tertiary">Add or hide workstreams. Hiding keeps the section and its content; nothing is deleted.</div>
           </div>
-          <button type="button" onClick={onClose} title="Close" aria-label="Close" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-          </button>
+          <Button variant="ghost" size="sm" iconOnly icon={<X size={14} />} title="Close" aria-label="Close" onClick={onClose} />
         </div>
 
-        {error && <div className="mx-5 mt-3 text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
+        {error && <div className="mx-5 mt-3 text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
           {streams.length === 0 ? (
-            <div className="text-center py-10 text-xs text-[var(--m12-text-muted)]">No workstreams found for this organization.</div>
+            <div className="text-center py-10 text-body-sm text-text-tertiary">No workstreams found for this organization.</div>
           ) : (
             streams.map((w) => {
               const on = selected.has(w.code)
@@ -60,18 +60,18 @@ export default function ManageWorkstreamsDialog({
               const hasContent = withContent.has(w.code)
               const wasActive = active.has(w.code)
               return (
-                <label key={w.code} className="flex items-start gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:border-[var(--m12-border)]"
-                  style={{ borderColor: on ? color : 'var(--m12-border)' }}>
+                <label key={w.code} className="flex items-start gap-2.5 px-3 py-2 rounded-lg border border-border cursor-pointer transition-colors hover:bg-surface-muted"
+                  style={on ? { borderColor: color } : undefined}>
                   <input type="checkbox" checked={on} onChange={() => toggle(w.code)} className="mt-0.5" />
                   <div className="w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1A`, color }}>
                     <WorkstreamIcon icon={w.icon} size={13} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs text-[var(--m12-text)] leading-snug">{w.name}</div>
+                    <div className="text-body-sm text-text-primary leading-snug">{w.name}</div>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      {hasContent && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#10B981]/15 text-[#10B981]">has content</span>}
-                      {wasActive && !on && <span className="text-[9px] text-[#D97706]">will be hidden, data kept</span>}
-                      {!wasActive && on && <span className="text-[9px] text-[#3B82F6]">{hasContent ? 'will be shown again' : 'will be added'}</span>}
+                      {hasContent && <span className="text-[10px] px-1.5 py-0.5 rounded bg-status-green-bg text-status-green">has content</span>}
+                      {wasActive && !on && <span className="text-[10px] text-amber-600">will be hidden, data kept</span>}
+                      {!wasActive && on && <span className="text-[10px] text-brand-600">{hasContent ? 'will be shown again' : 'will be added'}</span>}
                     </div>
                   </div>
                 </label>
@@ -80,11 +80,11 @@ export default function ManageWorkstreamsDialog({
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-[var(--m12-border)]/40 flex items-center gap-2">
-          <div className="text-[11px] text-[var(--m12-text-muted)]">{selected.size} in the workshop</div>
+        <div className="px-5 py-3 border-t border-border flex items-center gap-2">
+          <div className="text-[11px] text-text-tertiary">{selected.size} in the workshop</div>
           <div className="ml-auto flex items-center gap-2">
-            <button type="button" onClick={onClose} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">Cancel</button>
-            <button type="button" onClick={save} disabled={busy || !dirty} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50">{busy ? 'Saving…' : 'Save changes'}</button>
+            <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" size="sm" onClick={save} loading={busy} disabled={busy || !dirty}>{busy ? 'Saving...' : 'Save changes'}</Button>
           </div>
         </div>
       </div>

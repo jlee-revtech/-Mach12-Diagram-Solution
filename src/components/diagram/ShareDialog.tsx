@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { X } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useDiagramStore } from '@/lib/diagram/store'
 
@@ -101,51 +103,54 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
   return (
     <div className="fixed inset-0" style={{ zIndex: 9999 }} onClick={onClose}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60" />
+      <div className="absolute inset-0 bg-black/40" />
       {/* Scrollable centering wrapper */}
       <div className="absolute inset-0 overflow-y-auto flex items-start justify-center py-8 px-4">
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-md bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl my-auto"
+          className="relative w-full max-w-md bg-white rounded-xl shadow-card-hover my-auto"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--m12-border)]/40">
-            <h3 className="text-sm font-semibold text-[var(--m12-text)]">Share Diagram</h3>
-            <button
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <h3 className="text-heading-sm font-display text-text-primary">Share Diagram</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon={<X size={16} />}
+              aria-label="Close"
+              title="Close"
               onClick={onClose}
-              className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors"
-            >
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-            </button>
+            />
           </div>
 
           <div className="p-6">
-          <p className="text-xs text-[var(--m12-text-muted)] mb-4">
-            Generate a share link for <strong className="text-[var(--m12-text-secondary)]">{meta.title}</strong>. Recipients will be added to your organization and granted access to this diagram.
+          <p className="text-body-sm text-text-secondary mb-4">
+            Generate a share link for <strong className="text-text-primary">{meta.title}</strong>. Recipients will be added to your organization and granted access to this diagram.
           </p>
 
           {/* Permission selector */}
           <div className="mb-4">
-            <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1.5">
+            <label className="text-label uppercase text-text-secondary block mb-1.5">
               Permission Level
             </label>
             <div className="flex gap-2">
               <button
                 onClick={() => setPermission('editor')}
-                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${
+                className={`flex-1 py-2 text-[12px] font-medium rounded-lg transition-colors ${
                   permission === 'editor'
-                    ? 'bg-[#2563EB] text-white'
-                    : 'bg-[var(--m12-bg)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] border border-[var(--m12-border)]/40'
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-white text-text-secondary hover:text-text-primary hover:bg-surface-muted border border-border'
                 }`}
               >
                 Editor
               </button>
               <button
                 onClick={() => setPermission('viewer')}
-                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${
+                className={`flex-1 py-2 text-[12px] font-medium rounded-lg transition-colors ${
                   permission === 'viewer'
-                    ? 'bg-[#2563EB] text-white'
-                    : 'bg-[var(--m12-bg)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] border border-[var(--m12-border)]/40'
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-white text-text-secondary hover:text-text-primary hover:bg-surface-muted border border-border'
                 }`}
               >
                 View Only
@@ -155,34 +160,38 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
 
           {/* Generate / Show link */}
           {!shareLink ? (
-            <button
-              onClick={handleCreateLink}
+            <Button
+              variant="primary"
+              size="md"
+              fullWidth
+              loading={creating}
               disabled={creating}
-              className="w-full bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+              onClick={handleCreateLink}
             >
               {creating ? 'Creating...' : 'Generate Share Link'}
-            </button>
+            </Button>
           ) : (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2.5">
+              <div className="flex items-center gap-2 bg-surface-input border border-border rounded-lg px-3 py-2.5">
                 <input
                   readOnly
                   value={shareLink}
-                  className="flex-1 bg-transparent text-xs text-[var(--m12-text-secondary)] outline-none font-[family-name:var(--font-space-mono)]"
+                  aria-label="Share link"
+                  className="flex-1 bg-transparent text-body-sm text-text-secondary outline-none font-mono"
                 />
                 <button
                   onClick={handleCopy}
-                  className="text-[#2563EB] hover:text-[#3B82F6] text-xs font-medium shrink-0 transition-colors"
+                  className="text-brand-600 hover:text-brand-700 text-[12px] font-medium shrink-0 transition-colors"
                 >
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-              <p className="text-[10px] text-[var(--m12-border)]">
+              <p className="text-[10px] text-text-tertiary">
                 Link expires in 7 days. Anyone with this link can join as {permission}.
               </p>
               <button
                 onClick={() => { setShareLink(null); setCopied(false) }}
-                className="text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors"
+                className="text-[12px] text-text-secondary hover:text-text-primary transition-colors"
               >
                 Generate new link
               </button>
@@ -192,23 +201,23 @@ export default function ShareDialog({ open, onClose }: ShareDialogProps) {
           {/* Existing shares */}
           {existingShares.length > 0 && (
             <div className="mt-5">
-              <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-2">
+              <label className="text-label uppercase text-text-secondary block mb-2">
                 Active Share Links
               </label>
               <div className="space-y-1.5">
                 {existingShares.map((s: any) => (
-                  <div key={s.id} className="flex items-center justify-between bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg px-3 py-2">
+                  <div key={s.id} className="flex items-center justify-between bg-surface-muted border border-border rounded-lg px-3 py-2">
                     <div>
-                      <span className="text-[10px] text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)]">
+                      <span className="text-[10px] text-text-secondary font-mono">
                         ...{s.code.slice(-6)}
                       </span>
-                      <span className={`ml-2 text-[9px] uppercase px-1.5 py-0.5 rounded ${
-                        s.permission === 'editor' ? 'bg-[#2563EB]/20 text-[#2563EB]' : 'bg-[#64748B]/20 text-[var(--m12-text-muted)]'
+                      <span className={`ml-2 text-[10px] uppercase px-1.5 py-0.5 rounded font-medium ${
+                        s.permission === 'editor' ? 'bg-status-blue-bg text-status-blue' : 'bg-gray-100 text-gray-500'
                       }`}>
                         {s.permission}
                       </span>
                     </div>
-                    <span className="text-[9px] text-[var(--m12-border)]">
+                    <span className="text-[10px] text-text-tertiary">
                       {new Date(s.expires_at).toLocaleDateString()}
                     </span>
                   </div>

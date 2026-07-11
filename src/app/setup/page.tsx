@@ -3,7 +3,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { Button } from '@/components/common'
+import { Mach12Logo } from '@/components/brand/Mach12Logo'
 import VersionBadge from '@/components/VersionBadge'
+
+const INPUT_CLASSES =
+  'w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none transition-colors'
+
+const LABEL_CLASSES = 'text-label uppercase text-text-secondary block mb-1'
 
 export default function SetupPage() {
   const [mode, setMode] = useState<'create' | 'join'>('create')
@@ -54,39 +61,44 @@ export default function SetupPage() {
   if (loading) return null
 
   return (
-    <div className="min-h-screen bg-[var(--m12-bg)] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-surface-muted flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <span className="text-gradient text-2xl font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
-            MACH12
-          </span>
-          <span className="text-[var(--m12-text-muted)] text-xl">.AI</span>
-          <span className="self-end mb-1"><VersionBadge /></span>
-          <h2 className="text-lg font-semibold text-[var(--m12-text)] mt-4">Set Up Your Organization</h2>
-          <p className="text-sm text-[var(--m12-text-muted)] mt-1">
+          <div className="flex items-center justify-center gap-2">
+            <Mach12Logo size={32} />
+            <span className="font-display font-bold text-xl tracking-wide">
+              <span className="text-gradient">MACH12</span>
+              <span className="text-text-tertiary">.AI</span>
+            </span>
+            <VersionBadge />
+          </div>
+          <h2 className="text-heading-md text-text-primary mt-4">Set Up Your Organization</h2>
+          <p className="text-body-sm text-text-secondary mt-1">
             Create a new organization or join an existing one by name or invite code.
           </p>
         </div>
 
-        <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-2xl p-8">
+        <div className="bg-white border border-border rounded-xl shadow-card p-8">
           {/* Tab toggle */}
-          <div className="flex mb-6 bg-[var(--m12-bg)] rounded-lg p-1">
+          <div className="flex mb-6 bg-surface-muted rounded-lg p-1">
             <button
+              type="button"
               onClick={() => { setMode('create'); setError(null) }}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 text-body-sm font-medium rounded-md transition-colors ${
                 mode === 'create'
-                  ? 'bg-[#2563EB] text-white'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               Create / Join Org
             </button>
             <button
+              type="button"
               onClick={() => { setMode('join'); setError(null) }}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 text-body-sm font-medium rounded-md transition-colors ${
                 mode === 'join'
-                  ? 'bg-[#2563EB] text-white'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               Join with Code
@@ -96,7 +108,7 @@ export default function SetupPage() {
           {mode === 'create' ? (
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
+                <label className={LABEL_CLASSES}>
                   Organization Name
                 </label>
                 <input
@@ -105,11 +117,11 @@ export default function SetupPage() {
                   onChange={(e) => handleNameChange(e.target.value)}
                   required
                   placeholder="Revelation Technologies"
-                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
+                  className={INPUT_CLASSES}
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
+                <label className={LABEL_CLASSES}>
                   Slug
                 </label>
                 <input
@@ -118,29 +130,25 @@ export default function SetupPage() {
                   onChange={(e) => setOrgSlug(e.target.value)}
                   required
                   placeholder="revtech"
-                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]"
+                  className={`${INPUT_CLASSES} font-mono`}
                 />
-                <p className="text-[10px] text-[var(--m12-border)] mt-1">Used as a URL-friendly identifier</p>
+                <p className="text-[11px] text-text-tertiary mt-1">Used as a URL-friendly identifier</p>
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400">
+                <div className="bg-status-red-bg border border-red-200 rounded-lg px-3 py-2 text-body-sm text-status-red">
                   {error}
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
-              >
+              <Button type="submit" variant="primary" fullWidth loading={submitting}>
                 {submitting ? 'Joining...' : 'Create / Join Organization'}
-              </button>
+              </Button>
             </form>
           ) : (
             <form onSubmit={handleJoin} className="space-y-4">
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
+                <label className={LABEL_CLASSES}>
                   Invite Code
                 </label>
                 <input
@@ -149,23 +157,19 @@ export default function SetupPage() {
                   onChange={(e) => setInviteCode(e.target.value)}
                   required
                   placeholder="Enter invite code"
-                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)] font-[family-name:var(--font-space-mono)] tracking-wider text-center"
+                  className={`${INPUT_CLASSES} font-mono tracking-wider text-center`}
                 />
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400">
+                <div className="bg-status-red-bg border border-red-200 rounded-lg px-3 py-2 text-body-sm text-status-red">
                   {error}
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
-              >
+              <Button type="submit" variant="primary" fullWidth loading={submitting}>
                 {submitting ? 'Joining...' : 'Join Organization'}
-              </button>
+              </Button>
             </form>
           )}
         </div>

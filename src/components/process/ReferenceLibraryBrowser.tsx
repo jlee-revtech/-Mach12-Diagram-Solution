@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { BookOpen, Copy } from 'lucide-react'
+import { Button, CollapsibleSection, EmptyState, LoadingState } from '@/components/common'
 import {
   listReferenceLibraries, listReferenceScenarios, listReferenceOverlays,
   instantiateReferenceScenario,
@@ -70,23 +72,30 @@ export default function ReferenceLibraryBrowser({ orgId, userId }: { orgId: stri
     }
   }, [orgId, userId, router])
 
-  if (loading) return <div className="py-24 text-center text-sm text-[var(--m12-text-muted)]">Loading reference library…</div>
-  if (!library) return <div className="py-24 text-center text-sm text-[var(--m12-text-muted)]">No reference library is published yet.</div>
+  if (loading) return <LoadingState label="Loading reference library..." />
+  if (!library) {
+    return (
+      <EmptyState
+        icon={<BookOpen size={32} />}
+        title="No reference library published"
+        description="A published best-practice library will appear here once it is available."
+      />
+    )
+  }
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-5">
-        <span className="inline-flex items-center gap-1.5 bg-[#0EA5E9]/10 border border-[#0EA5E9]/30 rounded px-2 py-0.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#0EA5E9]" />
-          <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[#0EA5E9] uppercase tracking-wider font-bold">Reference Library</span>
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-status-blue-bg text-status-blue">
+          Reference Library
         </span>
-        <span className="text-sm font-semibold text-[var(--m12-text)]">{library.title}</span>
-        <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">v{library.version}</span>
+        <span className="text-body-md font-semibold text-text-primary">{library.title}</span>
+        <span className="text-[11px] text-text-tertiary font-mono">v{library.version}</span>
       </div>
 
       <div className="space-y-3">
         {tree.map(scenario => (
-          <ScenarioCard
+          <ScenarioSection
             key={scenario.id}
             node={scenario}
             overlaysByScenario={overlaysByScenario}
@@ -99,88 +108,88 @@ export default function ReferenceLibraryBrowser({ orgId, userId }: { orgId: stri
   )
 }
 
-function ScenarioCard({ node, overlaysByScenario, onInstantiate, instantiating }: {
+function ScenarioSection({ node, overlaysByScenario, onInstantiate, instantiating }: {
   node: RefTreeNode
   overlaysByScenario: Record<string, ProcessOverlay[]>
   onInstantiate: (s: ReferenceScenario) => void
   instantiating: string | null
 }) {
-  const [open, setOpen] = useState(false)
   const l3count = node.children.reduce((n, g) => n + g.children.length, 0)
 
   return (
-    <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-xl overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3">
-        <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform shrink-0 ${open ? 'rotate-90' : ''}`}>
-            <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="w-2 h-2 rounded-full bg-[#0EA5E9] shrink-0" />
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-[var(--m12-text)] truncate">{node.name}</div>
-            {node.description && <div className="text-[11px] text-[var(--m12-text-muted)] truncate">{node.description}</div>}
-          </div>
-        </button>
-        <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] shrink-0">
-          {node.children.length} groups · {l3count} processes
-        </span>
-        <button
-          onClick={() => onInstantiate(node)}
-          disabled={instantiating === node.id}
-          className="shrink-0 flex items-center gap-1.5 bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-50 text-white text-[11px] font-medium px-3 py-1.5 rounded-md transition-colors"
-        >
-          {instantiating === node.id ? 'Creating…' : 'Instantiate'}
-        </button>
-      </div>
-
-      {open && (
-        <div className="border-t border-[var(--m12-border)]/30 px-4 py-3 space-y-3">
-          {node.children.map(group => (
-            <div key={group.id}>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
-                <span className="text-xs font-semibold text-[var(--m12-text-secondary)]">{group.name}</span>
-                <button
-                  onClick={() => onInstantiate(group)}
-                  disabled={instantiating === group.id}
-                  className="text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#0EA5E9] hover:text-[#38BDF8] disabled:opacity-50"
-                >
-                  {instantiating === group.id ? '…' : 'Instantiate'}
-                </button>
-              </div>
-              <div className="pl-3.5 space-y-1">
-                {group.children.map(proc => {
-                  const overlays = overlaysByScenario[proc.id] || []
-                  return (
-                    <div key={proc.id} className="flex items-start gap-2 py-1">
-                      <span className="w-1 h-1 rounded-full bg-[#10B981] mt-2 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-[var(--m12-text)]">{proc.name}</span>
-                          {proc.scope_item_ref && (
-                            <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] border border-[var(--m12-border)]/50 rounded px-1 py-0.5">{proc.scope_item_ref}</span>
-                          )}
-                          {overlays.map(o => <OverlayChip key={o.id} overlay={o} />)}
-                        </div>
-                        {proc.description && <div className="text-[10px] text-[var(--m12-text-muted)]">{proc.description}</div>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+    <CollapsibleSection
+      id={node.id}
+      storageKey="process-library:scenario"
+      title={node.name}
+      tone="blue"
+      defaultOpen={false}
+      actions={
+        <>
+          <span className="text-[11px] text-text-tertiary tabular-nums whitespace-nowrap">
+            {node.children.length} groups · {l3count} processes
+          </span>
+          <Button
+            size="sm"
+            icon={<Copy size={12} />}
+            loading={instantiating === node.id}
+            onClick={() => onInstantiate(node)}
+          >
+            {instantiating === node.id ? 'Creating...' : 'Instantiate'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {node.description && (
+          <p className="text-body-sm text-text-secondary">{node.description}</p>
+        )}
+        {node.children.map(group => (
+          <div key={group.id}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              <span className="text-body-sm font-semibold text-text-secondary">{group.name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={instantiating === group.id}
+                onClick={() => onInstantiate(group)}
+              >
+                Instantiate
+              </Button>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+            <div className="pl-3.5 space-y-1">
+              {group.children.map(proc => {
+                const overlays = overlaysByScenario[proc.id] || []
+                return (
+                  <div key={proc.id} className="flex items-start gap-2 py-1">
+                    <span className="w-1 h-1 rounded-full bg-status-green mt-2 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-body-sm text-text-primary">{proc.name}</span>
+                        {proc.scope_item_ref && (
+                          <span className="text-[10px] font-mono text-text-tertiary border border-border rounded px-1 py-0.5">{proc.scope_item_ref}</span>
+                        )}
+                        {overlays.map(o => <OverlayChip key={o.id} overlay={o} />)}
+                      </div>
+                      {proc.description && <div className="text-[11px] text-text-tertiary">{proc.description}</div>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </CollapsibleSection>
   )
 }
 
 function OverlayChip({ overlay }: { overlay: ProcessOverlay }) {
   const p = overlay.payload
-  const color = overlay.overlay_kind === 'compliance' ? '#EF4444'
-    : overlay.overlay_kind === 'kpi' ? '#10B981'
-    : overlay.overlay_kind === 'accelerator' ? '#8B5CF6' : '#64748B'
+  const cls = overlay.overlay_kind === 'compliance' ? 'bg-status-red-bg text-status-red'
+    : overlay.overlay_kind === 'kpi' ? 'bg-status-green-bg text-status-green'
+    : overlay.overlay_kind === 'accelerator' ? 'bg-purple-50 text-purple-700'
+    : 'bg-gray-100 text-gray-500'
   const label = overlay.overlay_kind === 'compliance'
     ? `${p.framework || ''} ${p.code || ''}`.trim()
     : overlay.overlay_kind === 'kpi'
@@ -189,8 +198,7 @@ function OverlayChip({ overlay }: { overlay: ProcessOverlay }) {
   return (
     <span
       title={p.notes || p.title}
-      className="text-[9px] font-[family-name:var(--font-space-mono)] rounded px-1 py-0.5 border"
-      style={{ color, borderColor: `${color}55`, background: `${color}12` }}
+      className={`text-[10px] font-mono rounded px-1 py-0.5 ${cls}`}
     >
       {label}
     </span>

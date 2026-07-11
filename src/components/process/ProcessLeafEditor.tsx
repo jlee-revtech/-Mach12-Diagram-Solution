@@ -23,7 +23,9 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { v4 as uuid } from 'uuid'
+import { LayoutGrid, Sparkles, Trash2, Undo2, X } from 'lucide-react'
 
+import { Button } from '@/components/common'
 import { useProcessStore } from '@/lib/process/store'
 import * as api from '@/lib/supabase/process-models'
 import type {
@@ -495,44 +497,41 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
         {/* Top-right controls */}
         {!readOnly && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={undo}
               disabled={undoDepth === 0}
               title={`Undo${undoDepth ? ` (${undoDepth})` : ''}  ·  Ctrl+Z`}
-              className="flex items-center gap-1 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] disabled:opacity-40 disabled:cursor-not-allowed rounded-md px-2 py-1 text-[10px] text-[var(--m12-text-secondary)] transition-colors"
+              icon={<Undo2 size={12} />}
+              className="shadow-card"
             >
-              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                <path d="M5 3.5L2.5 6 5 8.5M2.5 6h6.5a2.5 2.5 0 010 5H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
               Undo
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleAutoLayout}
-              title="Auto Layout — tidy the flow into clean swimlane columns"
-              className="flex items-center gap-1 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] rounded-md px-2 py-1 text-[10px] text-[var(--m12-text-secondary)] transition-colors"
+              title="Auto Layout - tidy the flow into clean swimlane columns"
+              icon={<LayoutGrid size={12} />}
+              className="shadow-card"
             >
-              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="2" width="4" height="3" rx="0.6" stroke="currentColor" strokeWidth="1.1" />
-                <rect x="9" y="2" width="4" height="3" rx="0.6" stroke="currentColor" strokeWidth="1.1" />
-                <rect x="5" y="9" width="4" height="3" rx="0.6" stroke="currentColor" strokeWidth="1.1" />
-                <path d="M3 5v2.5h4V9M11 5v2.5H7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-              </svg>
               Auto Layout
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ai"
+              size="sm"
               onClick={() => setAiOpen(true)}
               title="Draft this flow from a text description"
-              className="flex items-center gap-1 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[#0EA5E9]/40 hover:border-[#0EA5E9]/70 rounded-md px-2 py-1 text-[10px] text-[#0EA5E9] transition-colors"
+              icon={<Sparkles size={12} />}
+              className="shadow-card"
             >
-              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                <path d="M7 1.5l1.3 3.2 3.2 1.3-3.2 1.3L7 10.5 5.7 7.3 2.5 6l3.2-1.3L7 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
-              </svg>
               AI Draft
-            </button>
-            <div className="flex items-center gap-1.5 bg-[var(--m12-bg-card)]/80 backdrop-blur-sm border border-[var(--m12-border)]/40 rounded-md px-2 py-1">
-              <div className={`w-1.5 h-1.5 rounded-full ${saveStatus === 'saved' ? 'bg-[#10B981]' : saveStatus === 'saving' ? 'bg-[#EAB308] animate-pulse' : 'bg-[var(--m12-text-muted)]'}`} />
-              <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-                {saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving…' : 'Unsaved'}
+            </Button>
+            <div className="flex items-center gap-1.5 h-8 bg-white border border-border shadow-card rounded-lg px-2">
+              <div className={`w-1.5 h-1.5 rounded-full ${saveStatus === 'saved' ? 'bg-status-green' : saveStatus === 'saving' ? 'bg-status-yellow animate-pulse' : 'bg-gray-400'}`} />
+              <span className="text-[10px] text-text-tertiary font-mono">
+                {saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving...' : 'Unsaved'}
               </span>
             </div>
           </div>
@@ -541,28 +540,31 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
         {/* AI draft modal */}
         {aiOpen && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => { if (!aiBusy) setAiOpen(false) }}>
-            <div onClick={e => e.stopPropagation()} className="w-[26rem] max-w-[90%] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl p-5">
+            <div onClick={e => e.stopPropagation()} className="w-[26rem] max-w-[90%] bg-white rounded-xl shadow-card-hover p-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-[var(--m12-text)]">Draft flow from text</h3>
+                <h3 className="text-heading-sm font-display text-text-primary">Draft flow from text</h3>
                 {!aiBusy && (
-                  <button onClick={() => setAiOpen(false)} aria-label="Close" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-                  </button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    aria-label="Close"
+                    onClick={() => setAiOpen(false)}
+                    icon={<X size={14} />}
+                  />
                 )}
               </div>
 
               {aiBusy ? (
                 <div className="py-8 flex flex-col items-center text-center">
                   <div className="relative w-12 h-12 mb-4">
-                    <div className="absolute inset-0 rounded-full border-2 border-[#0EA5E9]/20" />
-                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#0EA5E9] animate-spin" />
-                    <svg width="18" height="18" viewBox="0 0 14 14" fill="none" className="absolute inset-0 m-auto text-[#0EA5E9] animate-pulse">
-                      <path d="M7 1.5l1.3 3.2 3.2 1.3-3.2 1.3L7 10.5 5.7 7.3 2.5 6l3.2-1.3L7 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
-                    </svg>
+                    <div className="absolute inset-0 rounded-full border-2 border-brand-500/20" />
+                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-brand-500 animate-spin" />
+                    <Sparkles size={18} className="absolute inset-0 m-auto text-brand-500 animate-pulse" />
                   </div>
-                  <div className="text-sm font-medium text-[var(--m12-text)] mb-1">Drafting your process flow{aiDots}</div>
-                  <div className="text-[11px] text-[var(--m12-text-muted)] max-w-[18rem]">
-                    Designing swimlanes, tasks, gateways and sequence flows. This usually takes 10–20 seconds.
+                  <div className="text-body-md font-medium text-text-primary mb-1">Drafting your process flow{aiDots}</div>
+                  <div className="text-[11px] text-text-tertiary max-w-[18rem]">
+                    Designing swimlanes, tasks, gateways and sequence flows. This usually takes 10-20 seconds.
                   </div>
                 </div>
               ) : (
@@ -573,16 +575,17 @@ function EditorInner({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }
                     onChange={e => setAiPrompt(e.target.value)}
                     rows={4}
                     aria-label="Flow description"
-                    placeholder="Describe the process steps, who does each, and the decision points…"
-                    className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60 resize-y mb-3"
+                    placeholder="Describe the process steps, who does each, and the decision points..."
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-y mb-3"
                   />
-                  <button
+                  <Button
+                    variant="primary"
+                    fullWidth
                     onClick={handleAiDraft}
                     disabled={!aiPrompt.trim()}
-                    className="w-full bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                   >
                     Generate flow
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
@@ -674,13 +677,18 @@ function Inspector({
   onClose: () => void
 }) {
   return (
-    <aside className="w-64 shrink-0 border-l border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)]/40 overflow-y-auto">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--m12-border)]/40">
-        <span className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+    <aside className="w-64 shrink-0 border-l border-border bg-white overflow-y-auto">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">
           {isLane ? 'Lane' : selectedEdge ? 'Sequence Flow' : 'Element'}
         </span>
-        <button onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 4l6 6M10 4l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="h-6 w-6 rounded inline-flex items-center justify-center text-text-secondary hover:bg-surface-muted hover:text-text-primary transition-colors"
+        >
+          <X size={13} />
         </button>
       </div>
 
@@ -692,6 +700,7 @@ function Inspector({
               <input
                 value={(selectedNode.data as any).label}
                 onChange={e => onPatchNode(selectedNode.id, { label: e.target.value })}
+                aria-label="Lane name"
                 className="ins-input"
               />
             </Field>
@@ -702,9 +711,10 @@ function Inspector({
                   const id = e.target.value || null
                   onPatchNode(selectedNode.id, { systemId: id, systemLabel: systemName(id) })
                 }}
+                aria-label="System"
                 className="ins-input"
               >
-                <option value="">— none —</option>
+                <option value="">- none -</option>
                 {systems.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </Field>
@@ -712,9 +722,10 @@ function Inspector({
               <select
                 value={(selectedNode.data as any).roleId || ''}
                 onChange={e => onPatchNode(selectedNode.id, { roleId: e.target.value || null })}
+                aria-label="Role (swimlane)"
                 className="ins-input"
               >
-                <option value="">— none —</option>
+                <option value="">- none -</option>
                 {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </Field>
@@ -722,9 +733,10 @@ function Inspector({
               <select
                 value={(selectedNode.data as any).personaId || ''}
                 onChange={e => onPatchNode(selectedNode.id, { personaId: e.target.value || null })}
+                aria-label="Persona"
                 className="ins-input"
               >
-                <option value="">— none —</option>
+                <option value="">- none -</option>
                 {personas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </Field>
@@ -738,11 +750,12 @@ function Inspector({
               <input
                 value={(selectedNode.data as any).label}
                 onChange={e => onPatchNode(selectedNode.id, { label: e.target.value })}
+                aria-label="Element label"
                 className="ins-input"
               />
             </Field>
             <Field label="Type">
-              <div className="text-[11px] text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)]">
+              <div className="text-[11px] text-text-secondary font-mono">
                 {(selectedNode.data as any).elementType}
               </div>
             </Field>
@@ -751,12 +764,13 @@ function Inspector({
                 rows={2}
                 value={(selectedNode.data as any).description || ''}
                 onChange={e => onPatchNode(selectedNode.id, { description: e.target.value })}
+                aria-label="Element description"
                 className="ins-input resize-y"
               />
             </Field>
 
             {/* ─── Delivery metadata (from real SAP process docs) ─── */}
-            <div className="pt-1 border-t border-[var(--m12-border)]/30" />
+            <div className="pt-1 border-t border-border" />
             <Field label="Responsible role">
               <input
                 value={(selectedNode.data as any).responsibleRole || ''}
@@ -783,18 +797,19 @@ function Inspector({
             </Field>
             <Field label="IT systems">
               <div className="flex flex-wrap gap-1">
-                {systems.length === 0 && <span className="text-[10px] text-[var(--m12-text-muted)]">No systems defined yet.</span>}
+                {systems.length === 0 && <span className="text-[10px] text-text-tertiary">No systems defined yet.</span>}
                 {systems.map(s => {
                   const on = ((selectedNode.data as any).systemIds || []).includes(s.id)
                   return (
                     <button
                       key={s.id}
+                      type="button"
                       onClick={() => {
                         const cur: string[] = (selectedNode.data as any).systemIds || []
                         const next = on ? cur.filter(x => x !== s.id) : [...cur, s.id]
                         onPatchNode(selectedNode.id, { systemIds: next })
                       }}
-                      className={`text-[10px] rounded px-1.5 py-0.5 border transition-colors ${on ? 'bg-[#0EA5E9]/15 border-[#0EA5E9]/50 text-[#0EA5E9]' : 'border-[var(--m12-border)]/50 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}
+                      className={`text-[10px] rounded px-1.5 py-0.5 border transition-colors ${on ? 'bg-brand-50 border-brand-300 text-brand-700' : 'border-border text-text-tertiary hover:text-text-secondary hover:border-border-strong'}`}
                     >
                       {s.name}
                     </button>
@@ -806,7 +821,7 @@ function Inspector({
               <input
                 value={(selectedNode.data as any).module || ''}
                 onChange={e => onPatchNode(selectedNode.id, { module: e.target.value })}
-                className="ins-input font-[family-name:var(--font-space-mono)]"
+                className="ins-input font-mono"
                 placeholder="e.g. FI, CO, PS, MM"
                 list="sap-module-list"
               />
@@ -821,13 +836,13 @@ function Inspector({
               />
             </Field>
             <Field label="T-code">
-              <input value={(selectedNode.data as any).tcode || ''} onChange={e => onPatchNode(selectedNode.id, { tcode: e.target.value })} className="ins-input font-[family-name:var(--font-space-mono)]" placeholder="e.g. FB50" />
+              <input value={(selectedNode.data as any).tcode || ''} onChange={e => onPatchNode(selectedNode.id, { tcode: e.target.value })} className="ins-input font-mono" placeholder="e.g. FB50" />
             </Field>
             <Field label="RICEFW codes">
               <input
                 value={(((selectedNode.data as any).ricefwCodes) || []).join(', ')}
                 onChange={e => onPatchNode(selectedNode.id, { ricefwCodes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                className="ins-input font-[family-name:var(--font-space-mono)]" placeholder="e.g. INT-014, RPT-003"
+                className="ins-input font-mono" placeholder="e.g. INT-014, RPT-003"
               />
             </Field>
           </>
@@ -840,6 +855,7 @@ function Inspector({
               <select
                 value={(selectedEdge.data as any)?.kind || 'sequence'}
                 onChange={e => onPatchEdge(selectedEdge.id, { kind: e.target.value })}
+                aria-label="Flow type"
                 className="ins-input"
               >
                 <option value="sequence">Sequence</option>
@@ -852,6 +868,7 @@ function Inspector({
               <input
                 value={(selectedEdge.data as any)?.label || ''}
                 onChange={e => onPatchEdge(selectedEdge.id, { label: e.target.value })}
+                aria-label="Condition / label"
                 className="ins-input"
                 placeholder="e.g. Approved"
               />
@@ -859,27 +876,33 @@ function Inspector({
           </>
         )}
 
-        <button
+        <Button
+          variant="destructive"
+          size="sm"
+          fullWidth
           onClick={onDelete}
-          className="w-full flex items-center justify-center gap-1.5 text-[11px] text-red-400 border border-red-400/30 hover:border-red-400/60 hover:bg-red-400/5 rounded-md py-1.5 transition-colors"
+          icon={<Trash2 size={12} />}
         >
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5.5 4V3a1 1 0 011-1h1a1 1 0 011 1v1M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           Delete {isLane ? 'lane' : selectedEdge ? 'flow' : 'element'}
-        </button>
+        </Button>
       </div>
 
       <style jsx>{`
         :global(.ins-input) {
           width: 100%;
-          background: var(--m12-bg);
-          border: 1px solid color-mix(in srgb, var(--m12-border) 50%, transparent);
-          border-radius: 6px;
+          background: #f2f2f2;
+          border: 1px solid #e2e2e2;
+          border-radius: 8px;
           padding: 5px 8px;
           font-size: 12px;
-          color: var(--m12-text);
+          line-height: 1.5;
+          color: #1b1b1b;
           outline: none;
         }
-        :global(.ins-input:focus) { border-color: #0EA5E9; }
+        :global(.ins-input:focus) {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+        }
       `}</style>
     </aside>
   )
@@ -888,7 +911,7 @@ function Inspector({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-1.5">{label}</label>
+      <label className="block text-[10px] uppercase tracking-wider font-semibold text-text-secondary mb-1.5">{label}</label>
       {children}
     </div>
   )

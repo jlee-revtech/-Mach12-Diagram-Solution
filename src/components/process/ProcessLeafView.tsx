@@ -2,9 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ChevronRight, ClipboardCheck, Network } from 'lucide-react'
 import { useProcessStore } from '@/lib/process/store'
 import { PROCESS_LEVEL_LABEL } from '@/lib/process/types'
 import { pushProcessLeafToNewDiagram } from '@/lib/process/pushToDiagram'
+import { Button } from '@/components/common'
 import ProcessLeafEditor from './ProcessLeafEditor'
 import SipocLinkPanel from './SipocLinkPanel'
 import CapabilityAssignPanel from './CapabilityAssignPanel'
@@ -49,54 +51,48 @@ export default function ProcessLeafView({
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header strip */}
-      <div className="shrink-0 border-b border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)]/30">
+      <div className="shrink-0 border-b border-border bg-white">
         <div className="flex items-center gap-2 px-4 py-2">
-          <span className="text-[9px] uppercase tracking-widest text-[#10B981] font-[family-name:var(--font-space-mono)] font-bold">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-status-green bg-status-green-bg px-2 py-0.5 rounded shrink-0">
             {PROCESS_LEVEL_LABEL[3]} · BPMN
           </span>
-          <h2 className="text-sm font-semibold text-[var(--m12-text)] truncate">{node.name}</h2>
+          <h2 className="text-body-md font-semibold text-text-primary truncate">{node.name}</h2>
           {node.scope_item_ref && (
-            <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5">
+            <span className="text-[10px] font-mono text-text-secondary bg-surface-muted border border-border rounded px-1.5 py-0.5 shrink-0">
               {node.scope_item_ref}
             </span>
           )}
-          <div className="ml-auto flex items-center gap-3">
-            <button
-              type="button"
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ai"
+              size="sm"
               onClick={() => setTestPlanOpen(true)}
               title="Generate an executable test plan (Excel / Word) from this process flow"
-              className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#0EA5E9] hover:text-[#38BDF8] flex items-center gap-1"
+              icon={<ClipboardCheck size={12} />}
             >
-              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                <path d="M4 1.5h6a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1v-9a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" />
-                <path d="M5 5l1.2 1.2L8.5 4M5 8.5l1.2 1.2L8.5 7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
               Create Test Plan
-            </button>
+            </Button>
             {canScaffold && (
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleScaffold}
                 disabled={scaffolding}
+                loading={scaffolding}
                 title="Scaffold a data architecture diagram from this process's system lanes"
-                className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#2563EB] hover:text-[#3B82F6] disabled:opacity-50 flex items-center gap-1"
+                icon={<Network size={12} />}
               >
-                <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                  <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-                  <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M6 3.5h2.5a2 2 0 012 2V8" stroke="currentColor" strokeWidth="1.2" />
-                </svg>
-                {scaffolding ? 'Scaffolding…' : 'Scaffold Data Diagram'}
-              </button>
+                {scaffolding ? 'Scaffolding...' : 'Scaffold Data Diagram'}
+              </Button>
             )}
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setDetailsOpen(o => !o)}
-              className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] flex items-center gap-1"
+              icon={<ChevronRight size={12} className={`transition-transform ${detailsOpen ? 'rotate-90' : ''}`} />}
             >
-              <svg width="9" height="9" viewBox="0 0 10 10" fill="none" className={`transition-transform ${detailsOpen ? 'rotate-90' : ''}`}>
-                <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
               Details
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -104,24 +100,24 @@ export default function ProcessLeafView({
           <>
             <div className="px-4 pb-3 grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-1">Description</label>
+                <label className="block text-label uppercase text-text-secondary mb-1">Description</label>
                 <textarea
                   rows={2}
                   defaultValue={node.description || ''}
                   onBlur={e => { if (!readOnly && e.target.value.trim() !== (node.description || '')) updateNode(node.id, { description: e.target.value.trim() }) }}
                   readOnly={readOnly}
                   aria-label="Process description"
-                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-2.5 py-1.5 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#10B981]/60 resize-y"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-y"
                 />
               </div>
               <div>
-                <label className="block text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-1">SAP Scope-Item Ref</label>
+                <label className="block text-label uppercase text-text-secondary mb-1">SAP Scope-Item Ref</label>
                 <input
                   defaultValue={node.scope_item_ref || ''}
                   onBlur={e => { if (!readOnly && e.target.value.trim() !== (node.scope_item_ref || '')) updateNode(node.id, { scope_item_ref: e.target.value.trim() }) }}
                   readOnly={readOnly}
                   aria-label="SAP scope-item reference"
-                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-2.5 py-1.5 text-xs text-[var(--m12-text)] font-[family-name:var(--font-space-mono)] focus:outline-none focus:border-[#10B981]/60"
+                  className="w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
                 />
               </div>
             </div>

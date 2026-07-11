@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { X } from 'lucide-react'
+import { Button } from '@/components/common'
 
 interface OnboardingGuideProps {
   open: boolean
@@ -192,13 +194,13 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/40" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg mx-4 bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg mx-4 bg-white rounded-xl shadow-card-hover overflow-hidden"
       >
         {/* Progress bar */}
-        <div className="h-1 bg-[var(--m12-bg)]">
+        <div className="h-1 bg-surface-muted">
           <div
             className="h-full transition-all duration-500 ease-out rounded-r-full"
             style={{
@@ -212,20 +214,21 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
         <div className="flex items-center justify-between px-6 pt-5">
           <div className="flex items-center gap-2">
             <span
-              className="text-[10px] font-bold font-[family-name:var(--font-space-mono)] uppercase tracking-widest"
+              className="text-[10px] font-bold font-mono uppercase tracking-widest"
               style={{ color: current.color }}
             >
               Step {step + 1} of {total}
             </span>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={16} />}
+            aria-label="Close"
+            title="Close"
             onClick={onClose}
-            className="text-[var(--m12-border)] hover:text-[var(--m12-text-secondary)] transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+          />
         </div>
 
         {/* Content */}
@@ -233,19 +236,19 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
           {/* Icon + Title */}
           <div className="flex items-start gap-5 mb-5">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0"
+              className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0"
               style={{ backgroundColor: current.color + '10', border: `1px solid ${current.color}30` }}
             >
               {current.icon}
             </div>
             <div className="flex-1 min-w-0 pt-1">
-              <h3 className="text-lg font-semibold text-[var(--m12-text)]">{current.title}</h3>
-              <p className="text-sm text-[var(--m12-text-muted)] mt-0.5">{current.subtitle}</p>
+              <h3 className="text-heading-sm font-display text-text-primary">{current.title}</h3>
+              <p className="text-body-sm text-text-secondary mt-0.5">{current.subtitle}</p>
             </div>
           </div>
 
           {/* Description */}
-          <p className="text-sm leading-relaxed text-[var(--m12-text-secondary)]">{current.description}</p>
+          <p className="text-body-md leading-relaxed text-text-secondary">{current.description}</p>
 
           {/* Keyboard hints */}
           {current.keys.length > 0 && (
@@ -253,7 +256,7 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
               {current.keys.map((key) => (
                 <span
                   key={key}
-                  className="text-[11px] font-[family-name:var(--font-space-mono)] px-2.5 py-1 rounded-md bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 text-[var(--m12-text-faint)]"
+                  className="text-[11px] font-mono px-2.5 py-1 rounded-md bg-surface-muted border border-border text-text-secondary"
                 >
                   {key}
                 </span>
@@ -270,12 +273,14 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
               <button
                 key={i}
                 onClick={() => setStep(i)}
+                title={`Go to step ${i + 1}`}
+                aria-label={`Go to step ${i + 1}`}
                 className="transition-all duration-300"
                 style={{
                   width: i === step ? 24 : 8,
                   height: 8,
                   borderRadius: 4,
-                  backgroundColor: i === step ? current.color : '#374A5E',
+                  backgroundColor: i === step ? current.color : '#d1d1d1',
                 }}
               />
             ))}
@@ -284,20 +289,13 @@ export default function OnboardingGuide({ open, onClose }: OnboardingGuideProps)
           {/* Buttons */}
           <div className="flex items-center gap-2">
             {step > 0 && (
-              <button
-                onClick={handlePrev}
-                className="text-sm text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg transition-colors"
-              >
+              <Button variant="ghost" size="md" onClick={handlePrev}>
                 Back
-              </button>
+              </Button>
             )}
-            <button
-              onClick={handleNext}
-              className="text-sm font-medium text-white px-5 py-2 rounded-lg transition-colors"
-              style={{ backgroundColor: current.color }}
-            >
+            <Button variant="primary" size="md" onClick={handleNext}>
               {step === total - 1 ? 'Get Started' : 'Next'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

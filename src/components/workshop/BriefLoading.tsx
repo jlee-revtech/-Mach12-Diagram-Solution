@@ -35,25 +35,25 @@ export default function BriefLoading({
   }, [steps.length])
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--m12-bg)]/85 backdrop-blur-sm">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-white/85 backdrop-blur-sm">
       <div className="w-full max-w-md px-8 text-center">
         <div className="relative mx-auto mb-8 h-20 w-20">
           <motion.div
-            className="absolute inset-0 rounded-full border-2 border-[#2563EB]/30"
+            className="absolute inset-0 rounded-full border-2 border-brand-500/30"
             animate={{ scale: [1, 1.18, 1], opacity: [0.6, 0.15, 0.6] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           />
           <motion.div
-            className="absolute inset-2 rounded-full border-2 border-[#2563EB]/20 border-t-[#2563EB]"
+            className="absolute inset-2 rounded-full border-2 border-brand-500/20 border-t-brand-500"
             animate={{ rotate: 360 }}
             transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
           />
-          <div className="absolute inset-0 flex items-center justify-center text-gradient text-lg font-bold font-[family-name:var(--font-orbitron)]">
+          <div className="absolute inset-0 flex items-center justify-center text-gradient text-lg font-bold font-display">
             M12
           </div>
         </div>
 
-        <div className="text-sm font-semibold text-[var(--m12-text)] mb-2">
+        <div className="text-body-md font-semibold text-text-primary mb-2">
           {mode === 'regenerate' ? 'Regenerating the brief' : 'Preparing the brief'}
         </div>
 
@@ -65,9 +65,9 @@ export default function BriefLoading({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.4 }}
-              className="text-xs text-[var(--m12-text-muted)]"
+              className="text-body-sm text-text-tertiary"
             >
-              {steps[i]}…
+              {steps[i]}...
             </motion.div>
           </AnimatePresence>
         </div>
@@ -77,12 +77,12 @@ export default function BriefLoading({
             <div
               key={k}
               className="h-1.5 rounded-full transition-all duration-500"
-              style={{ width: k === i ? 18 : 6, backgroundColor: k <= i ? '#2563EB' : 'var(--m12-border)' }}
+              style={{ width: k === i ? 18 : 6, backgroundColor: k <= i ? '#2563EB' : '#e2e2e2' }}
             />
           ))}
         </div>
 
-        <div className="mt-6 text-[10px] text-[var(--m12-text-muted)]">
+        <div className="mt-6 text-[11px] text-text-tertiary">
           The consultant agents are reading the model and drafting a principal-grade agenda. This usually takes 15 to 30 seconds.
         </div>
       </div>

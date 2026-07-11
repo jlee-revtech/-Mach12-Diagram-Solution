@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { X, Check, Sparkles } from 'lucide-react'
+import { Button, EmptyState, LoadingState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import { PERSONA_COLORS } from '@/lib/sipoc/types'
 
@@ -74,23 +76,28 @@ function initSelection(suggestion: AISuggestion): SelectionState {
 }
 
 // ─── Checkbox component ─────────────────────────────────
-function Check({ checked, onChange, size = 'sm' }: { checked: boolean; onChange: (v: boolean) => void; size?: 'sm' | 'md' }) {
+function CheckBox({ checked, onChange, size = 'sm' }: { checked: boolean; onChange: (v: boolean) => void; size?: 'sm' | 'md' }) {
   const dim = size === 'md' ? 'w-4 h-4' : 'w-3 h-3'
   return (
     <button
       onClick={() => onChange(!checked)}
       className={`${dim} rounded border flex items-center justify-center shrink-0 transition-colors ${
         checked
-          ? 'bg-[#2563EB] border-[#2563EB]'
-          : 'border-[var(--m12-border)] hover:border-[var(--m12-text-muted)]'
+          ? 'bg-brand-500 border-brand-500'
+          : 'border-border hover:border-border-strong'
       }`}
     >
-      {checked && (
-        <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-          <path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
+      {checked && <Check size={size === 'md' ? 10 : 8} className="text-white" />}
     </button>
+  )
+}
+
+// ─── Section letter chip (I / O / F / U) ────────────────
+function SectionChip({ letter, classes }: { letter: string; classes: string }) {
+  return (
+    <div className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold font-display ${classes}`}>
+      {letter}
+    </div>
   )
 }
 
@@ -436,38 +443,39 @@ export default function AIGeneratePanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-2xl shadow-2xl w-[720px] max-h-[85vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-card-hover w-[720px] max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[var(--m12-border)]/30 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#2563EB] flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2L10 6L14 7L11 10L12 14L8 12L4 14L5 10L2 7L6 6L8 2Z" fill="white" />
-              </svg>
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+              <Sparkles size={16} className="text-amber-600" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-[var(--m12-text)]">AI SIPOC Generator</div>
-              <div className="text-[10px] text-[var(--m12-text-muted)]">
+              <div className="text-heading-sm font-display text-text-primary">AI SIPOC Generator</div>
+              <div className="text-[11px] text-text-tertiary">
                 {capability ? `For: ${capability.name}` : 'Generate SIPOC data'}
-                {hasExistingData && <span className="ml-1.5 text-[#06B6D4]">(Enhancement mode)</span>}
+                {hasExistingData && <span className="ml-1.5 text-brand-600">(Enhancement mode)</span>}
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={16} />}
+            aria-label="Close"
+            onClick={onClose}
+          />
         </div>
 
         {/* Prompt input */}
-        <div className="px-6 py-4 border-b border-[var(--m12-border)]/20">
+        <div className="px-6 py-4 border-b border-border">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+            <div className="text-label uppercase text-text-secondary">
               Describe the L3 capability or process
             </div>
-            <div className="flex items-center gap-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-surface-input border border-border rounded-lg p-0.5">
               {([
                 { value: 'full', label: 'Full SIPOC' },
                 { value: 'use-cases', label: 'Use cases only' },
@@ -475,10 +483,10 @@ export default function AIGeneratePanel({
                 <button
                   key={opt.value}
                   onClick={() => setScope(opt.value)}
-                  className={`text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-2 py-1 rounded transition-colors ${
+                  className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded transition-colors ${
                     scope === opt.value
-                      ? 'bg-[#2563EB] text-white'
-                      : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]'
+                      ? 'bg-brand-500 text-white'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   {opt.label}
@@ -493,37 +501,32 @@ export default function AIGeneratePanel({
               onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleGenerate() }}
               placeholder="e.g., External Market Inputs - gathering cost, labor, and rate data for proposals and estimates..."
               rows={8}
-              className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 resize-y min-h-[160px]"
+              className="flex-1 bg-surface-input border border-border rounded-lg px-3 py-2 text-body-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-y min-h-[160px]"
             />
-            <button
+            <Button
+              variant="ai"
+              size="md"
+              icon={<Sparkles size={14} />}
+              loading={loading}
+              disabled={!prompt.trim()}
               onClick={handleGenerate}
-              disabled={loading || !prompt.trim()}
-              className="self-end bg-gradient-to-r from-[#8B5CF6] to-[#2563EB] hover:from-[#7C3AED] hover:to-[#3B82F6] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-xs font-medium transition-all shrink-0"
+              className="self-end shrink-0"
             >
-              {loading ? (
-                <span className="flex items-center gap-1.5">
-                  <svg className="animate-spin w-3 h-3" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
-                  </svg>
-                  Generating...
-                </span>
-              ) : 'Generate'}
-            </button>
+              Generate
+            </Button>
           </div>
           {error && (
-            <div className="mt-2 text-[10px] text-red-400 bg-red-400/10 border border-red-400/20 rounded px-2 py-1">{error}</div>
+            <div className="mt-2 text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{error}</div>
           )}
         </div>
 
         {/* Results */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading && !suggestion && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <svg className="animate-spin w-8 h-8 text-[#2563EB]" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
-              </svg>
-              <span className="text-xs text-[var(--m12-text-muted)]">Analyzing capability and generating SIPOC data...</span>
-            </div>
+            <LoadingState
+              variant="inline"
+              label="Analyzing capability and generating SIPOC data..."
+            />
           )}
 
           {suggestion && selection && (
@@ -532,45 +535,45 @@ export default function AIGeneratePanel({
               {suggestion.inputs.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 rounded bg-[#EAB308]/20 flex items-center justify-center text-[#EAB308] text-[9px] font-bold font-[family-name:var(--font-orbitron)]">I</div>
-                  <span className="text-xs font-semibold text-[var(--m12-text)]">Inputs</span>
-                  <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{suggestion.inputs.length}</span>
+                  <SectionChip letter="I" classes="bg-status-yellow-bg text-status-yellow" />
+                  <span className="text-body-sm font-semibold text-text-primary">Inputs</span>
+                  <span className="text-[11px] text-text-tertiary">{suggestion.inputs.length}</span>
                 </div>
                 <div className="space-y-2">
                   {suggestion.inputs.map((inp, idx) => (
-                    <div key={idx} className={`border rounded-lg transition-all ${selection.inputs[idx]?.selected ? 'border-[#EAB308]/40 bg-[#EAB308]/[0.03]' : 'border-[var(--m12-border)]/20 opacity-50'}`}>
+                    <div key={idx} className={`bg-white border rounded-lg transition-all ${selection.inputs[idx]?.selected ? 'border-brand-300 shadow-card' : 'border-border opacity-50'}`}>
                       {/* Input header */}
                       <div className="flex items-start gap-2 px-3 py-2.5">
-                        <Check checked={selection.inputs[idx]?.selected} onChange={() => toggleInput(idx)} size="md" />
+                        <CheckBox checked={selection.inputs[idx]?.selected} onChange={() => toggleInput(idx)} size="md" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <div className="text-[11px] font-semibold text-[var(--m12-text)]">{inp.informationProduct}</div>
-                            <span className={`text-[7px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            <div className="text-body-sm font-semibold text-text-primary">{inp.informationProduct}</div>
+                            <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
                               inp.status === 'enhancement'
-                                ? 'bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30'
-                                : 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30'
+                                ? 'bg-status-blue-bg text-status-blue'
+                                : 'bg-status-green-bg text-status-green'
                             }`}>
                               {inp.status === 'enhancement' ? 'Enhance' : 'New'}
                             </span>
                           </div>
                           {inp.category && (
-                            <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{inp.category}</span>
+                            <span className="text-[10px] text-text-tertiary uppercase tracking-wider">{inp.category}</span>
                           )}
                         </div>
                       </div>
 
                       {selection.inputs[idx]?.selected && (
-                        <div className="px-3 pb-3 space-y-2.5 border-t border-[var(--m12-border)]/10 pt-2">
+                        <div className="px-3 pb-3 space-y-2.5 border-t border-border pt-2">
                           {/* Supplier Personas */}
                           <div>
-                            <div className="text-[8px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)] font-bold">Suppliers</div>
+                            <div className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 font-medium">Suppliers</div>
                             <div className="flex flex-wrap gap-1.5">
                               {inp.supplierPersonas.map((p, pi) => (
                                 <button key={pi} onClick={() => toggleInputPersona(idx, pi)}
-                                  className={`flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border transition-colors ${
+                                  className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
                                     selection.inputs[idx]?.personas[pi]
-                                      ? 'border-[#F97316]/40 bg-[#F97316]/10 text-[var(--m12-text)]'
-                                      : 'border-[var(--m12-border)]/20 text-[var(--m12-text-muted)] line-through'
+                                      ? 'border-[#F97316]/40 bg-[#F97316]/10 text-text-primary'
+                                      : 'border-border text-text-tertiary line-through'
                                   }`}
                                 >
                                   <div className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
@@ -583,14 +586,14 @@ export default function AIGeneratePanel({
                           {/* Source Systems */}
                           {inp.sourceSystems.length > 0 && (
                             <div>
-                              <div className="text-[8px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)] font-bold">Source Systems</div>
+                              <div className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 font-medium">Source Systems</div>
                               <div className="flex flex-wrap gap-1.5">
                                 {inp.sourceSystems.map((s, si) => (
                                   <button key={si} onClick={() => toggleInputSystem(idx, si)}
-                                    className={`flex items-center gap-1 text-[8px] px-2 py-0.5 rounded border font-[family-name:var(--font-space-mono)] uppercase transition-colors ${
+                                    className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border uppercase transition-colors ${
                                       selection.inputs[idx]?.systems[si]
-                                        ? 'border-[var(--m12-border)]/40 bg-[var(--m12-bg)] text-[var(--m12-text-secondary)]'
-                                        : 'border-[var(--m12-border)]/15 text-[var(--m12-text-muted)] line-through'
+                                        ? 'border-border bg-surface-muted text-text-secondary'
+                                        : 'border-border/50 text-text-tertiary line-through'
                                     }`}
                                   >
                                     {s.name}
@@ -603,12 +606,12 @@ export default function AIGeneratePanel({
                           {/* Dimensions */}
                           {inp.dimensions.length > 0 && (
                             <div>
-                              <div className="text-[8px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)] font-bold">Dimensions</div>
-                              <div className="border-l-2 border-[var(--m12-border)]/15 ml-1 pl-2 space-y-0.5">
+                              <div className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 font-medium">Dimensions</div>
+                              <div className="border-l-2 border-border ml-1 pl-2 space-y-0.5">
                                 {inp.dimensions.map((dim, di) => (
                                   <div key={di} className="flex items-center gap-1.5">
-                                    <Check checked={selection.inputs[idx]?.dimensions[di] ?? true} onChange={() => toggleInputDim(idx, di)} />
-                                    <span className={`text-[9px] ${selection.inputs[idx]?.dimensions[di] ? 'text-[var(--m12-text-secondary)]' : 'text-[var(--m12-text-muted)] line-through'}`}>
+                                    <CheckBox checked={selection.inputs[idx]?.dimensions[di] ?? true} onChange={() => toggleInputDim(idx, di)} />
+                                    <span className={`text-[11px] ${selection.inputs[idx]?.dimensions[di] ? 'text-text-secondary' : 'text-text-tertiary line-through'}`}>
                                       {dim.name}
                                     </span>
                                   </div>
@@ -628,45 +631,45 @@ export default function AIGeneratePanel({
               {suggestion.outputs.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 rounded bg-[#10B981]/20 flex items-center justify-center text-[#10B981] text-[9px] font-bold font-[family-name:var(--font-orbitron)]">O</div>
-                  <span className="text-xs font-semibold text-[var(--m12-text)]">Outputs</span>
-                  <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{suggestion.outputs.length}</span>
+                  <SectionChip letter="O" classes="bg-status-green-bg text-status-green" />
+                  <span className="text-body-sm font-semibold text-text-primary">Outputs</span>
+                  <span className="text-[11px] text-text-tertiary">{suggestion.outputs.length}</span>
                 </div>
                 <div className="space-y-2">
                   {suggestion.outputs.map((out, idx) => (
-                    <div key={idx} className={`border rounded-lg transition-all ${selection.outputs[idx]?.selected ? 'border-[#10B981]/40 bg-[#10B981]/[0.03]' : 'border-[var(--m12-border)]/20 opacity-50'}`}>
+                    <div key={idx} className={`bg-white border rounded-lg transition-all ${selection.outputs[idx]?.selected ? 'border-brand-300 shadow-card' : 'border-border opacity-50'}`}>
                       {/* Output header */}
                       <div className="flex items-start gap-2 px-3 py-2.5">
-                        <Check checked={selection.outputs[idx]?.selected} onChange={() => toggleOutput(idx)} size="md" />
+                        <CheckBox checked={selection.outputs[idx]?.selected} onChange={() => toggleOutput(idx)} size="md" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <div className="text-[11px] font-semibold text-[var(--m12-text)]">{out.informationProduct}</div>
-                            <span className={`text-[7px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            <div className="text-body-sm font-semibold text-text-primary">{out.informationProduct}</div>
+                            <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
                               out.status === 'enhancement'
-                                ? 'bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30'
-                                : 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30'
+                                ? 'bg-status-blue-bg text-status-blue'
+                                : 'bg-status-green-bg text-status-green'
                             }`}>
                               {out.status === 'enhancement' ? 'Enhance' : 'New'}
                             </span>
                           </div>
                           {out.category && (
-                            <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{out.category}</span>
+                            <span className="text-[10px] text-text-tertiary uppercase tracking-wider">{out.category}</span>
                           )}
                         </div>
                       </div>
 
                       {selection.outputs[idx]?.selected && (
-                        <div className="px-3 pb-3 space-y-2.5 border-t border-[var(--m12-border)]/10 pt-2">
+                        <div className="px-3 pb-3 space-y-2.5 border-t border-border pt-2">
                           {/* Consumer Personas */}
                           <div>
-                            <div className="text-[8px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)] font-bold">Consumers</div>
+                            <div className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 font-medium">Consumers</div>
                             <div className="flex flex-wrap gap-1.5">
                               {out.consumerPersonas.map((p, pi) => (
                                 <button key={pi} onClick={() => toggleOutputPersona(idx, pi)}
-                                  className={`flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border transition-colors ${
+                                  className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
                                     selection.outputs[idx]?.personas[pi]
-                                      ? 'border-[#8B5CF6]/40 bg-[#8B5CF6]/10 text-[var(--m12-text)]'
-                                      : 'border-[var(--m12-border)]/20 text-[var(--m12-text-muted)] line-through'
+                                      ? 'border-[#8B5CF6]/40 bg-[#8B5CF6]/10 text-text-primary'
+                                      : 'border-border text-text-tertiary line-through'
                                   }`}
                                 >
                                   <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
@@ -679,12 +682,12 @@ export default function AIGeneratePanel({
                           {/* Dimensions */}
                           {out.dimensions.length > 0 && (
                             <div>
-                              <div className="text-[8px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)] font-bold">Dimensions</div>
-                              <div className="border-l-2 border-[var(--m12-border)]/15 ml-1 pl-2 space-y-0.5">
+                              <div className="text-[10px] text-text-secondary uppercase tracking-wider mb-1 font-medium">Dimensions</div>
+                              <div className="border-l-2 border-border ml-1 pl-2 space-y-0.5">
                                 {out.dimensions.map((dim, di) => (
                                   <div key={di} className="flex items-center gap-1.5">
-                                    <Check checked={selection.outputs[idx]?.dimensions[di] ?? true} onChange={() => toggleOutputDim(idx, di)} />
-                                    <span className={`text-[9px] ${selection.outputs[idx]?.dimensions[di] ? 'text-[var(--m12-text-secondary)]' : 'text-[var(--m12-text-muted)] line-through'}`}>
+                                    <CheckBox checked={selection.outputs[idx]?.dimensions[di] ?? true} onChange={() => toggleOutputDim(idx, di)} />
+                                    <span className={`text-[11px] ${selection.outputs[idx]?.dimensions[di] ? 'text-text-secondary' : 'text-text-tertiary line-through'}`}>
                                       {dim.name}
                                     </span>
                                   </div>
@@ -704,16 +707,16 @@ export default function AIGeneratePanel({
               {(suggestion.features && suggestion.features.length > 0) && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="w-5 h-5 rounded bg-[#8B5CF6]/20 flex items-center justify-center text-[#8B5CF6] text-[9px] font-bold font-[family-name:var(--font-orbitron)]">F</div>
-                    <span className="text-xs font-semibold text-[var(--m12-text)]">Features</span>
-                    <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{suggestion.features.length}</span>
-                    <span className="text-[9px] text-[var(--m12-text-muted)]">sub-capabilities of this L3</span>
+                    <SectionChip letter="F" classes="bg-purple-50 text-purple-600" />
+                    <span className="text-body-sm font-semibold text-text-primary">Features</span>
+                    <span className="text-[11px] text-text-tertiary">{suggestion.features.length}</span>
+                    <span className="text-[11px] text-text-tertiary">sub-capabilities of this L3</span>
                   </div>
                   <div className="space-y-1.5">
                     {suggestion.features.map((f, i) => (
-                      <div key={i} className={`flex items-start gap-2 px-3 py-2 border rounded-lg transition-all ${selection.features[i] ? 'border-[#8B5CF6]/40 bg-[#8B5CF6]/[0.05]' : 'border-[var(--m12-border)]/20 opacity-50'}`}>
-                        <Check checked={selection.features[i] ?? true} onChange={() => toggleFeature(i)} size="md" />
-                        <span className={`text-[11px] leading-snug ${selection.features[i] ? 'text-[var(--m12-text)]' : 'text-[var(--m12-text-muted)] line-through'}`}>{f}</span>
+                      <div key={i} className={`flex items-start gap-2 px-3 py-2 bg-white border rounded-lg transition-all ${selection.features[i] ? 'border-brand-300' : 'border-border opacity-50'}`}>
+                        <CheckBox checked={selection.features[i] ?? true} onChange={() => toggleFeature(i)} size="md" />
+                        <span className={`text-body-sm leading-snug ${selection.features[i] ? 'text-text-primary' : 'text-text-tertiary line-through'}`}>{f}</span>
                       </div>
                     ))}
                   </div>
@@ -724,16 +727,16 @@ export default function AIGeneratePanel({
               {(suggestion.use_cases && suggestion.use_cases.length > 0) && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="w-5 h-5 rounded bg-[#06B6D4]/20 flex items-center justify-center text-[#06B6D4] text-[9px] font-bold font-[family-name:var(--font-orbitron)]">U</div>
-                    <span className="text-xs font-semibold text-[var(--m12-text)]">Use Cases</span>
-                    <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{suggestion.use_cases.length}</span>
-                    <span className="text-[9px] text-[var(--m12-text-muted)]">concrete scenarios</span>
+                    <SectionChip letter="U" classes="bg-cyan-50 text-cyan-600" />
+                    <span className="text-body-sm font-semibold text-text-primary">Use Cases</span>
+                    <span className="text-[11px] text-text-tertiary">{suggestion.use_cases.length}</span>
+                    <span className="text-[11px] text-text-tertiary">concrete scenarios</span>
                   </div>
                   <div className="space-y-1.5">
                     {suggestion.use_cases.map((u, i) => (
-                      <div key={i} className={`flex items-start gap-2 px-3 py-2 border rounded-lg transition-all ${selection.useCases[i] ? 'border-[#06B6D4]/40 bg-[#06B6D4]/[0.05]' : 'border-[var(--m12-border)]/20 opacity-50'}`}>
-                        <Check checked={selection.useCases[i] ?? true} onChange={() => toggleUseCase(i)} size="md" />
-                        <span className={`text-[11px] leading-snug ${selection.useCases[i] ? 'text-[var(--m12-text)]' : 'text-[var(--m12-text-muted)] line-through'}`}>{u}</span>
+                      <div key={i} className={`flex items-start gap-2 px-3 py-2 bg-white border rounded-lg transition-all ${selection.useCases[i] ? 'border-brand-300' : 'border-border opacity-50'}`}>
+                        <CheckBox checked={selection.useCases[i] ?? true} onChange={() => toggleUseCase(i)} size="md" />
+                        <span className={`text-body-sm leading-snug ${selection.useCases[i] ? 'text-text-primary' : 'text-text-tertiary line-through'}`}>{u}</span>
                       </div>
                     ))}
                   </div>
@@ -743,20 +746,19 @@ export default function AIGeneratePanel({
           )}
 
           {!loading && !suggestion && (
-            <div className="flex flex-col items-center justify-center py-16 gap-2 text-[var(--m12-text-muted)]">
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="opacity-30">
-                <path d="M16 4L20 12L28 14L22 20L24 28L16 24L8 28L10 20L4 14L12 12L16 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-              </svg>
-              <span className="text-xs">Describe the capability to generate SIPOC suggestions</span>
-              <span className="text-[10px] text-[var(--m12-text-faint)]">Cmd+Enter to generate</span>
-            </div>
+            <EmptyState
+              variant="inline"
+              icon={<Sparkles size={32} />}
+              title="Describe the capability to generate SIPOC suggestions"
+              description="Cmd+Enter to generate"
+            />
           )}
         </div>
 
         {/* Footer: Apply button */}
         {suggestion && selection && (
-          <div className="px-6 py-3 border-t border-[var(--m12-border)]/30 flex items-center justify-between">
-            <div className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+          <div className="px-6 py-3 border-t border-border flex items-center justify-between">
+            <div className="text-[11px] text-text-tertiary">
               {[
                 suggestion.inputs.length > 0 && `${Object.values(selection.inputs).filter(i => i.selected).length} inputs`,
                 suggestion.outputs.length > 0 && `${Object.values(selection.outputs).filter(o => o.selected).length} outputs`,
@@ -765,20 +767,12 @@ export default function AIGeneratePanel({
               ].filter(Boolean).join(', ')} selected
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={handleGenerate}
-                disabled={loading}
-                className="text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-3 py-1.5 transition-colors"
-              >
+              <Button variant="ghost" size="sm" disabled={loading} onClick={handleGenerate}>
                 Regenerate
-              </button>
-              <button
-                onClick={handleApply}
-                disabled={applying}
-                className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white px-5 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              >
+              </Button>
+              <Button variant="primary" size="sm" loading={applying} onClick={handleApply}>
                 {applying ? 'Applying...' : 'Apply Selected'}
-              </button>
+              </Button>
             </div>
           </div>
         )}

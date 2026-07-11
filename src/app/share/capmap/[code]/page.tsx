@@ -5,6 +5,8 @@ import {
   getCmShareByCode, listCapabilityMapAnon, listBedrockCatalogAnon, listWorkstreamsAnon,
 } from '@/lib/supabase/capmap-shares'
 import CapabilityMapShareView from '@/components/capmap/CapabilityMapShareView'
+import { LoadingState } from '@/components/common'
+import { Mach12Logo } from '@/components/brand/Mach12Logo'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import type { Workstream } from '@/lib/workstream/types'
@@ -37,15 +39,22 @@ export default function CapmapSharePage({ params }: { params: Promise<{ code: st
   }, [code])
 
   if (state === 'loading') {
-    return <div className="min-h-screen bg-[var(--m12-bg)] flex items-center justify-center text-sm text-[var(--m12-text-muted)]">Loading capability map…</div>
+    return (
+      <div className="min-h-screen bg-surface-muted flex items-center justify-center">
+        <LoadingState variant="inline" label="Loading capability map…" />
+      </div>
+    )
   }
   if (state === 'invalid') {
     return (
-      <div className="min-h-screen bg-[var(--m12-bg)] flex items-center justify-center p-6">
-        <div className="text-center max-w-sm">
-          <span className="text-gradient text-lg font-bold font-[family-name:var(--font-orbitron)] tracking-wide">MACH12</span>
-          <h1 className="text-base font-semibold text-[var(--m12-text-secondary)] mt-4 mb-2">Link unavailable</h1>
-          <p className="text-sm text-[var(--m12-text-muted)]">This share link is invalid or has expired. Ask the owner for a new one.</p>
+      <div className="min-h-screen bg-surface-muted flex items-center justify-center p-6">
+        <div className="w-full max-w-sm bg-white border border-border rounded-xl shadow-card p-8 text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Mach12Logo size={24} />
+            <span className="text-gradient font-display font-bold text-body-md tracking-wide">MACH12</span>
+          </div>
+          <h1 className="font-display text-heading-sm text-text-primary mb-2">Link unavailable</h1>
+          <p className="text-body-sm text-text-secondary">This share link is invalid or has expired. Ask the owner for a new one.</p>
         </div>
       </div>
     )

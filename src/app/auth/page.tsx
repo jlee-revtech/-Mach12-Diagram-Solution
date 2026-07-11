@@ -2,8 +2,16 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Mail } from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { Button } from '@/components/common'
+import { Mach12Logo } from '@/components/brand/Mach12Logo'
 import VersionBadge from '@/components/VersionBadge'
+
+const INPUT_CLASSES =
+  'w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none transition-colors'
+
+const LABEL_CLASSES = 'text-label uppercase text-text-secondary block mb-1'
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -47,16 +55,17 @@ export default function AuthPage() {
 
   if (signupSuccess) {
     return (
-      <div className="min-h-screen bg-[var(--m12-bg)] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-2xl p-8 text-center">
-          <div className="text-3xl mb-4">&#9993;</div>
-          <h2 className="text-lg font-semibold text-[var(--m12-text)] mb-2">Check your email</h2>
-          <p className="text-sm text-[var(--m12-text-muted)] mb-6">
-            We sent a confirmation link to <strong className="text-[var(--m12-text-secondary)]">{email}</strong>. Click it to activate your account.
+      <div className="min-h-screen bg-surface-muted flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-white border border-border rounded-xl shadow-card p-8 text-center">
+          <Mail size={28} className="mx-auto mb-4 text-brand-500" />
+          <h2 className="font-display text-heading-sm text-text-primary mb-2">Check your email</h2>
+          <p className="text-body-sm text-text-secondary mb-6">
+            We sent a confirmation link to <strong className="text-text-primary">{email}</strong>. Click it to activate your account.
           </p>
           <button
+            type="button"
             onClick={() => { setSignupSuccess(false); setMode('signin') }}
-            className="text-sm text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+            className="text-body-sm text-brand-500 hover:text-brand-600 transition-colors"
           >
             Back to sign in
           </button>
@@ -66,37 +75,42 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--m12-bg)] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-surface-muted flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
+        {/* Brand */}
         <div className="text-center mb-8">
-          <span className="text-gradient text-2xl font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
-            MACH12
-          </span>
-          <span className="text-[var(--m12-text-muted)] text-xl">.AI</span>
-          <span className="self-end mb-1"><VersionBadge /></span>
-          <p className="text-sm text-[var(--m12-text-muted)] mt-2">Data Architecture Diagrams</p>
+          <div className="flex items-center justify-center gap-2">
+            <Mach12Logo size={32} />
+            <span className="font-display font-bold text-xl tracking-wide">
+              <span className="text-gradient">MACH12</span>
+              <span className="text-text-tertiary">.AI</span>
+            </span>
+            <VersionBadge />
+          </div>
+          <p className="text-body-sm text-text-secondary mt-2">Data Architecture Diagrams</p>
         </div>
 
-        <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-2xl p-8">
+        <div className="bg-white border border-border rounded-xl shadow-card p-8">
           {/* Tab toggle */}
-          <div className="flex mb-6 bg-[var(--m12-bg)] rounded-lg p-1">
+          <div className="flex mb-6 bg-surface-muted rounded-lg p-1">
             <button
+              type="button"
               onClick={() => { setMode('signin'); setError(null) }}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 text-body-sm font-medium rounded-md transition-colors ${
                 mode === 'signin'
-                  ? 'bg-[#2563EB] text-white'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               Sign In
             </button>
             <button
+              type="button"
               onClick={() => { setMode('signup'); setError(null) }}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 text-body-sm font-medium rounded-md transition-colors ${
                 mode === 'signup'
-                  ? 'bg-[#2563EB] text-white'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               Sign Up
@@ -106,7 +120,7 @@ export default function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
+                <label className={LABEL_CLASSES}>
                   Display Name
                 </label>
                 <input
@@ -115,13 +129,13 @@ export default function AuthPage() {
                   onChange={(e) => setDisplayName(e.target.value)}
                   required
                   placeholder="Josh Lee"
-                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
+                  className={INPUT_CLASSES}
                 />
               </div>
             )}
 
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
+              <label className={LABEL_CLASSES}>
                 Email
               </label>
               <input
@@ -130,12 +144,12 @@ export default function AuthPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="you@company.com"
-                className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
+                className={INPUT_CLASSES}
               />
             </div>
 
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] block mb-1">
+              <label className={LABEL_CLASSES}>
                 Password
               </label>
               <input
@@ -145,23 +159,19 @@ export default function AuthPage() {
                 required
                 minLength={6}
                 placeholder="Min. 6 characters"
-                className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/60 rounded-lg px-3 py-2.5 text-sm text-[var(--m12-text)] outline-none focus:border-[#2563EB] transition-colors placeholder:text-[var(--m12-border)]"
+                className={INPUT_CLASSES}
               />
             </div>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400">
+              <div className="bg-status-red-bg border border-red-200 rounded-lg px-3 py-2 text-body-sm text-status-red">
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
-            >
+            <Button type="submit" variant="primary" fullWidth loading={submitting}>
               {submitting ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
-            </button>
+            </Button>
           </form>
         </div>
       </div>

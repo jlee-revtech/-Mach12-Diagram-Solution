@@ -2,7 +2,10 @@
 
 import { use, useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { Button } from '@/components/common'
+import { Mach12Logo } from '@/components/brand/Mach12Logo'
 
 function getToken(): string | null {
   try {
@@ -128,55 +131,57 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
   }, [user])
 
   return (
-    <div className="min-h-screen bg-[#151E2E] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-[#1F2C3F] border border-[#374A5E]/40 rounded-2xl p-8 text-center">
-        <div className="mb-4">
-          <span className="text-gradient text-xl font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
-            MACH12
+    <div className="min-h-screen bg-surface-muted flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-white border border-border rounded-xl shadow-card p-8 text-center">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <Mach12Logo size={28} />
+          <span className="font-display font-bold text-lg tracking-wide">
+            <span className="text-gradient">MACH12</span>
+            <span className="text-text-tertiary">.AI</span>
           </span>
-          <span className="text-[#64748B] text-lg">.AI</span>
         </div>
 
         {status === 'loading' && (
           <>
-            <div className="w-6 h-6 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-sm text-[#64748B]">Loading invite...</p>
+            <Loader2 size={24} className="animate-spin text-text-tertiary mx-auto mb-3" />
+            <p className="text-body-sm text-text-secondary">Loading invite...</p>
           </>
         )}
 
         {status === 'accepting' && (
           <>
-            <div className="w-6 h-6 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-sm text-[#CBD5E1]">Joining diagram...</p>
+            <Loader2 size={24} className="animate-spin text-brand-500 mx-auto mb-3" />
+            <p className="text-body-sm text-text-secondary">Joining diagram...</p>
           </>
         )}
 
         {status === 'done' && (
           <>
-            <div className="text-3xl mb-3">&#10003;</div>
-            <h2 className="text-lg font-semibold text-[#F8FAFC] mb-2">You're in!</h2>
-            <p className="text-sm text-[#64748B] mb-6">
+            <CheckCircle2 size={32} className="text-status-green mx-auto mb-3" />
+            <h2 className="font-display text-heading-sm text-text-primary mb-2">You're in!</h2>
+            <p className="text-body-sm text-text-secondary mb-6">
               You've been added to the diagram and organization.
             </p>
-            <button
+            <Button
+              variant="primary"
               onClick={() => router.push(diagramId ? `/diagram/${diagramId}` : '/')}
-              className="bg-[#2563EB] hover:bg-[#3B82F6] text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
             >
               Open Diagram
-            </button>
+            </Button>
           </>
         )}
 
         {status === 'error' && (
           <>
-            <div className="text-3xl mb-3">&#10007;</div>
-            <h2 className="text-lg font-semibold text-[#F8FAFC] mb-2">Invite Error</h2>
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400 mb-4">
+            <XCircle size={32} className="text-status-red mx-auto mb-3" />
+            <h2 className="font-display text-heading-sm text-text-primary mb-2">Invite Error</h2>
+            <div className="bg-status-red-bg border border-red-200 rounded-lg px-3 py-2 text-body-sm text-status-red mb-4">
               {error}
             </div>
             <button
+              type="button"
               onClick={() => router.push('/')}
-              className="text-sm text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+              className="text-body-sm text-brand-500 hover:text-brand-600 transition-colors"
             >
               Go to dashboard
             </button>

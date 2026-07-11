@@ -12,6 +12,7 @@
 // diagrams (flow / matrix / quadrant / layers) with a live preview.
 
 import { useState } from 'react'
+import { ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react'
 import type {
   SectionContent, OverviewSectionContent, WorkstreamSectionContent,
   EvaluationSectionContent, FutureStateOption, KeyDecision, EvaluationDivergence,
@@ -57,12 +58,12 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   return c
 }
 
-// ─── Shared class strings (dark/light token aware) ───────────────────────────
-const INPUT = 'w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded px-2 py-1 text-[11px] text-[var(--m12-text)] outline-none'
-const LABEL = 'text-[10px] uppercase tracking-wide text-[var(--m12-text-muted)] mb-1'
-const GHOST_BTN = 'text-[10px] px-1.5 py-0.5 rounded border border-[var(--m12-border)]/50 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:border-[var(--m12-border)] transition-colors'
-const ADD_BTN = 'text-[10px] px-2 py-1 rounded border border-[#2563EB]/50 text-[#3B82F6] hover:bg-[#2563EB14] transition-colors'
-const CARD = 'bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-3'
+// ─── Shared class strings (canonical Tesseract tokens) ───────────────────────
+const INPUT = 'w-full bg-surface-input border border-border rounded px-2 py-1 text-[11px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500'
+const LABEL = 'text-[10px] uppercase tracking-wide text-text-secondary mb-1'
+const GHOST_BTN = 'text-[10px] px-1.5 py-0.5 rounded border border-border text-text-tertiary hover:text-text-primary hover:border-border-strong transition-colors'
+const ADD_BTN = 'text-[10px] px-2 py-1 rounded border border-brand-200 text-brand-600 hover:bg-brand-50 transition-colors'
+const CARD = 'bg-white border border-border rounded-lg p-3'
 
 // ─── Field primitives ────────────────────────────────────────────────────────
 function Field({ label, children }: { label?: string; children: React.ReactNode }) {
@@ -100,9 +101,9 @@ function RowControls({ i, len, onMove, onRemove }: {
 }) {
   return (
     <div className="flex items-center gap-0.5 shrink-0">
-      <button type="button" title="Move up" disabled={i === 0} onClick={() => onMove(-1)} className={`${GHOST_BTN} disabled:opacity-30`}>↑</button>
-      <button type="button" title="Move down" disabled={i === len - 1} onClick={() => onMove(1)} className={`${GHOST_BTN} disabled:opacity-30`}>↓</button>
-      <button type="button" title="Remove" onClick={onRemove} className="text-[10px] px-1.5 py-0.5 rounded border border-[#DC2626]/40 text-[#EF4444] hover:bg-[#DC262614]">✕</button>
+      <button type="button" title="Move up" aria-label="Move up" disabled={i === 0} onClick={() => onMove(-1)} className={`${GHOST_BTN} disabled:opacity-30`}><ChevronUp size={10} /></button>
+      <button type="button" title="Move down" aria-label="Move down" disabled={i === len - 1} onClick={() => onMove(1)} className={`${GHOST_BTN} disabled:opacity-30`}><ChevronDown size={10} /></button>
+      <button type="button" title="Remove" aria-label="Remove" onClick={onRemove} className="text-[10px] px-1.5 py-0.5 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"><X size={10} /></button>
     </div>
   )
 }
@@ -147,8 +148,8 @@ function AiContentBar({ label, placeholder, onRun }: {
     finally { setBusy(false) }
   }
   return (
-    <div className="rounded-lg border border-[#7C3AED]/30 bg-[#7C3AED0A] p-2 space-y-1.5">
-      <div className="text-[10px] uppercase tracking-wide text-[#A78BFA]">{label}</div>
+    <div className="rounded-lg border border-[#7C3AED]/30 bg-[#7C3AED]/5 p-2 space-y-1.5">
+      <div className="text-[10px] uppercase tracking-wide text-[#7C3AED]">{label}</div>
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
@@ -159,12 +160,12 @@ function AiContentBar({ label, placeholder, onRun }: {
       />
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" onClick={run} disabled={busy || !prompt.trim()}
-          className="text-[10px] px-2 py-1 rounded font-medium text-white bg-[#7C3AED] hover:bg-[#8B5CF6] disabled:opacity-40">
-          {busy ? 'Generating…' : '✦ Generate'}
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded font-medium text-white bg-[#7C3AED] hover:bg-[#8B5CF6] disabled:opacity-40 transition-colors">
+          <Sparkles size={10} />{busy ? 'Generating...' : 'Generate'}
         </button>
-        <span className="text-[9px] text-[var(--m12-text-muted)]">Cmd/Ctrl+Enter.</span>
+        <span className="text-[10px] text-text-tertiary">Cmd/Ctrl+Enter.</span>
       </div>
-      {err && <div className="text-[10px] text-[#EF4444]">{err}</div>}
+      {err && <div className="text-[10px] text-red-600">{err}</div>}
     </div>
   )
 }
@@ -222,7 +223,7 @@ function MatrixEditor({ d, onChange }: { d: WorkshopDiagram; onChange: (d: Works
       <Field label="Rows">
         <div className="space-y-2">
           {rows.map((r, i) => (
-            <div key={i} className="border border-[var(--m12-border)]/40 rounded p-2 space-y-1.5">
+            <div key={i} className="border border-border rounded p-2 space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <input className={INPUT} value={r.label} placeholder="Row label" onChange={(e) => onChange({ ...d, rows: replaceAt(rows, i, { ...r, label: e.target.value }) })} />
                 <RowControls i={i} len={rows.length} onMove={(dir) => onChange({ ...d, rows: move(rows, i, dir) })} onRemove={() => onChange({ ...d, rows: removeAt(rows, i) })} />
@@ -289,7 +290,7 @@ function LayersEditor({ d, onChange }: { d: WorkshopDiagram; onChange: (d: Works
       <Field label="Layers (bands)">
         <div className="space-y-2">
           {layers.map((ly, i) => (
-            <div key={i} className="border border-[var(--m12-border)]/40 rounded p-2 space-y-1.5">
+            <div key={i} className="border border-border rounded p-2 space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <input className={INPUT} value={ly.label} placeholder="Layer label" onChange={(e) => onChange({ ...d, layers: replaceAt(layers, i, { ...ly, label: e.target.value }) })} />
                 <RowControls i={i} len={layers.length} onMove={(dir) => onChange({ ...d, layers: move(layers, i, dir) })} onRemove={() => onChange({ ...d, layers: removeAt(layers, i) })} />
@@ -306,7 +307,7 @@ function LayersEditor({ d, onChange }: { d: WorkshopDiagram; onChange: (d: Works
           {connections.map((cn, i) => (
             <div key={i} className="flex items-center gap-1.5">
               <input className={`${INPUT} flex-1`} value={cn.from} placeholder="From node" onChange={(e) => onChange({ ...d, connections: replaceAt(connections, i, { ...cn, from: e.target.value }) })} />
-              <span className="text-[10px] text-[var(--m12-text-muted)]">→</span>
+              <span className="text-[10px] text-text-tertiary">→</span>
               <input className={`${INPUT} flex-1`} value={cn.to} placeholder="To node" onChange={(e) => onChange({ ...d, connections: replaceAt(connections, i, { ...cn, to: e.target.value }) })} />
               <input className={`${INPUT} flex-1`} value={cn.label ?? ''} placeholder="Label" onChange={(e) => onChange({ ...d, connections: replaceAt(connections, i, { ...cn, label: e.target.value || undefined }) })} />
               <RowControls i={i} len={connections.length} onMove={(dir) => onChange({ ...d, connections: move(connections, i, dir) })} onRemove={() => onChange({ ...d, connections: removeAt(connections, i) })} />
@@ -347,8 +348,8 @@ function DiagramPromptBar({ diagram, gen, onChange, context }: {
     }
   }
   return (
-    <div className="rounded-lg border border-[#7C3AED]/30 bg-[#7C3AED0A] p-2 space-y-1.5">
-      <div className="text-[10px] uppercase tracking-wide text-[#A78BFA]">Generate with AI</div>
+    <div className="rounded-lg border border-[#7C3AED]/30 bg-[#7C3AED]/5 p-2 space-y-1.5">
+      <div className="text-[10px] uppercase tracking-wide text-[#7C3AED]">Generate with AI</div>
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
@@ -361,17 +362,17 @@ function DiagramPromptBar({ diagram, gen, onChange, context }: {
       />
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" onClick={run} disabled={busy || !prompt.trim()}
-          className="text-[10px] px-2 py-1 rounded font-medium text-white bg-[#7C3AED] hover:bg-[#8B5CF6] disabled:opacity-40">
-          {busy ? 'Generating…' : hasContent ? '✦ Generate / revise' : '✦ Generate diagram'}
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded font-medium text-white bg-[#7C3AED] hover:bg-[#8B5CF6] disabled:opacity-40 transition-colors">
+          <Sparkles size={10} />{busy ? 'Generating...' : hasContent ? 'Generate / revise' : 'Generate diagram'}
         </button>
-        <span className="text-[9px] text-[var(--m12-text-muted)]">Replaces the diagram below; you can then fine-tune it by hand. Cmd/Ctrl+Enter.</span>
+        <span className="text-[10px] text-text-tertiary">Replaces the diagram below; you can then fine-tune it by hand. Cmd/Ctrl+Enter.</span>
       </div>
-      {err && <div className="text-[10px] text-[#EF4444]">{err}</div>}
+      {err && <div className="text-[10px] text-red-600">{err}</div>}
     </div>
   )
 }
 
-const DIAGRAM_SELECT = 'bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5 text-[11px] text-[var(--m12-text)] outline-none'
+const DIAGRAM_SELECT = 'bg-surface-input border border-border rounded px-1.5 py-0.5 text-[11px] text-text-primary focus:outline-none focus:border-brand-500'
 
 // One diagram: an optional AI prompt box, then type + title + caption +
 // type-specific body + a live preview.
@@ -380,14 +381,14 @@ function DiagramEditor({ diagram, onChange, onRemove, gen, context }: {
   gen?: GenerateDiagramFn; context?: string
 }) {
   return (
-    <div className="border border-[#2563EB]/25 bg-[#2563EB08] rounded-lg p-3 space-y-2">
+    <div className="border border-brand-200 bg-brand-50/50 rounded-lg p-3 space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Diagram</span>
+        <span className="text-[10px] uppercase tracking-wide text-brand-600">Diagram</span>
         <select aria-label="Diagram type" title="Diagram type" className={DIAGRAM_SELECT}
           value={diagram.type} onChange={(e) => onChange(scaffoldForType(e.target.value as WorkshopDiagramType, diagram))}>
           {DIAGRAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
-        <button type="button" onClick={onRemove} className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-[#DC2626]/40 text-[#EF4444] hover:bg-[#DC262614]">Remove diagram</button>
+        <button type="button" onClick={onRemove} className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors">Remove diagram</button>
       </div>
       {gen && <DiagramPromptBar diagram={diagram} gen={gen} onChange={onChange} context={context} />}
       <TextField label="Title" value={diagram.title ?? ''} placeholder="Diagram title" onChange={(v) => onChange({ ...diagram, title: v || undefined })} />
@@ -410,9 +411,9 @@ function SingleDiagramEditor({ diagram, onChange, gen, context }: {
   diagram: WorkshopDiagram; onChange: (d: WorkshopDiagram) => void; gen?: GenerateDiagramFn; context?: string
 }) {
   return (
-    <div className="border border-[#2563EB]/25 bg-[#2563EB08] rounded-lg p-3 space-y-2">
+    <div className="border border-brand-200 bg-brand-50/50 rounded-lg p-3 space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Decision visual</span>
+        <span className="text-[10px] uppercase tracking-wide text-brand-600">Decision visual</span>
         <select aria-label="Diagram type" title="Diagram type" className={DIAGRAM_SELECT}
           value={diagram.type} onChange={(e) => onChange(scaffoldForType(e.target.value as WorkshopDiagramType, diagram))}>
           {DIAGRAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -486,8 +487,8 @@ function DecisionEditor({ d, onChange, onRemove, i, len, onMove, gen }: {
       </div>
       <StringListEditor label="Context" color="#2563EB" items={d.context ?? []} placeholder="Why this matters" addLabel="Context point" onChange={(context) => onChange({ ...d, context })} />
       <StringListEditor label="Leading questions" color="#D97706" items={d.leadingQuestions ?? []} placeholder="Question to walk the room" addLabel="Question" onChange={(leadingQuestions) => onChange({ ...d, leadingQuestions })} />
-      <div className="rounded-lg border border-[#2563EB]/40 bg-[#2563EB0F] p-2.5 space-y-2">
-        <div className="text-[10px] uppercase tracking-wide text-[#3B82F6]">Recommended decision</div>
+      <div className="rounded-lg border border-brand-200 bg-brand-50 p-2.5 space-y-2">
+        <div className="text-[10px] uppercase tracking-wide text-brand-600">Recommended decision</div>
         <TextAreaField value={rec.recommendation} placeholder="One short sentence" onChange={(v) => onChange({ ...d, recommendedDecision: { ...rec, recommendation: v } })} />
         <StringListEditor label="Rationale" color="#3B82F6" items={rec.rationale ?? []} placeholder="Reasoning point" addLabel="Rationale point" onChange={(rationale) => onChange({ ...d, recommendedDecision: { ...rec, rationale } })} />
         <Field label="Confidence">
@@ -650,7 +651,7 @@ function EvaluationEditor({ c, onChange, gen, genContent }: { c: EvaluationSecti
           <button type="button" className={ADD_BTN} onClick={() => onChange({ ...c, divergences: [...divergences, { topic: '', positions: [], tension: '' }] })}>+ Divergence</button>
         </div>
       </Field>
-      <div className="rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED0F] p-3 space-y-2">
+      <div className="rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED]/5 p-3 space-y-2">
         <TextAreaField label="Overall recommendation" value={c.overallRecommendation} placeholder="One short sentence" onChange={(v) => onChange({ ...c, overallRecommendation: v })} />
         <div className="grid grid-cols-2 gap-2">
           <StringListEditor label="Pros" color="#059669" items={c.pros ?? []} placeholder="Pro" addLabel="Pro" onChange={(pros) => onChange({ ...c, pros })} />
@@ -675,7 +676,7 @@ function DecisionCriteriaEditor({ c, onChange }: { c: EvaluationSectionContent; 
   const criteria = s.decisionCriteria
   const actions = s.actions
   return (
-    <div className="rounded-lg border border-[#0891B2]/40 bg-[#0891B20D] p-3 space-y-3">
+    <div className="rounded-lg border border-[#0891B2]/40 bg-[#0891B2]/5 p-3 space-y-3">
       <div className="text-[11px] uppercase tracking-wide text-[#0891B2] font-semibold">Decision Criteria</div>
 
       <StringListEditor label="Recommended decision" color="#0891B2" items={s.recommendedDecision} placeholder="Decision point" addLabel="Point"
@@ -747,7 +748,7 @@ export default function SectionContentEditor({ value, onChange, generateDiagram,
   return (
     <div className="space-y-4">
       {kindEditor}
-      <div className="pt-3 border-t border-[var(--m12-border)]/40 space-y-2">
+      <div className="pt-3 border-t border-border space-y-2">
         <StringListEditor label="Notes & Considerations" color="#D97706" items={notes} placeholder="Note or consideration" addLabel="Note" onChange={setNotes} />
         {generateContent && (
           <AiContentBar

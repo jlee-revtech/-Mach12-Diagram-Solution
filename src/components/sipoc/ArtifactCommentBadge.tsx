@@ -1,5 +1,6 @@
 'use client'
 
+import { MessageSquare, Check } from 'lucide-react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import { anchorKey } from '@/lib/sipoc/types'
 import type { SipocRegion } from '@/lib/sipoc/types'
@@ -51,7 +52,7 @@ export default function ArtifactCommentBadge({ capabilityId, region, itemId = nu
         setTimeout(() => setHighlightedAnchorKey(null), 2200)
       }}
       title={`${matching.length} comment${matching.length === 1 ? '' : 's'}${resolved ? ' (resolved)' : ''} · click to open thread`}
-      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-[family-name:var(--font-space-mono)] font-bold transition-transform hover:scale-110 ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-mono font-bold transition-transform hover:scale-110 ${className}`}
       style={{
         backgroundColor: resolved ? 'transparent' : color,
         color: resolved ? color : '#fff',
@@ -59,18 +60,9 @@ export default function ArtifactCommentBadge({ capabilityId, region, itemId = nu
         boxShadow: resolved ? 'none' : `0 1px 4px ${color}40`,
       }}
     >
-      <svg width="9" height="9" viewBox="0 0 16 16" fill="none">
-        <path
-          d="M3 3h10a1 1 0 011 1v6a1 1 0 01-1 1H8.5L5.5 13.5V11H3a1 1 0 01-1-1V4a1 1 0 011-1z"
-          fill="currentColor"
-        />
-      </svg>
+      <MessageSquare size={9} className="shrink-0" />
       <span>{matching.length}</span>
-      {resolved && (
-        <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
-          <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
+      {resolved && <Check size={8} className="shrink-0" />}
     </button>
   )
 }

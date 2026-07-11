@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { Download } from 'lucide-react'
+import { Button, EmptyState } from '@/components/common'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
@@ -95,7 +97,7 @@ export default function CapabilityMapShareView({
   const renderChips = (c: CapabilityWithSystems) => (
     <div className="flex flex-wrap gap-1">
       {c.logicalSystemIds.length === 0 && c.physicalSystemIds.length === 0 && (
-        <span className="text-[10px] text-[var(--m12-text-muted)] italic">Unmapped</span>
+        <span className="text-[10px] text-text-tertiary italic">Unmapped</span>
       )}
       {c.logicalSystemIds.map(sid => {
         const s = catById.get(sid)
@@ -109,7 +111,7 @@ export default function CapabilityMapShareView({
       })}
       {c.physicalSystemIds.map(pid => {
         const p = physById.get(pid)
-        return p ? <span key={pid} className="text-[10px] rounded px-1.5 py-0.5 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)]">{p.name}</span> : null
+        return p ? <span key={pid} className="text-[10px] rounded px-1.5 py-0.5 bg-surface-muted border border-border text-text-secondary">{p.name}</span> : null
       })}
     </div>
   )
@@ -117,58 +119,63 @@ export default function CapabilityMapShareView({
   const expiryNote = expiresAt ? `Link expires ${new Date(expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}` : null
 
   return (
-    <div className="min-h-screen bg-[var(--m12-bg)] p-6 md:p-8">
+    <div className="min-h-screen bg-surface-muted p-6 md:p-8">
       <div className="mx-auto w-full max-w-[1800px]">
         {/* Header */}
         <div className="flex items-center gap-3 mb-1">
-          <span className="text-gradient text-xl font-bold font-[family-name:var(--font-orbitron)] tracking-wide">MACH12</span>
-          <span className="text-[var(--m12-text-muted)] text-sm">/</span>
-          <span className="text-[var(--m12-text-secondary)] text-sm font-medium">{title}</span>
-          <span className="text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded">Read-only</span>
+          <span className="text-gradient text-xl font-bold font-display tracking-wide">MACH12</span>
+          <span className="text-text-tertiary text-body-md">/</span>
+          <span className="text-text-secondary text-body-md font-medium">{title}</span>
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-600 bg-brand-50 px-2 py-0.5 rounded">Read-only</span>
         </div>
         <div className="flex items-center gap-3 mb-5">
-          <p className="text-xs text-[var(--m12-text-muted)]">Shared view of the capability map. {caps.length} capabilities across {wsChips.length} value streams.{expiryNote ? ` ${expiryNote}.` : ''}</p>
+          <p className="text-body-sm text-text-secondary">Shared view of the capability map. {caps.length} capabilities across {wsChips.length} value streams.{expiryNote ? ` ${expiryNote}.` : ''}</p>
         </div>
 
-        {/* Toolbar (view + slice + search + export only — no editing) */}
+        {/* Toolbar (view + slice + search + export only - no editing) */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="flex gap-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-1">
-            <button type="button" onClick={() => setView('board')} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${view === 'board' ? 'bg-[#10B981]/12 text-[#34D399]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>Board</button>
-            <button type="button" onClick={() => setView('pivot')} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${view === 'pivot' ? 'bg-[#10B981]/12 text-[#34D399]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>Pivot</button>
+          <div className="flex gap-1 bg-white border border-border rounded-lg p-1">
+            <button type="button" onClick={() => setView('board')} className={`px-3 py-1.5 rounded text-body-sm font-medium transition-colors ${view === 'board' ? 'bg-brand-500 text-white' : 'text-text-secondary hover:bg-surface-muted'}`}>Board</button>
+            <button type="button" onClick={() => setView('pivot')} className={`px-3 py-1.5 rounded text-body-sm font-medium transition-colors ${view === 'pivot' ? 'bg-brand-500 text-white' : 'text-text-secondary hover:bg-surface-muted'}`}>Pivot</button>
           </div>
           {view === 'pivot' && (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)]">Slice by</span>
-              <div className="flex gap-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-1">
+              <span className="text-[10px] uppercase tracking-wider font-mono text-text-tertiary">Slice by</span>
+              <div className="flex gap-1 bg-white border border-border rounded-lg p-1">
                 {([['workstream', 'Value Stream'], ['logical', 'Logical System'], ['physical', 'Physical System']] as const).map(([k, label]) => (
-                  <button key={k} type="button" onClick={() => setSlice(k)} className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${slice === k ? 'bg-[#10B981]/12 text-[#34D399]' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>{label}</button>
+                  <button key={k} type="button" onClick={() => setSlice(k)} className={`px-2.5 py-1.5 rounded text-body-sm font-medium transition-colors ${slice === k ? 'bg-brand-500 text-white' : 'text-text-secondary hover:bg-surface-muted'}`}>{label}</button>
                 ))}
               </div>
             </div>
           )}
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search capabilities…" aria-label="Search capabilities" className="flex-1 min-w-[160px] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] placeholder:text-[var(--m12-text-muted)] focus:outline-none focus:border-[#10B981]/60" />
-          <button type="button" onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog, title)} title="Download this capability map as Excel" className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[#10B981]/60 text-[var(--m12-text-secondary)] px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.5 11.5v1A1.5 1.5 0 004 14h8a1.5 1.5 0 001.5-1.5v-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search capabilities…" aria-label="Search capabilities" className="flex-1 min-w-[160px] h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500" />
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog, title)}
+            title="Download this capability map as Excel"
+            icon={<Download size={14} />}
+          >
             Download
-          </button>
+          </Button>
         </div>
 
         {/* Value stream filter chips */}
         {(wsChips.length > 0 || unalignedCount > 0) && (
           <div className="flex flex-wrap items-center gap-1.5 mb-5">
-            <button type="button" onClick={() => setWsFilter(null)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${!wsFilter ? 'border-[#10B981]/60 bg-[#10B981]/12 text-[#34D399]' : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>All ({caps.length})</button>
+            <button type="button" onClick={() => setWsFilter(null)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${!wsFilter ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'}`}>All ({caps.length})</button>
             {wsChips.map(w => {
               const n = caps.filter(c => c.workstream_id === w.id).length
               const on = wsFilter === w.id
               return (
-                <button key={w.id} type="button" onClick={() => setWsFilter(w.id)} className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2.5 py-1 border transition-colors ${on ? 'text-white' : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`} style={on ? { background: w.color || '#10B981', borderColor: w.color || '#10B981' } : { borderColor: `${w.color || '#64748B'}66` }}>
+                <button key={w.id} type="button" onClick={() => setWsFilter(w.id)} className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2.5 py-1 border transition-colors ${on ? 'text-white' : 'text-text-secondary hover:bg-surface-muted'}`} style={on ? { background: w.color || '#10B981', borderColor: w.color || '#10B981' } : { borderColor: `${w.color || '#64748B'}66` }}>
                   <span style={{ color: on ? '#fff' : (w.color || '#10B981') }}><WorkstreamIcon icon={w.icon} size={11} /></span>
                   {w.name} ({n})
                 </button>
               )
             })}
             {unalignedCount > 0 && (
-              <button type="button" onClick={() => setWsFilter(UNALIGNED)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${wsFilter === UNALIGNED ? 'border-[#F59E0B]/70 bg-[#F59E0B]/15 text-[#FBBF24]' : 'border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'}`}>Unaligned ({unalignedCount})</button>
+              <button type="button" onClick={() => setWsFilter(UNALIGNED)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${wsFilter === UNALIGNED ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-border text-text-secondary hover:bg-surface-muted'}`}>Unaligned ({unalignedCount})</button>
             )}
           </div>
         )}
@@ -187,10 +194,10 @@ export default function CapabilityMapShareView({
               return (
                 <div key={key}>
                   <div className="flex items-center gap-2 mb-3">
-                    {ws ? <span style={{ color: ws.color || '#10B981' }}><WorkstreamIcon icon={ws.icon} size={14} /></span> : <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />}
-                    <h3 className="text-[12px] font-semibold tracking-wide" style={{ color: ws?.color || '#FBBF24' }}>{ws ? ws.name : 'Unaligned'}</h3>
-                    <span className="text-[10px] text-[var(--m12-text-muted)]">{list.length}</span>
-                    <div className="flex-1 h-px bg-[var(--m12-border)]/30" />
+                    {ws ? <span style={{ color: ws.color || '#10B981' }}><WorkstreamIcon icon={ws.icon} size={14} /></span> : <span className="w-2 h-2 rounded-full bg-amber-500" />}
+                    <h3 className="text-body-sm font-semibold tracking-wide" style={{ color: ws?.color || '#B45309' }}>{ws ? ws.name : 'Unaligned'}</h3>
+                    <span className="text-[10px] text-text-tertiary">{list.length}</span>
+                    <div className="flex-1 h-px bg-border" />
                   </div>
                   <div className="space-y-4">
                     {subGroups.map(([groupName, groupCaps]) => (
@@ -198,16 +205,16 @@ export default function CapabilityMapShareView({
                         {showSub && (
                           <div className="flex items-center gap-2 mb-2 pl-0.5">
                             <span className="w-1 h-3 rounded-full shrink-0" style={{ background: ws?.color || '#10B981' }} />
-                            <h4 className="text-[11px] font-semibold tracking-wide text-[var(--m12-text-secondary)]">{groupName}</h4>
-                            <span className="text-[10px] text-[var(--m12-text-muted)]">{groupCaps.length}</span>
-                            <div className="flex-1 h-px bg-[var(--m12-border)]/15" />
+                            <h4 className="text-[11px] font-semibold tracking-wide text-text-secondary">{groupName}</h4>
+                            <span className="text-[10px] text-text-tertiary">{groupCaps.length}</span>
+                            <div className="flex-1 h-px bg-border/50" />
                           </div>
                         )}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                           {groupCaps.map(c => (
-                            <div key={c.id} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-xl p-4">
-                              <h4 className="text-sm font-semibold text-[var(--m12-text)] mb-2">{c.name}</h4>
-                              {c.description && <p className="text-[11px] text-[var(--m12-text-muted)] mb-2 line-clamp-2">{c.description}</p>}
+                            <div key={c.id} className="bg-white border border-border rounded-lg shadow-card p-4">
+                              <h4 className="text-body-md font-semibold text-text-primary mb-2">{c.name}</h4>
+                              {c.description && <p className="text-[11px] text-text-secondary mb-2 line-clamp-2">{c.description}</p>}
                               {renderChips(c)}
                             </div>
                           ))}
@@ -218,33 +225,35 @@ export default function CapabilityMapShareView({
                 </div>
               )
             })}
-            {groups.length === 0 && <div className="text-sm text-[var(--m12-text-muted)] py-12 text-center border border-dashed border-[var(--m12-border)]/50 rounded-xl">No capabilities match this filter.</div>}
+            {groups.length === 0 && (
+              <EmptyState variant="dashed" title="No matches" description="No capabilities match this filter." />
+            )}
           </div>
         ) : (
           pivotColumns.length === 0 ? (
-            <div className="text-sm text-[var(--m12-text-muted)] py-12 text-center border border-dashed border-[var(--m12-border)]/50 rounded-xl">No capabilities match this slice.</div>
+            <EmptyState variant="dashed" title="No matches" description="No capabilities match this slice." />
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-3">
               {pivotColumns.map(col => (
-                <div key={col.key} className="w-64 shrink-0 bg-[var(--m12-bg-card)]/30 border border-[var(--m12-border)]/30 rounded-xl flex flex-col">
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--m12-border)]/30">
+                <div key={col.key} className="w-64 shrink-0 bg-surface-muted border border-border rounded-lg flex flex-col">
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
                     {slice === 'workstream' && col.icon !== undefined && col.key !== UNALIGNED
                       ? <span style={{ color: col.color }}><WorkstreamIcon icon={col.icon} size={13} /></span>
                       : <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: col.color }} />}
-                    <span className="text-[12px] font-semibold flex-1 truncate" style={{ color: col.color }}>{col.label}</span>
-                    <span className="text-[10px] text-[var(--m12-text-muted)] shrink-0">{col.caps.length}</span>
+                    <span className="text-body-sm font-semibold flex-1 truncate" style={{ color: col.color }}>{col.label}</span>
+                    <span className="text-[10px] text-text-tertiary shrink-0">{col.caps.length}</span>
                   </div>
                   <div className="p-2 space-y-1.5 overflow-y-auto" style={{ maxHeight: 600 }}>
                     {col.caps.map(c => {
                       const ws = c.workstream_id ? wsById.get(c.workstream_id) : null
                       return (
-                        <div key={c.id} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg px-2.5 py-2">
-                          <div className="text-xs font-medium text-[var(--m12-text)] mb-1">{c.name}</div>
+                        <div key={c.id} className="bg-white border border-border rounded-lg px-2.5 py-2">
+                          <div className="text-body-sm font-medium text-text-primary mb-1">{c.name}</div>
                           <div className="flex flex-wrap gap-1">
                             {slice !== 'workstream' && ws && (
-                              <span className="text-[9px] rounded px-1 py-0.5" style={{ color: ws.color || '#10B981', background: `${ws.color || '#10B981'}18` }}>{ws.name}</span>
+                              <span className="text-[10px] rounded px-1 py-0.5" style={{ color: ws.color || '#10B981', background: `${ws.color || '#10B981'}18` }}>{ws.name}</span>
                             )}
-                            {slice === 'workstream' && c.logicalSystemIds.map(sid => { const s = catById.get(sid); return s ? <span key={sid} className="text-[9px] rounded px-1 py-0.5 border" style={{ color: s.color || '#10B981', borderColor: `${s.color || '#10B981'}55` }}>{s.label}</span> : null })}
+                            {slice === 'workstream' && c.logicalSystemIds.map(sid => { const s = catById.get(sid); return s ? <span key={sid} className="text-[10px] rounded px-1 py-0.5 border" style={{ color: s.color || '#10B981', borderColor: `${s.color || '#10B981'}55` }}>{s.label}</span> : null })}
                           </div>
                         </div>
                       )

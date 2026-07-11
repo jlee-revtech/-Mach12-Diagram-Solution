@@ -2,6 +2,29 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  Archive,
+  ArrowLeftRight,
+  BookOpen,
+  Boxes,
+  Building2,
+  ChevronRight,
+  Copy,
+  Database,
+  Layers,
+  LayoutDashboard,
+  LayoutGrid,
+  Loader2,
+  Map,
+  Network,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Upload,
+  Users,
+  Workflow,
+  X,
+} from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { listDiagrams, createDiagram, archiveDiagram, restoreDiagram } from '@/lib/supabase/diagrams'
 import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreCapabilityMap, duplicateCapabilityMap } from '@/lib/supabase/capability-maps'
@@ -18,20 +41,28 @@ import CapabilityMapWorkspace from '@/components/capmap/CapabilityMapWorkspace'
 import type { DiagramRow } from '@/lib/supabase/types'
 import type { CapabilityMapRow } from '@/lib/sipoc/types'
 import type { ProcessModelRow } from '@/lib/process/types'
-import VersionBadge from '@/components/VersionBadge'
+import {
+  Button,
+  CollapsibleSection,
+  EmptyState,
+  KpiCard,
+  KpiCardSkeleton,
+  LoadingState,
+  PageHeader,
+} from '@/components/common'
+
+const SELECT_CLASSES =
+  'w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none'
 
 export default function Dashboard() {
   const [diagrams, setDiagrams] = useState<DiagramRow[]>([])
   const [capabilityMaps, setCapabilityMaps] = useState<CapabilityMapRow[]>([])
   const [processModels, setProcessModels] = useState<ProcessModelRow[]>([])
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
-  const [collapsedWs, setCollapsedWs] = useState<Set<string>>(new Set())
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
-  const [showArchived, setShowArchived] = useState(false)
   const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process' | 'capmap'>('sipoc')
   const router = useRouter()
-  const { user, profile, organization, organizations, loading, signOut, switchOrg } = useAuth()
-  const [orgMenuOpen, setOrgMenuOpen] = useState(false)
+  const { user, organization, loading } = useAuth()
 
   // Bedrock Data Integration generation
   const [bedrockOpen, setBedrockOpen] = useState(false)
@@ -270,7 +301,7 @@ export default function Dashboard() {
   const archivedProcesses = processModels.filter((p) => p.archived_at)
 
   // Group data-architecture diagrams by value stream (workstream), ordered by the
-  // workstream sort order, with an "Unaligned" bucket last — mirrors how Process
+  // workstream sort order, with an "Unaligned" bucket last - mirrors how Process
   // Studio organizes its content by value stream.
   const wsById = new Map(workstreams.map((w) => [w.id, w]))
   const diagramsByWs = new Map<string, DiagramRow[]>()
@@ -290,654 +321,469 @@ export default function Dashboard() {
       : []),
   ]
   for (const g of diagramGroups) g.diagrams.sort((a, b) => (a.process_context || '').localeCompare(b.process_context || '') || a.title.localeCompare(b.title))
-  const toggleWs = (key: string) =>
-    setCollapsedWs((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+
+  const pillBase = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-body-sm font-medium transition-colors'
+  const pillActive = 'bg-brand-500 text-white'
+  const pillInactive = 'text-text-secondary hover:bg-surface-muted'
+  const subPillBase = 'flex items-center gap-1.5 px-2.5 py-1 rounded text-body-sm transition-colors'
+  const subPillActive = 'bg-brand-50 text-brand-600 font-medium'
+  const subPillInactive = 'text-text-secondary hover:bg-surface-muted'
 
   return (
-    <div className="min-h-screen bg-[var(--m12-bg)] p-8">
-      <div className="mx-auto w-full max-w-[1800px]">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <span className="text-gradient text-2xl font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
-                MACH12
-              </span>
-              <span className="text-[var(--m12-text-muted)] text-lg font-light">/</span>
-              <span className="text-[var(--m12-text-secondary)] text-lg font-medium">Studio</span>
-              <span className="self-end mb-0.5"><VersionBadge /></span>
-            </div>
-            <div className="flex items-center gap-3 mt-1">
-              {/* Org switcher */}
-              <div className="relative">
-                <button
-                  onClick={() => setOrgMenuOpen(!orgMenuOpen)}
-                  className="flex items-center gap-1.5 text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors"
-                >
-                  {organization.name}
-                  {organizations.length > 1 && (
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${orgMenuOpen ? 'rotate-180' : ''}`}>
-                      <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </button>
-                {orgMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setOrgMenuOpen(false)} />
-                    <div className="absolute left-0 top-full mt-1 z-50 w-56 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-lg shadow-xl overflow-hidden">
-                      <div className="px-3 py-2 border-b border-[var(--m12-border)]/40">
-                        <span className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
-                          Organizations
-                        </span>
-                      </div>
-                      {organizations.map((org) => (
-                        <button
-                          key={org.id}
-                          onClick={async () => {
-                            await switchOrg(org.id)
-                            setOrgMenuOpen(false)
-                            setLoadingDiagrams(true)
-                            Promise.all([
-                              listDiagrams(org.id, true).then(setDiagrams),
-                              listCapabilityMaps(org.id, true).then(setCapabilityMaps),
-                              listProcessModels(org.id, true).then(setProcessModels),
-                            ]).finally(() => setLoadingDiagrams(false))
-                          }}
-                          className={`flex items-center gap-2 w-full text-left px-3 py-2 text-xs transition-colors ${
-                            org.id === organization.id
-                              ? 'bg-[#2563EB]/10 text-[#93C5FD]'
-                              : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'
-                          }`}
-                        >
-                          <div className={`w-2 h-2 rounded-full ${org.id === organization.id ? 'bg-[#2563EB]' : 'bg-[#374A5E]'}`} />
-                          <span className="flex-1 truncate">{org.name}</span>
-                          <span className="text-[8px] uppercase text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
-                            {org.role}
-                          </span>
-                        </button>
-                      ))}
-                      <div className="border-t border-[var(--m12-border)]/40">
-                        <button
-                          onClick={() => { setOrgMenuOpen(false); router.push('/setup') }}
-                          className="flex items-center gap-2 w-full text-left px-3 py-2 text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors"
-                        >
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                            <path d="M5 2v6M2 5h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                          </svg>
-                          Create or join org
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-              <span className="text-[var(--m12-border)]">|</span>
-              <span className="text-xs text-[var(--m12-text-muted)]">{profile?.display_name || profile?.email}</span>
+    <div className="space-y-6 max-w-[1400px]">
+      <PageHeader
+        title="Studio"
+        icon={<LayoutDashboard size={24} />}
+        subtitle={`Process models, data architecture diagrams, and capability maps for ${organization.name}`}
+        actions={
+          <>
+            <Button variant="secondary" icon={<Plus size={14} />} onClick={handleNewProcessModel}>
+              New Process Model
+            </Button>
+            <Button variant="secondary" icon={<Plus size={14} />} onClick={handleNewCapabilityMap}>
+              New SIPOC Map
+            </Button>
+            <Button variant="primary" icon={<Plus size={14} />} onClick={handleNew}>
+              New Diagram
+            </Button>
+          </>
+        }
+      />
+
+      {/* KPI row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {loadingDiagrams ? (
+          <>
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+          </>
+        ) : (
+          <>
+            <KpiCard
+              title="Process Models"
+              value={activeProcesses.length}
+              subtitle={archivedProcesses.length > 0 ? `${archivedProcesses.length} archived` : undefined}
+              icon={<Workflow size={16} />}
+              color="brand"
+            />
+            <KpiCard
+              title="Diagrams"
+              value={activeDiagrams.length}
+              subtitle={archivedDiagrams.length > 0 ? `${archivedDiagrams.length} archived` : undefined}
+              icon={<Network size={16} />}
+              color="brand"
+            />
+            <KpiCard
+              title="Capability Maps"
+              value={activeMaps.length}
+              subtitle={archivedMaps.length > 0 ? `${archivedMaps.length} archived` : undefined}
+              icon={<Map size={16} />}
+              color="brand"
+            />
+            <KpiCard
+              title="Workstreams"
+              value={workstreams.length}
+              subtitle="Value streams"
+              icon={<Layers size={16} />}
+              color="brand"
+            />
+          </>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        {/* Pillar filter pills: Process Studio / Data Architecture / Capability Map */}
+        <div className="space-y-2">
+          <div className="bg-white rounded-lg border border-border p-1 flex items-center gap-1 w-fit">
+            <button
+              onClick={() => setActiveTab('process')}
+              className={`${pillBase} ${activeTab === 'process' ? pillActive : pillInactive}`}
+            >
+              <Workflow size={14} />
+              Process Studio ({activeProcesses.length})
+            </button>
+            <button
+              onClick={() => setActiveTab(t => (t === 'diagrams' || t === 'sipoc') ? t : 'sipoc')}
+              className={`${pillBase} ${activeTab === 'diagrams' || activeTab === 'sipoc' ? pillActive : pillInactive}`}
+            >
+              <Database size={14} />
+              Data Architecture ({activeDiagrams.length + activeMaps.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('capmap')}
+              className={`${pillBase} ${activeTab === 'capmap' ? pillActive : pillInactive}`}
+            >
+              <LayoutGrid size={14} />
+              Capability Map
+            </button>
+          </div>
+
+          {/* Sub-pills under Data Architecture: Diagrams + SIPOC Maps */}
+          {(activeTab === 'diagrams' || activeTab === 'sipoc') && (
+            <div className="flex items-center gap-1 ml-1">
               <button
-                onClick={signOut}
-                className="text-xs text-[var(--m12-border)] hover:text-red-400 transition-colors"
+                onClick={() => setActiveTab('diagrams')}
+                className={`${subPillBase} ${activeTab === 'diagrams' ? subPillActive : subPillInactive}`}
               >
-                Sign out
+                <Network size={12} />
+                Diagrams ({activeDiagrams.length})
+              </button>
+              <span className="text-text-tertiary">/</span>
+              <button
+                onClick={() => setActiveTab('sipoc')}
+                className={`${subPillBase} ${activeTab === 'sipoc' ? subPillActive : subPillInactive}`}
+              >
+                <ArrowLeftRight size={12} />
+                SIPOC Maps ({activeMaps.length})
               </button>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push('/workstreams')}
-              title="Workstreams — value-stream alignment & consultant agents"
-              className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 hover:border-[var(--m12-border)] text-[var(--m12-text-secondary)] px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-            >
-              <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
-                <rect x="2.5" y="9" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
-                <rect x="7.5" y="5.5" width="3" height="9.5" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
-                <rect x="12.5" y="2.5" width="3" height="12.5" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
-              </svg>
-              Workstreams
-            </button>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-[#2563EB]/20"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              New Diagram
-            </button>
-            <button
-              onClick={handleNewCapabilityMap}
-              className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-[#8B5CF6]/20"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              New SIPOC Map
-            </button>
-            <button
-              onClick={handleNewProcessModel}
-              className="flex items-center gap-2 bg-[#0EA5E9] hover:bg-[#38BDF8] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-[#0EA5E9]/20"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              New Process Model
-            </button>
-          </div>
+          )}
         </div>
-
-        {/* Tab switcher — top level: Process Studio, Data Architecture (which contains SIPOC) */}
-        <div className="flex gap-1 mb-3 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-1 w-fit">
-          <button
-            onClick={() => setActiveTab('process')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              activeTab === 'process'
-                ? 'bg-[#0EA5E9]/10 text-[#0EA5E9] shadow-sm'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect x="1" y="2.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="9" y="2.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="5" y="8.5" width="4" height="3" rx="0.7" stroke="currentColor" strokeWidth="1.2" />
-              <path d="M5 4h2.5a1 1 0 011 1v3M9 4H6.5a1 1 0 00-1 1v3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-            </svg>
-            Process Studio ({activeProcesses.length})
-          </button>
-          <button
-            onClick={() => setActiveTab(t => (t === 'diagrams' || t === 'sipoc') ? t : 'sipoc')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              activeTab === 'diagrams' || activeTab === 'sipoc'
-                ? 'bg-[#2563EB]/10 text-[#2563EB] shadow-sm'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-            </svg>
-            Data Architecture ({activeDiagrams.length + activeMaps.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('capmap')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              activeTab === 'capmap'
-                ? 'bg-[#10B981]/10 text-[#10B981] shadow-sm'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-            }`}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="8" y="1.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <rect x="1.5" y="8" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <path d="M10.25 8v4.5M8 10.25h4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-            Capability Map
-          </button>
-        </div>
-
-        {/* Sub-tabs under Data Architecture: Diagrams + SIPOC Maps */}
-        {(activeTab === 'diagrams' || activeTab === 'sipoc') && (
-          <div className="flex items-center gap-1 mb-6 ml-1">
-            <button
-              onClick={() => setActiveTab('diagrams')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
-                activeTab === 'diagrams'
-                  ? 'bg-[#2563EB]/10 text-[#2563EB]'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-              }`}
-            >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-                <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              </svg>
-              Diagrams ({activeDiagrams.length})
-            </button>
-            <span className="text-[var(--m12-border)]/60">/</span>
-            <button
-              onClick={() => setActiveTab('sipoc')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
-                activeTab === 'sipoc'
-                  ? 'bg-[#8B5CF6]/10 text-[#8B5CF6]'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
-              }`}
-            >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <path d="M1 7h3M10 7h3M5.5 7h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                <path d="M4 5l1.5 2L4 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M8.5 5L10 7l-1.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              SIPOC Maps ({activeMaps.length})
-            </button>
-          </div>
-        )}
 
         {/* Process: reference-library + import entry points */}
         {activeTab === 'process' && (
-          <div className="flex items-stretch gap-3 mb-4">
-          <input
-            ref={importInputRef}
-            type="file"
-            accept=".bpmn,.xml,.xlsx,.xls,.csv"
-            onChange={handleImportFile}
-            className="hidden"
-            aria-label="Import process file"
-          />
-          <button
-            onClick={() => router.push('/process/library')}
-            className="flex-1 flex items-center gap-3 bg-[#0EA5E9]/8 border border-[#0EA5E9]/30 hover:border-[#0EA5E9]/60 rounded-xl px-4 py-3 transition-colors group text-left"
-          >
-            <div className="w-8 h-8 rounded-lg bg-[#0EA5E9]/15 flex items-center justify-center shrink-0">
-              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#0EA5E9]">
-                <path d="M3 4.5A1.5 1.5 0 014.5 3H8v12H4.5A1.5 1.5 0 013 13.5v-9zM10 3h3.5A1.5 1.5 0 0115 4.5v9a1.5 1.5 0 01-1.5 1.5H10V3z" stroke="currentColor" strokeWidth="1.3" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-[var(--m12-text)]">Start from a best-practice reference</div>
-              <div className="text-[11px] text-[var(--m12-text-muted)]">Browse the SAP-style A&amp;D process library and instantiate a scenario into an editable model.</div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#0EA5E9] group-hover:translate-x-0.5 transition-transform shrink-0">
-              <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <button
-            onClick={() => importInputRef.current?.click()}
-            disabled={importing}
-            title="Import a BPMN (.bpmn/.xml) flow or a Signavio/Solution Manager BPML spreadsheet (.xlsx/.csv)"
-            className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
-          >
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[var(--m12-text-secondary)]">
-              <path d="M9 11.5V3m0 8.5L6 8.5M9 11.5l3-3M3.5 12v2a1 1 0 001 1h9a1 1 0 001-1v-2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="text-xs font-medium text-[var(--m12-text-secondary)]">{importing ? 'Importing…' : 'Import'}</span>
-          </button>
-          <button
-            onClick={() => router.push('/process/personas')}
-            title="Persona Catalog — personas, roles, and role-as-swimlane"
-            className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
-          >
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#8B5CF6]">
-              <circle cx="6.5" cy="6" r="2.2" stroke="currentColor" strokeWidth="1.3" />
-              <circle cx="12" cy="7" r="1.8" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M2.5 14c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5M11 14c0-1.6 1-2.8 2.6-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
-            <span className="text-xs font-medium text-[var(--m12-text-secondary)]">Personas</span>
-          </button>
+          <div className="flex items-stretch gap-3">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".bpmn,.xml,.xlsx,.xls,.csv"
+              onChange={handleImportFile}
+              className="hidden"
+              aria-label="Import process file"
+            />
+            <button
+              onClick={() => router.push('/process/library')}
+              className="flex-1 flex items-center gap-3 bg-white rounded-lg border border-border shadow-card hover:shadow-card-hover px-4 py-3 transition-all group text-left"
+            >
+              <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                <BookOpen size={16} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-body-md font-semibold text-text-primary">Start from a best-practice reference</div>
+                <div className="text-[11px] text-text-tertiary">Browse the SAP-style A&amp;D process library and instantiate a scenario into an editable model.</div>
+              </div>
+              <ChevronRight size={16} className="text-text-tertiary group-hover:text-brand-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </button>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              title="Import a BPMN (.bpmn/.xml) flow or a Signavio/Solution Manager BPML spreadsheet (.xlsx/.csv)"
+              className="flex items-center gap-2 bg-white rounded-lg border border-border shadow-card hover:bg-surface-muted px-4 transition-colors text-left shrink-0 disabled:opacity-50 disabled:cursor-wait"
+            >
+              {importing ? (
+                <Loader2 size={16} className="animate-spin text-text-tertiary" />
+              ) : (
+                <Upload size={16} className="text-text-secondary" />
+              )}
+              <span className="text-body-sm font-medium text-text-secondary">{importing ? 'Importing…' : 'Import'}</span>
+            </button>
+            <button
+              onClick={() => router.push('/process/personas')}
+              title="Persona Catalog - personas, roles, and role-as-swimlane"
+              className="flex items-center gap-2 bg-white rounded-lg border border-border shadow-card hover:bg-surface-muted px-4 transition-colors text-left shrink-0"
+            >
+              <Users size={16} className="text-purple-600" />
+              <span className="text-body-sm font-medium text-text-secondary">Personas</span>
+            </button>
           </div>
         )}
 
         {/* Diagrams: bedrock data integration entry points */}
         {activeTab === 'diagrams' && (
-          <div className="flex items-stretch gap-3 mb-4">
+          <div className="flex items-stretch gap-3">
             <button
               onClick={() => { setBedrockOpen(true); setBedrockError(null) }}
-              className="flex-1 flex items-center gap-3 bg-[#2563EB]/8 border border-[#2563EB]/30 hover:border-[#2563EB]/60 rounded-xl px-4 py-3 transition-colors group text-left"
+              className="flex-1 flex items-center gap-3 bg-white rounded-lg border border-border shadow-card hover:shadow-card-hover px-4 py-3 transition-all group text-left"
             >
-              <div className="w-8 h-8 rounded-lg bg-[#2563EB]/15 flex items-center justify-center shrink-0">
-                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#2563EB]">
-                  <rect x="2" y="2.5" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3" />
-                  <rect x="11" y="2.5" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3" />
-                  <rect x="6.5" y="11.5" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M4.5 6.5v2.5a1 1 0 001 1H9m4.5-3.5v2.5a1 1 0 01-1 1H9m0 0v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                </svg>
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                <Boxes size={16} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-[var(--m12-text)]">Generate a Bedrock Data Integration</div>
-                <div className="text-[11px] text-[var(--m12-text-muted)]">Map the data passed between systems for a process model&apos;s L1/L2/L3 processes, grounded in your bedrock systems.</div>
+                <div className="text-body-md font-semibold text-text-primary">Generate a Bedrock Data Integration</div>
+                <div className="text-[11px] text-text-tertiary">Map the data passed between systems for a process model&apos;s L1/L2/L3 processes, grounded in your bedrock systems.</div>
               </div>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#2563EB] group-hover:translate-x-0.5 transition-transform shrink-0">
-                <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <ChevronRight size={16} className="text-text-tertiary group-hover:text-brand-600 group-hover:translate-x-0.5 transition-all shrink-0" />
             </button>
             <button
               onClick={() => { setSipocOpen(true); setSipocError(null) }}
-              className="flex-1 flex items-center gap-3 bg-[#8B5CF6]/8 border border-[#8B5CF6]/30 hover:border-[#8B5CF6]/60 rounded-xl px-4 py-3 transition-colors group text-left"
+              className="flex-1 flex items-center gap-3 bg-white rounded-lg border border-border shadow-card hover:shadow-card-hover px-4 py-3 transition-all group text-left"
             >
-              <div className="w-8 h-8 rounded-lg bg-[#8B5CF6]/15 flex items-center justify-center shrink-0">
-                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#8B5CF6]">
-                  <path d="M2 9h3M13 9h3M7 9h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                  <path d="M5 6.5L7 9l-2 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M11 6.5L13 9l-2 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+                <ArrowLeftRight size={16} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-[var(--m12-text)]">Generate a diagram from a SIPOC</div>
-                <div className="text-[11px] text-[var(--m12-text-muted)]">Turn a SIPOC capability map into a data-architecture diagram — one system flow per L3 capability, with information products on the wires.</div>
+                <div className="text-body-md font-semibold text-text-primary">Generate a diagram from a SIPOC</div>
+                <div className="text-[11px] text-text-tertiary">Turn a SIPOC capability map into a data-architecture diagram - one system flow per L3 capability, with information products on the wires.</div>
               </div>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#8B5CF6] group-hover:translate-x-0.5 transition-transform shrink-0">
-                <path d="M5 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <ChevronRight size={16} className="text-text-tertiary group-hover:text-brand-600 group-hover:translate-x-0.5 transition-all shrink-0" />
             </button>
             <button
               onClick={() => router.push('/data/bedrock')}
-              title="Bedrock Systems — logical platform categories and their physical systems"
-              className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
+              title="Bedrock Systems - logical platform categories and their physical systems"
+              className="flex items-center gap-2 bg-white rounded-lg border border-border shadow-card hover:bg-surface-muted px-4 transition-colors text-left shrink-0"
             >
-              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#2563EB]">
-                <ellipse cx="9" cy="4" rx="6" ry="2.2" stroke="currentColor" strokeWidth="1.3" />
-                <path d="M3 4v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4M3 9v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V9" stroke="currentColor" strokeWidth="1.3" />
-              </svg>
-              <span className="text-xs font-medium text-[var(--m12-text-secondary)]">Bedrock Systems</span>
+              <Database size={16} className="text-brand-600" />
+              <span className="text-body-sm font-medium text-text-secondary">Bedrock Systems</span>
             </button>
             <button
               onClick={() => router.push('/data/sap-model')}
-              title="SAP Enterprise Data Model — controlling area, company codes, plants, org units and RA-keyed WBS, pulled live from S/4HANA"
-              className="flex items-center gap-2 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl px-4 transition-colors text-left shrink-0"
+              title="SAP Enterprise Data Model - controlling area, company codes, plants, org units and RA-keyed WBS, pulled live from S/4HANA"
+              className="flex items-center gap-2 bg-white rounded-lg border border-border shadow-card hover:bg-surface-muted px-4 transition-colors text-left shrink-0"
             >
-              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" className="text-[#10B981]">
-                <rect x="6.5" y="1.5" width="5" height="3.2" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
-                <rect x="1.5" y="9" width="4.2" height="3.2" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
-                <rect x="7" y="9" width="4.2" height="3.2" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
-                <rect x="12.5" y="9" width="4.2" height="3.2" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
-                <path d="M9 4.7v2.1M9 6.8H3.6V9M9 6.8v2.2M9 6.8h5.6V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="text-xs font-medium text-[var(--m12-text-secondary)]">SAP Data Model</span>
+              <Building2 size={16} className="text-text-secondary" />
+              <span className="text-body-sm font-medium text-text-secondary">SAP Data Model</span>
             </button>
           </div>
         )}
 
         {/* Content grid */}
         {loadingDiagrams ? (
-          <div className="text-center py-24 text-[var(--m12-text-muted)] text-sm">Loading...</div>
+          <LoadingState variant="card" label="Loading studio content..." />
         ) : activeTab === 'diagrams' ? (
           /* ─── Diagrams Tab ─────────────────────────────── */
           activeDiagrams.length === 0 && archivedDiagrams.length === 0 ? (
-            <div className="text-center py-24 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
-              <div className="text-5xl mb-4 opacity-20">&#9634;</div>
-              <h2 className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">
-                No diagrams yet
-              </h2>
-              <p className="text-sm text-[var(--m12-text-muted)] mb-6">
-                Create your first data architecture diagram to get started.
-              </p>
-              <button
-                onClick={handleNew}
-                className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                Create Diagram
-              </button>
-            </div>
+            <EmptyState
+              variant="dashed"
+              icon={<Network size={40} />}
+              title="No diagrams yet"
+              description="Create your first data architecture diagram to get started."
+              action={
+                <Button variant="primary" icon={<Plus size={14} />} onClick={handleNew}>
+                  Create Diagram
+                </Button>
+              }
+            />
           ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <button
                   onClick={handleNew}
-                  className="flex flex-col items-center justify-center border-2 border-dashed border-[var(--m12-border)]/40 hover:border-[#2563EB]/60 rounded-xl p-8 transition-colors group"
+                  className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border hover:border-brand-500 hover:bg-brand-50/30 p-8 transition-colors group"
                 >
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-[var(--m12-border)] group-hover:text-[#2563EB] transition-colors mb-2">
-                    <path d="M16 8v16M8 16h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  <span className="text-sm text-[var(--m12-text-muted)] group-hover:text-[var(--m12-text-secondary)] transition-colors">New Diagram</span>
+                  <Plus size={28} className="text-text-tertiary group-hover:text-brand-600 transition-colors mb-2" />
+                  <span className="text-body-sm text-text-secondary group-hover:text-text-primary transition-colors">New Diagram</span>
                 </button>
               </div>
               {/* Grouped by value stream (mirrors Process Studio organization) */}
-              {diagramGroups.map((grp) => {
-                const collapsed = collapsedWs.has(grp.key)
-                return (
-                  <div key={grp.key} className="mb-6">
-                    <button
-                      onClick={() => toggleWs(grp.key)}
-                      className="w-full flex items-center gap-2.5 mb-3 group/head"
-                      style={{ borderLeft: `3px solid ${grp.color}`, paddingLeft: 10 }}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${collapsed ? '' : 'rotate-90'} text-[var(--m12-text-muted)]`}>
-                        <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+              {diagramGroups.map((grp) => (
+                <CollapsibleSection
+                  key={grp.key}
+                  id={grp.key}
+                  storageKey="mach12-studio:diagram-ws"
+                  tone="neutral"
+                  count={grp.diagrams.length}
+                  title={
+                    <span className="inline-flex items-center gap-2">
                       {grp.icon && (
-                        <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${grp.color}1A`, color: grp.color }}>
-                          <WorkstreamIcon icon={grp.icon} size={14} />
+                        <span
+                          className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: `${grp.color}1A`, color: grp.color }}
+                        >
+                          <WorkstreamIcon icon={grp.icon} size={12} />
                         </span>
                       )}
-                      <h3 className="text-sm font-semibold text-[var(--m12-text)] group-hover/head:text-white transition-colors">{grp.name}</h3>
-                      <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-full px-2 py-0.5">{grp.diagrams.length}</span>
-                    </button>
-                    {!collapsed && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {grp.diagrams.map((d) => (
-                          <div
-                            key={d.id}
-                            onClick={() => router.push(`/diagram/${d.id}`)}
-                            className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl p-5 cursor-pointer transition-all card-glow"
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">{d.title}</h3>
-                              <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                                {d.diagram_kind === 'bedrock_integration' && d.source_process_model_id && (
-                                  <button
-                                    onClick={(e) => handleRegenerateBedrock(d, e)}
-                                    title="Regenerate from the source process model"
-                                    disabled={regeneratingId === d.id}
-                                    className="text-[var(--m12-border)] hover:text-[#2563EB] transition-colors disabled:opacity-50"
-                                  >
-                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={regeneratingId === d.id ? 'animate-spin' : ''}>
-                                      <path d="M13 8a5 5 0 11-1.5-3.5M13 2.5V5h-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  </button>
-                                )}
-                                <button
-                                  onClick={(e) => handleArchive(d.id, e)}
-                                  title="Archive diagram"
-                                  className="text-[var(--m12-border)] hover:text-[#EAB308] transition-colors"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                                    <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-                                    <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
-                                    <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5 mb-3 empty:hidden">
-                              {d.diagram_kind === 'bedrock_integration' && (
-                                <span className="inline-flex items-center bg-[#2563EB]/15 border border-[#2563EB]/40 rounded px-2 py-0.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[#93C5FD] uppercase tracking-wider">Bedrock</span>
-                              )}
-                              {d.process_context && (
-                                <span className="inline-flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-0.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-                                  <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider">{d.process_context}</span>
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
-                              Updated {new Date(d.updated_at).toLocaleDateString()}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {archivedDiagrams.length > 0 && (
-                <div className="mt-8">
-                  <button
-                    onClick={() => setShowArchived(!showArchived)}
-                    className="flex items-center gap-2 text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors mb-3"
-                  >
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${showArchived ? 'rotate-90' : ''}`}>
-                      <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="opacity-60">
-                      <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                    </svg>
-                    Archived ({archivedDiagrams.length})
-                  </button>
-                  {showArchived && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {archivedDiagrams.map((d) => (
-                        <div key={d.id} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/20 rounded-xl p-5 opacity-60 hover:opacity-80 transition-all">
-                          <div className="flex items-start justify-between mb-3">
-                            <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">{d.title}</h3>
-                            <button
-                              onClick={(e) => handleRestore(d.id, e)}
-                              title="Restore diagram"
-                              className="text-[var(--m12-border)] hover:text-[#10B981] transition-colors ml-2 shrink-0 text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider flex items-center gap-1"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                                <path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M7 3L4 6l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                              Restore
-                            </button>
-                          </div>
-                          {d.process_context && (
-                            <div className="inline-flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-0.5 mb-3">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-                              <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider">{d.process_context}</span>
-                            </div>
-                          )}
-                          <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
-                            Archived {new Date(d.archived_at!).toLocaleDateString()}
+                      {grp.name}
+                    </span>
+                  }
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {grp.diagrams.map((d) => (
+                      <div
+                        key={d.id}
+                        onClick={() => router.push(`/diagram/${d.id}`)}
+                        className="bg-white rounded-lg border border-border shadow-card p-5 cursor-pointer hover:shadow-card-hover hover:-translate-y-0.5 transition-all"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="font-display text-heading-sm text-text-primary truncate flex-1">{d.title}</h3>
+                          <div className="flex items-center gap-1 ml-2 shrink-0">
+                            {d.diagram_kind === 'bedrock_integration' && d.source_process_model_id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
+                                aria-label="Regenerate from the source process model"
+                                title="Regenerate from the source process model"
+                                loading={regeneratingId === d.id}
+                                icon={<RefreshCw size={14} />}
+                                onClick={(e) => handleRegenerateBedrock(d, e)}
+                              />
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              iconOnly
+                              aria-label="Archive diagram"
+                              title="Archive diagram"
+                              icon={<Archive size={14} />}
+                              onClick={(e) => handleArchive(d.id, e)}
+                            />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-3 empty:hidden">
+                          {d.diagram_kind === 'bedrock_integration' && (
+                            <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-status-blue-bg text-status-blue">Bedrock</span>
+                          )}
+                          {d.process_context && (
+                            <span className="inline-flex items-center gap-1.5 rounded bg-surface-muted px-2 py-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />
+                              <span className="text-[10px] font-mono text-text-secondary uppercase tracking-wider">{d.process_context}</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-text-tertiary">
+                          Updated {new Date(d.updated_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleSection>
+              ))}
+              {archivedDiagrams.length > 0 && (
+                <CollapsibleSection
+                  id="archived-diagrams"
+                  storageKey="mach12-studio:home"
+                  tone="slate"
+                  title="Archived"
+                  count={archivedDiagrams.length}
+                  defaultOpen={false}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {archivedDiagrams.map((d) => (
+                      <div key={d.id} className="bg-white rounded-lg border border-border shadow-card p-5 opacity-60 hover:opacity-100 transition-opacity">
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="font-display text-heading-sm text-text-primary truncate flex-1">{d.title}</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Restore diagram"
+                            title="Restore diagram"
+                            icon={<RotateCcw size={12} />}
+                            onClick={(e) => handleRestore(d.id, e)}
+                            className="ml-2 shrink-0"
+                          >
+                            Restore
+                          </Button>
+                        </div>
+                        {d.process_context && (
+                          <div className="inline-flex items-center gap-1.5 rounded bg-surface-muted px-2 py-0.5 mb-3">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />
+                            <span className="text-[10px] font-mono text-text-secondary uppercase tracking-wider">{d.process_context}</span>
+                          </div>
+                        )}
+                        <div className="text-[11px] text-text-tertiary">
+                          Archived {new Date(d.archived_at!).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleSection>
               )}
-            </>
+            </div>
           )
         ) : activeTab === 'sipoc' ? (
           /* ─── SIPOC Maps Tab ───────────────────────────── */
           activeMaps.length === 0 && archivedMaps.length === 0 ? (
-            <div className="text-center py-24 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
-              <div className="text-5xl mb-4 opacity-20">&#9645;</div>
-              <h2 className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">
-                No capability maps yet
-              </h2>
-              <p className="text-sm text-[var(--m12-text-muted)] mb-6">
-                Create a SIPOC capability map to model data inputs, outputs, and personas.
-              </p>
-              <button
-                onClick={handleNewCapabilityMap}
-                className="inline-flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                Create SIPOC Map
-              </button>
-            </div>
+            <EmptyState
+              variant="dashed"
+              icon={<Map size={40} />}
+              title="No capability maps yet"
+              description="Create a SIPOC capability map to model data inputs, outputs, and personas."
+              action={
+                <Button variant="primary" icon={<Plus size={14} />} onClick={handleNewCapabilityMap}>
+                  Create SIPOC Map
+                </Button>
+              }
+            />
           ) : (
-            <>
+            <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <button
                   onClick={handleNewCapabilityMap}
-                  className="flex flex-col items-center justify-center border-2 border-dashed border-[var(--m12-border)]/40 hover:border-[#8B5CF6]/60 rounded-xl p-8 transition-colors group"
+                  className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border hover:border-brand-500 hover:bg-brand-50/30 p-8 transition-colors group"
                 >
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-[var(--m12-border)] group-hover:text-[#8B5CF6] transition-colors mb-2">
-                    <path d="M16 8v16M8 16h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  <span className="text-sm text-[var(--m12-text-muted)] group-hover:text-[var(--m12-text-secondary)] transition-colors">New SIPOC Map</span>
+                  <Plus size={28} className="text-text-tertiary group-hover:text-brand-600 transition-colors mb-2" />
+                  <span className="text-body-sm text-text-secondary group-hover:text-text-primary transition-colors">New SIPOC Map</span>
                 </button>
                 {activeMaps.map((m) => (
                   <div
                     key={m.id}
                     onClick={() => router.push(`/capability-map/${m.id}`)}
-                    className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl p-5 cursor-pointer transition-all card-glow"
+                    className="bg-white rounded-lg border border-border shadow-card p-5 cursor-pointer hover:shadow-card-hover hover:-translate-y-0.5 transition-all"
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">{m.title}</h3>
+                      <h3 className="font-display text-heading-sm text-text-primary truncate flex-1">{m.title}</h3>
                       <div className="flex items-center gap-1 ml-2 shrink-0">
-                        <button
-                          onClick={(e) => handleDuplicateMap(m.id, e)}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          aria-label="Duplicate capability map"
                           title="Duplicate capability map"
-                          disabled={duplicating === m.id}
-                          className="text-[var(--m12-border)] hover:text-[#2563EB] disabled:opacity-40 disabled:cursor-wait transition-colors"
-                        >
-                          {duplicating === m.id ? (
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="animate-spin">
-                              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="10" strokeLinecap="round"/>
-                            </svg>
-                          ) : (
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                              <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-                              <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.3"/>
-                            </svg>
-                          )}
-                        </button>
-                        <button
-                          onClick={(e) => handleArchiveMap(m.id, e)}
+                          loading={duplicating === m.id}
+                          icon={<Copy size={14} />}
+                          onClick={(e) => handleDuplicateMap(m.id, e)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          aria-label="Archive capability map"
                           title="Archive capability map"
-                          className="text-[var(--m12-border)] hover:text-[#EAB308] transition-colors"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                            <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-                            <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
-                            <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                          </svg>
-                        </button>
+                          icon={<Archive size={14} />}
+                          onClick={(e) => handleArchiveMap(m.id, e)}
+                        />
                       </div>
                     </div>
-                    <div className="inline-flex items-center gap-1.5 bg-[#8B5CF6]/10 border border-[#8B5CF6]/30 rounded px-2 py-0.5 mb-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
-                      <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[#8B5CF6] uppercase tracking-wider font-bold">SIPOC</span>
+                    <div className="inline-flex items-center gap-1.5 rounded bg-purple-50 px-2 py-0.5 mb-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                      <span className="text-[10px] font-mono text-purple-700 uppercase tracking-wider font-bold">SIPOC</span>
                     </div>
                     {m.description && (
-                      <div className="text-[11px] text-[var(--m12-text-muted)] mb-2 line-clamp-2">{m.description}</div>
+                      <div className="text-body-sm text-text-secondary mb-2 line-clamp-2">{m.description}</div>
                     )}
-                    <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
+                    <div className="text-[11px] text-text-tertiary">
                       Updated {new Date(m.updated_at).toLocaleDateString()}
                     </div>
                   </div>
                 ))}
               </div>
               {archivedMaps.length > 0 && (
-                <div className="mt-8">
-                  <button
-                    onClick={() => setShowArchived(!showArchived)}
-                    className="flex items-center gap-2 text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors mb-3"
-                  >
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${showArchived ? 'rotate-90' : ''}`}>
-                      <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="opacity-60">
-                      <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                    </svg>
-                    Archived ({archivedMaps.length})
-                  </button>
-                  {showArchived && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {archivedMaps.map((m) => (
-                        <div key={m.id} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/20 rounded-xl p-5 opacity-60 hover:opacity-80 transition-all">
-                          <div className="flex items-start justify-between mb-3">
-                            <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">{m.title}</h3>
-                            <button
-                              onClick={(e) => handleRestoreMap(m.id, e)}
-                              title="Restore capability map"
-                              className="text-[var(--m12-border)] hover:text-[#10B981] transition-colors ml-2 shrink-0 text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider flex items-center gap-1"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                                <path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M7 3L4 6l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                              Restore
-                            </button>
-                          </div>
-                          <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
-                            Archived {new Date(m.archived_at!).toLocaleDateString()}
-                          </div>
+                <CollapsibleSection
+                  id="archived-sipoc"
+                  storageKey="mach12-studio:home"
+                  tone="slate"
+                  title="Archived"
+                  count={archivedMaps.length}
+                  defaultOpen={false}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {archivedMaps.map((m) => (
+                      <div key={m.id} className="bg-white rounded-lg border border-border shadow-card p-5 opacity-60 hover:opacity-100 transition-opacity">
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="font-display text-heading-sm text-text-primary truncate flex-1">{m.title}</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Restore capability map"
+                            title="Restore capability map"
+                            icon={<RotateCcw size={12} />}
+                            onClick={(e) => handleRestoreMap(m.id, e)}
+                            className="ml-2 shrink-0"
+                          >
+                            Restore
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        <div className="text-[11px] text-text-tertiary">
+                          Archived {new Date(m.archived_at!).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleSection>
               )}
-            </>
+            </div>
           )
         ) : activeTab === 'capmap' ? (
           /* ─── Capability Map Tab ───────────────────────── */
@@ -945,169 +791,156 @@ export default function Dashboard() {
         ) : (
           /* ─── Process Studio Tab ───────────────────────── */
           activeProcesses.length === 0 && archivedProcesses.length === 0 ? (
-            <div className="text-center py-24 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
-              <div className="text-5xl mb-4 opacity-20">&#8694;</div>
-              <h2 className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">
-                No process models yet
-              </h2>
-              <p className="text-sm text-[var(--m12-text-muted)] mb-6">
-                Model end-to-end business processes with a navigable value-chain hierarchy and BPMN flows.
-              </p>
-              <button
-                onClick={handleNewProcessModel}
-                className="inline-flex items-center gap-2 bg-[#0EA5E9] hover:bg-[#38BDF8] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                Create Process Model
-              </button>
-            </div>
+            <EmptyState
+              variant="dashed"
+              icon={<Workflow size={40} />}
+              title="No process models yet"
+              description="Model end-to-end business processes with a navigable value-chain hierarchy and BPMN flows."
+              action={
+                <Button variant="primary" icon={<Plus size={14} />} onClick={handleNewProcessModel}>
+                  Create Process Model
+                </Button>
+              }
+            />
           ) : (
-            <>
+            <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <button
                   onClick={handleNewProcessModel}
-                  className="flex flex-col items-center justify-center border-2 border-dashed border-[var(--m12-border)]/40 hover:border-[#0EA5E9]/60 rounded-xl p-8 transition-colors group"
+                  className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border hover:border-brand-500 hover:bg-brand-50/30 p-8 transition-colors group"
                 >
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-[var(--m12-border)] group-hover:text-[#0EA5E9] transition-colors mb-2">
-                    <path d="M16 8v16M8 16h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  <span className="text-sm text-[var(--m12-text-muted)] group-hover:text-[var(--m12-text-secondary)] transition-colors">New Process Model</span>
+                  <Plus size={28} className="text-text-tertiary group-hover:text-brand-600 transition-colors mb-2" />
+                  <span className="text-body-sm text-text-secondary group-hover:text-text-primary transition-colors">New Process Model</span>
                 </button>
                 {activeProcesses.map((p) => (
                   <div
                     key={p.id}
                     onClick={() => router.push(`/process/${p.id}`)}
-                    className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl p-5 cursor-pointer transition-all card-glow"
+                    className="bg-white rounded-lg border border-border shadow-card p-5 cursor-pointer hover:shadow-card-hover hover:-translate-y-0.5 transition-all"
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">{p.title}</h3>
+                      <h3 className="font-display text-heading-sm text-text-primary truncate flex-1">{p.title}</h3>
                       <div className="flex items-center gap-1 ml-2 shrink-0">
-                        <button
-                          onClick={(e) => handleDuplicateProcess(p.id, e)}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          aria-label="Duplicate process model"
                           title="Duplicate process model"
-                          disabled={duplicatingProcess === p.id}
-                          className="text-[var(--m12-border)] hover:text-[#0EA5E9] disabled:opacity-40 disabled:cursor-wait transition-colors"
-                        >
-                          {duplicatingProcess === p.id ? (
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="animate-spin">
-                              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="10" strokeLinecap="round"/>
-                            </svg>
-                          ) : (
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                              <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-                              <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" strokeWidth="1.3"/>
-                            </svg>
-                          )}
-                        </button>
-                        <button
-                          onClick={(e) => handleArchiveProcess(p.id, e)}
+                          loading={duplicatingProcess === p.id}
+                          icon={<Copy size={14} />}
+                          onClick={(e) => handleDuplicateProcess(p.id, e)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          aria-label="Archive process model"
                           title="Archive process model"
-                          className="text-[var(--m12-border)] hover:text-[#EAB308] transition-colors"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                            <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-                            <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
-                            <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                          </svg>
-                        </button>
+                          icon={<Archive size={14} />}
+                          onClick={(e) => handleArchiveProcess(p.id, e)}
+                        />
                       </div>
                     </div>
-                    <div className="inline-flex items-center gap-1.5 bg-[#0EA5E9]/10 border border-[#0EA5E9]/30 rounded px-2 py-0.5 mb-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#0EA5E9]" />
-                      <span className="text-[10px] font-[family-name:var(--font-space-mono)] text-[#0EA5E9] uppercase tracking-wider font-bold">Process</span>
+                    <div className="inline-flex items-center gap-1.5 rounded bg-status-blue-bg px-2 py-0.5 mb-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-status-blue" />
+                      <span className="text-[10px] font-mono text-status-blue uppercase tracking-wider font-bold">Process</span>
                     </div>
                     {p.description && (
-                      <div className="text-[11px] text-[var(--m12-text-muted)] mb-2 line-clamp-2">{p.description}</div>
+                      <div className="text-body-sm text-text-secondary mb-2 line-clamp-2">{p.description}</div>
                     )}
-                    <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
+                    <div className="text-[11px] text-text-tertiary">
                       Updated {new Date(p.updated_at).toLocaleDateString()}
                     </div>
                   </div>
                 ))}
               </div>
               {archivedProcesses.length > 0 && (
-                <div className="mt-8">
-                  <button
-                    onClick={() => setShowArchived(!showArchived)}
-                    className="flex items-center gap-2 text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] transition-colors mb-3"
-                  >
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${showArchived ? 'rotate-90' : ''}`}>
-                      <path d="M3 1l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="opacity-60">
-                      <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M3 6v7a1 1 0 001 1h8a1 1 0 001-1V6" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M6.5 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                    </svg>
-                    Archived ({archivedProcesses.length})
-                  </button>
-                  {showArchived && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {archivedProcesses.map((p) => (
-                        <div key={p.id} className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/20 rounded-xl p-5 opacity-60 hover:opacity-80 transition-all">
-                          <div className="flex items-start justify-between mb-3">
-                            <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate flex-1">{p.title}</h3>
-                            <button
-                              onClick={(e) => handleRestoreProcess(p.id, e)}
-                              title="Restore process model"
-                              className="text-[var(--m12-border)] hover:text-[#10B981] transition-colors ml-2 shrink-0 text-[10px] font-medium font-[family-name:var(--font-space-mono)] uppercase tracking-wider flex items-center gap-1"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                                <path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M7 3L4 6l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                              Restore
-                            </button>
-                          </div>
-                          <div className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
-                            Archived {new Date(p.archived_at!).toLocaleDateString()}
-                          </div>
+                <CollapsibleSection
+                  id="archived-process"
+                  storageKey="mach12-studio:home"
+                  tone="slate"
+                  title="Archived"
+                  count={archivedProcesses.length}
+                  defaultOpen={false}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {archivedProcesses.map((p) => (
+                      <div key={p.id} className="bg-white rounded-lg border border-border shadow-card p-5 opacity-60 hover:opacity-100 transition-opacity">
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="font-display text-heading-sm text-text-primary truncate flex-1">{p.title}</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Restore process model"
+                            title="Restore process model"
+                            icon={<RotateCcw size={12} />}
+                            onClick={(e) => handleRestoreProcess(p.id, e)}
+                            className="ml-2 shrink-0"
+                          >
+                            Restore
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        <div className="text-[11px] text-text-tertiary">
+                          Archived {new Date(p.archived_at!).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleSection>
               )}
-            </>
+            </div>
           )
         )}
       </div>
 
       {/* Generate Bedrock Data Integration dialog */}
       {bedrockOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !bedrockBusy && setBedrockOpen(false)}>
-          <div className="w-full max-w-md bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-[var(--m12-text)] mb-1">Generate a Bedrock Data Integration</h2>
-            <p className="text-xs text-[var(--m12-text-muted)] mb-4">Maps the data passed between systems for each L1/L2/L3 process in a model, grounded in your Bedrock Systems catalog. Creates an editable data-architecture diagram.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !bedrockBusy && setBedrockOpen(false)}>
+          <div className="w-full max-w-md bg-white rounded-xl shadow-card-hover p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h2 className="text-heading-sm font-display text-text-primary">Generate a Bedrock Data Integration</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                aria-label="Close"
+                icon={<X size={14} />}
+                onClick={() => setBedrockOpen(false)}
+                disabled={bedrockBusy}
+                className="-mt-1 -mr-1"
+              />
+            </div>
+            <p className="text-body-sm text-text-secondary mb-4">Maps the data passed between systems for each L1/L2/L3 process in a model, grounded in your Bedrock Systems catalog. Creates an editable data-architecture diagram.</p>
 
-            <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mb-1">Process model</label>
+            <label className="block text-label uppercase text-text-secondary mb-1">Process model</label>
             <select
               value={bedrockModelId}
               onChange={(e) => setBedrockModelId(e.target.value)}
               aria-label="Process model"
-              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60 mb-1"
+              className={`${SELECT_CLASSES} mb-1`}
             >
               <option value="">Select a process model…</option>
               {activeProcesses.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
             {activeProcesses.length === 0 && (
-              <div className="text-[11px] text-[var(--m12-text-muted)] mb-3">No process models yet — create one in Process Studio first.</div>
+              <div className="text-body-sm text-text-tertiary mb-3">No process models yet - create one in Process Studio first.</div>
             )}
 
-            <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mt-3 mb-1">Workstream (optional)</label>
+            <label className="block text-label uppercase text-text-secondary mt-3 mb-1">Workstream (optional)</label>
             <div className="mb-4">
               <WorkstreamPicker orgId={organization.id} value={bedrockWorkstreamId} onChange={setBedrockWorkstreamId} />
             </div>
 
-            {bedrockError && <div className="text-[11px] text-red-400 mb-3">{bedrockError}</div>}
+            {bedrockError && <div className="text-body-sm text-red-600 mb-3">{bedrockError}</div>}
 
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setBedrockOpen(false)} disabled={bedrockBusy} className="px-4 py-2 rounded-lg text-sm text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] disabled:opacity-50 transition-colors">Cancel</button>
-              <button type="button" onClick={handleGenerateBedrock} disabled={bedrockBusy || !bedrockModelId} className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-50 text-white transition-colors">
-                {bedrockBusy ? 'Generating…' : 'Generate'}
-              </button>
+              <Button variant="secondary" onClick={() => setBedrockOpen(false)} disabled={bedrockBusy}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleGenerateBedrock} disabled={!bedrockModelId} loading={bedrockBusy}>
+                Generate
+              </Button>
             </div>
           </div>
         </div>
@@ -1115,32 +948,46 @@ export default function Dashboard() {
 
       {/* Generate a diagram from a SIPOC dialog */}
       {sipocOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !sipocBusy && setSipocOpen(false)}>
-          <div className="w-full max-w-md bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-[var(--m12-text)] mb-1">Generate a diagram from a SIPOC</h2>
-            <p className="text-xs text-[var(--m12-text-muted)] mb-4">Builds a data-architecture diagram from a SIPOC capability map. Each L3 capability becomes a source → feeding → host system flow, with its information products on the wires.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !sipocBusy && setSipocOpen(false)}>
+          <div className="w-full max-w-md bg-white rounded-xl shadow-card-hover p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h2 className="text-heading-sm font-display text-text-primary">Generate a diagram from a SIPOC</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                aria-label="Close"
+                icon={<X size={14} />}
+                onClick={() => setSipocOpen(false)}
+                disabled={sipocBusy}
+                className="-mt-1 -mr-1"
+              />
+            </div>
+            <p className="text-body-sm text-text-secondary mb-4">Builds a data-architecture diagram from a SIPOC capability map. Each L3 capability becomes a source → feeding → host system flow, with its information products on the wires.</p>
 
-            <label className="block text-[11px] font-medium text-[var(--m12-text-secondary)] mb-1">SIPOC map</label>
+            <label className="block text-label uppercase text-text-secondary mb-1">SIPOC map</label>
             <select
               value={sipocMapId}
               onChange={(e) => setSipocMapId(e.target.value)}
               aria-label="SIPOC map"
-              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg px-3 py-2 text-sm text-[var(--m12-text)] focus:outline-none focus:border-[#8B5CF6]/60 mb-1"
+              className={`${SELECT_CLASSES} mb-1`}
             >
               <option value="">Select a SIPOC map…</option>
               {activeMaps.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
             </select>
             {activeMaps.length === 0 && (
-              <div className="text-[11px] text-[var(--m12-text-muted)] mb-3">No SIPOC maps yet — create one first.</div>
+              <div className="text-body-sm text-text-tertiary mb-3">No SIPOC maps yet - create one first.</div>
             )}
 
-            {sipocError && <div className="text-[11px] text-red-400 mt-3 mb-1">{sipocError}</div>}
+            {sipocError && <div className="text-body-sm text-red-600 mt-3 mb-1">{sipocError}</div>}
 
             <div className="flex justify-end gap-2 mt-4">
-              <button type="button" onClick={() => setSipocOpen(false)} disabled={sipocBusy} className="px-4 py-2 rounded-lg text-sm text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] disabled:opacity-50 transition-colors">Cancel</button>
-              <button type="button" onClick={handleGenerateFromSipoc} disabled={sipocBusy || !sipocMapId} className="px-4 py-2 rounded-lg text-sm font-medium bg-[#8B5CF6] hover:bg-[#A78BFA] disabled:opacity-50 text-white transition-colors">
-                {sipocBusy ? 'Generating…' : 'Generate'}
-              </button>
+              <Button variant="secondary" onClick={() => setSipocOpen(false)} disabled={sipocBusy}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleGenerateFromSipoc} disabled={!sipocMapId} loading={sipocBusy}>
+                Generate
+              </Button>
             </div>
           </div>
         </div>

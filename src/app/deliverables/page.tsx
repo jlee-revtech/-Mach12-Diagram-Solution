@@ -15,9 +15,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { Check, FileText, X } from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { exportDeliverableDocx, exportDeliverableHtml, exportDeliverablePptx, type DeliverableDoc } from '@/lib/workshop/export'
-import VersionBadge from '@/components/VersionBadge'
+import { Button, EmptyState, LoadingState, PageHeader } from '@/components/common'
 
 interface DeliverableRow extends DeliverableDoc {
   id: string
@@ -36,10 +37,12 @@ interface TypeInfo {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  draft: 'bg-amber-50 text-amber-800 border-amber-200',
-  review: 'bg-sky-50 text-sky-800 border-sky-200',
-  final: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  draft: 'bg-gray-100 text-gray-500',
+  review: 'bg-status-blue-bg text-status-blue',
+  final: 'bg-status-green-bg text-status-green',
 }
+
+const SELECT_CLS = 'h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none'
 
 function getToken(): string | null {
   try {
@@ -113,56 +116,61 @@ export default function DeliverablesPage() {
   }
 
   if (loading || loadingData) {
-    return <div className="p-8 text-sm text-slate-500">Loading documents...</div>
+    return (
+      <div className="space-y-6 max-w-[1400px]">
+        <LoadingState label="Loading documents..." />
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">Documents</h1>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Consulting deliverables your agents produced, with the evidence each was written from.
-            </p>
-          </div>
-          <VersionBadge />
-        </div>
-      </header>
+    <div className="space-y-6 max-w-[1400px]">
+      <PageHeader
+        title="Deliverables"
+        icon={<FileText size={24} />}
+        subtitle="Consulting deliverables your agents produced, with the evidence each was written from."
+      />
 
       {!rows.length ? (
-        <div className="mx-auto max-w-3xl px-6 py-16">
-          <div className="rounded-lg border border-slate-200 bg-white p-8">
-            <h2 className="text-base font-semibold text-slate-900">No documents yet</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Ask a workstream agent, or the Solution Architect, to produce one. For example: &quot;draft the business process
-              design for project settlement&quot;, or &quot;generate the configuration workbook for record-to-report&quot;.
-            </p>
-            <p className="mt-3 text-sm text-slate-600">
-              An agent refuses to write a document whose required evidence it cannot gather. If it says the architecture model is
-              empty, or that no configuration has been executed, that is the honest answer, and the fix is to supply the evidence.
-            </p>
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-slate-900">What they can produce</h3>
-              <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
+        <>
+          <EmptyState
+            variant="dashed"
+            icon={<FileText size={28} />}
+            title="No documents yet"
+            description={
+              <>
+                Ask a workstream agent, or the Solution Architect, to produce one. For example: &quot;draft the business process
+                design for project settlement&quot;, or &quot;generate the configuration workbook for record-to-report&quot;.
+                <span className="block mt-2">
+                  An agent refuses to write a document whose required evidence it cannot gather. If it says the architecture model is
+                  empty, or that no configuration has been executed, that is the honest answer, and the fix is to supply the evidence.
+                </span>
+              </>
+            }
+          />
+          {types.length > 0 && (
+            <div className="bg-white rounded-lg border border-border shadow-card p-5">
+              <h3 className="text-body-md font-semibold text-text-primary">What they can produce</h3>
+              <ul className="mt-2 space-y-1.5 text-body-sm text-text-secondary">
                 {types.map((t) => (
                   <li key={t.type}>
-                    <span className="font-medium text-slate-800">{t.title}</span>
-                    {t.architectOnly ? <span className="ml-1.5 text-xs text-slate-400">(Solution Architect)</span> : null}
-                    <span className="block text-xs text-slate-500">{t.purpose}</span>
+                    <span className="font-medium text-text-primary">{t.title}</span>
+                    {t.architectOnly ? <span className="ml-1.5 text-body-sm text-text-tertiary">(Solution Architect)</span> : null}
+                    <span className="block text-body-sm text-text-tertiary">{t.purpose}</span>
                   </li>
                 ))}
               </ul>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       ) : (
-        <div className="flex" style={{ height: 'calc(100vh - 81px)' }}>
-          <aside className="w-96 shrink-0 overflow-y-auto border-r border-slate-200 bg-white">
-            <div className="sticky top-0 space-y-2 border-b border-slate-200 bg-white p-3">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,340px)_1fr] gap-4 items-start">
+          <aside className="bg-white rounded-lg border border-border shadow-card overflow-hidden">
+            <div className="space-y-2 border-b border-border p-3">
               <select
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className={`w-full ${SELECT_CLS}`}
                 value={filterType}
+                aria-label="Filter by document type"
                 onChange={(e) => setFilterType(e.target.value)}
               >
                 <option value="">All document types</option>
@@ -173,8 +181,9 @@ export default function DeliverablesPage() {
                 ))}
               </select>
               <select
-                className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                className={`w-full ${SELECT_CLS}`}
                 value={filterWs}
+                aria-label="Filter by workstream"
                 onChange={(e) => setFilterWs(e.target.value)}
               >
                 <option value="">All workstreams</option>
@@ -185,28 +194,29 @@ export default function DeliverablesPage() {
                 ))}
               </select>
             </div>
-            <ul>
+            <ul className="max-h-[65vh] overflow-y-auto">
               {filtered.map((r) => {
                 const gathered = (r.evidence ?? []).filter((e) => e.ok).length
                 const total = (r.evidence ?? []).length
                 return (
                   <li key={r.id}>
                     <button
+                      type="button"
                       onClick={() => setSelected(r.id)}
-                      className={`w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 ${
-                        current?.id === r.id ? 'bg-slate-50' : ''
+                      className={`w-full border-b border-border last:border-0 px-4 py-3 text-left transition-colors ${
+                        current?.id === r.id ? 'bg-brand-50' : 'hover:bg-surface-muted/50'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-medium text-slate-900">{r.title}</span>
-                        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] uppercase ${STATUS_STYLE[r.status ?? 'draft']}`}>
+                        <span className="text-body-sm font-medium text-text-primary">{r.title}</span>
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase font-medium ${STATUS_STYLE[r.status ?? 'draft']}`}>
                           {r.status}
                         </span>
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {typeTitle(r.dtype)} &middot; {r.workstream_code}
+                      <div className="mt-1 text-body-sm text-text-secondary">
+                        {typeTitle(r.dtype)} &middot; <span className="font-mono">{r.workstream_code}</span>
                       </div>
-                      <div className="mt-1 text-[11px] text-slate-400">
+                      <div className="mt-1 text-[11px] text-text-tertiary">
                         {gathered}/{total} evidence slots filled
                         {r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString()}` : ''}
                       </div>
@@ -217,58 +227,43 @@ export default function DeliverablesPage() {
             </ul>
           </aside>
 
-          <main className="flex-1 overflow-y-auto">
+          <section className="bg-white rounded-lg border border-border shadow-card">
             {!current ? (
-              <div className="p-8 text-sm text-slate-500">Select a document.</div>
+              <EmptyState variant="inline" title="Select a document" compact />
             ) : (
-              <article className="mx-auto max-w-4xl p-8">
-                <div className="flex items-start justify-between gap-4">
+              <article className="p-6">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div>
-                    <h2 className="text-2xl font-semibold text-slate-900">{current.title}</h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {typeTitle(current.dtype)} &middot; {current.workstream_code}
+                    <h2 className="text-heading-lg font-display text-text-primary">{current.title}</h2>
+                    <p className="mt-1 text-body-sm text-text-secondary">
+                      {typeTitle(current.dtype)} &middot; <span className="font-mono">{current.workstream_code}</span>
                       {current.subject ? ` · ${current.subject}` : ''}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2 flex-wrap">
                     <select
-                      className="rounded border border-slate-300 px-2 py-1 text-xs"
+                      className={SELECT_CLS}
                       value={current.status ?? 'draft'}
                       disabled={busy}
+                      aria-label="Document status"
                       onChange={(e) => setStatus(current.id, e.target.value)}
                     >
                       <option value="draft">Draft</option>
                       <option value="review">In review</option>
                       <option value="final">Final</option>
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => exportDeliverableHtml(current)}
-                      className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => exportDeliverableHtml(current)}>
                       Download HTML
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => exportDeliverablePptx(current)}
-                      className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => exportDeliverablePptx(current)}>
                       Download PowerPoint
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => exportDeliverableDocx(current)}
-                      className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                    >
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={() => exportDeliverableDocx(current)}>
                       Download Word
-                    </button>
-                    <button
-                      onClick={() => remove(current.id)}
-                      disabled={busy}
-                      className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-                    >
+                    </Button>
+                    <Button variant="destructive" size="sm" disabled={busy} onClick={() => remove(current.id)}>
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -277,14 +272,14 @@ export default function DeliverablesPage() {
                 <div className="mt-6 space-y-8">
                   {(current.content?.sections ?? []).map((s) => (
                     <section key={s.key}>
-                      <h3 className="border-b border-slate-200 pb-1 text-lg font-semibold text-slate-900">{s.title}</h3>
-                      <pre className="mt-3 whitespace-pre-wrap font-sans text-sm leading-6 text-slate-700">{s.content}</pre>
+                      <h3 className="border-b border-border pb-1 text-heading-md text-text-primary">{s.title}</h3>
+                      <pre className="mt-3 whitespace-pre-wrap font-sans text-body-md leading-6 text-text-secondary">{s.content}</pre>
                     </section>
                   ))}
                 </div>
               </article>
             )}
-          </main>
+          </section>
         </div>
       )}
     </div>
@@ -296,26 +291,28 @@ function EvidencePanel({ evidence }: { evidence: { key: string; tool: string; ok
   const filled = evidence.filter((e) => e.ok).length
   const missing = evidence.filter((e) => !e.ok)
   return (
-    <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
+    <div className="mt-5 rounded-lg border border-border bg-surface-muted/50 p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">Provenance</h3>
-        <span className="text-xs text-slate-500">
+        <h3 className="text-body-sm font-semibold text-text-primary">Provenance</h3>
+        <span className="text-body-sm text-text-secondary">
           {filled} of {evidence.length} evidence slots filled
         </span>
       </div>
-      <ul className="mt-2 grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
+      <ul className="mt-2 grid grid-cols-1 gap-1 text-body-sm sm:grid-cols-2">
         {evidence.map((e) => (
           <li key={e.key} className="flex items-start gap-1.5">
-            <span className={e.ok ? 'text-emerald-600' : 'text-slate-400'}>{e.ok ? '✓' : '✗'}</span>
-            <span className="text-slate-600">
-              <span className="font-medium text-slate-800">{e.key}</span> via {e.tool}
-              {!e.ok && e.reason ? <span className="block text-slate-400">{e.reason}</span> : null}
+            <span className={`mt-0.5 shrink-0 ${e.ok ? 'text-status-green' : 'text-text-tertiary'}`}>
+              {e.ok ? <Check size={12} /> : <X size={12} />}
+            </span>
+            <span className="text-text-secondary">
+              <span className="font-medium text-text-primary">{e.key}</span> via <span className="font-mono">{e.tool}</span>
+              {!e.ok && e.reason ? <span className="block text-text-tertiary">{e.reason}</span> : null}
             </span>
           </li>
         ))}
       </ul>
       {missing.length ? (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-body-sm text-text-tertiary">
           Sections that depended on the unfilled slots say so explicitly. They were not filled with generic content.
         </p>
       ) : null}

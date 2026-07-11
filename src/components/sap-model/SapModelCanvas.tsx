@@ -23,11 +23,11 @@ const nodeTypes = { org: OrgNodeComponent }
 function Legend() {
   const items = Object.values(ENTITY_META)
   return (
-    <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-x-3 gap-y-1 max-w-[560px] bg-[var(--m12-bg-card)]/85 backdrop-blur-sm border border-[var(--m12-border)]/50 rounded-lg px-3 py-2">
+    <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-x-3 gap-y-1 max-w-[560px] bg-white/85 backdrop-blur-sm border border-border rounded-lg shadow-card px-3 py-2">
       {items.map((it) => (
         <div key={it.label} className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: it.color }} />
-          <span className="text-[9px] text-[var(--m12-text-muted)]">{it.label}</span>
+          <span className="text-[10px] text-text-secondary">{it.label}</span>
         </div>
       ))}
     </div>
@@ -65,7 +65,7 @@ function CanvasInner({ model, mode }: { model: SapEnterpriseModel; mode: 'schema
         style={{ backgroundColor: 'var(--m12-bg)' }}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} style={{ color: 'var(--m12-canvas-dot)' } as React.CSSProperties} />
-        <Controls showInteractive={false} className="!bg-[var(--m12-bg-card)] !border-[var(--m12-border)]" />
+        <Controls showInteractive={false} className="!bg-white !border-border !shadow-card" />
         <MiniMap
           pannable
           zoomable
@@ -75,7 +75,7 @@ function CanvasInner({ model, mode }: { model: SapEnterpriseModel; mode: 'schema
           }}
           nodeBorderRadius={6}
           maskColor="var(--m12-minimap-mask)"
-          style={{ width: 150, height: 96, backgroundColor: 'var(--m12-minimap-bg)', borderColor: 'var(--m12-border)', borderRadius: 8 }}
+          style={{ width: 150, height: 96, backgroundColor: 'var(--m12-minimap-bg)', borderColor: 'var(--m12-minimap-stroke)', borderRadius: 8 }}
         />
       </ReactFlow>
       <Legend />

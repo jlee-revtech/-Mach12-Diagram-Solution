@@ -1,6 +1,17 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import {
+  X,
+  Sparkles,
+  Star,
+  AlertCircle,
+  ListChecks,
+  Lightbulb,
+  Lock,
+  Network,
+} from 'lucide-react'
+import { Button, LoadingState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 
 interface Gap {
@@ -37,33 +48,35 @@ interface L3AnalysisResult {
   recommendations: string[]
 }
 
+// Canonical status token pairs for priority / impact pills.
 const PRIORITY_COLORS = {
-  high: { bg: 'bg-red-400/10', border: 'border-red-400/30', text: 'text-red-400', dot: 'bg-red-400' },
-  medium: { bg: 'bg-[#EAB308]/10', border: 'border-[#EAB308]/30', text: 'text-[#EAB308]', dot: 'bg-[#EAB308]' },
-  low: { bg: 'bg-[#06B6D4]/10', border: 'border-[#06B6D4]/30', text: 'text-[#06B6D4]', dot: 'bg-[#06B6D4]' },
+  high: { pill: 'bg-status-red-bg text-status-red', dot: 'bg-status-red' },
+  medium: { pill: 'bg-status-yellow-bg text-status-yellow', dot: 'bg-status-yellow' },
+  low: { pill: 'bg-status-blue-bg text-status-blue', dot: 'bg-status-blue' },
 }
 
 const IMPACT_COLORS = {
-  high: { bg: 'bg-[#10B981]/10', border: 'border-[#10B981]/30', text: 'text-[#10B981]' },
-  medium: { bg: 'bg-[#2563EB]/10', border: 'border-[#2563EB]/30', text: 'text-[#2563EB]' },
-  low: { bg: 'bg-[var(--m12-bg)]', border: 'border-[var(--m12-border)]/30', text: 'text-[var(--m12-text-muted)]' },
+  high: { pill: 'bg-status-green-bg text-status-green' },
+  medium: { pill: 'bg-status-blue-bg text-status-blue' },
+  low: { pill: 'bg-surface-muted text-text-secondary' },
 }
 
 function ScoreRing({ score }: { score: number }) {
   const r = 38
   const circ = 2 * Math.PI * r
   const offset = circ - (score / 100) * circ
-  const color = score >= 75 ? '#10B981' : score >= 50 ? '#EAB308' : '#EF4444'
+  // RAG chart colors per the design system (green / yellow / red)
+  const color = score >= 75 ? '#16a34a' : score >= 50 ? '#ca8a04' : '#dc2626'
 
   return (
     <div className="relative w-24 h-24">
       <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-        <circle cx="50" cy="50" r={r} fill="none" stroke="var(--m12-border)" strokeWidth="6" opacity="0.2" />
+        <circle cx="50" cy="50" r={r} fill="none" stroke="#e2e2e2" strokeWidth="6" opacity="0.6" />
         <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} className="transition-all duration-1000" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold font-[family-name:var(--font-orbitron)]" style={{ color }}>{score}</span>
-        <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">Score</span>
+        <span className="text-2xl font-bold font-display" style={{ color }}>{score}</span>
+        <span className="text-[10px] text-text-tertiary uppercase tracking-wider">Score</span>
       </div>
     </div>
   )
@@ -73,9 +86,9 @@ function SectionTitle({ icon, label, count }: { icon: React.ReactNode; label: st
   return (
     <div className="flex items-center gap-2 mb-2.5">
       {icon}
-      <span className="text-[10px] uppercase tracking-widest font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] font-bold">{label}</span>
+      <span className="text-label uppercase text-text-secondary">{label}</span>
       {count !== undefined && (
-        <span className="text-[9px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1.5 py-0.5 text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{count}</span>
+        <span className="text-[11px] bg-surface-muted border border-border rounded px-1.5 py-0.5 text-text-tertiary">{count}</span>
       )}
     </div>
   )
@@ -192,26 +205,27 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
   }, [map, selectedId])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[var(--m12-border)]/30 flex items-center justify-between shrink-0">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#06B6D4] to-[#2563EB] flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v12M5 5l3-3 3 3M5 11l3 3 3-3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+              <Sparkles size={16} className="text-amber-600" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-[var(--m12-text)]">{getSelectedCap() ? 'AI SIPOC Analysis' : 'AI Map Analysis'}</div>
-              <div className="text-[10px] text-[var(--m12-text-muted)]">{getSelectedCap()?.name || map?.title || 'Capability Map'}</div>
+              <div className="text-heading-sm font-display text-text-primary">{getSelectedCap() ? 'AI SIPOC Analysis' : 'AI Map Analysis'}</div>
+              <div className="text-[11px] text-text-tertiary">{getSelectedCap()?.name || map?.title || 'Capability Map'}</div>
             </div>
           </div>
-          <button onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={16} />}
+            aria-label="Close"
+            onClick={onClose}
+          />
         </div>
 
         {/* Content */}
@@ -220,45 +234,36 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
             const cap = getSelectedCap()
             return (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="opacity-20">
-                  <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="1.5" className="text-[var(--m12-text)]" />
-                  <path d="M24 14v10l7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-[var(--m12-text)]" />
-                </svg>
+                <Sparkles size={40} className="text-text-tertiary opacity-30" />
                 <div className="text-center">
-                  <div className="text-sm text-[var(--m12-text-secondary)] mb-1">
+                  <div className="text-body-md text-text-primary font-medium mb-1">
                     {cap ? `Analyze "${cap.name}"` : 'Analyze your SIPOC capability map'}
                   </div>
-                  <div className="text-[10px] text-[var(--m12-text-muted)] max-w-[320px]">
+                  <div className="text-body-sm text-text-secondary max-w-[320px]">
                     {cap
                       ? 'AI will summarize this capability for an executive audience, highlight gaps, and recommend improvements.'
                       : 'AI will review all capabilities, information products, suppliers, consumers, and dimensions to identify gaps and suggest improvements.'}
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="ai"
+                  size="md"
+                  icon={<Sparkles size={14} />}
                   onClick={handleAnalyze}
-                  className="flex items-center gap-2 bg-gradient-to-r from-[#06B6D4] to-[#2563EB] hover:from-[#0891B2] hover:to-[#3B82F6] text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg shadow-[#2563EB]/20"
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M7 1L8.5 4.5L12 5.5L9.5 8L10 11.5L7 10L4 11.5L4.5 8L2 5.5L5.5 4.5L7 1Z" fill="white" />
-                  </svg>
                   {cap ? 'Analyze This Capability' : 'Run Analysis'}
-                </button>
+                </Button>
               </div>
             )
           })()}
 
           {loading && (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <svg className="animate-spin w-10 h-10 text-[#06B6D4]" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
-              </svg>
-              <span className="text-xs text-[var(--m12-text-muted)]">Analyzing capability map...</span>
-            </div>
+            <LoadingState variant="inline" label="Analyzing capability map..." className="py-20" />
           )}
 
           {error && (
             <div className="p-6">
-              <div className="text-[11px] text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">{error}</div>
+              <div className="text-body-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</div>
             </div>
           )}
 
@@ -268,18 +273,18 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
               <div className="flex gap-5 items-start">
                 <ScoreRing score={l3Result.completenessScore} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[9px] uppercase tracking-widest font-[family-name:var(--font-space-mono)] text-[#06B6D4] font-bold mb-2">Executive Summary</div>
-                  <div className="text-[12px] text-[var(--m12-text)] leading-relaxed">{l3Result.executiveSummary}</div>
+                  <div className="text-label uppercase text-brand-600 mb-2">Executive Summary</div>
+                  <div className="text-body-sm text-text-primary leading-relaxed">{l3Result.executiveSummary}</div>
                 </div>
               </div>
 
               {/* Strengths */}
               <div>
-                <SectionTitle icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1l1.5 3.5L11 5.5 8.5 8l.5 3.5L6 9.5 3 11.5l.5-3.5L1 5.5l3.5-1L6 1z" fill="#10B981"/></svg>} label="Strengths" count={l3Result.strengths.length} />
+                <SectionTitle icon={<Star size={12} className="text-status-green" />} label="Strengths" count={l3Result.strengths.length} />
                 <div className="space-y-1.5">
                   {l3Result.strengths.map((s, i) => (
-                    <div key={i} className="flex gap-2 text-[11px] text-[var(--m12-text-secondary)]">
-                      <span className="text-[#10B981] shrink-0 mt-0.5">+</span>
+                    <div key={i} className="flex gap-2 text-body-sm text-text-secondary">
+                      <span className="text-status-green shrink-0 mt-0.5">+</span>
                       <span>{s}</span>
                     </div>
                   ))}
@@ -288,20 +293,20 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
 
               {/* Gaps */}
               <div>
-                <SectionTitle icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#EF4444" strokeWidth="1.2"/><path d="M6 3.5v3M6 8.5v.01" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round"/></svg>} label="Gaps" count={l3Result.gaps.length} />
+                <SectionTitle icon={<AlertCircle size={12} className="text-status-red" />} label="Gaps" count={l3Result.gaps.length} />
                 <div className="space-y-2">
                   {l3Result.gaps.map((g, i) => {
                     const colors = PRIORITY_COLORS[g.priority] || PRIORITY_COLORS.medium
                     return (
-                      <div key={i} className={`${colors.bg} border ${colors.border} rounded-lg p-3`}>
+                      <div key={i} className="bg-white border border-border rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1">
                           <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
-                          <span className="text-[10px] font-semibold text-[var(--m12-text)]">{g.title}</span>
-                          <span className={`text-[8px] ${colors.text} font-[family-name:var(--font-space-mono)] uppercase`}>{g.priority}</span>
-                          <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase ml-auto">{g.area}</span>
+                          <span className="text-body-sm font-semibold text-text-primary">{g.title}</span>
+                          <span className={`text-[10px] uppercase font-medium tracking-wider px-1.5 py-0.5 rounded ${colors.pill}`}>{g.priority}</span>
+                          <span className="text-[10px] text-text-tertiary uppercase tracking-wider ml-auto">{g.area}</span>
                         </div>
-                        <div className="text-[10px] text-[var(--m12-text-secondary)] leading-relaxed">{g.description}</div>
-                        <div className="text-[10px] text-[#2563EB] mt-1.5 font-medium">Recommendation: {g.recommendation}</div>
+                        <div className="text-body-sm text-text-secondary leading-relaxed">{g.description}</div>
+                        <div className="text-body-sm text-brand-600 mt-1.5 font-medium">Recommendation: {g.recommendation}</div>
                       </div>
                     )
                   })}
@@ -310,11 +315,11 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
 
               {/* Recommendations */}
               <div>
-                <SectionTitle icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="#2563EB" strokeWidth="1.2" strokeLinecap="round"/></svg>} label="Recommendations" count={l3Result.recommendations.length} />
+                <SectionTitle icon={<ListChecks size={12} className="text-brand-600" />} label="Recommendations" count={l3Result.recommendations.length} />
                 <div className="space-y-1.5">
                   {l3Result.recommendations.map((r, i) => (
-                    <div key={i} className="flex gap-2 text-[11px] text-[var(--m12-text-secondary)]">
-                      <span className="text-[#2563EB] shrink-0 mt-0.5">{i + 1}.</span>
+                    <div key={i} className="flex gap-2 text-body-sm text-text-secondary">
+                      <span className="text-brand-600 shrink-0 mt-0.5">{i + 1}.</span>
                       <span>{r}</span>
                     </div>
                   ))}
@@ -323,12 +328,9 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
 
               {/* Re-run button */}
               <div className="flex justify-center pt-2">
-                <button
-                  onClick={handleAnalyze}
-                  className="flex items-center gap-2 border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-4 py-2 rounded-lg text-xs transition-colors"
-                >
+                <Button variant="secondary" size="sm" onClick={handleAnalyze}>
                   Re-analyze
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -339,7 +341,7 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
               <div className="flex gap-5 items-start">
                 <ScoreRing score={result.overallScore} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[11px] text-[var(--m12-text)] leading-relaxed">{result.summary}</div>
+                  <div className="text-body-sm text-text-primary leading-relaxed">{result.summary}</div>
                 </div>
               </div>
 
@@ -347,14 +349,14 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
               {result.strengths.length > 0 && (
                 <div>
                   <SectionTitle
-                    icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1l1.5 3L11 5l-2.5 2.5L9 11l-3-1.5L3 11l.5-3.5L1 5l3.5-1L6 1z" stroke="#10B981" strokeWidth="1" strokeLinejoin="round" /></svg>}
+                    icon={<Star size={12} className="text-status-green" />}
                     label="Strengths"
                     count={result.strengths.length}
                   />
                   <div className="space-y-1.5">
                     {result.strengths.map((s, i) => (
-                      <div key={i} className="flex items-start gap-2 text-[10px] text-[var(--m12-text-secondary)]">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] mt-1.5 shrink-0" />
+                      <div key={i} className="flex items-start gap-2 text-body-sm text-text-secondary">
+                        <div className="w-1.5 h-1.5 rounded-full bg-status-green mt-1.5 shrink-0" />
                         {s}
                       </div>
                     ))}
@@ -366,7 +368,7 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
               {result.gaps.length > 0 && (
                 <div>
                   <SectionTitle
-                    icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#EF4444" strokeWidth="1" /><path d="M6 3.5v3M6 8.5v.01" stroke="#EF4444" strokeWidth="1.2" strokeLinecap="round" /></svg>}
+                    icon={<AlertCircle size={12} className="text-status-red" />}
                     label="Gaps Identified"
                     count={result.gaps.length}
                   />
@@ -374,21 +376,21 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
                     {result.gaps.map((gap, i) => {
                       const c = PRIORITY_COLORS[gap.priority]
                       return (
-                        <div key={i} className={`${c.bg} border ${c.border} rounded-lg px-3 py-2.5`}>
+                        <div key={i} className="bg-white border border-border rounded-lg px-3 py-2.5">
                           <div className="flex items-center gap-2 mb-1">
                             <div className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-                            <span className="text-[11px] font-semibold text-[var(--m12-text)]">{gap.title}</span>
-                            <span className={`text-[7px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold ${c.text}`}>{gap.priority}</span>
+                            <span className="text-body-sm font-semibold text-text-primary">{gap.title}</span>
+                            <span className={`text-[10px] uppercase font-medium tracking-wider px-1.5 py-0.5 rounded ${c.pill}`}>{gap.priority}</span>
                             {gap.capability !== 'Overall' && (
-                              <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] ml-auto">{gap.capability}</span>
+                              <span className="text-[11px] text-text-tertiary ml-auto">{gap.capability}</span>
                             )}
                           </div>
-                          <div className="text-[10px] text-[var(--m12-text-secondary)] leading-relaxed pl-3.5">{gap.description}</div>
+                          <div className="text-body-sm text-text-secondary leading-relaxed pl-3.5">{gap.description}</div>
                           {onImplement && gap.capability !== 'Overall' && (
                             <div className="pl-3.5 mt-1.5">
                               <button
-                                onClick={() => onImplement(gap.capability, `Address gap: ${gap.title} — ${gap.description}`)}
-                                className="text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                                onClick={() => onImplement(gap.capability, `Address gap: ${gap.title} - ${gap.description}`)}
+                                className="text-[10px] uppercase tracking-wider font-semibold text-brand-600 hover:text-brand-500 transition-colors"
                               >
                                 Implement with AI →
                               </button>
@@ -405,7 +407,7 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
               {result.suggestions.length > 0 && (
                 <div>
                   <SectionTitle
-                    icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v2M6 9v2M1 6h2M9 6h2M2.5 2.5l1.5 1.5M8 8l1.5 1.5M9.5 2.5L8 4M4 8l-1.5 1.5" stroke="#2563EB" strokeWidth="1" strokeLinecap="round" /></svg>}
+                    icon={<Lightbulb size={12} className="text-brand-600" />}
                     label="Suggestions"
                     count={result.suggestions.length}
                   />
@@ -413,20 +415,20 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
                     {result.suggestions.map((sug, i) => {
                       const c = IMPACT_COLORS[sug.impact]
                       return (
-                        <div key={i} className={`${c.bg} border ${c.border} rounded-lg px-3 py-2.5`}>
+                        <div key={i} className="bg-white border border-border rounded-lg px-3 py-2.5">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[11px] font-semibold text-[var(--m12-text)]">{sug.title}</span>
-                            <span className={`text-[7px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold ${c.text}`}>{sug.impact} impact</span>
+                            <span className="text-body-sm font-semibold text-text-primary">{sug.title}</span>
+                            <span className={`text-[10px] uppercase font-medium tracking-wider px-1.5 py-0.5 rounded ${c.pill}`}>{sug.impact} impact</span>
                             {sug.capability !== 'Overall' && (
-                              <span className="text-[8px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] ml-auto">{sug.capability}</span>
+                              <span className="text-[11px] text-text-tertiary ml-auto">{sug.capability}</span>
                             )}
                           </div>
-                          <div className="text-[10px] text-[var(--m12-text-secondary)] leading-relaxed">{sug.description}</div>
+                          <div className="text-body-sm text-text-secondary leading-relaxed">{sug.description}</div>
                           {onImplement && sug.capability !== 'Overall' && (
                             <div className="mt-1.5">
                               <button
-                                onClick={() => onImplement(sug.capability, `Implement suggestion: ${sug.title} — ${sug.description}`)}
-                                className="text-[8px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider font-bold text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                                onClick={() => onImplement(sug.capability, `Implement suggestion: ${sug.title} - ${sug.description}`)}
+                                className="text-[10px] uppercase tracking-wider font-semibold text-brand-600 hover:text-brand-500 transition-colors"
                               >
                                 Implement with AI →
                               </button>
@@ -443,14 +445,14 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
               {result.dataGovernance?.length > 0 && (
                 <div>
                   <SectionTitle
-                    icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="3" width="8" height="7" rx="1" stroke="#8B5CF6" strokeWidth="1" /><path d="M4 3V2a2 2 0 014 0v1" stroke="#8B5CF6" strokeWidth="1" strokeLinecap="round" /></svg>}
+                    icon={<Lock size={12} className="text-purple-500" />}
                     label="Data Governance"
                     count={result.dataGovernance.length}
                   />
                   <div className="space-y-1.5">
                     {result.dataGovernance.map((obs, i) => (
-                      <div key={i} className="flex items-start gap-2 text-[10px] text-[var(--m12-text-secondary)] bg-[#8B5CF6]/5 border border-[#8B5CF6]/15 rounded-lg px-3 py-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6] mt-1.5 shrink-0" />
+                      <div key={i} className="flex items-start gap-2 text-body-sm text-text-secondary bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5 shrink-0" />
                         {obs}
                       </div>
                     ))}
@@ -462,14 +464,14 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
               {result.crossCapabilityInsights?.length > 0 && (
                 <div>
                   <SectionTitle
-                    icon={<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2v8" stroke="#F97316" strokeWidth="1" strokeLinecap="round" /><circle cx="2" cy="6" r="1.5" stroke="#F97316" strokeWidth="0.8" /><circle cx="10" cy="6" r="1.5" stroke="#F97316" strokeWidth="0.8" /><circle cx="6" cy="2" r="1.5" stroke="#F97316" strokeWidth="0.8" /><circle cx="6" cy="10" r="1.5" stroke="#F97316" strokeWidth="0.8" /></svg>}
+                    icon={<Network size={12} className="text-orange-500" />}
                     label="Cross-Capability Insights"
                     count={result.crossCapabilityInsights.length}
                   />
                   <div className="space-y-1.5">
                     {result.crossCapabilityInsights.map((ins, i) => (
-                      <div key={i} className="flex items-start gap-2 text-[10px] text-[var(--m12-text-secondary)] bg-[#F97316]/5 border border-[#F97316]/15 rounded-lg px-3 py-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] mt-1.5 shrink-0" />
+                      <div key={i} className="flex items-start gap-2 text-body-sm text-text-secondary bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5 shrink-0" />
                         {ins}
                       </div>
                     ))}
@@ -482,24 +484,17 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
 
         {/* Footer */}
         {result && (
-          <div className="px-6 py-3 border-t border-[var(--m12-border)]/30 flex items-center justify-between shrink-0">
-            <div className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+          <div className="px-6 py-3 border-t border-border flex items-center justify-between shrink-0">
+            <div className="text-[11px] text-text-tertiary">
               {result.gaps.length} gaps / {result.suggestions.length} suggestions
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={handleAnalyze}
-                disabled={loading}
-                className="text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-3 py-1.5 transition-colors"
-              >
+              <Button variant="ghost" size="sm" disabled={loading} onClick={handleAnalyze}>
                 Re-analyze
-              </button>
-              <button
-                onClick={onClose}
-                className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 text-[var(--m12-text-secondary)] px-4 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-[var(--m12-bg-card)]"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={onClose}>
                 Done
-              </button>
+              </Button>
             </div>
           </div>
         )}

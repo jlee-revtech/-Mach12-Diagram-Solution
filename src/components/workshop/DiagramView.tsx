@@ -52,7 +52,7 @@ export default function DiagramView({
 // INSIDE the SVG; this frame adds the surrounding chrome only.
 export function DiagramCard({ diagram, width }: { diagram: WorkshopDiagram; width?: number }) {
   return (
-    <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 rounded-lg p-3">
+    <div className="bg-white border border-border rounded-lg p-3">
       <DiagramView diagram={diagram} width={width} />
     </div>
   )

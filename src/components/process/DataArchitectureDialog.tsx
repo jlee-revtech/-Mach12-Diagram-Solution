@@ -8,6 +8,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Check, Loader2, Sparkles, X } from 'lucide-react'
+import { Button } from '@/components/common'
 import {
   listWorkstreamDataArchProcesses, clarifyDataArchitecture, generateWorkstreamDataArchitecture,
   type DataArchProcess, type ClarifyingQuestion,
@@ -105,61 +107,64 @@ export default function DataArchitectureDialog({
   const doneOk = Object.values(results).filter((r) => r.status === 'done')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[40rem] max-w-[94vw] max-h-[85vh] flex flex-col bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-[40rem] max-w-[94vw] max-h-[85vh] flex flex-col bg-white border border-border rounded-xl shadow-card-hover overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--m12-border)]/40">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-[var(--m12-text)] truncate">Generate data architecture</h3>
-            <div className="text-[11px] text-[var(--m12-text-muted)] truncate">{workstream.name}</div>
+            <h3 className="text-heading-sm font-display text-text-primary truncate">Generate data architecture</h3>
+            <div className="text-[11px] text-text-tertiary truncate">{workstream.name}</div>
           </div>
-          <button type="button" onClick={onClose} title="Close" aria-label="Close" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-          </button>
+          <Button variant="ghost" size="sm" iconOnly icon={<X size={16} />} title="Close" aria-label="Close" onClick={onClose} />
         </div>
 
-        {error && <div className="mx-5 mt-3 text-[11px] text-[#EF4444] bg-[#DC262614] border border-[#DC2626]/30 rounded-lg px-3 py-2">{error}</div>}
+        {error && <div className="mx-5 mt-3 text-body-sm text-status-red bg-status-red-bg border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
-        {/* ─── Select phase ─── */}
+        {/* Select phase */}
         {phase === 'select' && (
           <>
-            <div className="px-5 py-3 border-b border-[var(--m12-border)]/30 flex items-center gap-2">
-              <div className="text-[11px] text-[var(--m12-text-muted)]">Pick the L3 process flow(s) to build a data architecture for.</div>
+            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+              <div className="text-[11px] text-text-tertiary">Pick the L3 process flow(s) to build a data architecture for.</div>
               <div className="ml-auto flex items-center gap-2">
-                <button type="button" onClick={selectAllBuildable} className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">All buildable</button>
-                <button type="button" onClick={clearAll} className="text-[10px] px-2 py-1 rounded border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">Clear</button>
+                <Button variant="secondary" size="sm" onClick={selectAllBuildable}>All buildable</Button>
+                <Button variant="secondary" size="sm" onClick={clearAll}>Clear</Button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
               {loading ? (
-                <div className="text-center py-10 text-xs text-[var(--m12-text-muted)]">Loading process flows…</div>
+                <div className="flex flex-col items-center justify-center text-center py-10">
+                  <Loader2 className="animate-spin text-text-tertiary mb-3 size-5" />
+                  <span className="text-body-sm text-text-tertiary">Loading process flows...</span>
+                </div>
               ) : processes.length === 0 ? (
-                <div className="text-center py-10 text-xs text-[var(--m12-text-muted)]">No L3 process flows are aligned to this workstream yet.</div>
+                <div className="text-center py-10 text-body-sm text-text-tertiary">No L3 process flows are aligned to this workstream yet.</div>
               ) : (
                 processes.map((p) => (
                   <label
                     key={p.id}
-                    className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border transition-colors ${p.buildable ? 'cursor-pointer hover:border-[var(--m12-border)]' : 'opacity-70'}`}
-                    style={{ borderColor: selected.has(p.id) ? color : 'var(--m12-border)' }}
+                    className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border transition-colors ${p.buildable ? 'cursor-pointer hover:border-border-strong' : 'opacity-70'} ${selected.has(p.id) ? '' : 'border-border'}`}
+                    style={selected.has(p.id) ? { borderColor: color } : undefined}
                   >
                     <input
                       type="checkbox"
                       checked={selected.has(p.id)}
                       disabled={!p.buildable}
                       onChange={() => toggle(p.id)}
-                      className="mt-0.5"
+                      className="mt-0.5 accent-brand-500"
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs text-[var(--m12-text)]">{p.name}</div>
+                      <div className="text-body-sm text-text-primary">{p.name}</div>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <Badge color="#0EA5E9">{p.capabilityCount} capabilit{p.capabilityCount === 1 ? 'y' : 'ies'}</Badge>
-                        {p.hasSystemLanes && <Badge color="#8B5CF6">swimlane systems</Badge>}
+                        <Chip className="bg-status-blue-bg text-status-blue">{p.capabilityCount} capabilit{p.capabilityCount === 1 ? 'y' : 'ies'}</Chip>
+                        {p.hasSystemLanes && <Chip className="bg-purple-50 text-purple-700">swimlane systems</Chip>}
                         {p.existingDiagramId ? (
-                          <button type="button" onClick={(e) => { e.preventDefault(); open(p.existingDiagramId!) }} className="text-[9px] px-1.5 py-0.5 rounded bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/25">✓ Has data architecture · Open</button>
+                          <button type="button" onClick={(e) => { e.preventDefault(); open(p.existingDiagramId!) }} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-status-green-bg text-status-green hover:bg-green-100 transition-colors">
+                            <Check size={10} /> Has data architecture · Open
+                          </button>
                         ) : !p.buildable ? (
-                          <span className="text-[9px] text-[#D97706]">Assign capabilities or bind swimlanes to systems first</span>
+                          <span className="text-[10px] text-status-yellow">Assign capabilities or bind swimlanes to systems first</span>
                         ) : (
-                          <Badge color="#64748B">Not generated</Badge>
+                          <Chip className="bg-gray-100 text-gray-500">Not generated</Chip>
                         )}
                       </div>
                     </div>
@@ -167,81 +172,81 @@ export default function DataArchitectureDialog({
                 ))
               )}
             </div>
-            <div className="px-5 py-3 border-t border-[var(--m12-border)]/40 flex items-center gap-2">
-              <div className="text-[11px] text-[var(--m12-text-muted)]">{selected.size} selected</div>
+            <div className="px-5 py-3 border-t border-border flex items-center gap-2">
+              <div className="text-[11px] text-text-tertiary">{selected.size} selected</div>
               <div className="ml-auto flex items-center gap-2">
-                <button type="button" onClick={onClose} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">Cancel</button>
-                <button type="button" onClick={toQuestions} disabled={selected.size === 0 || preparing} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white disabled:opacity-50" style={{ backgroundColor: color }}>
-                  {preparing ? 'Preparing…' : 'Continue'}
-                </button>
+                <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+                <Button size="sm" loading={preparing} disabled={selected.size === 0} onClick={toQuestions}>
+                  {preparing ? 'Preparing...' : 'Continue'}
+                </Button>
               </div>
             </div>
           </>
         )}
 
-        {/* ─── Questions phase ─── */}
+        {/* Questions phase */}
         {phase === 'questions' && (
           <>
-            <div className="px-5 py-3 border-b border-[var(--m12-border)]/30 text-[11px] text-[var(--m12-text-muted)]">
+            <div className="px-5 py-3 border-b border-border text-[11px] text-text-tertiary">
               A few clarifying questions to build a sharper data architecture for the {selectedList.length} selected flow(s). Answer what you can; all are optional.
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
               {questions.map((q) => (
                 <div key={q.id}>
-                  <div className="text-[12px] text-[var(--m12-text)] leading-snug">{q.question}</div>
-                  {q.why && <div className="text-[10px] text-[var(--m12-text-muted)] mb-1">{q.why}</div>}
+                  <div className="text-body-sm text-text-primary leading-snug">{q.question}</div>
+                  {q.why && <div className="text-[10px] text-text-tertiary mb-1">{q.why}</div>}
                   <textarea
                     value={answers[q.id] || ''}
                     onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
                     rows={2}
                     placeholder="Your answer (optional)"
-                    className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-2.5 py-1.5 text-xs text-[var(--m12-text)] outline-none resize-none mt-1"
+                    className="w-full bg-surface-input border border-border rounded-lg px-3 py-2 text-body-sm focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none resize-none mt-1"
                   />
                 </div>
               ))}
             </div>
-            <div className="px-5 py-3 border-t border-[var(--m12-border)]/40 flex items-center gap-2">
-              <button type="button" onClick={() => setPhase('select')} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">Back</button>
+            <div className="px-5 py-3 border-t border-border flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setPhase('select')}>Back</Button>
               <div className="ml-auto flex items-center gap-2">
-                <button type="button" onClick={() => runGeneration([])} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]">Skip</button>
-                <button type="button" onClick={() => runGeneration(answeredList())} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white" style={{ backgroundColor: color }}>
+                <Button variant="secondary" size="sm" onClick={() => runGeneration([])}>Skip</Button>
+                <Button variant="ai" size="sm" icon={<Sparkles size={12} />} onClick={() => runGeneration(answeredList())}>
                   Generate {selectedList.length} diagram{selectedList.length === 1 ? '' : 's'}
-                </button>
+                </Button>
               </div>
             </div>
           </>
         )}
 
-        {/* ─── Run phase ─── */}
+        {/* Run phase */}
         {phase === 'run' && (
           <>
-            <div className="px-5 py-3 border-b border-[var(--m12-border)]/30 text-[11px] text-[var(--m12-text-muted)]">
-              {runDone ? `Generated ${doneOk.length} of ${selectedList.length} diagram(s).` : 'Generating data architecture…'}
+            <div className="px-5 py-3 border-b border-border text-[11px] text-text-tertiary">
+              {runDone ? `Generated ${doneOk.length} of ${selectedList.length} diagram(s).` : 'Generating data architecture...'}
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
               {selectedList.map((p) => {
                 const r = results[p.id] || { status: 'pending' as const }
                 return (
-                  <div key={p.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-[var(--m12-border)]/40">
+                  <div key={p.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border">
                     <StatusDot status={r.status} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs text-[var(--m12-text)] truncate">{r.title || p.name}</div>
-                      {r.status === 'error' && <div className="text-[10px] text-[#EF4444]">{r.error}</div>}
+                      <div className="text-body-sm text-text-primary truncate">{r.title || p.name}</div>
+                      {r.status === 'error' && <div className="text-[10px] text-status-red">{r.error}</div>}
                     </div>
                     {r.status === 'done' && r.diagramId && (
-                      <button type="button" onClick={() => open(r.diagramId!)} className="text-[10px] px-2 py-1 rounded font-medium text-white" style={{ backgroundColor: color }}>Open</button>
+                      <Button size="sm" onClick={() => open(r.diagramId!)}>Open</Button>
                     )}
                   </div>
                 )
               })}
             </div>
-            <div className="px-5 py-3 border-t border-[var(--m12-border)]/40 flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2">
               {runDone && doneOk.length === 1 && doneOk[0].diagramId && (
-                <button type="button" onClick={() => open(doneOk[0].diagramId!)} className="text-xs px-3 py-1.5 rounded-lg font-medium text-white" style={{ backgroundColor: color }}>Open diagram</button>
+                <Button size="sm" onClick={() => open(doneOk[0].diagramId!)}>Open diagram</Button>
               )}
-              <button type="button" onClick={onClose} disabled={!runDone} className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--m12-border)]/50 text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)] disabled:opacity-50">
-                {runDone ? 'Done' : 'Working…'}
-              </button>
+              <Button variant="secondary" size="sm" disabled={!runDone} onClick={onClose}>
+                {runDone ? 'Done' : 'Working...'}
+              </Button>
             </div>
           </>
         )}
@@ -250,13 +255,13 @@ export default function DataArchitectureDialog({
   )
 }
 
-function Badge({ color, children }: { color: string; children: React.ReactNode }) {
-  return <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${color}1A`, color }}>{children}</span>
+function Chip({ className, children }: { className: string; children: React.ReactNode }) {
+  return <span className={`text-[10px] px-1.5 py-0.5 rounded ${className}`}>{children}</span>
 }
 
 function StatusDot({ status }: { status: RunStatus['status'] }) {
-  if (status === 'busy') return <span className="inline-block w-3.5 h-3.5 border-2 border-[var(--m12-border)] border-t-[#2563EB] rounded-full animate-spin shrink-0" />
-  if (status === 'done') return <span className="text-[#10B981] shrink-0">✓</span>
-  if (status === 'error') return <span className="text-[#EF4444] shrink-0">✕</span>
-  return <span className="inline-block w-3 h-3 rounded-full bg-[var(--m12-border)] shrink-0" />
+  if (status === 'busy') return <Loader2 size={14} className="animate-spin text-brand-500 shrink-0" />
+  if (status === 'done') return <Check size={14} className="text-status-green shrink-0" />
+  if (status === 'error') return <X size={14} className="text-status-red shrink-0" />
+  return <span className="inline-block w-3 h-3 rounded-full bg-border-strong shrink-0" />
 }

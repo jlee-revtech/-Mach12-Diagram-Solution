@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState, useCallback } from 'react'
+import { AlertTriangle, Check, Loader2, Sparkles, X } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useProcessStore } from '@/lib/process/store'
 import { listProcessOverlays } from '@/lib/supabase/process-models'
 import {
@@ -11,6 +13,16 @@ import {
 import type { ProcessElementData, ProcessGraph } from '@/lib/process/types'
 
 type Phase = 'idle' | 'plan' | 'shots' | 'export' | 'done' | 'error'
+
+// System-kind chips shown in the detected-steps preview, mapped to the
+// documented status token pairs.
+const KIND_CHIP_CLASSES: Record<string, string> = {
+  'Standard SAP S/4HANA': 'bg-status-blue-bg text-status-blue',
+  'Dassian A&D': 'bg-rose-50 text-rose-600',
+  'Custom / RICEFW': 'bg-purple-50 text-purple-700',
+  'Non-SAP System': 'bg-amber-50 text-amber-700',
+  'Manual / Offline': 'bg-gray-100 text-gray-500',
+}
 
 // Bounded-concurrency map (keeps AI screenshot calls from stampeding).
 async function pooledMap<T, R>(items: T[], size: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
@@ -67,7 +79,7 @@ export default function TestPlanDialog({ nodeId, onClose }: { nodeId: string; on
     setError(null)
     try {
       // 1) Build the AI test plan.
-      setPhase('plan'); setProgress('Analyzing process steps and systems…')
+      setPhase('plan'); setProgress('Analyzing process steps and systems...')
       const overlays = await listProcessOverlays(node.id).catch(() => [])
       const modules = Array.from(new Set(
         (graph.nodes || []).map(n => (n.data as ProcessElementData).module).filter(Boolean) as string[],
@@ -116,12 +128,12 @@ export default function TestPlanDialog({ nodeId, onClose }: { nodeId: string; on
               if (html.trim()) tc.screenshotDataUrl = await renderHtmlToPng(html, MOCKUP_WIDTH, MOCKUP_HEIGHT)
             }
           } catch { /* a failed screenshot just omits the image */ }
-          finally { done++; setPhase('shots'); setProgress(`Rendering Fiori mockups… ${done}/${plan.testCases.length}`) }
+          finally { done++; setPhase('shots'); setProgress(`Rendering Fiori mockups... ${done}/${plan.testCases.length}`) }
         })
       }
 
       // 3) Export the chosen formats.
-      setPhase('export'); setProgress('Building files…')
+      setPhase('export'); setProgress('Building files...')
       if (excel) {
         const { exportTestPlanXlsx } = await import('@/lib/export/testPlanXlsx')
         exportTestPlanXlsx(plan)
@@ -141,35 +153,31 @@ export default function TestPlanDialog({ nodeId, onClose }: { nodeId: string; on
   const estCases = classified.length
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={busy ? undefined : onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={busy ? undefined : onClose}>
       <div
         onClick={e => e.stopPropagation()}
-        className="w-[30rem] max-w-[94vw] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl overflow-hidden"
+        className="w-[30rem] max-w-[94vw] bg-white border border-border rounded-xl shadow-card-hover overflow-hidden"
       >
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--m12-border)]/40">
-          <h3 className="text-sm font-semibold text-[var(--m12-text)]">Create Test Plan</h3>
-          <button type="button" aria-label="Close" onClick={onClose} disabled={busy} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] disabled:opacity-40">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-          </button>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+          <h3 className="text-heading-sm font-display text-text-primary">Create Test Plan</h3>
+          <Button variant="ghost" size="sm" iconOnly icon={<X size={16} />} aria-label="Close" disabled={busy} onClick={onClose} />
         </div>
 
         <div className="p-5">
-          <p className="text-xs text-[var(--m12-text-muted)] mb-3">
-            Generates an executable functional test script from <span className="text-[var(--m12-text-secondary)] font-medium">{node?.name || 'this process'}</span> — one test case per step, with the SAP system / Fiori tile each action runs in detected automatically.
+          <p className="text-body-sm text-text-secondary mb-3">
+            Generates an executable functional test script from <span className="text-text-primary font-medium">{node?.name || 'this process'}</span>: one test case per step, with the SAP system / Fiori tile each action runs in detected automatically.
           </p>
 
           {/* Detected steps + system breakdown */}
-          <div className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2.5 mb-4">
+          <div className="bg-surface-muted border border-border rounded-lg px-3 py-2.5 mb-4">
             {estCases === 0 ? (
-              <div className="text-xs text-[#F59E0B]">No testable steps found on this flow. Add tasks to the BPMN first.</div>
+              <div className="text-body-sm text-status-yellow">No testable steps found on this flow. Add tasks to the BPMN first.</div>
             ) : (
               <>
-                <div className="text-xs text-[var(--m12-text)] mb-1.5"><span className="font-semibold">{estCases}</span> testable step{estCases === 1 ? '' : 's'} detected</div>
+                <div className="text-body-sm text-text-primary mb-1.5"><span className="font-semibold">{estCases}</span> testable step{estCases === 1 ? '' : 's'} detected</div>
                 <div className="flex flex-wrap gap-1.5">
                   {breakdown.map(([label, n]) => (
-                    <span key={label} className="text-[10px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-secondary)] bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-1.5 py-0.5">
+                    <span key={label} className={`text-[10px] font-mono rounded px-1.5 py-0.5 ${KIND_CHIP_CLASSES[label] || 'bg-gray-100 text-gray-500'}`}>
                       {label} · {n}
                     </span>
                   ))}
@@ -179,7 +187,7 @@ export default function TestPlanDialog({ nodeId, onClose }: { nodeId: string; on
           </div>
 
           {/* Format selection */}
-          <div className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-2">Output Format</div>
+          <div className="text-label uppercase text-text-secondary mb-2">Output Format</div>
           <div className="flex gap-2 mb-4">
             <FormatToggle label="Excel (.xlsx)" desc="Test-case grid" on={excel} onClick={() => setExcel(v => !v)} />
             <FormatToggle label="Word (.docx)" desc="Formatted script" on={word} onClick={() => setWord(v => !v)} />
@@ -191,38 +199,47 @@ export default function TestPlanDialog({ nodeId, onClose }: { nodeId: string; on
             onClick={() => setIncludeShots(v => !v)}
             disabled={!word}
             className={`w-full text-left flex items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors mb-1 ${
-              shotEligible ? 'border-[#0EA5E9]/50 bg-[#0EA5E9]/5' : 'border-[var(--m12-border)]/40 bg-[var(--m12-bg)]'
+              shotEligible ? 'border-brand-500/50 bg-brand-50' : 'border-border bg-surface-muted'
             } ${!word ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <span className={`mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center ${shotEligible ? 'bg-[#0EA5E9] border-[#0EA5E9]' : 'border-[var(--m12-border)]'}`}>
-              {shotEligible && (
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              )}
+            <span className={`mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center ${shotEligible ? 'bg-brand-500 border-brand-500 text-white' : 'border-border-strong'}`}>
+              {shotEligible && <Check size={10} />}
             </span>
             <span>
-              <span className="block text-xs text-[var(--m12-text)]">Include AI-rendered Fiori screenshots <span className="text-[var(--m12-text-muted)]">(Word only)</span></span>
-              <span className="block text-[10px] text-[var(--m12-text-muted)] mt-0.5">One generated screen mockup per test case, embedded in the document.</span>
+              <span className="block text-body-sm text-text-primary">Include AI-rendered Fiori screenshots <span className="text-text-tertiary">(Word only)</span></span>
+              <span className="block text-[10px] text-text-tertiary mt-0.5">One generated screen mockup per test case, embedded in the document.</span>
             </span>
           </button>
           {shotEligible && (
-            <div className="flex items-start gap-1.5 text-[10px] text-[#F59E0B] mb-3 px-1">
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" className="mt-0.5 shrink-0"><path d="M7 1.5l5.5 9.5h-11L7 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" /><path d="M7 6v2.2M7 9.6v.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
+            <div className="flex items-start gap-1.5 text-[10px] text-status-yellow mb-3 px-1">
+              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
               <span>This makes ~{estCases} extra AI calls and will cost additional time and tokens.</span>
             </div>
           )}
 
-          {error && <div className="text-xs text-[#EF4444] bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg px-3 py-2 mb-3">{error}</div>}
-          {busy && <div className="text-xs text-[var(--m12-text-secondary)] mb-3 flex items-center gap-2"><Spinner />{progress}</div>}
-          {phase === 'done' && <div className="text-xs text-[#10B981] mb-3">✓ {progress}</div>}
+          {error && <div className="text-body-sm text-status-red bg-status-red-bg border border-red-200 rounded-lg px-3 py-2 mb-3">{error}</div>}
+          {busy && (
+            <div className="text-body-sm text-text-secondary mb-3 flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" />
+              {progress}
+            </div>
+          )}
+          {phase === 'done' && (
+            <div className="text-body-sm text-status-green mb-3 flex items-center gap-1.5">
+              <Check size={14} />
+              {progress}
+            </div>
+          )}
 
-          <button
-            type="button"
-            onClick={handleGenerate}
+          <Button
+            fullWidth
+            icon={<Sparkles size={14} />}
+            loading={busy}
             disabled={!canGo}
-            className="w-full flex items-center justify-center gap-2 bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            onClick={handleGenerate}
           >
-            {busy ? 'Generating…' : phase === 'done' ? 'Generate again' : 'Generate Test Plan'}
-          </button>
+            {busy ? 'Generating...' : phase === 'done' ? 'Generate again' : 'Generate Test Plan'}
+          </Button>
         </div>
       </div>
     </div>
@@ -235,25 +252,16 @@ function FormatToggle({ label, desc, on, onClick }: { label: string; desc: strin
       type="button"
       onClick={onClick}
       className={`flex-1 text-left rounded-lg border px-3 py-2 transition-colors ${
-        on ? 'border-[#0EA5E9]/60 bg-[#0EA5E9]/5' : 'border-[var(--m12-border)]/40 bg-[var(--m12-bg)] hover:border-[var(--m12-border)]'
+        on ? 'border-brand-500/60 bg-brand-50' : 'border-border bg-surface-muted hover:border-border-strong'
       }`}
     >
       <div className="flex items-center gap-1.5">
-        <span className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${on ? 'bg-[#0EA5E9] border-[#0EA5E9]' : 'border-[var(--m12-border)]'}`}>
-          {on && <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+        <span className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${on ? 'bg-brand-500 border-brand-500 text-white' : 'border-border-strong'}`}>
+          {on && <Check size={9} />}
         </span>
-        <span className="text-xs text-[var(--m12-text)]">{label}</span>
+        <span className="text-body-sm text-text-primary">{label}</span>
       </div>
-      <div className="text-[10px] text-[var(--m12-text-muted)] mt-0.5 ml-5">{desc}</div>
+      <div className="text-[10px] text-text-tertiary mt-0.5 ml-5">{desc}</div>
     </button>
-  )
-}
-
-function Spinner() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="animate-spin">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-      <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
   )
 }

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { Download, FileCode, FileSpreadsheet, FileText, Presentation } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useProcessStore } from '@/lib/process/store'
 import { listProcessOverlays, listProcessInterfaces, listRicefw } from '@/lib/supabase/process-models'
 import { generateProcessBpmn } from '@/lib/export/bpmn'
@@ -37,7 +39,7 @@ export default function ProcessExportMenu() {
   const leaf = selectedNode?.is_leaf ? selectedNode : null
   const sysName = useCallback((id?: string | null) => (id ? logicalSystems.find(s => s.id === id)?.name ?? null : null), [logicalSystems])
 
-  // ─── Executive process map (model-level SVG) ──────────
+  // Executive process map (model-level SVG)
   const handleExecMap = async () => {
     if (!model || busy) return
     setBusy('exec'); setOpen(false)
@@ -60,7 +62,7 @@ export default function ProcessExportMenu() {
     finally { setBusy(null) }
   }
 
-  // ─── BPMN 2.0 (selected leaf) ─────────────────────────
+  // BPMN 2.0 (selected leaf)
   const handleBpmn = () => {
     if (!leaf || !model) return
     setOpen(false)
@@ -69,7 +71,7 @@ export default function ProcessExportMenu() {
     downloadBlob(xml, `${sanitize(leaf.name)}.bpmn`, 'application/xml')
   }
 
-  // ─── Playbook (selected leaf) — generate once, then export ──
+  // Playbook (selected leaf) - generate once, then export
   const getPlaybook = useCallback(async (): Promise<ProcessPlaybook | null> => {
     if (!leaf || !model) return null
     if (playbookCache.current && playbookForNode.current === leaf.id) return playbookCache.current
@@ -134,27 +136,26 @@ export default function ProcessExportMenu() {
 
   return (
     <div className="relative" ref={ref}>
-      <button
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={<Download size={12} />}
+        loading={!!busy}
         onClick={() => setOpen(o => !o)}
-        disabled={!!busy}
-        className="flex items-center gap-1.5 text-xs text-[var(--m12-text-secondary)] hover:text-[var(--m12-text)] border border-[var(--m12-border)]/60 hover:border-[var(--m12-border)] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
       >
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1.5v7m0 0L4.5 6M7 8.5L9.5 6M2.5 10v1.5a1 1 0 001 1h7a1 1 0 001-1V10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        {busy ? 'Exporting…' : 'Export'}
-      </button>
+        {busy ? 'Exporting...' : 'Export'}
+      </Button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-60 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-lg shadow-xl overflow-hidden py-1">
+        <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-white rounded-lg shadow-dropdown border border-border py-1 animate-slide-in-up">
           <MenuLabel>Model</MenuLabel>
-          <MenuItem onClick={handleExecMap} desc="AI value-chain slide (SVG)">Executive Process Map</MenuItem>
+          <MenuItem icon={<Presentation size={14} />} onClick={handleExecMap} desc="AI value-chain slide (SVG)">Executive Process Map</MenuItem>
 
           <MenuLabel>{leaf ? `Leaf: ${leaf.name}` : 'Leaf process (select one)'}</MenuLabel>
-          <MenuItem onClick={handleBpmn} disabled={!leaf}>BPMN 2.0 (.bpmn)</MenuItem>
-          <MenuItem onClick={() => handlePlaybook('xlsx')} disabled={!leaf} desc="AI playbook">Playbook — Excel</MenuItem>
-          <MenuItem onClick={() => handlePlaybook('pdf')} disabled={!leaf} desc="AI playbook">Playbook — PDF</MenuItem>
-          <MenuItem onClick={() => handlePlaybook('pptx')} disabled={!leaf} desc="AI playbook">Playbook — PowerPoint</MenuItem>
+          <MenuItem icon={<FileCode size={14} />} onClick={handleBpmn} disabled={!leaf}>BPMN 2.0 (.bpmn)</MenuItem>
+          <MenuItem icon={<FileSpreadsheet size={14} />} onClick={() => handlePlaybook('xlsx')} disabled={!leaf} desc="AI playbook">Playbook - Excel</MenuItem>
+          <MenuItem icon={<FileText size={14} />} onClick={() => handlePlaybook('pdf')} disabled={!leaf} desc="AI playbook">Playbook - PDF</MenuItem>
+          <MenuItem icon={<Presentation size={14} />} onClick={() => handlePlaybook('pptx')} disabled={!leaf} desc="AI playbook">Playbook - PowerPoint</MenuItem>
         </div>
       )}
     </div>
@@ -162,13 +163,16 @@ export default function ProcessExportMenu() {
 }
 
 function MenuLabel({ children }: { children: React.ReactNode }) {
-  return <div className="px-3 py-1 text-[8px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">{children}</div>
+  return <div className="px-3 py-1 text-[10px] uppercase tracking-wider font-semibold text-text-tertiary truncate">{children}</div>
 }
-function MenuItem({ children, desc, onClick, disabled }: { children: React.ReactNode; desc?: string; onClick: () => void; disabled?: boolean }) {
+function MenuItem({ children, desc, icon, onClick, disabled }: { children: React.ReactNode; desc?: string; icon?: React.ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
-    <button onClick={onClick} disabled={disabled} className="w-full text-left px-3 py-1.5 hover:bg-[var(--m12-bg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-      <div className="text-xs text-[var(--m12-text)]">{children}</div>
-      {desc && <div className="text-[9px] text-[var(--m12-text-muted)]">{desc}</div>}
+    <button type="button" onClick={onClick} disabled={disabled} className="w-full flex items-start gap-2 text-left px-3 py-1.5 hover:bg-surface-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+      {icon && <span className="inline-flex shrink-0 text-text-tertiary mt-0.5">{icon}</span>}
+      <span className="min-w-0">
+        <span className="block text-body-sm text-text-primary">{children}</span>
+        {desc && <span className="block text-[10px] text-text-tertiary">{desc}</span>}
+      </span>
     </button>
   )
 }

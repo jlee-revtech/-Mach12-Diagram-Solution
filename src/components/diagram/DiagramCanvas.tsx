@@ -13,6 +13,7 @@ import {
   type NodeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { Check } from 'lucide-react'
 
 import { useDiagramStore } from '@/lib/diagram/store'
 import { useAuth } from '@/lib/supabase/auth-context'
@@ -50,13 +51,13 @@ function ArtifactSpotlightBar() {
           <button
             key={art.id}
             onClick={() => setSpotlightArtifact(isActive ? null : art.id)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[9px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
               isActive
-                ? 'bg-[#F97316]/20 text-[#FB923C] border border-[#F97316]/40 shadow-[0_0_8px_rgba(249,115,22,0.2)]'
-                : 'bg-[var(--m12-bg-card)]/80 text-[var(--m12-text-muted)] border border-[var(--m12-border)]/30 hover:text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)]/60'
+                ? 'bg-m12-ember/15 text-m12-ember border border-m12-ember/40 shadow-card'
+                : 'bg-white text-text-tertiary border border-border hover:text-text-secondary hover:border-border-strong'
             }`}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#F97316]' : 'bg-[#F97316]/30'}`} />
+            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-m12-ember' : 'bg-m12-ember/30'}`} />
             {art.name}
           </button>
         )
@@ -307,7 +308,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
   }, [updateCursor])
 
   return (
-    <div className="flex h-screen w-full bg-[var(--m12-bg)]">
+    <div className="flex h-screen w-full bg-surface-muted">
       {/* Canvas area */}
       <div className="flex-1 relative" onMouseMove={handleMouseMove}>
         <RemoteCursors users={users} />
@@ -316,22 +317,22 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
         <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
           {/* Mach12.ai logo */}
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-gradient text-sm font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
+            <span className="text-gradient text-body-md font-bold font-display tracking-wide">
               MACH12
             </span>
-            <span className="text-[var(--m12-text-muted)] text-xs">.AI</span>
+            <span className="text-text-tertiary text-body-sm">.AI</span>
             <span className="ml-1"><VersionBadge /></span>
           </div>
           {/* Diagram title */}
-          <div className="bg-[var(--m12-bg-card)]/90 backdrop-blur-sm border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5">
-            <span className="text-[13px] font-semibold text-[var(--m12-text)]">
+          <div className="bg-white border border-border rounded-lg px-3 py-1.5 shadow-card">
+            <span className="text-body-md font-semibold text-text-primary">
               {meta.title}
             </span>
           </div>
           {meta.processContext && (
-            <div className="bg-[var(--m12-bg-card)]/90 backdrop-blur-sm border border-[var(--m12-border)]/60 rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#06B6D4]" />
-              <span className="text-[11px] font-medium text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">
+            <div className="bg-white border border-border rounded-lg px-3 py-1.5 shadow-card flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-brand-500" />
+              <span className="text-[11px] font-medium text-text-secondary font-mono uppercase tracking-wider">
                 {meta.processContext}
               </span>
             </div>
@@ -339,11 +340,11 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
           {/* Autosave indicator */}
           <div className="flex items-center gap-1.5 px-2 py-1">
             <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
-              saveStatus === 'saved' ? 'bg-[#10B981]' :
-              saveStatus === 'saving' ? 'bg-[#EAB308] animate-pulse' :
-              'bg-[var(--m12-text-muted)]'
+              saveStatus === 'saved' ? 'bg-status-green' :
+              saveStatus === 'saving' ? 'bg-status-yellow animate-pulse' :
+              'bg-border-strong'
             }`} />
-            <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+            <span className="text-[10px] text-text-tertiary font-mono">
               {saveStatus === 'saved' ? 'Saved' :
                saveStatus === 'saving' ? 'Saving...' :
                'Unsaved changes'}
@@ -362,19 +363,17 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
 
         {/* Toast notification */}
         {toast && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#06B6D4]/15 backdrop-blur-sm border border-[#06B6D4]/40 rounded-lg px-4 py-2 shadow-lg animate-in fade-in slide-in-from-bottom-2">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 7l3 3 5-6" stroke="#06B6D4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="text-xs text-[#67E8F9] font-medium">{toast}</span>
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white border border-border rounded-lg px-4 py-2 shadow-dropdown animate-slide-in-up">
+            <Check size={14} className="text-status-green" />
+            <span className="text-body-sm text-text-primary font-medium">{toast}</span>
           </div>
         )}
 
         {/* Reconnect mode indicator */}
         {reconnecting && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-[#06B6D4]/15 backdrop-blur-sm border border-[#06B6D4]/40 rounded-lg px-4 py-2 shadow-lg animate-in fade-in">
-            <div className="w-2 h-2 rounded-full bg-[#06B6D4] animate-pulse" />
-            <span className="text-xs text-[#67E8F9] font-medium">
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white border border-border rounded-lg px-4 py-2 shadow-dropdown animate-fade-in">
+            <div className="w-2 h-2 rounded-full bg-m12-cyan animate-pulse" />
+            <span className="text-body-sm text-text-secondary font-medium">
               Drop on a system to reconnect
             </span>
           </div>
@@ -382,16 +381,16 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
 
         {/* Connect mode status banner */}
         {connectMode && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-[#2563EB]/15 backdrop-blur-sm border border-[#2563EB]/40 rounded-lg px-4 py-2 shadow-lg animate-in fade-in">
-            <div className="w-2 h-2 rounded-full bg-[#2563EB] animate-pulse" />
-            <span className="text-xs text-[#93C5FD] font-medium">
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-brand-50 border border-brand-200 rounded-lg px-4 py-2 shadow-dropdown animate-fade-in">
+            <div className="w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
+            <span className="text-body-sm text-brand-700 font-medium">
               {pendingConnectionSource
                 ? 'Now click a target system to connect'
                 : 'Click a source system to start connecting'}
             </span>
             <button
               onClick={toggleConnectMode}
-              className="text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] ml-2 transition-colors"
+              className="text-[10px] text-text-secondary hover:text-text-primary ml-2 transition-colors"
             >
               Esc to cancel
             </button>
@@ -443,7 +442,7 @@ function DiagramCanvasInner({ diagramId }: { diagramId?: string }) {
             maskColor="var(--m12-minimap-mask)"
             style={{ width: 160, height: 100, backgroundColor: 'var(--m12-minimap-bg)', borderColor: 'var(--m12-border)', borderRadius: 8 }}
           />
-          <div className="absolute bottom-1 right-1 text-[9px] text-[var(--m12-border)]/50 select-none pointer-events-none">
+          <div className="absolute bottom-1 right-1 text-[10px] text-text-tertiary/40 select-none pointer-events-none">
             v{process.env.NEXT_PUBLIC_APP_VERSION}
           </div>
         </ReactFlow>

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
+import { Button, LoadingState, StatusBadge } from '@/components/common'
 import { useProcessStore } from '@/lib/process/store'
 import { getReferenceScenario, listReferenceScenarios } from '@/lib/supabase/process-models'
 
@@ -84,47 +86,44 @@ export default function ProcessGapAssessment({ onClose }: { onClose: () => void 
     return () => { cancelled = true }
   }, [model, nodes])
 
-  const sevColor = (s: string) => s === 'high' ? '#EF4444' : s === 'medium' ? '#EAB308' : '#64748B'
-  const scoreColor = result && result.overallScore >= 75 ? '#10B981' : result && result.overallScore >= 50 ? '#EAB308' : '#EF4444'
+  const scoreClasses = result && result.overallScore >= 75
+    ? 'bg-status-green-bg border-green-200 text-status-green'
+    : result && result.overallScore >= 50
+      ? 'bg-status-yellow-bg border-amber-200 text-status-yellow'
+      : 'bg-status-red-bg border-red-200 text-status-red'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="w-[40rem] max-w-[94vw] max-h-[85vh] flex flex-col bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--m12-border)]/40 shrink-0">
-          <h3 className="text-sm font-semibold text-[var(--m12-text)]">Best-practice gap assessment</h3>
-          <button onClick={onClose} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="w-[40rem] max-w-[94vw] max-h-[85vh] flex flex-col bg-white border border-border rounded-xl shadow-card-hover overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0">
+          <h3 className="text-heading-sm font-display text-text-primary">Best-practice gap assessment</h3>
+          <Button variant="ghost" size="sm" iconOnly icon={<X size={16} />} aria-label="Close" onClick={onClose} />
         </div>
 
         <div className="p-5 overflow-y-auto">
           {status === 'running' && (
-            <div className="py-16 text-center">
-              <div className="inline-block w-6 h-6 border-2 border-[#0EA5E9]/30 border-t-[#0EA5E9] rounded-full animate-spin mb-3" />
-              <div className="text-sm text-[var(--m12-text-muted)]">Comparing your model against best practice…</div>
-            </div>
+            <LoadingState variant="inline" label="Comparing your model against best practice..." />
           )}
-          {status === 'error' && <div className="py-12 text-center text-sm text-red-400">{errorMsg}</div>}
+          {status === 'error' && <div className="py-12 text-center text-body-sm text-status-red">{errorMsg}</div>}
           {status === 'done' && result && (
             <div className="space-y-5">
               <div className="flex items-start gap-4">
-                <div className="shrink-0 w-16 h-16 rounded-xl flex flex-col items-center justify-center" style={{ background: `${scoreColor}15`, border: `1px solid ${scoreColor}40` }}>
-                  <span className="text-xl font-bold" style={{ color: scoreColor }}>{result.overallScore}</span>
-                  <span className="text-[8px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">score</span>
+                <div className={`shrink-0 w-16 h-16 rounded-xl border flex flex-col items-center justify-center ${scoreClasses}`}>
+                  <span className="text-heading-md font-display">{result.overallScore}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-text-tertiary">score</span>
                 </div>
-                <p className="text-xs text-[var(--m12-text-secondary)] leading-relaxed flex-1">{result.summary}</p>
+                <p className="text-body-sm text-text-secondary leading-relaxed flex-1">{result.summary}</p>
               </div>
 
               <Section title="Fit Gaps" count={result.fitGaps?.length}>
                 {(result.fitGaps || []).map((g, i) => (
                   <div key={i} className="flex items-start gap-2 py-1.5">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: sevColor(g.severity) }} />
-                    <div>
-                      <div className="text-xs font-medium text-[var(--m12-text)]">
-                        {g.title}
-                        <span className="ml-2 text-[8px] uppercase tracking-wider font-[family-name:var(--font-space-mono)]" style={{ color: sevColor(g.severity) }}>{g.severity}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-body-sm font-medium text-text-primary">{g.title}</span>
+                        <StatusBadge status={g.severity} size="sm" className="capitalize" />
                       </div>
-                      <div className="text-[11px] text-[var(--m12-text-muted)]">{g.description}</div>
+                      <div className="text-[11px] text-text-tertiary">{g.description}</div>
                     </div>
                   </div>
                 ))}
@@ -133,10 +132,10 @@ export default function ProcessGapAssessment({ onClose }: { onClose: () => void 
               <Section title="Compliance Gaps" count={result.complianceGaps?.length}>
                 {(result.complianceGaps || []).map((g, i) => (
                   <div key={i} className="flex items-start gap-2 py-1.5">
-                    <span className="shrink-0 text-[9px] font-[family-name:var(--font-space-mono)] text-[#EF4444] border border-[#EF4444]/40 bg-[#EF4444]/10 rounded px-1 py-0.5 mt-0.5">{g.framework}</span>
+                    <span className="shrink-0 text-[10px] font-mono bg-status-red-bg text-status-red border border-red-200 rounded px-1 py-0.5 mt-0.5">{g.framework}</span>
                     <div>
-                      <div className="text-xs font-medium text-[var(--m12-text)]">{g.title}</div>
-                      <div className="text-[11px] text-[var(--m12-text-muted)]">{g.description}</div>
+                      <div className="text-body-sm font-medium text-text-primary">{g.title}</div>
+                      <div className="text-[11px] text-text-tertiary">{g.description}</div>
                     </div>
                   </div>
                 ))}
@@ -145,7 +144,7 @@ export default function ProcessGapAssessment({ onClose }: { onClose: () => void 
               <Section title="Recommendations" count={result.recommendations?.length}>
                 <ol className="list-decimal list-inside space-y-1">
                   {(result.recommendations || []).map((r, i) => (
-                    <li key={i} className="text-[11px] text-[var(--m12-text-secondary)]">{r}</li>
+                    <li key={i} className="text-body-sm text-text-secondary">{r}</li>
                   ))}
                 </ol>
               </Section>
@@ -160,7 +159,7 @@ export default function ProcessGapAssessment({ onClose }: { onClose: () => void 
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-1.5">
+      <div className="text-label uppercase text-text-secondary mb-1.5">
         {title}{typeof count === 'number' ? ` (${count})` : ''}
       </div>
       {children}

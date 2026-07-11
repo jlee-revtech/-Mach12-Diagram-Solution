@@ -29,23 +29,20 @@ export default function SectionCard({
   return (
     <button
       onClick={onSelect}
-      className="w-full text-left rounded-lg border px-3 py-2.5 transition-colors"
-      style={{
-        borderColor: selected ? meta.color : 'var(--m12-border)',
-        backgroundColor: selected ? `${meta.color}14` : 'var(--m12-bg-card)',
-      }}
+      className={`w-full text-left rounded-lg border px-3 py-2.5 shadow-card transition-colors ${selected ? '' : 'border-border bg-white hover:bg-surface-muted'}`}
+      style={selected ? { borderColor: meta.color, backgroundColor: `${meta.color}14` } : undefined}
     >
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[10px] text-[var(--m12-text-muted)] w-4 shrink-0">{index + 1}</span>
+        <span className="text-[10px] text-text-tertiary w-4 shrink-0">{index + 1}</span>
         <span
-          className="text-[8px] uppercase tracking-wide px-1.5 py-0.5 rounded flex items-center gap-1"
+          className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded flex items-center gap-1"
           style={{ backgroundColor: `${meta.color}1A`, color: meta.color }}
         >
           <span>{meta.icon}</span>{meta.label}
         </span>
         {item.workstream_code && (
           <span
-            className="text-[8px] px-1.5 py-0.5 rounded truncate max-w-[10rem]"
+            className="text-[10px] px-1.5 py-0.5 rounded truncate max-w-[10rem]"
             style={{ backgroundColor: `${wsColor}1A`, color: wsColor }}
             title={wsName || undefined}
           >
@@ -54,19 +51,19 @@ export default function SectionCard({
         )}
         <span className="ml-auto flex items-center gap-2 shrink-0">
           {item.timebox_minutes ? (
-            <span className="text-[9px] text-[var(--m12-text-muted)]">{item.timebox_minutes}m</span>
+            <span className="text-[10px] text-text-tertiary">{item.timebox_minutes}m</span>
           ) : null}
           <span
-            className="text-[8px] uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+            className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full"
             style={{ backgroundColor: `${statusMeta.color}1A`, color: statusMeta.color }}
           >
             {statusMeta.label}
           </span>
         </span>
       </div>
-      <div className="text-[12px] text-[var(--m12-text)] leading-snug pl-6">{item.title}</div>
+      <div className="font-display text-[12px] text-text-primary leading-snug pl-6">{item.title}</div>
       {item.objective && (
-        <div className="text-[10px] text-[var(--m12-text-muted)] leading-snug mt-0.5 pl-6">{item.objective}</div>
+        <div className="text-[10px] text-text-tertiary leading-snug mt-0.5 pl-6">{item.objective}</div>
       )}
     </button>
   )

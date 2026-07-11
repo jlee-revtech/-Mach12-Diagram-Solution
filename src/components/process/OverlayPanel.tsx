@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { Plus, X } from 'lucide-react'
+import { Button, LoadingState } from '@/components/common'
 import {
   listProcessOverlays, createProcessOverlay, deleteProcessOverlay,
 } from '@/lib/supabase/process-models'
@@ -16,10 +18,16 @@ const KIND_LABEL: Record<OverlayKind, string> = {
   scope_item: 'Scope Item',
 }
 
-const KIND_COLOR: Record<OverlayKind, string> = {
-  compliance: '#EF4444', control: '#EF4444', kpi: '#10B981',
-  accelerator: '#8B5CF6', variant: '#F59E0B', scope_item: '#0EA5E9',
+const KIND_CHIP: Record<OverlayKind, string> = {
+  compliance: 'bg-status-red-bg text-status-red',
+  control: 'bg-status-red-bg text-status-red',
+  kpi: 'bg-status-green-bg text-status-green',
+  accelerator: 'bg-purple-50 text-purple-700',
+  variant: 'bg-status-yellow-bg text-status-yellow',
+  scope_item: 'bg-status-blue-bg text-status-blue',
 }
+
+const FIELD_CLASSES = 'h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none'
 
 // RevTech/Mach12 A&D overlay editor for a process node.
 export default function OverlayPanel({ nodeId, readOnly }: { nodeId: string; readOnly: boolean }) {
@@ -69,35 +77,37 @@ export default function OverlayPanel({ nodeId, readOnly }: { nodeId: string; rea
   }
 
   return (
-    <div className="px-4 py-3 border-t border-[var(--m12-border)]/40">
+    <div className="px-4 py-3 border-t border-border">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+        <span className="text-label uppercase text-text-secondary">
           A&amp;D Overlay {overlays.length > 0 && `(${overlays.length})`}
         </span>
         {!readOnly && !adding && (
-          <button onClick={() => setAdding(true)} className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#0EA5E9] hover:text-[#38BDF8]">
-            + Add
-          </button>
+          <Button variant="ghost" size="sm" icon={<Plus size={12} />} onClick={() => setAdding(true)}>
+            Add
+          </Button>
         )}
       </div>
 
       {loading ? (
-        <div className="text-[11px] text-[var(--m12-text-muted)]">Loading…</div>
+        <LoadingState variant="inline" compact label="Loading overlays..." />
       ) : (
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {overlays.length === 0 && !adding && <span className="text-[11px] text-[var(--m12-text-muted)]">No controls, KPIs, or accelerators yet.</span>}
+          {overlays.length === 0 && !adding && <span className="text-[11px] text-text-tertiary">No controls, KPIs, or accelerators yet.</span>}
           {overlays.map(o => {
-            const c = KIND_COLOR[o.overlay_kind] || '#64748B'
+            const chip = KIND_CHIP[o.overlay_kind] || 'bg-gray-100 text-gray-500'
             const label = o.overlay_kind === 'compliance' || o.overlay_kind === 'control'
               ? `${o.payload.framework || ''} ${o.payload.code || ''} ${o.payload.title}`.trim()
               : o.overlay_kind === 'kpi'
                 ? `${o.payload.title}${o.payload.kpiTarget ? ` · ${o.payload.kpiTarget}` : ''}`
                 : o.payload.title
             return (
-              <span key={o.id} title={o.payload.notes || KIND_LABEL[o.overlay_kind]} className="group inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: c, borderColor: `${c}55`, background: `${c}12` }}>
+              <span key={o.id} title={o.payload.notes || KIND_LABEL[o.overlay_kind]} className={`group inline-flex items-center gap-1 text-[10px] font-mono rounded px-1.5 py-0.5 ${chip}`}>
                 {label}
                 {!readOnly && (
-                  <button onClick={() => handleDelete(o.id)} className="opacity-50 group-hover:opacity-100 hover:text-red-400">×</button>
+                  <button type="button" onClick={() => handleDelete(o.id)} aria-label="Remove overlay" className="opacity-50 group-hover:opacity-100 hover:text-status-red">
+                    <X size={10} />
+                  </button>
                 )}
               </span>
             )
@@ -106,30 +116,32 @@ export default function OverlayPanel({ nodeId, readOnly }: { nodeId: string; rea
       )}
 
       {adding && !readOnly && (
-        <div className="bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-lg p-2.5 space-y-2">
+        <div className="bg-surface-muted border border-border rounded-lg p-2.5 space-y-2">
           <div className="flex gap-2">
-            <select value={kind} onChange={e => setKind(e.target.value as OverlayKind)} aria-label="Overlay kind" className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none">
+            <select value={kind} onChange={e => setKind(e.target.value as OverlayKind)} aria-label="Overlay kind" className={FIELD_CLASSES}>
               {(Object.keys(KIND_LABEL) as OverlayKind[]).map(k => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
             </select>
             {(kind === 'compliance' || kind === 'control') && (
-              <select value={framework} onChange={e => setFramework(e.target.value as ComplianceFramework)} aria-label="Framework" className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none">
+              <select value={framework} onChange={e => setFramework(e.target.value as ComplianceFramework)} aria-label="Framework" className={FIELD_CLASSES}>
                 {COMPLIANCE_FRAMEWORKS.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
             )}
           </div>
-          <input value={title} onChange={e => setTitle(e.target.value)} aria-label="Overlay title" placeholder="Title (e.g. Timekeeping integrity)" className="w-full bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none" />
+          <input value={title} onChange={e => setTitle(e.target.value)} aria-label="Overlay title" placeholder="Title (e.g. Timekeeping integrity)" className={`w-full ${FIELD_CLASSES}`} />
           <div className="flex gap-2">
             {(kind === 'compliance' || kind === 'control' || kind === 'scope_item' || kind === 'accelerator') && (
-              <input value={code} onChange={e => setCode(e.target.value)} aria-label="Code or reference" placeholder={kind === 'accelerator' ? 'Accelerator ref' : 'Code (e.g. 52.216-7)'} className="flex-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] font-[family-name:var(--font-space-mono)] focus:outline-none" />
+              <input value={code} onChange={e => setCode(e.target.value)} aria-label="Code or reference" placeholder={kind === 'accelerator' ? 'Accelerator ref' : 'Code (e.g. 52.216-7)'} className={`flex-1 min-w-0 font-mono ${FIELD_CLASSES}`} />
             )}
             {kind === 'kpi' && (
-              <input value={kpiTarget} onChange={e => setKpiTarget(e.target.value)} aria-label="KPI target" placeholder="Target (e.g. CPI >= 0.95)" className="flex-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] font-[family-name:var(--font-space-mono)] focus:outline-none" />
+              <input value={kpiTarget} onChange={e => setKpiTarget(e.target.value)} aria-label="KPI target" placeholder="Target (e.g. CPI >= 0.95)" className={`flex-1 min-w-0 font-mono ${FIELD_CLASSES}`} />
             )}
           </div>
-          <input value={notes} onChange={e => setNotes(e.target.value)} aria-label="Notes" placeholder="Notes (optional)" className="w-full bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded px-2 py-1 text-[11px] text-[var(--m12-text)] focus:outline-none" />
+          <input value={notes} onChange={e => setNotes(e.target.value)} aria-label="Notes" placeholder="Notes (optional)" className={`w-full ${FIELD_CLASSES}`} />
           <div className="flex gap-2">
-            <button onClick={handleAdd} disabled={busy || !title.trim()} className="flex-1 bg-[#0EA5E9] hover:bg-[#38BDF8] disabled:opacity-50 text-white text-[11px] font-medium rounded py-1.5 transition-colors">{busy ? 'Adding…' : 'Add'}</button>
-            <button onClick={reset} className="px-3 text-[11px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]">Cancel</button>
+            <Button size="sm" className="flex-1" loading={busy} disabled={!title.trim()} onClick={handleAdd}>
+              {busy ? 'Adding...' : 'Add'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={reset}>Cancel</Button>
           </div>
         </div>
       )}

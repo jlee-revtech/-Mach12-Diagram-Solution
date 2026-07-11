@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import { X, Check, Sparkles, ImagePlus } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 
 interface BulkLoadResult {
@@ -163,28 +165,29 @@ export default function AIBulkLoadPanel({ coreAreaId, coreAreaName, onClose }: {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-2xl shadow-2xl w-[640px] max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="relative bg-white rounded-xl shadow-card-hover w-[640px] max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--m12-border)]/20">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#2563EB] flex items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-              <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="white" />
-            </svg>
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+            <Sparkles size={16} className="text-amber-600" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-semibold text-[var(--m12-text)]">AI Bulk Load</div>
-            <div className="text-[10px] text-[var(--m12-text-muted)]">
-              Generate L2 Capabilities and L3 Functionalities for <span className="font-semibold text-[var(--m12-text-secondary)]">{coreAreaName}</span>
+            <div className="text-heading-sm font-display text-text-primary">AI Bulk Load</div>
+            <div className="text-[11px] text-text-tertiary">
+              Generate L2 Capabilities and L3 Functionalities for <span className="font-medium text-text-secondary">{coreAreaName}</span>
             </div>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 10L10 2M2 2l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={14} />}
+            aria-label="Close"
+            onClick={onClose}
+          />
         </div>
 
         {/* Body */}
@@ -193,7 +196,7 @@ export default function AIBulkLoadPanel({ coreAreaId, coreAreaName, onClose }: {
             <>
               {/* Prompt input */}
               <div>
-                <label className="text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider text-[var(--m12-text-muted)] mb-1.5 block">
+                <label className="text-label uppercase text-text-secondary mb-1.5 block">
                   Instructions or description
                 </label>
                 <textarea
@@ -203,23 +206,24 @@ export default function AIBulkLoadPanel({ coreAreaId, coreAreaName, onClose }: {
                   onPaste={handlePaste}
                   placeholder="Describe the capabilities to add, or paste a screenshot of an existing capability model..."
                   rows={4}
-                  className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2.5 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 resize-none"
+                  className="w-full bg-surface-input border border-border rounded-lg px-3 py-2.5 text-body-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-none"
                 />
               </div>
 
               {/* Image preview */}
               {image && (
-                <div className="relative rounded-lg border border-[var(--m12-border)]/30 overflow-hidden bg-[var(--m12-bg)]">
+                <div className="relative rounded-lg border border-border overflow-hidden bg-surface-muted">
                   <img src={image} alt="Pasted" className="max-h-[200px] w-full object-contain" />
                   <div className="absolute top-2 right-2 flex gap-1">
-                    <span className="text-[8px] bg-black/60 text-white px-2 py-0.5 rounded font-[family-name:var(--font-space-mono)]">{imageName}</span>
+                    <span className="text-[10px] font-mono bg-black/60 text-white px-2 py-0.5 rounded">{imageName}</span>
                     <button
+                      type="button"
                       onClick={() => { setImage(null); setImageName(null) }}
+                      aria-label="Remove image"
+                      title="Remove image"
                       className="w-5 h-5 rounded bg-black/60 text-white flex items-center justify-center hover:bg-red-500/80 transition-colors"
                     >
-                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                        <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                      </svg>
+                      <X size={8} />
                     </button>
                   </div>
                 </div>
@@ -227,61 +231,54 @@ export default function AIBulkLoadPanel({ coreAreaId, coreAreaName, onClose }: {
 
               {/* Paste hint */}
               {!image && (
-                <div className="flex items-center gap-2 text-[10px] text-[var(--m12-text-faint)]">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0">
-                    <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1.5" />
-                    <path d="M4 6h4M6 4v4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
-                  </svg>
+                <div className="flex items-center gap-2 text-[11px] text-text-tertiary">
+                  <ImagePlus size={12} className="shrink-0" />
                   Paste an image (Ctrl+V) of a capability model, org chart, or process map to extract capabilities from it
                 </div>
               )}
 
               {/* Existing capabilities note */}
               {existingL2s.length > 0 && (
-                <div className="text-[9px] text-[var(--m12-text-faint)] bg-[var(--m12-bg)] rounded-lg px-3 py-2 border border-[var(--m12-border)]/20">
-                  <span className="font-semibold text-[var(--m12-text-muted)]">{existingL2s.length} existing L2s</span> will be preserved. AI will not duplicate them.
+                <div className="text-[11px] text-text-secondary bg-surface-muted rounded-lg px-3 py-2 border border-border">
+                  <span className="font-semibold text-text-primary">{existingL2s.length} existing L2s</span> will be preserved. AI will not duplicate them.
                 </div>
               )}
 
               {error && (
-                <div className="text-[10px] text-red-400 bg-red-400/10 rounded-lg px-3 py-2 border border-red-400/20">{error}</div>
+                <div className="text-[11px] text-red-700 bg-red-50 rounded-lg px-3 py-2 border border-red-200">{error}</div>
               )}
             </>
           ) : (
             <>
               {/* Results */}
-              <div className="text-[10px] text-[var(--m12-text-muted)] mb-2">
+              <div className="text-[11px] text-text-secondary mb-2">
                 {result.capabilities.length} L2 Capabilities generated. Select which to add:
               </div>
               <div className="space-y-2">
                 {result.capabilities.map((l2, i) => {
                   const l2Selected = selected.has(`l2-${i}`)
                   return (
-                    <div key={i} className={`rounded-lg border overflow-hidden transition-colors ${l2Selected ? 'border-[#2563EB]/30 bg-[#2563EB]/5' : 'border-[var(--m12-border)]/20 bg-[var(--m12-bg)]'}`}>
+                    <div key={i} className={`rounded-lg border overflow-hidden transition-colors ${l2Selected ? 'border-brand-300 bg-brand-50' : 'border-border bg-white'}`}>
                       {/* L2 header */}
                       <button
                         onClick={() => toggleL2(i)}
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left"
                       >
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${l2Selected ? 'bg-[#2563EB] border-[#2563EB]' : 'border-[var(--m12-border)]'}`}>
-                          {l2Selected && (
-                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                              <path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${l2Selected ? 'bg-brand-500 border-brand-500' : 'border-border-strong'}`}>
+                          {l2Selected && <Check size={10} className="text-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-[var(--m12-text)]">{l2.name}</div>
-                          {l2.description && <div className="text-[9px] text-[var(--m12-text-muted)] mt-0.5">{l2.description}</div>}
+                          <div className="text-body-sm font-semibold text-text-primary">{l2.name}</div>
+                          {l2.description && <div className="text-[11px] text-text-secondary mt-0.5">{l2.description}</div>}
                         </div>
-                        <span className="text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-faint)] bg-[var(--m12-bg)] px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] text-text-tertiary bg-surface-muted px-1.5 py-0.5 rounded">
                           L2 · {l2.children.length} L3s
                         </span>
                       </button>
 
                       {/* L3 children */}
                       {l2.children.length > 0 && (
-                        <div className="border-t border-[var(--m12-border)]/10 pl-9 pr-3 py-1.5 space-y-0.5">
+                        <div className="border-t border-border pl-9 pr-3 py-1.5 space-y-0.5">
                           {l2.children.map((l3, j) => {
                             const l3Selected = selected.has(`l3-${i}-${j}`)
                             return (
@@ -290,14 +287,10 @@ export default function AIBulkLoadPanel({ coreAreaId, coreAreaName, onClose }: {
                                 onClick={() => toggleL3(i, j)}
                                 className="w-full flex items-center gap-2 py-1 text-left"
                               >
-                                <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 transition-colors ${l3Selected ? 'bg-[#8B5CF6] border-[#8B5CF6]' : 'border-[var(--m12-border)]/60'}`}>
-                                  {l3Selected && (
-                                    <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-                                      <path d="M1 3L2.5 4.5L5 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  )}
+                                <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 transition-colors ${l3Selected ? 'bg-brand-500 border-brand-500' : 'border-border-strong'}`}>
+                                  {l3Selected && <Check size={8} className="text-white" />}
                                 </div>
-                                <span className={`text-[10px] ${l3Selected ? 'text-[var(--m12-text)]' : 'text-[var(--m12-text-muted)]'}`}>{l3.name}</span>
+                                <span className={`text-[11px] ${l3Selected ? 'text-text-primary' : 'text-text-tertiary'}`}>{l3.name}</span>
                               </button>
                             )
                           })}
@@ -309,59 +302,45 @@ export default function AIBulkLoadPanel({ coreAreaId, coreAreaName, onClose }: {
               </div>
 
               {error && (
-                <div className="text-[10px] text-red-400 bg-red-400/10 rounded-lg px-3 py-2 border border-red-400/20">{error}</div>
+                <div className="text-[11px] text-red-700 bg-red-50 rounded-lg px-3 py-2 border border-red-200">{error}</div>
               )}
             </>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-2 px-5 py-3 border-t border-[var(--m12-border)]/20 bg-[var(--m12-bg)]/50">
+        <div className="flex items-center gap-2 px-5 py-3 border-t border-border bg-surface-muted/50">
           {!result ? (
             <>
               <div className="flex-1" />
-              <button onClick={onClose} className="text-xs text-[var(--m12-text-muted)] px-3 py-1.5">Cancel</button>
-              <button
+              <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+              <Button
+                variant="ai"
+                size="sm"
+                icon={<Sparkles size={12} />}
+                loading={loading}
+                disabled={!prompt.trim() && !image}
                 onClick={handleGenerate}
-                disabled={loading || (!prompt.trim() && !image)}
-                className="flex items-center gap-1.5 bg-gradient-to-r from-[#8B5CF6] to-[#2563EB] hover:from-[#7C3AED] hover:to-[#3B82F6] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-xs font-medium transition-all"
               >
-                {loading ? (
-                  <>
-                    <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                      <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="white" />
-                    </svg>
-                    Generate
-                  </>
-                )}
-              </button>
+                {loading ? 'Generating...' : 'Generate'}
+              </Button>
             </>
           ) : (
             <>
-              <div className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+              <div className="text-[11px] text-text-tertiary">
                 {totalCount} items selected
               </div>
               <div className="flex-1" />
-              <button onClick={() => setResult(null)} className="text-xs text-[var(--m12-text-muted)] px-3 py-1.5">Back</button>
-              <button
+              <Button variant="ghost" size="sm" onClick={() => setResult(null)}>Back</Button>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={applying}
+                disabled={totalCount === 0}
                 onClick={handleApply}
-                disabled={applying || totalCount === 0}
-                className="flex items-center gap-1.5 bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-xs font-medium transition-colors"
               >
-                {applying ? (
-                  <>
-                    <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  <>Add {totalCount} Capabilities</>
-                )}
-              </button>
+                {applying ? 'Adding...' : `Add ${totalCount} Capabilities`}
+              </Button>
             </>
           )}
         </div>

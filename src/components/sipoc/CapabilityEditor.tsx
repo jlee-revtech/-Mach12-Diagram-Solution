@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { Maximize2, Minimize2 } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { Persona, InformationProduct, LogicalSystem, Dimension, Tag } from '@/lib/sipoc/types'
 import { PERSONA_COLORS, IP_CATEGORIES, TAG_COLORS } from '@/lib/sipoc/types'
@@ -22,14 +24,11 @@ function QuickAdd({ placeholder, onAdd }: { placeholder: string; onAdd: (value: 
         onChange={e => setValue(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && handleSubmit()}
         placeholder={placeholder}
-        className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-2.5 py-1.5 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+        className="flex-1 h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary placeholder:text-text-tertiary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none"
       />
-      <button
-        onClick={handleSubmit}
-        className="bg-[#2563EB] hover:bg-[#3B82F6] text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0"
-      >
+      <Button variant="primary" size="md" onClick={handleSubmit} className="shrink-0">
         Add
-      </button>
+      </Button>
     </div>
   )
 }
@@ -73,21 +72,21 @@ function SearchableIPDropdown({ items, onSelect, accent, placeholder }: {
         className={`w-full text-left text-[10px] px-2.5 py-1.5 rounded-lg border border-dashed transition-colors ${
           open
             ? `border-[${accent}]/60 text-[${accent}]`
-            : `border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:border-[${accent}]/40 hover:text-[${accent}]`
+            : `border-border text-text-tertiary hover:border-[${accent}]/40 hover:text-[${accent}]`
         }`}
         style={open ? { borderColor: `${accent}99`, color: accent } : undefined}
       >
         + Add existing info product
       </button>
       {open && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden">
-          <div className="p-1.5 border-b border-[var(--m12-border)]/20">
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-border rounded-lg shadow-dropdown overflow-hidden">
+          <div className="p-1.5 border-b border-border">
             <input
               ref={inputRef}
               value={filter}
               onChange={e => setFilter(e.target.value)}
               placeholder={placeholder}
-              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-md px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[color:var(--accent)]"
+              className="w-full bg-surface-input border border-border rounded-md px-2 py-1 text-[10px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-[color:var(--accent)]"
               style={{ '--accent': accent } as React.CSSProperties}
             />
           </div>
@@ -96,16 +95,16 @@ function SearchableIPDropdown({ items, onSelect, accent, placeholder }: {
               <button
                 key={ip.id}
                 onClick={() => { onSelect(ip.id); setOpen(false); setFilter('') }}
-                className="w-full text-left px-2.5 py-1.5 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors flex items-center gap-2"
+                className="w-full text-left px-2.5 py-1.5 text-[10px] text-text-secondary hover:bg-surface-muted transition-colors flex items-center gap-2"
               >
                 <div className="w-1 h-3 rounded-full shrink-0" style={{ backgroundColor: accent }} />
                 <span className="flex-1 truncate">{ip.name}</span>
                 {ip.category && (
-                  <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase shrink-0">{ip.category}</span>
+                  <span className="text-[10px] text-text-tertiary font-mono uppercase shrink-0">{ip.category}</span>
                 )}
               </button>
             )) : (
-              <div className="px-2.5 py-3 text-[10px] text-[var(--m12-text-faint)] text-center italic">No matches</div>
+              <div className="px-2.5 py-3 text-[10px] text-text-tertiary text-center italic">No matches</div>
             )}
           </div>
         </div>
@@ -159,7 +158,7 @@ function MultiSelect<T extends { id: string; name: string }>({
   }
 
   if (items.length === 0) {
-    return <div className="text-[10px] text-[var(--m12-text-muted)] italic py-1">{emptyLabel}</div>
+    return <div className="text-[10px] text-text-tertiary italic py-1">{emptyLabel}</div>
   }
 
   const selectedItems = items.filter(i => selectedIds.includes(i.id))
@@ -186,10 +185,10 @@ function MultiSelect<T extends { id: string; name: string }>({
         key={item.id}
         onClick={() => toggle(item.id)}
         className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${
-          isSelected ? 'bg-[#2563EB]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'
+          isSelected ? 'bg-brand-50 text-text-primary' : 'text-text-secondary hover:bg-surface-muted'
         }`}
       >
-        <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#2563EB] border-[#2563EB]' : 'border-[var(--m12-border)]'}`}>
+        <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-brand-500 border-brand-500' : 'border-border-strong'}`}>
           {isSelected && (
             <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
               <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
@@ -207,14 +206,14 @@ function MultiSelect<T extends { id: string; name: string }>({
       {/* Trigger */}
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-1 min-h-[28px] bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-2 py-1 text-left hover:border-[var(--m12-border)]/60 transition-colors"
+        className="w-full flex items-center gap-1 min-h-[28px] bg-surface-input border border-border rounded-lg px-2 py-1 text-left hover:border-border-strong transition-colors"
       >
         {selectedItems.length > 0 ? (
           <div className="flex flex-wrap gap-0.5 flex-1">
             {selectedItems.map(item => {
               const color = colorFn?.(item)
               return (
-                <span key={item.id} className="inline-flex items-center gap-1 bg-[#2563EB]/10 border border-[#2563EB]/20 rounded px-1.5 py-0 text-[9px] text-[var(--m12-text)]">
+                <span key={item.id} className="inline-flex items-center gap-1 bg-brand-50 border border-[#2563EB]/20 rounded px-1.5 py-0 text-[10px] text-text-primary">
                   {color && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />}
                   {item.name}
                 </span>
@@ -222,24 +221,24 @@ function MultiSelect<T extends { id: string; name: string }>({
             })}
           </div>
         ) : (
-          <span className="text-[10px] text-[var(--m12-text-faint)] flex-1">{placeholder || 'Select...'}</span>
+          <span className="text-[10px] text-text-tertiary flex-1">{placeholder || 'Select...'}</span>
         )}
-        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}>
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-text-tertiary transition-transform ${open ? 'rotate-180' : ''}`}>
           <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden min-w-full w-max max-w-[400px]">
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-border rounded-lg shadow-dropdown overflow-hidden min-w-full w-max max-w-[400px]">
           {/* Search */}
-          <div className="p-1.5 border-b border-[var(--m12-border)]/20">
+          <div className="p-1.5 border-b border-border">
             <input
               ref={searchRef}
               value={filter}
               onChange={e => setFilter(e.target.value)}
               placeholder="Search..."
-              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-md px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/50"
+              className="w-full bg-surface-input border border-border rounded-md px-2 py-1 text-[10px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-brand-500"
             />
           </div>
           {/* Items */}
@@ -248,7 +247,7 @@ function MultiSelect<T extends { id: string; name: string }>({
               grouped ? (
                 [...grouped.entries()].map(([group, groupItems]) => (
                   <div key={group}>
-                    <div className="px-2.5 py-1 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold bg-[var(--m12-bg)]/60 border-b border-[var(--m12-border)]/20 sticky top-0">
+                    <div className="px-2.5 py-1 text-[10px] font-mono text-text-tertiary uppercase tracking-widest font-bold bg-surface-muted/60 border-b border-border sticky top-0">
                       {group}
                     </div>
                     {groupItems.map(renderItem)}
@@ -258,7 +257,7 @@ function MultiSelect<T extends { id: string; name: string }>({
                 filtered.map(renderItem)
               )
             ) : (
-              <div className="px-2.5 py-3 text-[10px] text-[var(--m12-text-faint)] text-center italic">No matches</div>
+              <div className="px-2.5 py-3 text-[10px] text-text-tertiary text-center italic">No matches</div>
             )}
           </div>
         </div>
@@ -271,11 +270,11 @@ function MultiSelect<T extends { id: string; name: string }>({
 function SectionLabel({ label, count }: { label: string; count?: number }) {
   return (
     <div className="flex items-center gap-2 mb-2">
-      <span className="text-[9px] uppercase tracking-widest font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] font-bold">
+      <span className="text-label uppercase text-text-secondary">
         {label}
       </span>
       {count !== undefined && (
-        <span className="text-[9px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-1.5 py-0.5 text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+        <span className="text-[10px] bg-surface-muted border border-border rounded px-1.5 py-0.5 text-text-tertiary font-mono">
           {count}
         </span>
       )}
@@ -330,13 +329,13 @@ function TagPicker({
     setFilter('')
   }
 
-  const chipSize = compact ? 'text-[8px] px-1 py-0' : 'text-[9px] px-1.5 py-0'
+  const chipSize = compact ? 'text-[10px] px-1 py-0' : 'text-[10px] px-1.5 py-0'
 
   return (
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className={`w-full flex items-center gap-1 ${compact ? 'min-h-[20px]' : 'min-h-[24px]'} bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-1.5 py-0.5 text-left hover:border-[var(--m12-border)]/60 transition-colors`}
+        className={`w-full flex items-center gap-1 ${compact ? 'min-h-[20px]' : 'min-h-[24px]'} bg-surface-input border border-border rounded px-1.5 py-0.5 text-left hover:border-border-strong transition-colors`}
       >
         {selected.length > 0 ? (
           <div className="flex flex-wrap gap-0.5 flex-1">
@@ -347,24 +346,24 @@ function TagPicker({
             ))}
           </div>
         ) : (
-          <span className={`${compact ? 'text-[9px]' : 'text-[10px]'} text-[var(--m12-text-faint)] flex-1`}>
+          <span className={`${compact ? 'text-[10px]' : 'text-[10px]'} text-text-tertiary flex-1`}>
             {compact ? '+ tag' : '+ Add tag'}
           </span>
         )}
-        <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}>
+        <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-text-tertiary transition-transform ${open ? 'rotate-180' : ''}`}>
           <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden min-w-[200px] w-max max-w-[320px]">
-          <div className="p-1.5 border-b border-[var(--m12-border)]/20">
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-border rounded-lg shadow-dropdown overflow-hidden min-w-[200px] w-max max-w-[320px]">
+          <div className="p-1.5 border-b border-border">
             <input
               ref={searchRef}
               value={filter}
               onChange={e => setFilter(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && canCreate) { e.preventDefault(); handleCreate() } }}
               placeholder="Search or create..."
-              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-md px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/50"
+              className="w-full bg-surface-input border border-border rounded-md px-2 py-1 text-[10px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-brand-500"
             />
           </div>
           <div className="max-h-[180px] overflow-y-auto">
@@ -374,9 +373,9 @@ function TagPicker({
                 <button
                   key={t.id}
                   onClick={() => toggle(t.id)}
-                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${isSelected ? 'bg-[#2563EB]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'}`}
+                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${isSelected ? 'bg-brand-50 text-text-primary' : 'text-text-secondary hover:bg-surface-muted'}`}
                 >
-                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#2563EB] border-[#2563EB]' : 'border-[var(--m12-border)]'}`}>
+                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-brand-500 border-brand-500' : 'border-border-strong'}`}>
                     {isSelected && (
                       <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
                         <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
@@ -388,13 +387,13 @@ function TagPicker({
                 </button>
               )
             }) : (
-              <div className="px-2.5 py-3 text-[10px] text-[var(--m12-text-faint)] text-center italic">No tags yet</div>
+              <div className="px-2.5 py-3 text-[10px] text-text-tertiary text-center italic">No tags yet</div>
             )}
           </div>
           {canCreate && (
             <button
               onClick={handleCreate}
-              className="w-full text-left px-2.5 py-1.5 text-[10px] text-[#2563EB] hover:bg-[#2563EB]/10 border-t border-[var(--m12-border)]/20 transition-colors"
+              className="w-full text-left px-2.5 py-1.5 text-[10px] text-[#2563EB] hover:bg-brand-50 border-t border-border transition-colors"
             >
               + Create tag &quot;{filter.trim()}&quot;
             </button>
@@ -454,33 +453,33 @@ function SystemDataElementPicker({
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-1 min-h-[24px] bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-1.5 py-0.5 text-left hover:border-[var(--m12-border)]/60 transition-colors"
+        className="w-full flex items-center gap-1 min-h-[24px] bg-surface-input border border-border rounded px-1.5 py-0.5 text-left hover:border-border-strong transition-colors"
       >
         {selected.length > 0 ? (
           <div className="flex flex-wrap gap-0.5 flex-1">
             {selected.map(e => (
-              <span key={e.id} className="inline-flex items-center gap-1 rounded text-[9px] px-1.5 py-0 bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30">
+              <span key={e.id} className="inline-flex items-center gap-1 rounded text-[10px] px-1.5 py-0 bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30">
                 {e.name}
               </span>
             ))}
           </div>
         ) : (
-          <span className="text-[10px] text-[var(--m12-text-faint)] flex-1">+ Add data element</span>
+          <span className="text-[10px] text-text-tertiary flex-1">+ Add data element</span>
         )}
-        <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}>
+        <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-text-tertiary transition-transform ${open ? 'rotate-180' : ''}`}>
           <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden min-w-[220px] w-max max-w-[340px]">
-          <div className="p-1.5 border-b border-[var(--m12-border)]/20">
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-border rounded-lg shadow-dropdown overflow-hidden min-w-[220px] w-max max-w-[340px]">
+          <div className="p-1.5 border-b border-border">
             <input
               ref={searchRef}
               value={filter}
               onChange={e => setFilter(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && canCreate) { e.preventDefault(); handleCreate() } }}
               placeholder="Search or type to create..."
-              className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-md px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#06B6D4]/50"
+              className="w-full bg-surface-input border border-border rounded-md px-2 py-1 text-[10px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-[#06B6D4]/50"
             />
           </div>
           <div className="max-h-[180px] overflow-y-auto">
@@ -490,9 +489,9 @@ function SystemDataElementPicker({
                 <button
                   key={e.id}
                   onClick={() => toggle(e.id)}
-                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${isSelected ? 'bg-[#06B6D4]/10 text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)]'}`}
+                  className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[10px] transition-colors ${isSelected ? 'bg-[#06B6D4]/10 text-text-primary' : 'text-text-secondary hover:bg-surface-muted'}`}
                 >
-                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#06B6D4] border-[#06B6D4]' : 'border-[var(--m12-border)]'}`}>
+                  <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#06B6D4] border-[#06B6D4]' : 'border-border-strong'}`}>
                     {isSelected && (
                       <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
                         <path d="M1 3.5L3 5.5L6 1.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
@@ -503,13 +502,13 @@ function SystemDataElementPicker({
                 </button>
               )
             }) : (
-              <div className="px-2.5 py-3 text-[10px] text-[var(--m12-text-faint)] text-center italic">No data elements yet</div>
+              <div className="px-2.5 py-3 text-[10px] text-text-tertiary text-center italic">No data elements yet</div>
             )}
           </div>
           {canCreate && (
             <button
               onClick={handleCreate}
-              className="w-full text-left px-2.5 py-1.5 text-[10px] text-[#06B6D4] hover:bg-[#06B6D4]/10 border-t border-[var(--m12-border)]/20 transition-colors"
+              className="w-full text-left px-2.5 py-1.5 text-[10px] text-[#06B6D4] hover:bg-[#06B6D4]/10 border-t border-border transition-colors"
             >
               + Create data element &quot;{filter.trim()}&quot;
             </button>
@@ -541,17 +540,17 @@ function DimensionsEditor({
 
   return (
     <div>
-      <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+      <div className="text-label uppercase text-text-secondary mb-1">
         Dimensions
       </div>
       {dimensions.length > 0 && (
-        <div className="space-y-1 mb-1.5 border-l-2 border-[var(--m12-border)]/20 ml-1 pl-2">
+        <div className="space-y-1 mb-1.5 border-l-2 border-border ml-1 pl-2">
           {dimensions.map(dim => (
             <div key={dim.id} className="flex items-center gap-1.5 group/dim">
               <input
                 value={dim.name}
                 onChange={e => updateDimension(side, itemId, capabilityId, dim.id, { name: e.target.value })}
-                className="flex-1 min-w-0 bg-transparent text-[10px] text-[var(--m12-text-secondary)] focus:outline-none border-b border-transparent focus:border-[#2563EB]/30 py-0.5"
+                className="flex-1 min-w-0 bg-transparent text-[10px] text-text-secondary focus:outline-none border-b border-transparent focus:border-brand-500/50 py-0.5"
               />
               <div className="shrink-0 w-[110px]">
                 <TagPicker
@@ -563,7 +562,7 @@ function DimensionsEditor({
               </div>
               <button
                 onClick={() => removeDimension(side, itemId, capabilityId, dim.id)}
-                className="opacity-0 group-hover/dim:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all shrink-0"
+                className="opacity-0 group-hover/dim:opacity-100 text-text-tertiary hover:text-red-600 transition-all shrink-0"
               >
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                   <path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
@@ -656,26 +655,26 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
       <div>
         <button
           onClick={() => toggle(sectionKey)}
-          className="w-full flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--m12-text-secondary)] transition-colors"
+          className="w-full flex items-center gap-1.5 text-[10px] font-mono text-text-tertiary uppercase tracking-wider mb-1 hover:text-text-secondary transition-colors"
         >
           <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
             <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <span>{label}</span>
-          <span className="text-[var(--m12-text-faint)]">({items.length})</span>
+          <span className="text-text-tertiary">({items.length})</span>
         </button>
         {isOpen && (
           items.length > 0 ? (
             <div className="flex flex-wrap gap-1 pl-3">
               {items.map(i => (
-                <span key={i.id} className="inline-flex items-center gap-1 text-[10px] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1.5 py-0.5 text-[var(--m12-text-secondary)]">
+                <span key={i.id} className="inline-flex items-center gap-1 text-[10px] bg-surface-muted border border-border rounded px-1.5 py-0.5 text-text-secondary">
                   {colorFor?.(i.id) && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorFor(i.id) }} />}
                   {i.name}
                 </span>
               ))}
             </div>
           ) : (
-            <div className="text-[10px] text-[var(--m12-text-faint)] italic pl-3">None</div>
+            <div className="text-[10px] text-text-tertiary italic pl-3">None</div>
           )
         )}
       </div>
@@ -683,18 +682,18 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
   }
 
   return (
-    <div className="rounded-lg border border-[#2563EB]/30 bg-[#2563EB]/[0.04] p-3 space-y-3">
+    <div className="rounded-lg border border-blue-200 bg-brand-50 p-3 space-y-3">
       <div className="flex items-center gap-2">
-        <svg width="11" height="11" viewBox="0 0 10 10" fill="none" className="text-[#93C5FD]">
+        <svg width="11" height="11" viewBox="0 0 10 10" fill="none" className="text-brand-600">
           <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="text-[10px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#93C5FD] font-bold flex-1">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-brand-600 font-bold flex-1">
           Rollup · summarized from {childCount} sub-capabilit{childCount === 1 ? 'y' : 'ies'} (read-only)
         </span>
         <button
           onClick={handleGenerateNarrative}
           disabled={generating}
-          className="shrink-0 text-[9px] px-2 py-1 rounded-md font-[family-name:var(--font-space-mono)] uppercase tracking-wider border bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#C4B5FD] hover:bg-[#8B5CF6]/25 disabled:opacity-50 disabled:cursor-wait transition-colors flex items-center gap-1"
+          className="shrink-0 text-[10px] px-2 py-1 rounded-md font-mono uppercase tracking-wider border bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-wait transition-colors flex items-center gap-1"
           title="Generate an AI description from this rollup and save it to the capability"
         >
           <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
@@ -704,7 +703,7 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
         </button>
       </div>
       {genError && (
-        <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1">{genError}</div>
+        <div className="text-[10px] text-status-red bg-status-red-bg border border-red-200 rounded px-2 py-1">{genError}</div>
       )}
       <Row sectionKey="suppliers" label="Suppliers" items={[...allSuppliers.values()]} colorFor={id => allSuppliers.get(id)?.color} />
       <Row sectionKey="inputs" label="Inputs" items={[...allInputIPs.entries()].map(([id, name]) => ({ id, name }))} />
@@ -716,18 +715,18 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
           <div>
             <button
               onClick={() => toggle('tags')}
-              className="w-full flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--m12-text-secondary)] transition-colors"
+              className="w-full flex items-center gap-1.5 text-[10px] font-mono text-text-tertiary uppercase tracking-wider mb-1 hover:text-text-secondary transition-colors"
             >
               <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
                 <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>Tags</span>
-              <span className="text-[var(--m12-text-faint)]">({allTags.size})</span>
+              <span className="text-text-tertiary">({allTags.size})</span>
             </button>
             {isOpen && (
               <div className="flex flex-wrap gap-1 pl-3">
                 {[...allTags.values()].map(t => (
-                  <span key={t.id} className="inline-flex items-center rounded text-[9px] px-1.5 py-0 text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
+                  <span key={t.id} className="inline-flex items-center rounded text-[10px] px-1.5 py-0 text-white" style={{ backgroundColor: t.color }}>{t.name}</span>
                 ))}
               </div>
             )}
@@ -740,13 +739,13 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
           <div>
             <button
               onClick={() => toggle('features')}
-              className="w-full flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--m12-text-secondary)] transition-colors"
+              className="w-full flex items-center gap-1.5 text-[10px] font-mono text-text-tertiary uppercase tracking-wider mb-1 hover:text-text-secondary transition-colors"
             >
               <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
                 <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>Features (auto)</span>
-              <span className="text-[var(--m12-text-faint)]">({(rollup.features || []).length})</span>
+              <span className="text-text-tertiary">({(rollup.features || []).length})</span>
             </button>
             {isOpen && (
               <ul className="pl-3 space-y-0.5">
@@ -756,8 +755,8 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
                   const tail = dashIdx >= 0 ? f.slice(dashIdx + 3) : f
                   return (
                     <li key={i} className="text-[10px] leading-snug">
-                      {head && <span className="text-[#93C5FD] font-[family-name:var(--font-space-mono)] mr-1">{head}</span>}
-                      <span className="text-[var(--m12-text-secondary)]">{tail}</span>
+                      {head && <span className="text-brand-600 font-mono mr-1">{head}</span>}
+                      <span className="text-text-secondary">{tail}</span>
                     </li>
                   )
                 })}
@@ -772,13 +771,13 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
           <div>
             <button
               onClick={() => toggle('use_cases')}
-              className="w-full flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--m12-text-secondary)] transition-colors"
+              className="w-full flex items-center gap-1.5 text-[10px] font-mono text-text-tertiary uppercase tracking-wider mb-1 hover:text-text-secondary transition-colors"
             >
               <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
                 <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>Use Cases (auto)</span>
-              <span className="text-[var(--m12-text-faint)]">({(rollup.use_cases || []).length})</span>
+              <span className="text-text-tertiary">({(rollup.use_cases || []).length})</span>
             </button>
             {isOpen && (
               <ul className="pl-3 space-y-0.5">
@@ -788,8 +787,8 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
                   const tail = dashIdx >= 0 ? u.slice(dashIdx + 3) : u
                   return (
                     <li key={i} className="text-[10px] leading-snug">
-                      {head && <span className="text-[#93C5FD] font-[family-name:var(--font-space-mono)] mr-1">{head}</span>}
-                      <span className="text-[var(--m12-text-secondary)]">{tail}</span>
+                      {head && <span className="text-brand-600 font-mono mr-1">{head}</span>}
+                      <span className="text-text-secondary">{tail}</span>
                     </li>
                   )
                 })}
@@ -945,17 +944,17 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
         <input
           value={capability.name}
           onChange={e => updateCapability(capabilityId, { name: e.target.value })}
-          className="w-full bg-transparent border-b border-[var(--m12-border)]/40 focus:border-[#2563EB] text-sm font-semibold text-[var(--m12-text)] py-1 focus:outline-none transition-colors"
+          className="w-full bg-transparent border-b border-border focus:border-brand-500 text-sm font-semibold text-text-primary py-1 focus:outline-none transition-colors"
         />
         {/* Features */}
         <div className="space-y-1.5">
-          <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
+          <div className="text-label uppercase text-text-secondary">
             Features
-            <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(what this capability does)</span>
+            <span className="ml-1 text-text-tertiary normal-case">(what this capability does)</span>
           </div>
           {(capability.features || []).map((feat, i) => (
             <div key={i} className="flex items-center gap-1.5 group/feat">
-              <span className="text-[var(--m12-text-faint)] text-[9px] shrink-0">•</span>
+              <span className="text-text-tertiary text-[10px] shrink-0">•</span>
               <input
                 value={feat}
                 onChange={e => {
@@ -963,14 +962,14 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   updated[i] = e.target.value
                   updateCapability(capabilityId, { features: updated })
                 }}
-                className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+                className="flex-1 bg-surface-input border border-border rounded px-2 py-1 text-[10px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-brand-500"
               />
               <button
                 onClick={() => {
                   const updated = (capability.features || []).filter((_, j) => j !== i)
                   updateCapability(capabilityId, { features: updated })
                 }}
-                className="w-5 h-5 rounded flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/feat:opacity-100"
+                className="w-5 h-5 rounded flex items-center justify-center text-text-tertiary hover:text-red-600 hover:bg-red-50 transition-all opacity-0 group-hover/feat:opacity-100"
               >
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                   <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -983,7 +982,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
               const updated = [...(capability.features || []), '']
               updateCapability(capabilityId, { features: updated })
             }}
-            className="text-[9px] text-[#2563EB] hover:text-[#3B82F6] font-medium transition-colors flex items-center gap-1"
+            className="text-[10px] text-brand-600 hover:text-brand-500 font-medium transition-colors flex items-center gap-1"
           >
             <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
               <path d="M4 1v6M1 4h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -994,13 +993,13 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
 
         {/* Use Cases */}
         <div className="space-y-1.5">
-          <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
+          <div className="text-label uppercase text-text-secondary">
             Use Cases
-            <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(scenarios where this capability is applied)</span>
+            <span className="ml-1 text-text-tertiary normal-case">(scenarios where this capability is applied)</span>
           </div>
           {(capability.use_cases || []).map((uc, i) => (
             <div key={i} className="flex items-center gap-1.5 group/uc">
-              <span className="text-[var(--m12-text-faint)] text-[9px] shrink-0">•</span>
+              <span className="text-text-tertiary text-[10px] shrink-0">•</span>
               <input
                 value={uc}
                 onChange={e => {
@@ -1008,14 +1007,14 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   updated[i] = e.target.value
                   updateCapability(capabilityId, { use_cases: updated })
                 }}
-                className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-[10px] text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+                className="flex-1 bg-surface-input border border-border rounded px-2 py-1 text-[10px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-brand-500"
               />
               <button
                 onClick={() => {
                   const updated = (capability.use_cases || []).filter((_, j) => j !== i)
                   updateCapability(capabilityId, { use_cases: updated })
                 }}
-                className="w-5 h-5 rounded flex items-center justify-center text-[var(--m12-text-faint)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/uc:opacity-100"
+                className="w-5 h-5 rounded flex items-center justify-center text-text-tertiary hover:text-red-600 hover:bg-red-50 transition-all opacity-0 group-hover/uc:opacity-100"
               >
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                   <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -1028,7 +1027,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
               const updated = [...(capability.use_cases || []), '']
               updateCapability(capabilityId, { use_cases: updated })
             }}
-            className="text-[9px] text-[#2563EB] hover:text-[#3B82F6] font-medium transition-colors flex items-center gap-1"
+            className="text-[10px] text-brand-600 hover:text-brand-500 font-medium transition-colors flex items-center gap-1"
           >
             <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
               <path d="M4 1v6M1 4h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -1039,9 +1038,9 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
 
         {/* Dependencies (other L3 capabilities this one depends on) */}
         <div className="space-y-1.5">
-          <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider font-[family-name:var(--font-space-mono)]">
+          <div className="text-label uppercase text-text-secondary">
             Dependencies
-            <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(other L3s this capability depends on)</span>
+            <span className="ml-1 text-text-tertiary normal-case">(other L3s this capability depends on)</span>
           </div>
           {(() => {
             const allL3s = capabilities.filter(c => c.level === 3 && c.id !== capabilityId)
@@ -1067,9 +1066,9 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
 
       {/* System (where this capability is performed) */}
       <div>
-        <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+        <div className="text-label uppercase text-text-secondary mb-1">
           Performed In
-          <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(system)</span>
+          <span className="ml-1 text-text-tertiary normal-case">(system)</span>
         </div>
         {(() => {
           const capSys = capability.system_id ? logicalSystems.find(s => s.id === capability.system_id) : null
@@ -1079,7 +1078,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
               <select
                 value={capability.system_id || ''}
                 onChange={e => updateCapability(capabilityId, { system_id: e.target.value || null })}
-                className="w-full bg-[var(--m12-bg-input)] border border-[#2563EB]/30 rounded-lg px-2.5 py-2 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60 appearance-none pr-7"
+                className="w-full bg-surface-input border border-blue-200 rounded-lg px-2.5 py-2 text-body-sm text-text-primary focus:outline-none focus:border-brand-500 appearance-none pr-7"
                 style={capSys ? { borderLeftWidth: 3, borderLeftColor: capSys.color || capTmpl?.color || '#64748B' } : {}}
               >
                 <option value="">Not specified</option>
@@ -1087,7 +1086,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   const groups = new Map<string, typeof logicalSystems>()
                   logicalSystems.forEach(s => {
                     const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
-                    const label = tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
+                    const label = tmpl ? `${tmpl.label} - ${tmpl.description}` : 'Other'
                     if (!groups.has(label)) groups.set(label, [])
                     groups.get(label)!.push(s)
                   })
@@ -1100,7 +1099,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   ))
                 })()}
               </select>
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--m12-text-muted)] pointer-events-none">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
                 <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
@@ -1125,13 +1124,13 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 onDragOver={handleRowDragOver('input', input.id)}
                 onDrop={handleRowDrop('input', input.id)}
                 onDragEnd={handleRowDragEnd}
-                className={`bg-[var(--m12-bg)] border rounded-lg overflow-hidden transition-colors ${expandedItems.has(input.id) ? 'border-[#EAB308]/30' : 'border-[var(--m12-border)]/30'} ${isDragging ? 'opacity-40' : ''} ${drop?.above ? 'shadow-[0_-2px_0_0_#2563EB]' : ''} ${drop && !drop.above ? 'shadow-[0_2px_0_0_#2563EB]' : ''}`}
+                className={`bg-surface-muted border rounded-lg overflow-hidden transition-colors ${expandedItems.has(input.id) ? 'border-yellow-200' : 'border-border'} ${isDragging ? 'opacity-40' : ''} ${drop?.above ? 'shadow-[0_-2px_0_0_#2563EB]' : ''} ${drop && !drop.above ? 'shadow-[0_2px_0_0_#2563EB]' : ''}`}
               >
                 <div
-                  className="flex items-center gap-2 px-2.5 py-2 cursor-grab active:cursor-grabbing hover:bg-[var(--m12-bg-card)]/30 transition-colors"
+                  className="flex items-center gap-2 px-2.5 py-2 cursor-grab active:cursor-grabbing hover:bg-white/60 transition-colors"
                   onClick={() => toggleItem(input.id)}
                 >
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-[var(--m12-text-faint)]" aria-hidden>
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-text-tertiary" aria-hidden>
                     <circle cx="2.5" cy="2" r="0.6" fill="currentColor"/>
                     <circle cx="5.5" cy="2" r="0.6" fill="currentColor"/>
                     <circle cx="2.5" cy="4" r="0.6" fill="currentColor"/>
@@ -1139,7 +1138,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     <circle cx="2.5" cy="6" r="0.6" fill="currentColor"/>
                     <circle cx="5.5" cy="6" r="0.6" fill="currentColor"/>
                   </svg>
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(input.id) ? 'rotate-90' : ''}`}>
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-text-tertiary transition-transform ${expandedItems.has(input.id) ? 'rotate-90' : ''}`}>
                     <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <div className="w-1 h-3 rounded-full bg-[#EAB308]/60 shrink-0" />
@@ -1148,17 +1147,17 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                       value={ip.name}
                       onChange={e => updateInformationProduct(ip.id, { name: e.target.value })}
                       onClick={e => e.stopPropagation()}
-                      className="text-xs font-medium text-[var(--m12-text)] flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-[var(--m12-border)]/40 focus:border-[#2563EB] focus:outline-none truncate"
+                      className="text-body-sm font-medium text-text-primary flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-border focus:border-brand-500 focus:outline-none truncate"
                     />
                   ) : (
-                    <span className="text-xs font-medium italic text-[var(--m12-text-muted)] flex-1 truncate">(deleted)</span>
+                    <span className="text-body-sm font-medium italic text-text-tertiary flex-1 truncate">(deleted)</span>
                   )}
-                  <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                  <span className="text-[10px] text-text-tertiary font-mono">
                     {input.supplier_persona_ids.length}s {input.source_system_ids.length}sys {(input.dimensions || []).length}d
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); archiveInput(input.id, capabilityId) }}
-                    className="text-[var(--m12-text-muted)] hover:text-[#2563EB] transition-colors shrink-0"
+                    className="text-text-tertiary hover:text-brand-600 transition-colors shrink-0"
                     title="Unassign from L3 (keeps all detail; can restore from Archived)"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -1169,7 +1168,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); removeInput(input.id, capabilityId) }}
-                    className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
+                    className="text-text-tertiary hover:text-red-600 transition-colors shrink-0"
                     title="Delete permanently"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -1177,10 +1176,10 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     </svg>
                   </button>
                 </div>
-                {expandedItems.has(input.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-[var(--m12-border)]/20 pt-2">
+                {expandedItems.has(input.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-border pt-2">
                 {/* Tags (reusable, org-scoped) */}
                 <div>
-                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Tags</div>
+                  <div className="text-label uppercase text-text-secondary mb-1">Tags</div>
                   <TagPicker
                     selectedIds={input.tag_ids || []}
                     onChange={ids => updateInputTags(input.id, capabilityId, ids)}
@@ -1189,7 +1188,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 </div>
                 {/* Supplier personas */}
                 <div>
-                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Suppliers</div>
+                  <div className="text-label uppercase text-text-secondary mb-1">Suppliers</div>
                   <MultiSelect
                     items={personas}
                     selectedIds={input.supplier_persona_ids}
@@ -1200,10 +1199,10 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 </div>
                 {/* Source systems (ordered upstream flow) */}
                 <div>
-                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                  <div className="text-label uppercase text-text-secondary mb-1">
                     Source Systems
                     {input.source_system_ids.length > 1 && (
-                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(order = data lineage)</span>
+                      <span className="ml-1 text-text-tertiary normal-case">(order = data lineage)</span>
                     )}
                   </div>
                   {input.source_system_ids.length > 0 && (
@@ -1218,32 +1217,32 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                           <div key={sysId}>
                             {idx > 0 && (
                               <div className="flex items-center justify-center py-0.5">
-                                <svg width="10" height="12" viewBox="0 0 10 12" fill="none" className="text-[var(--m12-border)]">
+                                <svg width="10" height="12" viewBox="0 0 10 12" fill="none" className="text-border-strong">
                                   <path d="M5 0v9M2.5 7L5 10l2.5-3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
                               </div>
                             )}
-                            <div className="flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded-lg px-2 py-1.5 group/sys">
+                            <div className="flex items-center gap-1.5 bg-surface-muted border border-border rounded-lg px-2 py-1.5 group/sys">
                               <div className="w-2 h-2 rounded shrink-0" style={{ backgroundColor: sys.color || tmpl?.color || '#64748B' }} />
                               <div className="flex-1 min-w-0">
-                                <div className="text-[10px] font-medium text-[var(--m12-text)] truncate">{sys.name}</div>
-                                {tmpl && <div className="text-[7px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{tmpl.label}</div>}
+                                <div className="text-[10px] font-medium text-text-primary truncate">{sys.name}</div>
+                                {tmpl && <div className="text-[10px] text-text-tertiary font-mono uppercase">{tmpl.label}</div>}
                               </div>
-                              <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] font-bold">
+                              <span className="text-[10px] text-text-tertiary font-mono font-bold">
                                 {isFirst && input.source_system_ids.length > 1 ? 'ORIGIN' : `#${idx + 1}`}
                               </span>
                               <div className="flex items-center gap-0.5 opacity-0 group-hover/sys:opacity-100 transition-opacity">
                                 {!isFirst && (
-                                  <button onClick={() => { const ids = [...input.source_system_ids]; [ids[idx-1],ids[idx]]=[ids[idx],ids[idx-1]]; updateInputSystems(input.id, capabilityId, ids) }} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5" title="Move up">
+                                  <button onClick={() => { const ids = [...input.source_system_ids]; [ids[idx-1],ids[idx]]=[ids[idx],ids[idx-1]]; updateInputSystems(input.id, capabilityId, ids) }} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Move up">
                                     <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5L1.5 4.5h5L4 1.5z" fill="currentColor" /></svg>
                                   </button>
                                 )}
                                 {!isLast && (
-                                  <button onClick={() => { const ids = [...input.source_system_ids]; [ids[idx],ids[idx+1]]=[ids[idx+1],ids[idx]]; updateInputSystems(input.id, capabilityId, ids) }} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5" title="Move down">
+                                  <button onClick={() => { const ids = [...input.source_system_ids]; [ids[idx],ids[idx+1]]=[ids[idx+1],ids[idx]]; updateInputSystems(input.id, capabilityId, ids) }} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Move down">
                                     <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 6.5L1.5 3.5h5L4 6.5z" fill="currentColor" /></svg>
                                   </button>
                                 )}
-                                <button onClick={() => updateInputSystems(input.id, capabilityId, input.source_system_ids.filter(id => id !== sysId))} className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors p-0.5" title="Remove">
+                                <button onClick={() => updateInputSystems(input.id, capabilityId, input.source_system_ids.filter(id => id !== sysId))} className="text-text-tertiary hover:text-red-600 transition-colors p-0.5" title="Remove">
                                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
                                 </button>
                               </div>
@@ -1262,7 +1261,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     colorFn={s => s.color || '#64748B'}
                     groupFn={s => {
                       const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
-                      return tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
+                      return tmpl ? `${tmpl.label} - ${tmpl.description}` : 'Other'
                     }}
                     emptyLabel="No more systems to add"
                     placeholder="+ Add source system..."
@@ -1270,9 +1269,9 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 </div>
                 {/* Feeding system (single select) */}
                 <div>
-                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                  <div className="text-label uppercase text-text-secondary mb-1">
                     Feeding System
-                    <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(delivers to process)</span>
+                    <span className="ml-1 text-text-tertiary normal-case">(delivers to process)</span>
                   </div>
                   {(() => {
                     const feedSys = input.feeding_system_id ? logicalSystems.find(s => s.id === input.feeding_system_id) : null
@@ -1282,7 +1281,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                         <select
                           value={input.feeding_system_id || ''}
                           onChange={e => updateInputFeedingSystem(input.id, capabilityId, e.target.value || null)}
-                          className="w-full bg-[var(--m12-bg-input)] border border-[#EAB308]/30 rounded-lg px-2.5 py-2 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#EAB308]/60 appearance-none pr-7"
+                          className="w-full bg-surface-input border border-yellow-200 rounded-lg px-2.5 py-2 text-body-sm text-text-primary focus:outline-none focus:border-yellow-400 appearance-none pr-7"
                           style={feedSys ? { borderLeftWidth: 3, borderLeftColor: feedSys.color || feedTmpl?.color || '#64748B' } : {}}
                         >
                           <option value="">None</option>
@@ -1290,7 +1289,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                             const groups = new Map<string, typeof logicalSystems>()
                             logicalSystems.forEach(s => {
                               const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
-                              const label = tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
+                              const label = tmpl ? `${tmpl.label} - ${tmpl.description}` : 'Other'
                               if (!groups.has(label)) groups.set(label, [])
                               groups.get(label)!.push(s)
                             })
@@ -1303,7 +1302,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                             ))
                           })()}
                         </select>
-                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--m12-text-muted)] pointer-events-none">
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
                           <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
@@ -1321,9 +1320,9 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 {/* System Data Elements (on the IP, reusable across IPs) */}
                 {ip && (
                   <div>
-                    <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                    <div className="text-label uppercase text-text-secondary mb-1">
                       System Data Elements
-                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(on this info product)</span>
+                      <span className="ml-1 text-text-tertiary normal-case">(on this info product)</span>
                     </div>
                     <SystemDataElementPicker
                       selectedIds={ip.data_element_ids || []}
@@ -1342,35 +1341,35 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
             <div className="mt-1">
               <button
                 onClick={() => setArchivedInputsOpen(o => !o)}
-                className="flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider hover:text-[var(--m12-text)] transition-colors"
+                className="flex items-center gap-1.5 text-[10px] font-mono text-text-tertiary uppercase tracking-wider hover:text-text-primary transition-colors"
               >
                 <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${archivedInputsOpen ? 'rotate-90' : ''}`}>
                   <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <span>Archived</span>
-                <span className="text-[var(--m12-text-faint)]">({archivedInputs.length})</span>
+                <span className="text-text-tertiary">({archivedInputs.length})</span>
               </button>
               {archivedInputsOpen && (
                 <div className="mt-1 space-y-1">
                   {archivedInputs.map(input => {
                     const ip = informationProducts.find(p => p.id === input.information_product_id)
                     return (
-                      <div key={input.id} className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--m12-bg)]/40 border border-dashed border-[var(--m12-border)]/30">
+                      <div key={input.id} className="flex items-center gap-2 px-2 py-1 rounded bg-surface-muted/40 border border-dashed border-border">
                         <div className="w-1 h-3 rounded-full bg-[#EAB308]/30 shrink-0" />
-                        <span className="text-[10px] text-[var(--m12-text-muted)] flex-1 truncate italic">{ip?.name || '(deleted)'}</span>
-                        <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                        <span className="text-[10px] text-text-tertiary flex-1 truncate italic">{ip?.name || '(deleted)'}</span>
+                        <span className="text-[10px] text-text-tertiary font-mono">
                           {input.supplier_persona_ids.length}s {input.source_system_ids.length}sys {(input.dimensions || []).length}d
                         </span>
                         <button
                           onClick={() => unarchiveInput(input.id, capabilityId)}
-                          className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                          className="text-[10px] font-mono uppercase tracking-wider text-brand-600 hover:text-brand-500 transition-colors"
                           title="Restore to active inputs"
                         >
                           Restore
                         </button>
                         <button
                           onClick={() => { if (confirm('Delete this archived input permanently? Detail will be lost.')) removeInput(input.id, capabilityId) }}
-                          className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
+                          className="text-text-tertiary hover:text-red-600 transition-colors shrink-0"
                           title="Delete permanently"
                         >
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -1415,13 +1414,13 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 onDragOver={handleRowDragOver('output', output.id)}
                 onDrop={handleRowDrop('output', output.id)}
                 onDragEnd={handleRowDragEnd}
-                className={`bg-[var(--m12-bg)] border rounded-lg overflow-hidden transition-colors ${expandedItems.has(output.id) ? 'border-[#10B981]/30' : 'border-[var(--m12-border)]/30'} ${isDragging ? 'opacity-40' : ''} ${drop?.above ? 'shadow-[0_-2px_0_0_#2563EB]' : ''} ${drop && !drop.above ? 'shadow-[0_2px_0_0_#2563EB]' : ''}`}
+                className={`bg-surface-muted border rounded-lg overflow-hidden transition-colors ${expandedItems.has(output.id) ? 'border-green-200' : 'border-border'} ${isDragging ? 'opacity-40' : ''} ${drop?.above ? 'shadow-[0_-2px_0_0_#2563EB]' : ''} ${drop && !drop.above ? 'shadow-[0_2px_0_0_#2563EB]' : ''}`}
               >
                 <div
-                  className="flex items-center gap-2 px-2.5 py-2 cursor-grab active:cursor-grabbing hover:bg-[var(--m12-bg-card)]/30 transition-colors"
+                  className="flex items-center gap-2 px-2.5 py-2 cursor-grab active:cursor-grabbing hover:bg-white/60 transition-colors"
                   onClick={() => toggleItem(output.id)}
                 >
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-[var(--m12-text-faint)]" aria-hidden>
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-text-tertiary" aria-hidden>
                     <circle cx="2.5" cy="2" r="0.6" fill="currentColor"/>
                     <circle cx="5.5" cy="2" r="0.6" fill="currentColor"/>
                     <circle cx="2.5" cy="4" r="0.6" fill="currentColor"/>
@@ -1429,7 +1428,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     <circle cx="2.5" cy="6" r="0.6" fill="currentColor"/>
                     <circle cx="5.5" cy="6" r="0.6" fill="currentColor"/>
                   </svg>
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-[var(--m12-text-muted)] transition-transform ${expandedItems.has(output.id) ? 'rotate-90' : ''}`}>
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-text-tertiary transition-transform ${expandedItems.has(output.id) ? 'rotate-90' : ''}`}>
                     <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <div className="w-1 h-3 rounded-full bg-[#10B981]/60 shrink-0" />
@@ -1438,17 +1437,17 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                       value={ip.name}
                       onChange={e => updateInformationProduct(ip.id, { name: e.target.value })}
                       onClick={e => e.stopPropagation()}
-                      className="text-xs font-medium text-[var(--m12-text)] flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-[var(--m12-border)]/40 focus:border-[#2563EB] focus:outline-none truncate"
+                      className="text-body-sm font-medium text-text-primary flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-border focus:border-brand-500 focus:outline-none truncate"
                     />
                   ) : (
-                    <span className="text-xs font-medium italic text-[var(--m12-text-muted)] flex-1 truncate">(deleted)</span>
+                    <span className="text-body-sm font-medium italic text-text-tertiary flex-1 truncate">(deleted)</span>
                   )}
-                  <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                  <span className="text-[10px] text-text-tertiary font-mono">
                     {output.consumer_persona_ids.length}c {(output.destination_system_ids || []).length}sys {(output.dimensions || []).length}d
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); archiveOutput(output.id, capabilityId) }}
-                    className="text-[var(--m12-text-muted)] hover:text-[#2563EB] transition-colors shrink-0"
+                    className="text-text-tertiary hover:text-brand-600 transition-colors shrink-0"
                     title="Unassign from L3 (keeps all detail; can restore from Archived)"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -1459,7 +1458,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); removeOutput(output.id, capabilityId) }}
-                    className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
+                    className="text-text-tertiary hover:text-red-600 transition-colors shrink-0"
                     title="Delete permanently"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -1467,10 +1466,10 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     </svg>
                   </button>
                 </div>
-                {expandedItems.has(output.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-[var(--m12-border)]/20 pt-2">
+                {expandedItems.has(output.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-border pt-2">
                 {/* Tags (reusable, org-scoped) */}
                 <div>
-                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Tags</div>
+                  <div className="text-label uppercase text-text-secondary mb-1">Tags</div>
                   <TagPicker
                     selectedIds={output.tag_ids || []}
                     onChange={ids => updateOutputTags(output.id, capabilityId, ids)}
@@ -1479,7 +1478,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 </div>
                 {/* Consumer personas */}
                 <div>
-                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">Consumers</div>
+                  <div className="text-label uppercase text-text-secondary mb-1">Consumers</div>
                   <MultiSelect
                     items={personas}
                     selectedIds={output.consumer_persona_ids}
@@ -1490,10 +1489,10 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 </div>
                 {/* Destination systems */}
                 <div>
-                  <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                  <div className="text-label uppercase text-text-secondary mb-1">
                     Destination Systems
                     {(output.destination_system_ids || []).length > 1 && (
-                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(order = integration flow)</span>
+                      <span className="ml-1 text-text-tertiary normal-case">(order = integration flow)</span>
                     )}
                   </div>
                   {(output.destination_system_ids || []).length > 0 && (
@@ -1508,30 +1507,30 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                           <div key={sysId}>
                             {idx > 0 && (
                               <div className="flex items-center py-0.5 pl-3">
-                                <svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M4 0v12M1 9l3 3 3-3" stroke="var(--m12-text-faint)" strokeWidth="0.8" strokeLinecap="round" /></svg>
+                                <svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M4 0v12M1 9l3 3 3-3" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" /></svg>
                               </div>
                             )}
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--m12-bg)] border border-[var(--m12-border)]/20 group/sys">
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-muted border border-border group/sys">
                               <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: sys.color || '#64748B' }} />
                               <div className="flex-1 min-w-0">
-                                <div className="text-[10px] font-medium text-[var(--m12-text)] truncate">{sys.name}</div>
-                                {tmpl && <div className="text-[7px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] uppercase">{tmpl.label}</div>}
+                                <div className="text-[10px] font-medium text-text-primary truncate">{sys.name}</div>
+                                {tmpl && <div className="text-[10px] text-text-tertiary font-mono uppercase">{tmpl.label}</div>}
                               </div>
-                              <span className="text-[7px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] font-bold">
+                              <span className="text-[10px] text-text-tertiary font-mono font-bold">
                                 {isFirst && (output.destination_system_ids || []).length > 1 ? 'PRIMARY' : `#${idx + 1}`}
                               </span>
                               <div className="flex items-center gap-0.5 opacity-0 group-hover/sys:opacity-100 transition-opacity">
                                 {!isFirst && (
-                                  <button onClick={() => { const ids = [...(output.destination_system_ids || [])]; [ids[idx-1],ids[idx]]=[ids[idx],ids[idx-1]]; updateOutputSystems(output.id, capabilityId, ids) }} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5" title="Move up">
+                                  <button onClick={() => { const ids = [...(output.destination_system_ids || [])]; [ids[idx-1],ids[idx]]=[ids[idx],ids[idx-1]]; updateOutputSystems(output.id, capabilityId, ids) }} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Move up">
                                     <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5L1.5 4.5h5L4 1.5z" fill="currentColor" /></svg>
                                   </button>
                                 )}
                                 {!isLast && (
-                                  <button onClick={() => { const ids = [...(output.destination_system_ids || [])]; [ids[idx],ids[idx+1]]=[ids[idx+1],ids[idx]]; updateOutputSystems(output.id, capabilityId, ids) }} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors p-0.5" title="Move down">
+                                  <button onClick={() => { const ids = [...(output.destination_system_ids || [])]; [ids[idx],ids[idx+1]]=[ids[idx+1],ids[idx]]; updateOutputSystems(output.id, capabilityId, ids) }} className="text-text-tertiary hover:text-text-primary transition-colors p-0.5" title="Move down">
                                     <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 6.5L1.5 3.5h5L4 6.5z" fill="currentColor" /></svg>
                                   </button>
                                 )}
-                                <button onClick={() => updateOutputSystems(output.id, capabilityId, (output.destination_system_ids || []).filter(id => id !== sysId))} className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors p-0.5" title="Remove">
+                                <button onClick={() => updateOutputSystems(output.id, capabilityId, (output.destination_system_ids || []).filter(id => id !== sysId))} className="text-text-tertiary hover:text-red-600 transition-colors p-0.5" title="Remove">
                                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 2l4 4M6 2l-4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
                                 </button>
                               </div>
@@ -1550,7 +1549,7 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     colorFn={s => s.color || '#64748B'}
                     groupFn={s => {
                       const tmpl = SYSTEM_TEMPLATES.find(t => t.type === s.system_type)
-                      return tmpl ? `${tmpl.label} — ${tmpl.description}` : 'Other'
+                      return tmpl ? `${tmpl.label} - ${tmpl.description}` : 'Other'
                     }}
                     emptyLabel="No more systems to add"
                     placeholder="+ Add destination system..."
@@ -1567,9 +1566,9 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                 {/* System Data Elements (on the IP, reusable across IPs) */}
                 {ip && (
                   <div>
-                    <div className="text-[9px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)]">
+                    <div className="text-label uppercase text-text-secondary mb-1">
                       System Data Elements
-                      <span className="ml-1 text-[var(--m12-text-faint)] normal-case">(on this info product)</span>
+                      <span className="ml-1 text-text-tertiary normal-case">(on this info product)</span>
                     </div>
                     <SystemDataElementPicker
                       selectedIds={ip.data_element_ids || []}
@@ -1596,35 +1595,35 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
             <div className="mt-1">
               <button
                 onClick={() => setArchivedOutputsOpen(o => !o)}
-                className="flex items-center gap-1.5 text-[9px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-wider hover:text-[var(--m12-text)] transition-colors"
+                className="flex items-center gap-1.5 text-[10px] font-mono text-text-tertiary uppercase tracking-wider hover:text-text-primary transition-colors"
               >
                 <svg width="7" height="7" viewBox="0 0 8 8" fill="none" className={`transition-transform ${archivedOutputsOpen ? 'rotate-90' : ''}`}>
                   <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <span>Archived</span>
-                <span className="text-[var(--m12-text-faint)]">({archivedOutputs.length})</span>
+                <span className="text-text-tertiary">({archivedOutputs.length})</span>
               </button>
               {archivedOutputsOpen && (
                 <div className="mt-1 space-y-1">
                   {archivedOutputs.map(output => {
                     const ip = informationProducts.find(p => p.id === output.information_product_id)
                     return (
-                      <div key={output.id} className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--m12-bg)]/40 border border-dashed border-[var(--m12-border)]/30">
+                      <div key={output.id} className="flex items-center gap-2 px-2 py-1 rounded bg-surface-muted/40 border border-dashed border-border">
                         <div className="w-1 h-3 rounded-full bg-[#10B981]/30 shrink-0" />
-                        <span className="text-[10px] text-[var(--m12-text-muted)] flex-1 truncate italic">{ip?.name || '(deleted)'}</span>
-                        <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                        <span className="text-[10px] text-text-tertiary flex-1 truncate italic">{ip?.name || '(deleted)'}</span>
+                        <span className="text-[10px] text-text-tertiary font-mono">
                           {output.consumer_persona_ids.length}c {(output.destination_system_ids || []).length}sys {(output.dimensions || []).length}d
                         </span>
                         <button
                           onClick={() => unarchiveOutput(output.id, capabilityId)}
-                          className="text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[#2563EB] hover:text-[#3B82F6] transition-colors"
+                          className="text-[10px] font-mono uppercase tracking-wider text-brand-600 hover:text-brand-500 transition-colors"
                           title="Restore to active outputs"
                         >
                           Restore
                         </button>
                         <button
                           onClick={() => { if (confirm('Delete this archived output permanently? Detail will be lost.')) removeOutput(output.id, capabilityId) }}
-                          className="text-[var(--m12-text-muted)] hover:text-red-400 transition-colors shrink-0"
+                          className="text-text-tertiary hover:text-red-600 transition-colors shrink-0"
                           title="Delete permanently"
                         >
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -1645,10 +1644,10 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
       </div>
 
       {/* Delete capability */}
-      <div className="pt-2 border-t border-[var(--m12-border)]/20">
+      <div className="pt-2 border-t border-border">
         <button
           onClick={() => { if (confirm(`Delete capability "${capability.name}"?`)) removeCapability(capabilityId) }}
-          className="text-[10px] text-red-400/60 hover:text-red-400 transition-colors font-[family-name:var(--font-space-mono)] uppercase tracking-wider"
+          className="text-[10px] text-red-500/70 hover:text-red-600 transition-colors font-mono uppercase tracking-wider"
         >
           Delete Capability
         </button>
@@ -1716,7 +1715,7 @@ function EditableRow({
 
   if (isEditing) {
     return (
-      <div className="bg-[var(--m12-bg)] border border-[#2563EB]/40 rounded-lg p-2.5 space-y-2">
+      <div className="bg-surface-muted border border-brand-500/40 rounded-lg p-2.5 space-y-2">
         <div className="flex items-center gap-2">
           {color && (
             <div className={`w-2.5 h-2.5 shrink-0 ${colorDot === 'square' ? 'rounded' : 'rounded-full'}`} style={{ backgroundColor: color }} />
@@ -1726,7 +1725,7 @@ function EditableRow({
             onChange={e => setEditName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && save()}
             autoFocus
-            className="flex-1 bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60"
+            className="flex-1 bg-surface-input border border-border rounded px-2 py-1 text-body-sm text-text-primary focus:outline-none focus:border-brand-500"
           />
         </div>
         {onSaveSecondary && (
@@ -1735,14 +1734,14 @@ function EditableRow({
             onChange={e => setEditSecondary(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && save()}
             placeholder={secondaryLabel || 'Role...'}
-            className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60"
+            className="w-full bg-surface-input border border-border rounded px-2 py-1 text-body-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-brand-500"
           />
         )}
         {onSaveCategory && (
           <select
             value={editCategory}
             onChange={e => setEditCategory(e.target.value)}
-            className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60"
+            className="w-full bg-surface-input border border-border rounded px-2 py-1 text-body-sm text-text-primary focus:outline-none focus:border-brand-500"
           >
             <option value="">No category</option>
             {IP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1754,7 +1753,7 @@ function EditableRow({
               <button
                 key={c}
                 onClick={() => onSaveColor(c)}
-                className={`w-5 h-5 rounded-full border-2 transition-colors ${color === c ? 'border-white scale-110' : 'border-transparent hover:border-white/40'}`}
+                className={`w-5 h-5 rounded-full border-2 transition-colors ${color === c ? 'border-text-primary scale-110' : 'border-transparent hover:border-border-strong'}`}
                 style={{ backgroundColor: c }}
               />
             ))}
@@ -1762,36 +1761,36 @@ function EditableRow({
         )}
         {children}
         <div className="flex gap-1.5">
-          <button onClick={save} className="text-[10px] bg-[#2563EB] hover:bg-[#3B82F6] text-white px-2.5 py-1 rounded font-medium transition-colors">Save</button>
-          <button onClick={() => setEditingId(null)} className="text-[10px] text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-2 py-1 transition-colors">Cancel</button>
+          <Button variant="primary" size="sm" onClick={save}>Save</Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex items-center gap-2 group cursor-pointer hover:bg-[var(--m12-bg)]/50 rounded-lg px-1 py-0.5 -mx-1 transition-colors" onClick={startEditing}>
+    <div className="flex items-center gap-2 group cursor-pointer hover:bg-surface-muted/50 rounded-lg px-1 py-0.5 -mx-1 transition-colors" onClick={startEditing}>
       {color && (
         <div className={`w-2.5 h-2.5 shrink-0 ${colorDot === 'square' ? 'rounded' : 'rounded-full'}`} style={{ backgroundColor: color }} />
       )}
       {!color && (
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[var(--m12-text-muted)] shrink-0">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-text-tertiary shrink-0">
           <rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1" />
           <path d="M3 4.5h4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
         </svg>
       )}
-      <span className="text-xs text-[var(--m12-text)] flex-1 truncate">{name}</span>
+      <span className="text-body-sm text-text-primary flex-1 truncate">{name}</span>
       {categoryValue && (
-        <span className="text-[8px] text-[var(--m12-text-muted)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] uppercase">
+        <span className="text-[10px] text-text-tertiary bg-surface-muted border border-border rounded px-1 py-0.5 font-mono uppercase">
           {categoryValue}
         </span>
       )}
       {secondaryField && !categoryValue && (
-        <span className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">{secondaryField}</span>
+        <span className="text-[10px] text-text-tertiary font-mono">{secondaryField}</span>
       )}
       <button
         onClick={(e) => { e.stopPropagation(); onDelete() }}
-        className="opacity-0 group-hover:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all"
+        className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-600 transition-all"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
           <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -1860,35 +1859,35 @@ function IPEntityList({
         }
 
         return (
-          <div key={ip.id} className={`border rounded-lg transition-all ${isExpanded ? 'border-[var(--m12-border)]/50 bg-[var(--m12-bg)]/50' : 'border-transparent'}`}>
+          <div key={ip.id} className={`border rounded-lg transition-all ${isExpanded ? 'border-border bg-surface-muted/50' : 'border-transparent'}`}>
             {/* Collapsed row */}
             <div
-              className="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-[var(--m12-bg)]/50 rounded-lg transition-colors group"
+              className="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-surface-muted/50 rounded-lg transition-colors group"
               onClick={() => setExpandedId(isExpanded ? null : ip.id)}
             >
-              <button className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] transition-colors shrink-0">
+              <button className="text-text-tertiary hover:text-text-primary transition-colors shrink-0">
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
                   <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[var(--m12-text-muted)] shrink-0">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-text-tertiary shrink-0">
                 <rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1" />
                 <path d="M3 4.5h4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
               </svg>
-              <span className="text-xs text-[var(--m12-text)] flex-1 truncate">{ip.name}</span>
+              <span className="text-body-sm text-text-primary flex-1 truncate">{ip.name}</span>
               {ip.category && (
-                <span className="text-[8px] text-[var(--m12-text-muted)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/30 rounded px-1 py-0.5 font-[family-name:var(--font-space-mono)] uppercase">
+                <span className="text-[10px] text-text-tertiary bg-surface-muted border border-border rounded px-1 py-0.5 font-mono uppercase">
                   {ip.category}
                 </span>
               )}
               {usedIn.length > 0 && (
-                <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">
+                <span className="text-[10px] text-text-tertiary font-mono">
                   {usedIn.length}x
                 </span>
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); removeInformationProduct(ip.id) }}
-                className="opacity-0 group-hover:opacity-100 text-[var(--m12-text-muted)] hover:text-red-400 transition-all shrink-0"
+                className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-600 transition-all shrink-0"
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                   <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -1898,11 +1897,11 @@ function IPEntityList({
 
             {/* Expanded detail */}
             {isExpanded && (
-              <div className="px-3 pb-2.5 pt-1 space-y-2 border-t border-[var(--m12-border)]/20 mx-1">
+              <div className="px-3 pb-2.5 pt-1 space-y-2 border-t border-border mx-1">
                 {/* Edit button */}
                 <button
                   onClick={() => setEditingId(ip.id)}
-                  className="text-[8px] font-[family-name:var(--font-space-mono)] text-[#2563EB] hover:text-[#3B82F6] uppercase tracking-wider font-bold transition-colors"
+                  className="text-[10px] font-mono text-brand-600 hover:text-brand-500 uppercase tracking-wider font-bold transition-colors"
                 >
                   Edit Name / Category
                 </button>
@@ -1910,27 +1909,27 @@ function IPEntityList({
                 {/* Usage */}
                 {usedIn.length > 0 ? (
                   <div>
-                    <div className="text-[8px] text-[var(--m12-text-muted)] uppercase tracking-wider mb-1 font-[family-name:var(--font-space-mono)] font-bold">Used In</div>
+                    <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1 font-mono font-bold">Used In</div>
                     <div className="space-y-0.5">
                       {usedIn.map((u, i) => (
-                        <div key={i} className="flex items-center gap-1.5 text-[9px]">
-                          <span className={`text-[7px] font-[family-name:var(--font-space-mono)] font-bold uppercase px-1 py-0.5 rounded ${
+                        <div key={i} className="flex items-center gap-1.5 text-[10px]">
+                          <span className={`text-[10px] font-mono font-bold uppercase px-1 py-0.5 rounded ${
                             u.side === 'input'
-                              ? 'bg-[#EAB308]/10 text-[#EAB308]'
-                              : 'bg-[#10B981]/10 text-[#10B981]'
+                              ? 'bg-status-yellow-bg text-status-yellow'
+                              : 'bg-status-green-bg text-status-green'
                           }`}>
                             {u.side === 'input' ? 'IN' : 'OUT'}
                           </span>
-                          <span className="text-[var(--m12-text-secondary)] truncate">{u.capName}</span>
+                          <span className="text-text-secondary truncate">{u.capName}</span>
                           {u.dimCount > 0 && (
-                            <span className="text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] text-[7px]">{u.dimCount} dims</span>
+                            <span className="text-text-tertiary font-mono text-[10px]">{u.dimCount} dims</span>
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="text-[9px] text-[var(--m12-text-faint)] italic">Not used in any capability yet</div>
+                  <div className="text-[10px] text-text-tertiary italic">Not used in any capability yet</div>
                 )}
               </div>
             )}
@@ -1998,15 +1997,15 @@ function EntityPool({ orgId }: { orgId: string }) {
   return (
     <div className="space-y-3">
       {/* Tabs */}
-      <div className="flex gap-1 bg-[var(--m12-bg)] rounded-lg p-0.5">
+      <div className="flex gap-1 bg-surface-muted rounded-lg p-0.5">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => { setActiveTab(tab.key); setEditingId(null) }}
-            className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 px-2 rounded-md transition-colors ${
+            className={`flex-1 text-[10px] uppercase tracking-wider font-mono font-bold py-1.5 px-2 rounded transition-colors ${
               activeTab === tab.key
-                ? 'bg-[var(--m12-bg-card)] text-[var(--m12-text)] shadow-sm'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                ? 'bg-brand-500 text-white'
+                : 'text-text-secondary hover:bg-white'
             }`}
           >
             {tab.label} ({tab.count})
@@ -2079,11 +2078,11 @@ function EntityPool({ orgId }: { orgId: string }) {
                       color: tmpl?.color,
                     })
                   }}
-                  className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded px-2 py-1 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60"
+                  className="w-full bg-surface-input border border-border rounded px-2 py-1 text-body-sm text-text-primary focus:outline-none focus:border-brand-500"
                 >
                   <option value="">Type (optional)</option>
                   {SYSTEM_TEMPLATES.map(t => (
-                    <option key={t.type} value={t.type}>{t.label} — {t.description}</option>
+                    <option key={t.type} value={t.type}>{t.label} - {t.description}</option>
                   ))}
                 </select>
               </EditableRow>
@@ -2094,11 +2093,11 @@ function EntityPool({ orgId }: { orgId: string }) {
             <select
               value={newSystemType}
               onChange={e => setNewSystemType(e.target.value)}
-              className="w-full bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-2.5 py-1.5 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#2563EB]/60"
+              className="w-full bg-surface-input border border-border rounded-lg px-2.5 py-1.5 text-body-sm text-text-primary focus:outline-none focus:border-brand-500"
             >
               <option value="">Type (optional)</option>
               {SYSTEM_TEMPLATES.map(t => (
-                <option key={t.type} value={t.type}>{t.label} — {t.description}</option>
+                <option key={t.type} value={t.type}>{t.label} - {t.description}</option>
               ))}
             </select>
             <QuickAdd placeholder="New system name..." onAdd={handleAddSystem} />
@@ -2146,50 +2145,44 @@ export default function CapabilityEditor({ orgId }: { orgId: string }) {
   return (
     <div className={
       fullscreen
-        ? 'fixed inset-0 z-40 bg-[var(--m12-bg-card)] flex flex-col overflow-hidden'
-        : 'w-[380px] shrink-0 bg-[var(--m12-bg-card)] border-l border-[var(--m12-border)]/40 flex flex-col h-full overflow-hidden'
+        ? 'fixed inset-0 z-40 bg-white flex flex-col overflow-hidden'
+        : 'w-[380px] shrink-0 bg-white border-l border-border flex flex-col h-full overflow-hidden'
     }>
       {/* Sidebar header */}
-      <div className="px-4 py-3 border-b border-[var(--m12-border)]/40">
+      <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2 mb-3">
           <div className="flex gap-1 flex-1">
             <button
               onClick={() => setSidebarMode('detail')}
-              className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 rounded-md transition-colors ${
+              className={`flex-1 text-[10px] uppercase tracking-wider font-mono font-bold py-1.5 rounded transition-colors ${
                 sidebarMode === 'detail'
-                  ? 'bg-[#2563EB]/10 text-[#93C5FD]'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-text-secondary hover:bg-surface-muted'
               }`}
             >
               Capability
             </button>
             <button
               onClick={() => setSidebarMode('entities')}
-              className={`flex-1 text-[9px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold py-1.5 rounded-md transition-colors ${
+              className={`flex-1 text-[10px] uppercase tracking-wider font-mono font-bold py-1.5 rounded transition-colors ${
                 sidebarMode === 'entities'
-                  ? 'bg-[#2563EB]/10 text-[#93C5FD]'
-                  : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                  ? 'bg-brand-500 text-white'
+                  : 'text-text-secondary hover:bg-surface-muted'
               }`}
             >
               Entity Pool
             </button>
           </div>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
+            iconOnly
             onClick={() => setFullscreen(f => !f)}
             title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors border border-[var(--m12-border)]/40"
-          >
-            {fullscreen ? (
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M4.5 1v3.5H1M7.5 11V7.5H11M1 7.5h3.5V11M11 4.5H7.5V1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            ) : (
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M1 4V1h3M11 4V1H8M1 8v3h3M11 8v3H8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-          </button>
+            className="shrink-0"
+            icon={fullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+          />
         </div>
       </div>
 
@@ -2200,7 +2193,7 @@ export default function CapabilityEditor({ orgId }: { orgId: string }) {
             <CapabilityDetail capabilityId={selectedCapabilityId} orgId={orgId} />
           ) : (
             <div className="space-y-4">
-              <div className="text-xs text-[var(--m12-text-muted)]">
+              <div className="text-body-sm text-text-tertiary">
                 Select a capability from the visual, or add a new one.
               </div>
 
@@ -2211,7 +2204,7 @@ export default function CapabilityEditor({ orgId }: { orgId: string }) {
                   <button
                     key={cap.id}
                     onClick={() => useSIPOCStore.getState().setSelectedCapability(cap.id)}
-                    className="w-full text-left px-3 py-2 rounded-lg text-xs text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors border border-transparent hover:border-[var(--m12-border)]/30"
+                    className="w-full text-left px-3 py-2 rounded-lg text-body-sm text-text-primary hover:bg-surface-muted transition-colors border border-transparent hover:border-border"
                   >
                     {cap.name}
                   </button>

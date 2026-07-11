@@ -234,10 +234,10 @@ function DataFlowEdgeComponent({
             className="cursor-pointer"
           >
             <div
-              className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold font-[family-name:var(--font-space-mono)] shadow-md transition-all ${
+              className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold font-mono shadow-md transition-all ${
                 highlight
                   ? 'bg-[#06B6D4] text-[#0F172A] shadow-[0_0_8px_rgba(6,182,212,0.4)]'
-                  : 'bg-[var(--m12-border)] text-[var(--m12-text)]'
+                  : 'bg-[var(--m12-border)] text-text-primary'
               }`}
             >
               {displaySequence}
@@ -285,7 +285,7 @@ function DataFlowEdgeComponent({
               {/* Condition badge */}
               {data?.condition && (
                 <div className="flex items-center gap-1 mb-1.5 -mx-0.5">
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#EAB308] bg-[#EAB308]/10 border border-[#EAB308]/30 px-1.5 py-0.5 rounded font-[family-name:var(--font-space-mono)]">IF</span>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#EAB308] bg-[#EAB308]/10 border border-[#EAB308]/30 px-1.5 py-0.5 rounded font-mono">IF</span>
                   <span className="text-[9px] text-[#EAB308]/90 font-medium italic">{data.condition}</span>
                 </div>
               )}
@@ -323,7 +323,7 @@ function DataFlowEdgeComponent({
                 {hasOverflow && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
-                    className="flex items-center gap-1 mt-0.5 text-[10px] text-[#06B6D4] hover:text-[#67E8F9] transition-colors font-[family-name:var(--font-space-mono)]"
+                    className="flex items-center gap-1 mt-0.5 text-[10px] text-[#06B6D4] hover:text-[#67E8F9] transition-colors font-mono"
                   >
                     <svg
                       width="10" height="10" viewBox="0 0 10 10" fill="none"
@@ -364,7 +364,7 @@ function DataFlowEdgeComponent({
                   : isSelected ? 'border-[#06B6D4]' : 'border-[var(--m12-border)] hover:border-[var(--m12-text-muted)]'
               }`}
             >
-              <span className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+              <span className="text-[10px] text-[var(--m12-text-muted)] font-mono">
                 + data elements
               </span>
             </div>

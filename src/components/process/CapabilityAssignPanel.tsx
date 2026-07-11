@@ -8,6 +8,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Check, ExternalLink, Plus, X } from 'lucide-react'
+import { Button } from '@/components/common'
 import {
   listProcessNodeLinks, createProcessNodeLink, deleteProcessNodeLink, type ProcessNodeLink,
 } from '@/lib/supabase/process-models'
@@ -60,41 +62,39 @@ export default function CapabilityAssignPanel({
   }, [])
 
   return (
-    <div className="px-4 py-3 border-t border-[var(--m12-border)]/40">
+    <div className="px-4 py-3 border-t border-border">
       <div className="flex items-center gap-2 mb-2">
-        <span className="inline-flex items-center gap-1.5 bg-[#0EA5E9]/10 border border-[#0EA5E9]/30 rounded px-2 py-0.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#0EA5E9]" />
-          <span className="text-[9px] font-[family-name:var(--font-space-mono)] text-[#0EA5E9] uppercase tracking-wider font-bold">Capabilities</span>
+        <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-status-blue-bg text-status-blue">
+          Capabilities
         </span>
-        <span className="text-[11px] text-[var(--m12-text-muted)]">{links.length} assigned</span>
+        <span className="text-[11px] text-text-tertiary">{links.length} assigned</span>
         {!readOnly && (
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="ml-auto text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] text-[#0EA5E9] hover:text-[#38BDF8]"
-          >
-            + Assign
-          </button>
+          <Button variant="ghost" size="sm" icon={<Plus size={12} />} className="ml-auto" onClick={() => setPickerOpen(true)}>
+            Assign
+          </Button>
         )}
       </div>
 
       {links.length === 0 ? (
-        <div className="text-[11px] text-[var(--m12-text-muted)]">
+        <div className="text-[11px] text-text-tertiary">
           No capabilities assigned. These drive the capability groupings in the workstream data-architecture diagram.
         </div>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {links.map((l) => (
-            <span key={l.id} className="inline-flex items-center gap-1.5 text-[10px] text-[var(--m12-text-secondary)] bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded px-2 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#0EA5E9] shrink-0" />
+            <span key={l.id} className="inline-flex items-center gap-1.5 text-[10px] text-text-secondary bg-surface-muted border border-border rounded px-2 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />
               <span className="truncate max-w-[180px]">{l.label || '(capability)'}</span>
               {!readOnly && (
                 <button
+                  type="button"
                   onClick={() => unassign(l)}
                   disabled={busyId === l.target_id}
                   title="Remove"
-                  className="text-[var(--m12-border)] hover:text-red-400 disabled:opacity-40"
+                  aria-label="Remove capability"
+                  className="text-text-tertiary hover:text-status-red disabled:opacity-40"
                 >
-                  <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M4 4l6 6M10 4l-6 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                  <X size={10} />
                 </button>
               )}
             </span>
@@ -147,36 +147,36 @@ function CapabilityMultiPicker({
   }, [selectedMap])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[32rem] max-w-[92vw] max-h-[80vh] flex flex-col bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/60 rounded-xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--m12-border)]/40">
-          <h3 className="text-sm font-semibold text-[var(--m12-text)]">Assign L3 capabilities</h3>
-          <button type="button" onClick={onClose} title="Close" aria-label="Close" className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-[32rem] max-w-[92vw] max-h-[80vh] flex flex-col bg-white border border-border rounded-xl shadow-card-hover overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+          <h3 className="text-heading-sm font-display text-text-primary">Assign L3 capabilities</h3>
+          <Button variant="ghost" size="sm" iconOnly icon={<X size={16} />} title="Close" aria-label="Close" onClick={onClose} />
         </div>
         <div className="p-4 overflow-y-auto">
-          <label className="block text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold mb-1.5">Capability map</label>
+          <label className="block text-label uppercase text-text-secondary mb-1.5">Capability map</label>
           <select
             value={selectedMap || ''}
             onChange={(e) => setSelectedMap(e.target.value || null)}
             aria-label="Capability map"
-            className="w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 rounded-md px-2.5 py-1.5 text-xs text-[var(--m12-text)] focus:outline-none focus:border-[#0EA5E9]/60 mb-4"
+            className="w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none mb-4"
           >
-            <option value="">{loading ? 'Loading…' : '— select a map —'}</option>
+            <option value="">{loading ? 'Loading...' : 'Select a map...'}</option>
             {maps.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
           </select>
 
           {selectedMap && (
             <>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">L3 functionalities</label>
-                <button onClick={() => onOpenMap(selectedMap)} className="text-[9px] uppercase tracking-wider text-[#0EA5E9] hover:text-[#38BDF8]">Open map ↗</button>
+                <label className="block text-label uppercase text-text-secondary">L3 functionalities</label>
+                <Button variant="ghost" size="sm" trailingIcon={<ExternalLink size={12} />} onClick={() => onOpenMap(selectedMap)}>
+                  Open map
+                </Button>
               </div>
               {loadingCaps ? (
-                <div className="text-xs text-[var(--m12-text-muted)] py-3">Loading…</div>
+                <div className="text-body-sm text-text-tertiary py-3">Loading...</div>
               ) : caps.length === 0 ? (
-                <div className="text-xs text-[var(--m12-text-muted)] py-3">No L3 capabilities in this map.</div>
+                <div className="text-body-sm text-text-tertiary py-3">No L3 capabilities in this map.</div>
               ) : (
                 <div className="space-y-1">
                   {caps.map((c) => {
@@ -184,17 +184,17 @@ function CapabilityMultiPicker({
                     return (
                       <button
                         key={c.id}
+                        type="button"
                         onClick={() => { if (!added) onAdd(c, selectedMap) }}
                         disabled={added || busyId === c.id}
-                        className="w-full text-left px-3 py-2 rounded-md border transition-colors flex items-center gap-2 disabled:cursor-default"
-                        style={{ borderColor: added ? '#0EA5E933' : 'var(--m12-border)' }}
+                        className={`w-full text-left px-3 py-2 rounded-lg border transition-colors flex items-center gap-2 disabled:cursor-default ${added ? 'border-status-green/30 bg-status-green-bg/50' : 'border-border hover:border-brand-500/60 hover:bg-brand-50/50'}`}
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs text-[var(--m12-text)]">{c.name}</div>
-                          {c.description && <div className="text-[10px] text-[var(--m12-text-muted)] truncate">{c.description}</div>}
+                          <div className="text-body-sm text-text-primary">{c.name}</div>
+                          {c.description && <div className="text-[11px] text-text-tertiary truncate">{c.description}</div>}
                         </div>
-                        <span className={`text-[10px] font-medium shrink-0 ${added ? 'text-[#10B981]' : 'text-[#0EA5E9]'}`}>
-                          {busyId === c.id ? '…' : added ? '✓ Added' : '+ Add'}
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-medium shrink-0 ${added ? 'text-status-green' : 'text-brand-600'}`}>
+                          {busyId === c.id ? '...' : added ? (<><Check size={10} /> Added</>) : (<><Plus size={10} /> Add</>)}
                         </span>
                       </button>
                     )
@@ -204,8 +204,8 @@ function CapabilityMultiPicker({
             </>
           )}
         </div>
-        <div className="px-5 py-3 border-t border-[var(--m12-border)]/40 flex justify-end">
-          <button onClick={onClose} className="text-[11px] px-3 py-1.5 rounded-lg bg-[#0EA5E9] hover:bg-[#38BDF8] text-white font-medium">Done</button>
+        <div className="px-5 py-3 border-t border-border flex justify-end">
+          <Button size="sm" onClick={onClose}>Done</Button>
         </div>
       </div>
     </div>

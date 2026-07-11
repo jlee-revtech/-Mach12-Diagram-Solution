@@ -28,14 +28,14 @@ export default function CollabPresence({
             <div
               key={u.clientId}
               title={u.editingCapabilityId ? `${u.name} (editing)` : u.name}
-              className="w-6 h-6 rounded-full border-2 border-[var(--m12-bg-card)] flex items-center justify-center text-[9px] font-bold text-white shadow-sm"
+              className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
               style={{ backgroundColor: u.color }}
             >
               {initials(u.name)}
             </div>
           ))}
           {others.length > 4 && (
-            <div className="w-6 h-6 rounded-full border-2 border-[var(--m12-bg-card)] bg-[var(--m12-bg)] flex items-center justify-center text-[9px] font-bold text-[var(--m12-text-muted)] shadow-sm">
+            <div className="w-6 h-6 rounded-full border-2 border-white bg-surface-muted flex items-center justify-center text-[10px] font-bold text-text-tertiary shadow-sm">
               +{others.length - 4}
             </div>
           )}
@@ -43,7 +43,7 @@ export default function CollabPresence({
       )}
       <div
         title={connected ? 'Live' : 'Connecting...'}
-        className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[#10B981]' : 'bg-[var(--m12-text-faint)]'}`}
+        className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-status-green' : 'bg-gray-300'}`}
       />
     </div>
   )

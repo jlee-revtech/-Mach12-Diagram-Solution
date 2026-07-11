@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Archive, ArchiveRestore, MoreHorizontal, Plus, Presentation, RotateCcw } from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
 import { listWorkshops, createWorkshop, archiveWorkshop, restoreWorkshop, restartWorkshop } from '@/lib/supabase/workshops'
@@ -9,10 +10,15 @@ import type { Workstream } from '@/lib/workstream/types'
 import type { Workshop, WorkshopFocus } from '@/lib/workshop/types'
 import { FOCUS_AREAS, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
-import VersionBadge from '@/components/VersionBadge'
+import { Button, PageHeader, EmptyState, LoadingState } from '@/components/common'
 
-const STATUS_COLOR: Record<string, string> = {
-  draft: '#6B7280', scheduled: '#D97706', live: '#059669', completed: '#2563EB', archived: '#6B7280',
+// Workshop status -> documented status token pairs (PPM design system 5.3).
+const STATUS_CLASSES: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-500',
+  scheduled: 'bg-status-yellow-bg text-status-yellow',
+  live: 'bg-status-green-bg text-status-green',
+  completed: 'bg-status-blue-bg text-status-blue',
+  archived: 'bg-gray-100 text-gray-400',
 }
 
 export default function WorkshopsPage() {
@@ -102,177 +108,183 @@ export default function WorkshopsPage() {
   if (loading || !user || !organization) return null
 
   return (
-    <div className="min-h-screen bg-[var(--m12-bg)] p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <button onClick={() => router.push('/workstreams')} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]" title="Back to workstreams">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 4l-5 5 5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-            <span className="text-gradient text-xl font-bold font-[family-name:var(--font-orbitron)] tracking-wide">MACH12</span>
-            <span className="text-[var(--m12-text-muted)] text-lg font-light">/</span>
-            <span className="text-[var(--m12-text-secondary)] text-lg font-medium">Workshops</span>
-            <span className="self-end mb-0.5"><VersionBadge /></span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center rounded-lg border border-[var(--m12-border)]/50 p-0.5 text-[11px]">
+    <div className="space-y-6 max-w-[1400px]">
+      <PageHeader
+        title="Workshops"
+        icon={<Presentation size={24} />}
+        subtitle="Agent-facilitated delivery sessions. Prep an agenda, run the room with your value-stream consultants, and capture decisions, actions, and deliverables live."
+        actions={
+          <>
+            <div className="flex items-center rounded-lg border border-border p-0.5">
               {(['active', 'archived'] as const).map((v) => (
-                <button key={v} onClick={() => setView(v)}
-                  className="px-2.5 py-1 rounded-md font-medium capitalize transition-colors"
-                  style={{ backgroundColor: view === v ? '#2563EB' : 'transparent', color: view === v ? '#fff' : 'var(--m12-text-muted)' }}>
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={`px-2.5 py-1 rounded-md text-[12px] font-medium capitalize transition-colors ${
+                    view === v ? 'bg-brand-500 text-white' : 'text-text-secondary hover:bg-surface-muted'
+                  }`}
+                >
                   {v}{v === 'archived' && archivedCount ? ` (${archivedCount})` : ''}
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setShowNew((v) => !v)}
-              className="flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors shadow-lg shadow-[#2563EB]/20"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+            <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowNew((v) => !v)}>
               New Workshop
-            </button>
-          </div>
-        </div>
-        <p className="text-sm text-[var(--m12-text-muted)] mb-8 ml-9">
-          Agent-facilitated delivery sessions. Prep an agenda, run the room with your value-stream consultants, and capture decisions, actions, and deliverables live.
-        </p>
+            </Button>
+          </>
+        }
+      />
 
-        {/* New workshop form */}
-        {showNew && (
-          <div className="bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-xl p-6 mb-8">
-            <h2 className="text-sm font-semibold text-[var(--m12-text)] mb-4">New workshop</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <Field label="Title *"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Offer-to-Cash To-Be Design" className={inputCls} /></Field>
-              <Field label="Customer"><input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="e.g. Vanguard Aerospace" className={inputCls} /></Field>
-              <Field label="Topic"><input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What the workshop is about" className={inputCls} /></Field>
-              <Field label="Objective"><input value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="The outcome you want" className={inputCls} /></Field>
+      {/* New workshop form */}
+      {showNew && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-5">
+          <h2 className="text-heading-sm font-display text-text-primary mb-4">New workshop</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Field label="Title *"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Offer-to-Cash To-Be Design" className={inputCls} /></Field>
+            <Field label="Customer"><input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="e.g. Vanguard Aerospace" className={inputCls} /></Field>
+            <Field label="Topic"><input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What the workshop is about" className={inputCls} /></Field>
+            <Field label="Objective"><input value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="The outcome you want" className={inputCls} /></Field>
+          </div>
+          <div className="mb-4">
+            <div className="text-label uppercase text-text-secondary mb-2">Value streams / agents in the room *</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {workstreams.map((w) => {
+                const on = wsCodes.includes(w.code)
+                const color = w.color || '#2563EB'
+                return (
+                  <button key={w.id} onClick={() => setWsCodes((a) => toggle(a, w.code))}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${on ? '' : 'border-border hover:bg-surface-muted'}`}
+                    style={on ? { borderColor: color, backgroundColor: `${color}14` } : undefined}>
+                    <div className="w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1A`, color }}>
+                      <WorkstreamIcon icon={w.icon} size={13} />
+                    </div>
+                    <span className="text-[11px] text-text-primary leading-tight truncate">{w.name}</span>
+                  </button>
+                )
+              })}
             </div>
-            <div className="mb-4">
-              <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">Value streams / agents in the room *</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {workstreams.map((w) => {
-                  const on = wsCodes.includes(w.code)
-                  const color = w.color || '#2563EB'
+          </div>
+          <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-label uppercase text-text-secondary mb-2">Focus areas</div>
+              <div className="flex flex-wrap gap-2">
+                {FOCUS_AREAS.map((f) => {
+                  const on = focus.includes(f.key)
                   return (
-                    <button key={w.id} onClick={() => setWsCodes((a) => toggle(a, w.code))}
-                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors"
-                      style={{ borderColor: on ? color : 'var(--m12-border)', backgroundColor: on ? `${color}14` : 'transparent' }}>
-                      <div className="w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1A`, color }}>
-                        <WorkstreamIcon icon={w.icon} size={13} />
-                      </div>
-                      <span className="text-[11px] text-[var(--m12-text)] leading-tight truncate">{w.name}</span>
+                    <button key={f.key} onClick={() => setFocus((a) => toggle(a, f.key))} title={f.blurb}
+                      className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+                        on ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'
+                      }`}>
+                      {f.label}
                     </button>
                   )
                 })}
               </div>
             </div>
-            <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">Focus areas</div>
-                <div className="flex flex-wrap gap-2">
-                  {FOCUS_AREAS.map((f) => {
-                    const on = focus.includes(f.key)
-                    return (
-                      <button key={f.key} onClick={() => setFocus((a) => toggle(a, f.key))} title={f.blurb}
-                        className="rounded-full border px-3 py-1 text-[11px] font-medium transition-colors"
-                        style={{ borderColor: on ? '#2563EB' : 'var(--m12-border)', backgroundColor: on ? '#2563EB14' : 'transparent', color: on ? '#3B82F6' : 'var(--m12-text-muted)' }}>
-                        {f.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-2">Workshop length</div>
-                <select value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} title="Workshop length" aria-label="Workshop length" className={`${inputCls} appearance-none`}>
-                  {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
-                </select>
-                <div className="text-[10px] text-[var(--m12-text-muted)] mt-1.5">Agenda timeboxes and per-section depth scale to this length.</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={handleCreate} disabled={creating || !title.trim() || wsCodes.length === 0}
-                className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-xs font-medium transition-colors">
-                {creating ? 'Creating…' : 'Create & open'}
-              </button>
-              <button onClick={() => setShowNew(false)} className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] px-3 py-2 text-xs">Cancel</button>
+            <div>
+              <div className="text-label uppercase text-text-secondary mb-2">Workshop length</div>
+              <select value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} title="Workshop length" aria-label="Workshop length" className={`${inputCls} appearance-none`}>
+                {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
+              </select>
+              <div className="text-[11px] text-text-tertiary mt-1.5">Agenda timeboxes and per-section depth scale to this length.</div>
             </div>
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <Button variant="primary" onClick={handleCreate} loading={creating} disabled={creating || !title.trim() || wsCodes.length === 0}>
+              {creating ? 'Creating...' : 'Create & open'}
+            </Button>
+            <Button variant="ghost" onClick={() => setShowNew(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
 
-        {/* Workshop list */}
-        {loadingData ? (
-          <div className="text-center py-24 text-[var(--m12-text-muted)] text-sm">Loading…</div>
-        ) : visible.length === 0 ? (
-          <div className="text-center py-24 border border-dashed border-[var(--m12-border)]/60 rounded-2xl">
-            <h2 className="text-lg font-semibold text-[var(--m12-text-secondary)] mb-2">{view === 'archived' ? 'No archived workshops' : 'No workshops yet'}</h2>
-            <p className="text-sm text-[var(--m12-text-muted)] mb-6 max-w-md mx-auto">{view === 'archived' ? 'Workshops you archive show up here. You can restore any of them later; nothing is deleted.' : 'Create a workshop to prep an agenda and run an agent-facilitated session with your value-stream consultants.'}</p>
-            {view === 'active' && <button onClick={() => setShowNew(true)} className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-5 py-2.5 rounded-lg text-sm font-medium">New Workshop</button>}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visible.map((w) => (
-              <div key={w.id} role="button" tabIndex={0}
-                onClick={() => router.push(`/workshops/${w.id}`)}
-                onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/workshops/${w.id}`) }}
-                className="relative text-left bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] rounded-xl p-5 transition-all card-glow cursor-pointer outline-none"
-                style={{ opacity: view === 'archived' || busyId === w.id ? 0.65 : 1 }}>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="text-sm font-semibold text-[var(--m12-text)] leading-tight">{w.title}</h3>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ color: STATUS_COLOR[w.status], backgroundColor: `${STATUS_COLOR[w.status]}1A` }}>{w.status}</span>
-                    <div className="relative">
-                      <button onClick={(e) => { e.stopPropagation(); setMenuId(menuId === w.id ? null : w.id) }}
-                        className="text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-1 leading-none text-base rounded" title="Actions" aria-label="Actions">⋯</button>
-                      {menuId === w.id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuId(null) }} />
-                          <div className="absolute right-0 top-6 z-20 w-44 rounded-lg border border-[var(--m12-border)] bg-[var(--m12-bg-card)] shadow-xl py-1">
-                            {view === 'active' ? (
-                              <>
-                                <button onClick={(e) => { e.stopPropagation(); onRestart(w.id) }} disabled={busyId === w.id} className={menuItemCls}>↺&nbsp; Restart to prep</button>
-                                <button onClick={(e) => { e.stopPropagation(); onArchive(w.id) }} disabled={busyId === w.id} className={menuItemCls}>⤓&nbsp; Archive</button>
-                              </>
-                            ) : (
-                              <button onClick={(e) => { e.stopPropagation(); onRestore(w.id) }} disabled={busyId === w.id} className={menuItemCls}>↩&nbsp; Restore</button>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
+      {/* Workshop list */}
+      {loadingData ? (
+        <LoadingState label="Loading workshops..." />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          variant="dashed"
+          icon={<Presentation size={40} />}
+          title={view === 'archived' ? 'No archived workshops' : 'No workshops yet'}
+          description={view === 'archived'
+            ? 'Workshops you archive show up here. You can restore any of them later; nothing is deleted.'
+            : 'Create a workshop to prep an agenda and run an agent-facilitated session with your value-stream consultants.'}
+          action={view === 'active'
+            ? <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowNew(true)}>New Workshop</Button>
+            : undefined}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {visible.map((w) => (
+            <div key={w.id} role="button" tabIndex={0}
+              onClick={() => router.push(`/workshops/${w.id}`)}
+              onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/workshops/${w.id}`) }}
+              className="relative text-left bg-white border border-border rounded-lg shadow-card p-5 hover:shadow-card-hover hover:-translate-y-0.5 transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+              style={{ opacity: view === 'archived' || busyId === w.id ? 0.65 : 1 }}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="font-display text-heading-sm text-text-primary leading-tight">{w.title}</h3>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${STATUS_CLASSES[w.status] ?? 'bg-surface-muted text-text-secondary'}`}>{w.status}</span>
+                  <div className="relative">
+                    <Button
+                      variant="ghost" size="sm" iconOnly
+                      icon={<MoreHorizontal size={14} />}
+                      title="Actions" aria-label="Actions"
+                      onClick={(e) => { e.stopPropagation(); setMenuId(menuId === w.id ? null : w.id) }}
+                    />
+                    {menuId === w.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuId(null) }} />
+                        <div className="absolute right-0 top-9 z-20 w-48 rounded-lg border border-border bg-white shadow-dropdown py-1 animate-slide-in-up">
+                          {view === 'active' ? (
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); onRestart(w.id) }} disabled={busyId === w.id} className={menuItemCls}>
+                                <RotateCcw size={14} /> Restart to prep
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); onArchive(w.id) }} disabled={busyId === w.id} className={menuItemCls}>
+                                <Archive size={14} /> Archive
+                              </button>
+                            </>
+                          ) : (
+                            <button onClick={(e) => { e.stopPropagation(); onRestore(w.id) }} disabled={busyId === w.id} className={menuItemCls}>
+                              <ArchiveRestore size={14} /> Restore
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-                {w.customer_name && <div className="text-[11px] text-[var(--m12-text-muted)] mb-3">{w.customer_name}</div>}
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {(w.workstream_codes || []).slice(0, 4).map((c) => {
-                    const ws = workstreams.find((x) => x.code === c)
-                    const color = ws?.color || '#2563EB'
-                    return <span key={c} className="text-[9px] px-1.5 py-0.5 rounded" style={{ color, backgroundColor: `${color}1A` }}>{ws?.name?.split('(')[0].trim() || c}</span>
-                  })}
-                  {(w.workstream_codes || []).length > 4 && <span className="text-[9px] text-[var(--m12-text-muted)]">+{w.workstream_codes.length - 4}</span>}
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-[var(--m12-text-muted)]">
-                  <span>{new Date(w.created_at).toLocaleDateString()}</span>
-                  {w.archived_at && <span className="italic">archived</span>}
-                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              {w.customer_name && <div className="text-body-sm text-text-secondary mb-3">{w.customer_name}</div>}
+              <div className="flex flex-wrap gap-1 mb-3">
+                {(w.workstream_codes || []).slice(0, 4).map((c) => {
+                  const ws = workstreams.find((x) => x.code === c)
+                  const color = ws?.color || '#2563EB'
+                  return <span key={c} className="text-[10px] px-1.5 py-0.5 rounded" style={{ color, backgroundColor: `${color}1A` }}>{ws?.name?.split('(')[0].trim() || c}</span>
+                })}
+                {(w.workstream_codes || []).length > 4 && <span className="text-[10px] text-text-tertiary">+{w.workstream_codes.length - 4}</span>}
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-text-tertiary">
+                <span>{new Date(w.created_at).toLocaleDateString()}</span>
+                {w.archived_at && <span className="italic">archived</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-const inputCls = 'w-full bg-[var(--m12-bg)] border border-[var(--m12-border)]/50 focus:border-[#2563EB] rounded-lg px-3 py-2 text-xs text-[var(--m12-text)] outline-none transition-colors'
+const inputCls = 'w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none transition-colors'
 
-const menuItemCls = 'w-full text-left px-3 py-1.5 text-[11px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] hover:text-[var(--m12-text)] disabled:opacity-40 transition-colors'
+const menuItemCls = 'w-full text-left px-3 py-2 text-body-sm text-text-secondary hover:bg-surface-muted hover:text-text-primary disabled:opacity-40 transition-colors flex items-center gap-2'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="text-[11px] uppercase tracking-wider text-[var(--m12-text-muted)] mb-1.5">{label}</div>
+      <div className="text-label uppercase text-text-secondary mb-1.5">{label}</div>
       {children}
     </label>
   )

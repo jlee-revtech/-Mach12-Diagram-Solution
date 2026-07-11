@@ -2,10 +2,12 @@ import type { Metadata } from 'next'
 import '@/styles/globals.css'
 import { AuthProvider } from '@/lib/supabase/auth-context'
 import { ThemeProvider } from '@/lib/theme-context'
+import { AppChrome } from '@/components/studio/AppChrome'
 
 export const metadata: Metadata = {
-  title: 'Mach12.ai — Data Architecture Diagrams',
-  description: 'AI-powered data architecture diagramming for Aerospace & Defense.',
+  title: 'Mach12 Studio — Data Architecture, Process & Capability Maps',
+  description:
+    'AI-powered SAP data architecture diagrams, BPMN process models, and capability maps for Aerospace & Defense.',
 }
 
 export default function RootLayout({
@@ -17,13 +19,15 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link
-          href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&family=Work+Sans:wght@500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
-      <body className="font-[family-name:var(--font-dm-sans)] antialiased">
+      <body className="antialiased" suppressHydrationWarning>
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <AppChrome>{children}</AppChrome>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

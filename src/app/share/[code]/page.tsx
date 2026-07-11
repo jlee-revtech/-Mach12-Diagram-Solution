@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useEffect, useState, useCallback } from 'react'
+import { Lock, Download } from 'lucide-react'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import {
   getShareByCode, getCapabilityMapAnon, listCapabilitiesAnon,
@@ -12,7 +13,8 @@ import type { CapabilityInput, CapabilityOutput } from '@/lib/sipoc/types'
 import SIPOCDrawer from '@/components/sipoc/SIPOCDrawer'
 import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import VersionBadge from '@/components/VersionBadge'
-import { useTheme } from '@/lib/theme-context'
+import { Button, EmptyState, LoadingState } from '@/components/common'
+import { Mach12Logo } from '@/components/brand/Mach12Logo'
 import { exportCapabilityMapWorkbook } from '@/lib/export/capabilityMap'
 
 export default function SharePage({ params }: { params: Promise<{ code: string }> }) {
@@ -20,7 +22,6 @@ export default function SharePage({ params }: { params: Promise<{ code: string }
   const [status, setStatus] = useState<'loading' | 'invalid' | 'ready'>('loading')
   const [mapTitle, setMapTitle] = useState('')
   const [mapDescription, setMapDescription] = useState('')
-  const { theme, toggleTheme } = useTheme()
 
   const selectedCapabilityId = useSIPOCStore(s => s.selectedCapabilityId)
   const drawerFullscreen = useSIPOCStore(s => s.drawerFullscreen)
@@ -117,80 +118,61 @@ export default function SharePage({ params }: { params: Promise<{ code: string }
 
   if (status === 'loading') {
     return (
-      <div className="fixed inset-0 bg-[var(--m12-bg)] flex items-center justify-center">
-        <div className="text-[var(--m12-text-muted)] text-sm">Loading shared capability map...</div>
+      <div className="fixed inset-0 bg-surface-muted flex items-center justify-center">
+        <LoadingState variant="inline" label="Loading shared capability map..." />
       </div>
     )
   }
 
   if (status === 'invalid') {
     return (
-      <div className="fixed inset-0 bg-[var(--m12-bg)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4">🔒</div>
-          <h1 className="text-xl font-bold text-[var(--m12-text)] mb-2">Link expired or invalid</h1>
-          <p className="text-[var(--m12-text-muted)] text-sm">This share link is no longer active. Ask the map owner to generate a new one.</p>
-        </div>
+      <div className="fixed inset-0 bg-surface-muted flex items-center justify-center p-6">
+        <EmptyState
+          variant="inline"
+          icon={<Lock size={32} />}
+          title="Link expired or invalid"
+          description="This share link is no longer active. Ask the map owner to generate a new one."
+        />
       </div>
     )
   }
 
   return (
-    <div className="fixed inset-0 bg-[var(--m12-bg)] flex flex-col">
-      {/* Top bar — mirrors the real capability map page but read-only */}
-      <div className="h-12 border-b border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)] flex items-center px-4 gap-4 shrink-0">
-        <span className="text-gradient text-sm font-bold font-[family-name:var(--font-orbitron)] tracking-wide">
-          MACH12
-        </span>
+    <div className="fixed inset-0 bg-surface-muted flex flex-col">
+      {/* Top bar — minimal white read-only chrome over the shared map */}
+      <div className="h-14 bg-white border-b border-border flex items-center px-4 gap-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <Mach12Logo size={24} />
+          <span className="text-gradient font-display font-bold text-body-md tracking-wide">
+            MACH12
+          </span>
+        </div>
         <VersionBadge />
-        <span className="text-[var(--m12-text-muted)] text-xs">/</span>
-        <span className="text-base font-semibold text-[var(--m12-text)] truncate max-w-[400px]">
+        <span className="text-body-sm text-text-tertiary">/</span>
+        <span className="text-body-md font-semibold text-text-primary truncate max-w-[400px]">
           {mapTitle}
         </span>
-        <span className="text-[9px] font-[family-name:var(--font-space-mono)] font-bold uppercase tracking-wider text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-1 rounded-md">
+        <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded bg-status-blue-bg text-status-blue shrink-0">
           Capability Map
         </span>
 
         <div className="flex-1" />
 
-        <span className="inline-flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 text-amber-500 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M5 2a2 2 0 00-2 2v1H2.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h5a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5H7V4a2 2 0 00-2-2zm0 .8A1.2 1.2 0 016.2 4v1H3.8V4A1.2 1.2 0 015 2.8z" fill="currentColor"/>
-          </svg>
+        <span className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider shrink-0">
+          <Lock size={10} />
           Read-Only
         </span>
 
         {/* Easy button: full capability-map Excel export (same workbook as the editor) */}
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Download size={12} />}
           onClick={handleExportAll}
-          title="Download the full capability map (L1 → L2 → L3 → SIPOC, IPs, data elements, use cases) as a structured Excel workbook"
-          className="flex items-center gap-1.5 bg-gradient-to-r from-[#10B981]/20 to-[#06B6D4]/20 border border-[#10B981]/30 hover:border-[#10B981]/50 text-[#10B981] px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          title="Download the full capability map (L1 to L2 to L3 to SIPOC, IPs, data elements, use cases) as a structured Excel workbook"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 1.5v6M3.5 5L6 7.5 8.5 5M2 9.5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
           Export to Excel
-        </button>
-
-        {/* Theme toggle */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:border-[var(--m12-border)] transition-colors"
-        >
-          {theme === 'dark' ? (
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.76 3.76l1.06 1.06M11.18 11.18l1.06 1.06M3.76 12.24l1.06-1.06M11.18 4.82l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M13.5 9.5a5.5 5.5 0 01-7-7 5.5 5.5 0 107 7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          )}
-        </button>
+        </Button>
       </div>
 
       {/* Main content — same layout as the real capability map page */}

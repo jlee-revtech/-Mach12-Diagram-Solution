@@ -144,7 +144,7 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
         minWidth={180}
         minHeight={60}
         lineClassName="!border-[#06B6D4]/30"
-        handleClassName="!w-2.5 !h-2.5 !bg-[#06B6D4] !border-[var(--m12-bg-card)] !border-2 !rounded-sm"
+        handleClassName="!w-2.5 !h-2.5 !bg-[#06B6D4] !border-[var(--m12-node-bg)] !border-2 !rounded-sm"
       />
 
       {/* ── Primary handles: 1 per side at midpoint, visible on hover ── */}
@@ -189,7 +189,7 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
       <div className="flex items-center gap-3">
         <div
           style={{ backgroundColor: color + '20', color }}
-          className="flex items-center justify-center w-10 h-10 rounded-lg text-xs font-bold font-[family-name:var(--font-space-mono)] shrink-0"
+          className="flex items-center justify-center w-10 h-10 rounded-lg text-xs font-bold font-mono shrink-0"
         >
           {icon}
         </div>
@@ -201,10 +201,10 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className="w-full bg-transparent border-b border-[#06B6D4] text-[var(--m12-text)] text-sm font-semibold outline-none"
+              className="w-full bg-transparent border-b border-[#06B6D4] text-text-primary text-sm font-semibold outline-none"
             />
           ) : (
-            <div className="text-sm font-semibold text-[var(--m12-text)]">
+            <div className="text-sm font-semibold text-text-primary">
               {data.label}
             </div>
           )}
@@ -213,7 +213,7 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
               {data.physicalSystem}
             </div>
           )}
-          <div className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--m12-text-muted)] font-mono">
             {data.systemType}
           </div>
         </div>
@@ -229,7 +229,7 @@ function SystemNodeComponent({ id, data, selected }: NodeProps & { data: SystemD
                 style={{ borderColor: color + '40', backgroundColor: color + '08' }}
                 className="border rounded px-1.5 py-0.5"
               >
-                <span style={{ color: color + 'CC' }} className="text-[9px] font-medium font-[family-name:var(--font-space-mono)]">
+                <span style={{ color: color + 'CC' }} className="text-[9px] font-medium font-mono">
                   {mod.name}
                 </span>
               </div>

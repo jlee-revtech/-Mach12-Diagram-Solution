@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────────────
+   Mach12 Studio design tokens.
+   Ported from the PPM (Tesseract XPM) design system skill into Tailwind 4
+   @theme syntax. Class strings (brand-500, surface-muted, status-green-bg,
+   text-text-primary, text-body-sm, shadow-card, ...) match the skill
+   verbatim. The m12-* namespace is the sanctioned Mach12 brand palette
+   used by the wordmark, gradients, and diagram canvases.
+   ───────────────────────────────────────────────────────────────────── */
+
 @theme {
+  /* ── Mach12 brand palette (parallel namespace) ─────────────────────── */
   --color-m12-midnight: #151E2E;
   --color-m12-deep-navy: #1F2C3F;
   --color-m12-steel: #374A5E;
@@ -17,115 +27,289 @@
   --color-m12-gray-700: #334155;
   --color-m12-gray-900: #0F172A;
 
-  --font-orbitron: 'Orbitron', sans-serif;
-  --font-dm-sans: 'DM Sans', sans-serif;
-  --font-space-mono: 'Space Mono', monospace;
+  /* ── Brand scale ───────────────────────────────────────────────────── */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #3B82F6;
+  --color-brand-500: #2563EB;
+  --color-brand-600: #1D4ED8;
+  --color-brand-700: #1e40af;
+  --color-brand-800: #0F1629;
+  --color-brand-900: #0A0E1A;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────── */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f6f6;
+  --color-surface-input: #f2f2f2;
+
+  /* ── Borders ───────────────────────────────────────────────────────── */
+  --color-border: #e2e2e2;
+  --color-border-strong: #d1d1d1;
+
+  /* ── Text ──────────────────────────────────────────────────────────── */
+  --color-text-primary: #1b1b1b;
+  --color-text-secondary: #5e5e5e;
+  --color-text-tertiary: #595959;
+  --color-text-inverse: #ffffff;
+
+  /* ── Status (state colors) ─────────────────────────────────────────── */
+  --color-status-green: #16a34a;
+  --color-status-green-bg: #f0fdf4;
+  --color-status-yellow: #ca8a04;
+  --color-status-yellow-bg: #fefce8;
+  --color-status-red: #dc2626;
+  --color-status-red-bg: #fef2f2;
+  --color-status-blue: #2563eb;
+  --color-status-blue-bg: #eff6ff;
+
+  /* ── Fonts ─────────────────────────────────────────────────────────── */
+  --font-sans: "Noto Sans", system-ui, sans-serif;
+  --font-body: "DM Sans", "Noto Sans", system-ui, sans-serif;
+  --font-heading: "Work Sans", system-ui, sans-serif;
+  --font-display: "Orbitron", sans-serif;
+  --font-mono: "Space Mono", monospace;
+  /* Legacy aliases still referenced by a few components */
+  --font-orbitron: "Orbitron", sans-serif;
+  --font-dm-sans: "DM Sans", sans-serif;
+  --font-space-mono: "Space Mono", monospace;
+
+  /* ── Type scale ────────────────────────────────────────────────────── */
+  --text-display-xl: 3rem;
+  --text-display-xl--line-height: 1.2;
+  --text-display-xl--font-weight: 700;
+  --text-display-lg: 2.25rem;
+  --text-display-lg--line-height: 1.2;
+  --text-display-lg--font-weight: 700;
+  --text-display-md: 1.875rem;
+  --text-display-md--line-height: 1.25;
+  --text-display-md--font-weight: 600;
+  --text-heading-lg: 1.375rem;
+  --text-heading-lg--line-height: 1.3;
+  --text-heading-lg--font-weight: 600;
+  --text-heading-md: 1.125rem;
+  --text-heading-md--line-height: 1.3;
+  --text-heading-md--font-weight: 600;
+  --text-heading-sm: 1rem;
+  --text-heading-sm--line-height: 1.3;
+  --text-heading-sm--font-weight: 600;
+  --text-body-lg: 1rem;
+  --text-body-lg--line-height: 1.5;
+  --text-body-lg--font-weight: 400;
+  --text-body-md: 0.875rem;
+  --text-body-md--line-height: 1.5;
+  --text-body-md--font-weight: 400;
+  --text-body-sm: 0.75rem;
+  --text-body-sm--line-height: 1.5;
+  --text-body-sm--font-weight: 400;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.5;
+  --text-label--font-weight: 500;
+  --text-label--letter-spacing: 0.05em;
+
+  /* ── Border radius ─────────────────────────────────────────────────── */
+  --radius: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 18px;
+
+  /* ── Shadows ───────────────────────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 2px 6px 0px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 4px 12px 0px rgba(0, 0, 0, 0.12);
+  --shadow-dropdown: 0 4px 16px 0px rgba(0, 0, 0, 0.16);
+  --shadow-modal: 0 8px 32px 0px rgba(0, 0, 0, 0.2);
+  --shadow-glow-blue: 0 0 20px rgba(37, 99, 235, 0.2), 0 0 40px rgba(37, 99, 235, 0.08);
+
+  /* ── Animations ────────────────────────────────────────────────────── */
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-fade-in-up: fade-in-up 0.4s ease-out both;
+  --animate-slide-in-right: slide-in-right 0.3s ease-out;
+  --animate-slide-in-up: slide-in-up 0.2s ease-out;
+  --animate-scale-in: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
+  --animate-skeleton: skeleton 1.5s ease-in-out infinite;
 }
 
-/* ─── Theme Variables ────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────
+   Keyframes (referenced by --animate-* tokens above).
+   ───────────────────────────────────────────────────────────────────── */
+
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  0% { transform: translateX(16px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slide-in-up {
+  0% { transform: translateY(8px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes scale-in {
+  0% { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Runtime canvas variables. The diagram/BPMN/capability-map canvases and
+   nodes read these at render time. Values are the Tesseract light tokens;
+   the old .dark block was retired when the app adopted the XPM system
+   (XPM is a light-chrome design system).
+   ───────────────────────────────────────────────────────────────────── */
 :root {
-  --m12-bg: #F8FAFC;
-  --m12-bg-secondary: #F1F5F9;
-  --m12-bg-card: #FFFFFF;
-  --m12-bg-card-hover: #F1F5F9;
-  --m12-bg-input: #F1F5F9;
-  --m12-bg-deep: #E2E8F0;
-  --m12-border: #CBD5E1;
-  --m12-text: #0F172A;
-  --m12-text-secondary: #334155;
-  --m12-text-muted: #64748B;
-  --m12-text-faint: #94A3B8;
-  --m12-node-bg: #FFFFFF;
+  --m12-bg: #f6f6f6;
+  --m12-bg-secondary: #f6f6f6;
+  --m12-bg-card: #ffffff;
+  --m12-bg-card-hover: #f6f6f6;
+  --m12-bg-input: #f2f2f2;
+  --m12-bg-deep: #ececec;
+  --m12-border: #e2e2e2;
+  --m12-text: #1b1b1b;
+  --m12-text-secondary: #5e5e5e;
+  --m12-text-muted: #8a8a8a;
+  --m12-text-faint: #b0b0b0;
+  --m12-node-bg: #ffffff;
   --m12-edge-label-bg: rgba(255, 255, 255, 0.95);
-  --m12-edge-default: #94A3B8;
-  --m12-marker-default: #94A3B8;
-  --m12-canvas-dot: rgba(203, 213, 225, 0.25);
-  --m12-minimap-bg: #F1F5F9;
-  --m12-minimap-node: #FFFFFF;
-  --m12-minimap-mask: rgba(248, 250, 252, 0.85);
-  --m12-minimap-stroke: #CBD5E1;
-  --m12-scrollbar-track: #F8FAFC;
-  --m12-scrollbar-thumb: #CBD5E1;
-  --m12-cursor-stroke: #0F172A;
-  --m12-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --m12-node-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-  --m12-handle-bg: #FFFFFF;
-  --m12-handle-border: #94A3B8;
-  --m12-secondary-handle-border: #CBD5E1;
+  --m12-edge-default: #b0b0b0;
+  --m12-marker-default: #b0b0b0;
+  --m12-canvas-dot: rgba(0, 0, 0, 0.07);
+  --m12-minimap-bg: #f6f6f6;
+  --m12-minimap-node: #ffffff;
+  --m12-minimap-mask: rgba(246, 246, 246, 0.85);
+  --m12-minimap-stroke: #e2e2e2;
+  --m12-scrollbar-track: transparent;
+  --m12-scrollbar-thumb: #d1d1d1;
+  --m12-cursor-stroke: #1b1b1b;
+  --m12-shadow: 0 2px 6px 0px rgba(0, 0, 0, 0.08);
+  --m12-node-shadow: 0 2px 6px 0px rgba(0, 0, 0, 0.08);
+  --m12-handle-bg: #ffffff;
+  --m12-handle-border: #b0b0b0;
+  --m12-secondary-handle-border: #d1d1d1;
 }
 
-.dark {
-  --m12-bg: #151E2E;
-  --m12-bg-secondary: #1A2435;
-  --m12-bg-card: #1F2C3F;
-  --m12-bg-card-hover: #263448;
-  --m12-bg-input: #151E2E;
-  --m12-bg-deep: #0F172A;
-  --m12-border: #374A5E;
-  --m12-text: #F8FAFC;
-  --m12-text-secondary: #CBD5E1;
-  --m12-text-muted: #64748B;
-  --m12-text-faint: #94A3B8;
-  --m12-node-bg: #1F2C3F;
-  --m12-edge-label-bg: rgba(15, 23, 42, 0.9);
-  --m12-edge-default: #64748B;
-  --m12-marker-default: #64748B;
-  --m12-canvas-dot: rgba(55, 74, 94, 0.25);
-  --m12-minimap-bg: #1A2435;
-  --m12-minimap-node: #1F2C3F;
-  --m12-minimap-mask: rgba(21, 30, 46, 0.85);
-  --m12-minimap-stroke: #374A5E;
-  --m12-scrollbar-track: #151E2E;
-  --m12-scrollbar-thumb: #374A5E;
-  --m12-cursor-stroke: #151E2E;
-  --m12-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  --m12-node-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  --m12-handle-bg: #1F2C3F;
-  --m12-handle-border: #64748B;
-  --m12-secondary-handle-border: #374A5E;
+/* ─────────────────────────────────────────────────────────────────────
+   Base resets and document chrome.
+   ───────────────────────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
 }
 
-@layer base {
-  html {
-    scroll-behavior: smooth;
-  }
-  body {
-    background-color: var(--m12-bg);
-    color: var(--m12-text);
-    font-family: 'DM Sans', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
 }
 
-/* Card hover glow */
-.card-glow {
-  transition: box-shadow 0.4s ease, transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-}
-.card-glow:hover {
-  box-shadow: 0 0 30px rgba(37, 99, 235, 0.15), 0 0 60px rgba(6, 182, 212, 0.08);
-  transform: translateY(-2px);
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
+body {
+  font-family: "Noto Sans", system-ui, sans-serif;
+  background: #f6f6f6;
+  color: #1b1b1b;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Work Sans", system-ui, sans-serif;
+}
+
+/* Focus ring uses RevTech legacy brand blue (#6081ad), while interactive
+   states use brand-500 (#2563EB). The dual palette is intentional, per
+   the PPM design system skill. */
+:focus-visible {
+  outline: 2px solid #6081ad;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Scrollbar ───────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--m12-scrollbar-track);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--m12-scrollbar-thumb);
+  background: #d1d1d1;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2563EB;
+  background: #b0b0b0;
 }
 
-/* Gradient text utility */
-.text-gradient {
+/* Hide scrollbar utility (used inside the sidebar) */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   Brand utilities.
+   ───────────────────────────────────────────────────────────────────── */
+
+.text-gradient,
+.gradient-text {
   background: linear-gradient(135deg, #2563EB, #06B6D4);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Card hover lift, harmonized to the design-system shadow ramp. */
+.card-glow {
+  transition: box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+}
+.card-glow:hover {
+  box-shadow: 0 4px 12px 0px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+/* Skeleton shimmer block (skill section 5.5). */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 400% 100%;
+  animation: skeleton 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* Stagger delays for sequenced reveal animations */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+
+/* Fullbleed escape for shell pages that need to fill the entire <main>
+   area ignoring its 24px padding. Locks height to the viewport minus the
+   56px header. */
+.fullbleed-page {
+  margin: -1.5rem;
+  height: calc(100vh - 3.5rem);
+  overflow: hidden;
 }

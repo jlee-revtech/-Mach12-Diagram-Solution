@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useMemo, useCallback, useRef } from 'react'
+import { X, Check, Sparkles, Loader2 } from 'lucide-react'
+import { Button, EmptyState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import { applyAISuggestion, type AISuggestion } from '@/lib/sipoc/applyAISuggestion'
 
@@ -151,44 +153,42 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={running ? undefined : onClose} />
+      <div className="absolute inset-0 bg-black/40" onClick={running ? undefined : onClose} />
 
       {/* Panel */}
-      <div className="relative bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-2xl shadow-2xl w-[640px] max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="relative bg-white rounded-xl shadow-card-hover w-[640px] max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--m12-border)]/20">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#2563EB] flex items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-              <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="white" />
-            </svg>
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+            <Sparkles size={16} className="text-amber-600" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-semibold text-[var(--m12-text)]">AI: Fill Blank L3s</div>
-            <div className="text-[10px] text-[var(--m12-text-muted)]">
+            <div className="text-heading-sm font-display text-text-primary">AI: Fill Blank L3s</div>
+            <div className="text-[11px] text-text-tertiary">
               {mode === 'use-cases'
                 ? 'Generate use cases for every L3 that has none. Suggestions are applied automatically.'
                 : 'Auto-generate SIPOC for every L3 with no inputs or outputs. Suggestions are applied automatically.'}
             </div>
           </div>
-          <button
-            onClick={onClose}
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon={<X size={14} />}
+            aria-label="Close"
             disabled={running}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 10L10 2M2 2l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
+            onClick={onClose}
+          />
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
           {progress.length === 0 && (
             <div className="flex items-center gap-2">
-              <div className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+              <div className="text-label uppercase text-text-secondary">
                 Scope
               </div>
-              <div className="flex items-center gap-1 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg p-0.5">
+              <div className="flex items-center gap-1 bg-surface-input border border-border rounded-lg p-0.5">
                 {([
                   { value: 'full', label: 'Full SIPOC (no inputs/outputs)' },
                   { value: 'use-cases', label: 'Use cases only (no use cases)' },
@@ -196,10 +196,10 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
                   <button
                     key={opt.value}
                     onClick={() => setMode(opt.value)}
-                    className={`text-[9px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider px-2 py-1 rounded transition-colors ${
+                    className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded transition-colors ${
                       mode === opt.value
-                        ? 'bg-[#2563EB] text-white'
-                        : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text)]'
+                        ? 'bg-brand-500 text-white'
+                        : 'text-text-secondary hover:text-text-primary'
                     }`}
                   >
                     {opt.label}
@@ -211,29 +211,29 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
           {progress.length === 0 ? (
             // Idle: show list of blanks to be processed
             blankL3s.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-sm text-[var(--m12-text)] font-medium mb-1">
-                  {mode === 'use-cases' ? 'No L3s without use cases' : 'No blank L3s found'}
-                </div>
-                <div className="text-[11px] text-[var(--m12-text-muted)]">
-                  {mode === 'use-cases'
+              <EmptyState
+                variant="inline"
+                icon={<Check size={24} />}
+                title={mode === 'use-cases' ? 'No L3s without use cases' : 'No blank L3s found'}
+                description={
+                  mode === 'use-cases'
                     ? 'Every L3 in this map already has at least one use case.'
-                    : 'Every L3 in this map already has inputs or outputs. Add a new L3 first if you want to use this.'}
-                </div>
-              </div>
+                    : 'Every L3 in this map already has inputs or outputs. Add a new L3 first if you want to use this.'
+                }
+              />
             ) : (
               <>
-                <div className="text-[10px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] font-bold">
+                <div className="text-label uppercase text-text-secondary">
                   {blankL3s.length} L3{blankL3s.length === 1 ? '' : 's'} ready to process
                   {mode === 'use-cases' ? ' (no use cases)' : ' (blank)'}
                 </div>
                 <div className="space-y-1">
                   {blankL3s.map(l3 => (
-                    <div key={l3.id} className="flex items-center gap-2 px-3 py-2 bg-[var(--m12-bg)] border border-[var(--m12-border)]/20 rounded-lg">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--m12-text-muted)] shrink-0" />
+                    <div key={l3.id} className="flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-lg">
+                      <div className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="text-[11px] font-medium text-[var(--m12-text)] truncate">{l3.name}</div>
-                        <div className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] truncate">{l3.parentPath}</div>
+                        <div className="text-body-sm font-medium text-text-primary truncate">{l3.name}</div>
+                        <div className="text-[10px] text-text-tertiary truncate">{l3.parentPath}</div>
                       </div>
                     </div>
                   ))}
@@ -244,20 +244,20 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
             // Running or done: show progress
             <>
               <div className="flex items-center justify-between">
-                <div className="text-[10px] font-[family-name:var(--font-space-mono)] uppercase tracking-wider text-[var(--m12-text-muted)] font-bold">
+                <div className="text-label uppercase text-text-secondary">
                   {done ? 'Complete' : 'Processing'}
                 </div>
-                <div className="text-[10px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+                <div className="text-[11px] text-text-tertiary">
                   {completedCount} done
-                  {errorCount > 0 && <span className="text-red-400"> · {errorCount} error{errorCount === 1 ? '' : 's'}</span>}
-                  {skippedCount > 0 && <span className="text-[var(--m12-text-faint)]"> · {skippedCount} skipped</span>}
+                  {errorCount > 0 && <span className="text-status-red"> · {errorCount} error{errorCount === 1 ? '' : 's'}</span>}
+                  {skippedCount > 0 && <span className="text-text-tertiary"> · {skippedCount} skipped</span>}
                   {' · '}{progress.length} total
                 </div>
               </div>
               {/* Progress bar */}
-              <div className="h-1 bg-[var(--m12-bg)] rounded-full overflow-hidden">
+              <div className="h-1 bg-surface-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-[#8B5CF6] to-[#2563EB] transition-all duration-300"
+                  className="h-full bg-brand-500 transition-all duration-300"
                   style={{ width: `${((completedCount + errorCount + skippedCount) / progress.length) * 100}%` }}
                 />
               </div>
@@ -267,51 +267,35 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
                     key={p.capabilityId}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
                       p.status === 'running'
-                        ? 'border-[#2563EB]/40 bg-[#2563EB]/5'
+                        ? 'border-brand-200 bg-brand-50'
                         : p.status === 'done'
-                          ? 'border-[#10B981]/30 bg-[#10B981]/5'
+                          ? 'border-green-200 bg-status-green-bg'
                           : p.status === 'error'
-                            ? 'border-red-400/30 bg-red-400/5'
+                            ? 'border-red-200 bg-status-red-bg'
                             : p.status === 'skipped'
-                              ? 'border-[var(--m12-border)]/20 bg-transparent opacity-50'
-                              : 'border-[var(--m12-border)]/20 bg-[var(--m12-bg)]'
+                              ? 'border-border bg-transparent opacity-50'
+                              : 'border-border bg-white'
                     }`}
                   >
                     {/* Status icon */}
                     <div className="w-3.5 h-3.5 shrink-0 flex items-center justify-center">
-                      {p.status === 'pending' && <div className="w-1.5 h-1.5 rounded-full bg-[var(--m12-text-faint)]" />}
-                      {p.status === 'running' && (
-                        <svg className="animate-spin w-3.5 h-3.5 text-[#2563EB]" viewBox="0 0 16 16" fill="none">
-                          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
-                        </svg>
-                      )}
-                      {p.status === 'done' && (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#10B981]">
-                          <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                      {p.status === 'error' && (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-red-400">
-                          <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      )}
-                      {p.status === 'skipped' && (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[var(--m12-text-faint)]">
-                          <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                        </svg>
-                      )}
+                      {p.status === 'pending' && <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
+                      {p.status === 'running' && <Loader2 size={14} className="animate-spin text-brand-500" />}
+                      {p.status === 'done' && <Check size={12} className="text-status-green" />}
+                      {p.status === 'error' && <X size={12} className="text-status-red" />}
+                      {p.status === 'skipped' && <X size={12} className="text-text-tertiary" />}
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-medium text-[var(--m12-text)] truncate">{p.capabilityName}</div>
-                      <div className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] truncate">{p.parentPath}</div>
+                      <div className="text-body-sm font-medium text-text-primary truncate">{p.capabilityName}</div>
+                      <div className="text-[10px] text-text-tertiary truncate">{p.parentPath}</div>
                       {p.status === 'error' && p.error && (
-                        <div className="text-[9px] text-red-400 truncate mt-0.5">{p.error}</div>
+                        <div className="text-[10px] text-status-red truncate mt-0.5">{p.error}</div>
                       )}
                     </div>
 
                     {p.status === 'done' && (
-                      <div className="text-[9px] text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] shrink-0">
+                      <div className="text-[10px] text-text-tertiary font-mono shrink-0">
                         {p.inputCount}I / {p.outputCount}O
                         {(p.featureCount || 0) > 0 && ` / ${p.featureCount}F`}
                         {(p.useCaseCount || 0) > 0 && ` / ${p.useCaseCount}U`}
@@ -325,37 +309,30 @@ export default function AIAutoFillBlankL3sPanel({ orgId, mapTitle, onClose }: {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-[var(--m12-border)]/20 flex items-center justify-end gap-2">
+        <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2">
           {progress.length === 0 ? (
             <>
-              <button
-                onClick={onClose}
-                className="text-xs text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] px-3 py-1.5 transition-colors"
-              >
+              <Button variant="ghost" size="sm" onClick={onClose}>
                 Cancel
-              </button>
-              <button
-                onClick={handleStart}
+              </Button>
+              <Button
+                variant="ai"
+                size="sm"
+                icon={<Sparkles size={12} />}
                 disabled={blankL3s.length === 0}
-                className="bg-gradient-to-r from-[#8B5CF6] to-[#2563EB] hover:from-[#7C3AED] hover:to-[#3B82F6] disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                onClick={handleStart}
               >
                 Start ({blankL3s.length})
-              </button>
+              </Button>
             </>
           ) : running ? (
-            <button
-              onClick={handleAbort}
-              className="border border-[var(--m12-border)]/40 hover:border-red-400/40 text-[var(--m12-text-muted)] hover:text-red-400 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            >
+            <Button variant="secondary" size="sm" onClick={handleAbort}>
               Stop after current
-            </button>
+            </Button>
           ) : (
-            <button
-              onClick={onClose}
-              className="bg-[#2563EB] hover:bg-[#3B82F6] text-white px-5 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            >
+            <Button variant="primary" size="sm" onClick={onClose}>
               Close
-            </button>
+            </Button>
           )}
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { Rows3 } from 'lucide-react'
 import { BPMN_PALETTE } from '@/lib/process/types'
 import type { BpmnElementType } from '@/lib/process/types'
 
@@ -14,26 +15,25 @@ export default function ProcessPalette({ onAddLane }: { onAddLane: () => void })
   }
 
   return (
-    <div className="w-44 shrink-0 border-r border-[var(--m12-border)]/40 bg-[var(--m12-bg-card)]/40 overflow-y-auto">
-      <div className="px-3 py-2 border-b border-[var(--m12-border)]/40 flex items-center justify-between">
-        <span className="text-[9px] uppercase tracking-widest text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)] font-bold">
+    <div className="w-44 shrink-0 border-r border-border bg-white overflow-y-auto">
+      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wider font-semibold text-text-tertiary">
           Palette
         </span>
       </div>
 
       <button
+        type="button"
         onClick={onAddLane}
-        className="m-2 w-[calc(100%-1rem)] flex items-center justify-center gap-1.5 text-[11px] text-[#0EA5E9] border border-dashed border-[#0EA5E9]/40 hover:border-[#0EA5E9]/70 hover:bg-[#0EA5E9]/5 rounded-md py-1.5 transition-colors"
+        className="m-2 w-[calc(100%-1rem)] flex items-center justify-center gap-1.5 text-[11px] font-medium text-brand-600 border border-dashed border-brand-300 hover:border-brand-500 hover:bg-brand-50 rounded-md py-1.5 transition-colors"
       >
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-          <path d="M2 7h10M2 4h10M2 10h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
+        <Rows3 size={12} />
         Add Lane
       </button>
 
       {groups.map(group => (
         <div key={group} className="px-2 pb-2">
-          <div className="px-1 py-1 text-[9px] uppercase tracking-wider text-[var(--m12-text-muted)] font-[family-name:var(--font-space-mono)]">
+          <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-text-tertiary font-medium">
             {group}
           </div>
           <div className="space-y-1">
@@ -42,10 +42,10 @@ export default function ProcessPalette({ onAddLane }: { onAddLane: () => void })
                 key={item.type}
                 draggable
                 onDragStart={e => handleDragStart(e, item.type)}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-[var(--m12-border)]/40 hover:border-[var(--m12-border)] bg-[var(--m12-bg)]/40 hover:bg-[var(--m12-bg)] cursor-grab active:cursor-grabbing transition-colors"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:border-border-strong bg-white hover:bg-surface-muted cursor-grab active:cursor-grabbing transition-colors"
               >
                 <PaletteGlyph group={group} color={item.color} />
-                <span className="text-[11px] text-[var(--m12-text-secondary)] truncate">{item.label}</span>
+                <span className="text-[11px] text-text-secondary truncate">{item.label}</span>
               </div>
             ))}
           </div>

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { Plus, X, Check, Lock, MoreVertical, Sparkles, Trash2, AlertCircle, ArrowRight } from 'lucide-react'
+import { Button, EmptyState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import { CAPABILITY_STATUSES, type CapabilityStatus, type CapabilityTreeNode } from '@/lib/sipoc/types'
 import { CapabilityStatusBadge } from '@/components/sipoc/CapabilityStatusControl'
@@ -55,46 +57,39 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
         onClick={onSelect}
         className={`text-left w-full px-2.5 py-1.5 text-[10px] leading-tight transition-colors rounded ${readOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} flex items-center gap-1 ${
           isSelected
-            ? 'bg-[#2563EB]/15 text-[var(--m12-text)] font-medium'
-            : 'text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg-card-hover)]'
+            ? 'bg-brand-50 text-text-primary font-medium'
+            : 'text-text-secondary hover:bg-surface-muted'
         }`}
       >
-        <span className="text-[var(--m12-text-faint)] shrink-0">⠿</span>
+        <span className="text-text-tertiary shrink-0">⠿</span>
         <span className="flex-1 min-w-0 truncate" title={node.description ? `${node.name}\n\n${node.description}` : node.name}>{node.name}</span>
         <CapabilityStatusBadge status={node.status} />
         {lockedBy && (
           <span
             title={`Currently editing: ${lockedBy.name}`}
-            className="shrink-0 flex items-center gap-1 px-1 py-0.5 rounded bg-[#EAB308]/15 text-[#A16207]"
+            className="shrink-0 flex items-center gap-1 px-1 py-0.5 rounded bg-amber-50 text-amber-700"
           >
             <span
               className="w-1.5 h-1.5 rounded-full"
               style={{ backgroundColor: lockedBy.color }}
             />
-            <svg width="8" height="8" viewBox="0 0 12 12" fill="none">
-              <rect x="2" y="5" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <path d="M4 5V3.5a2 2 0 014 0V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
+            <Lock size={8} />
           </span>
         )}
         {!readOnly && (
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
-            className="opacity-0 group-hover/l3:opacity-100 shrink-0 w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-all"
+            className="opacity-0 group-hover/l3:opacity-100 shrink-0 w-4 h-4 rounded flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-surface-muted transition-all"
             title="More actions"
           >
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-              <circle cx="4" cy="1.5" r="0.7" fill="currentColor"/>
-              <circle cx="4" cy="4" r="0.7" fill="currentColor"/>
-              <circle cx="4" cy="6.5" r="0.7" fill="currentColor"/>
-            </svg>
+            <MoreVertical size={8} />
           </button>
         )}
       </div>
       {menuOpen && (
-        <div ref={menuRef} className="absolute right-0 top-full mt-0.5 z-50 w-56 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden">
+        <div ref={menuRef} className="absolute right-0 top-full mt-0.5 z-50 w-56 bg-white border border-border rounded-lg shadow-dropdown overflow-hidden animate-slide-in-up">
           {/* Review status */}
-          <div className="px-2.5 py-1.5 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold border-b border-[var(--m12-border)]/20">
+          <div className="px-2.5 py-1.5 text-[10px] font-mono text-text-tertiary uppercase tracking-widest font-bold border-b border-border">
             Review Status
           </div>
           <div className="py-0.5">
@@ -106,16 +101,14 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
                   useSIPOCStore.getState().updateCapability(node.id, { status: s.value as CapabilityStatus })
                   setMenuOpen(false)
                 }}
-                className="w-full text-left px-2.5 py-1.5 text-[10px] flex items-center gap-2 hover:bg-[var(--m12-bg)] transition-colors"
+                className="w-full text-left px-2.5 py-1.5 text-[10px] flex items-center gap-2 hover:bg-surface-muted transition-colors"
               >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                <span className={node.status === s.value ? 'font-semibold text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)]'}>
+                <span className={node.status === s.value ? 'font-semibold text-text-primary' : 'text-text-secondary'}>
                   Mark {s.label}
                 </span>
                 {node.status === s.value && (
-                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none" className="ml-auto text-[var(--m12-text-muted)]">
-                    <path d="M1.5 5.2l2.2 2.3L8.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <Check size={9} className="ml-auto text-text-tertiary" />
                 )}
               </button>
             ))}
@@ -125,10 +118,10 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
                 useSIPOCStore.getState().updateCapability(node.id, { status: null })
                 setMenuOpen(false)
               }}
-              className="w-full text-left px-2.5 py-1.5 text-[10px] flex items-center gap-2 hover:bg-[var(--m12-bg)] transition-colors"
+              className="w-full text-left px-2.5 py-1.5 text-[10px] flex items-center gap-2 hover:bg-surface-muted transition-colors"
             >
-              <span className="w-2 h-2 rounded-full shrink-0 border border-[var(--m12-text-faint)]" />
-              <span className={!node.status ? 'font-semibold text-[var(--m12-text)]' : 'text-[var(--m12-text-secondary)]'}>
+              <span className="w-2 h-2 rounded-full shrink-0 border border-border-strong" />
+              <span className={!node.status ? 'font-semibold text-text-primary' : 'text-text-secondary'}>
                 Not Started
               </span>
             </button>
@@ -137,7 +130,7 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
           {/* Move to... */}
           {otherL2s.length > 0 && (
             <>
-              <div className="px-2.5 py-1.5 text-[8px] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] uppercase tracking-widest font-bold border-y border-[var(--m12-border)]/20">
+              <div className="px-2.5 py-1.5 text-[10px] font-mono text-text-tertiary uppercase tracking-widest font-bold border-y border-border">
                 Move to...
               </div>
               <div className="max-h-[200px] overflow-y-auto py-0.5">
@@ -149,11 +142,9 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
                       onDrop(node.id, l2.id)
                       setMenuOpen(false)
                     }}
-                    className="w-full text-left px-2.5 py-1.5 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors flex items-center gap-1.5"
+                    className="w-full text-left px-2.5 py-1.5 text-[10px] text-text-secondary hover:bg-surface-muted transition-colors flex items-center gap-1.5"
                   >
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0 text-[var(--m12-text-muted)]">
-                      <path d="M1 4h5M4.5 2L6.5 4 4.5 6" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <ArrowRight size={8} className="shrink-0 text-text-tertiary" />
                     <span className="truncate">{l2.parentName} / {l2.name}</span>
                   </button>
                 ))}
@@ -207,33 +198,33 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
         const id = e.dataTransfer.getData('text/plain')
         if (id && id !== node.id) onDrop(id, node.id)
       }}
-      className={`space-y-0.5 transition-all ${dragOver ? 'ring-2 ring-[#2563EB]/50 rounded-lg bg-[#2563EB]/5' : ''}`}
+      className={`space-y-0.5 transition-all ${dragOver ? 'ring-2 ring-brand-500/50 rounded-lg bg-brand-50' : ''}`}
     >
       <div
-        className={`px-2.5 py-2 rounded-lg border bg-[var(--m12-bg-card)] ${readOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} ${
-          selectedId === node.id ? 'border-[#2563EB]/50 ring-1 ring-[#2563EB]/20' : 'border-[var(--m12-border)]/20'
+        className={`px-2.5 py-2 rounded-lg border bg-white ${readOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} ${
+          selectedId === node.id ? 'border-brand-500/50 ring-1 ring-brand-500/20' : 'border-border'
         }`}
         style={{ borderTopWidth: 2, borderTopColor: parentColor }}
       >
         <div className="flex items-center gap-1.5">
-          {!readOnly && <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>}
+          {!readOnly && <span className="text-text-tertiary text-[10px]">⠿</span>}
           <div
-            className="text-[11px] font-bold text-[var(--m12-text)] flex-1 min-w-0 truncate cursor-pointer hover:text-[#2563EB] transition-colors"
+            className="text-[11px] font-bold text-text-primary flex-1 min-w-0 truncate cursor-pointer hover:text-brand-600 transition-colors"
             onClick={(e) => { e.stopPropagation(); onSelect(node.id) }}
             title={node.description ? `${node.name}\n\n${node.description}` : node.name}
           >{node.name}</div>
           {!readOnly && (
             <button
               onClick={(e) => { e.stopPropagation(); onAddL3(node.id) }}
-              className="w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-[var(--m12-text)] hover:bg-[var(--m12-bg)] transition-colors opacity-0 group-hover/l2:opacity-100"
+              className="w-4 h-4 rounded flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-surface-muted transition-colors opacity-0 group-hover/l2:opacity-100"
               title="Add L3"
             >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1.5v5M1.5 4h5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
+              <Plus size={8} />
             </button>
           )}
         </div>
         {(node.features || []).length > 0 && (
-          <div className="text-[8px] text-[var(--m12-text-muted)] leading-tight mt-0.5">
+          <div className="text-[10px] text-text-tertiary leading-tight mt-0.5">
             {node.features!.slice(0, 2).join(' · ')}{node.features!.length > 2 ? ` +${node.features!.length - 2}` : ''}
           </div>
         )}
@@ -310,10 +301,10 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
       className={`flex flex-col transition-all duration-200 ${focusFlex} ${
         dragOver && draggedLevel === 1
           ? dragOverLeft
-            ? 'border-l-4 border-[#2563EB] rounded-xl'
-            : 'border-r-4 border-[#2563EB] rounded-xl'
+            ? 'border-l-4 border-brand-500 rounded-xl'
+            : 'border-r-4 border-brand-500 rounded-xl'
           : dragOver
-            ? 'ring-2 ring-[#2563EB]/40 rounded-xl'
+            ? 'ring-2 ring-brand-500/40 rounded-xl'
             : ''
       }`}
       onDragOver={readOnly ? undefined : handleDragOver}
@@ -344,7 +335,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
         className={`rounded-t-xl px-4 py-3 flex items-start gap-3 ${readOnly ? '' : 'cursor-grab active:cursor-grabbing'} min-h-[72px] ${focusState === 'focused' ? 'ring-2 ring-white/40' : ''}`}
         style={{ backgroundColor: color }}
       >
-        <span className="text-[11px] font-[family-name:var(--font-space-mono)] text-white/50 font-bold mt-0.5 shrink-0">
+        <span className="text-[11px] font-mono text-white/50 font-bold mt-0.5 shrink-0">
           {index + 1}.
         </span>
         <button
@@ -356,7 +347,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
           <div
             className={`text-[13px] font-semibold text-white leading-snug ${focusState === 'shrunk' ? 'truncate' : ''}`}
           >{node.name}</div>
-          <div className="text-[8px] text-white/60 font-[family-name:var(--font-space-mono)] uppercase tracking-wider mt-0.5 opacity-0 group-hover/focus:opacity-100 transition-opacity">
+          <div className="text-[10px] text-white/60 font-mono uppercase tracking-wider mt-0.5 opacity-0 group-hover/focus:opacity-100 transition-opacity">
             {focusState === 'focused' ? '← reset' : 'focus →'}
           </div>
         </button>
@@ -364,47 +355,42 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
           <button
             onClick={() => setShowAddMenu(!showAddMenu)}
             className="w-6 h-6 rounded-md flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors"
+            title="Add or manage"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M5 2v6M2 5h6" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
+            <Plus size={10} className="text-white" />
           </button>
           {showAddMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-[var(--m12-bg-card)] border border-[var(--m12-border)]/50 rounded-lg shadow-xl overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-white border border-border rounded-lg shadow-dropdown overflow-hidden animate-slide-in-up">
                 <button
                   onClick={() => { setShowAddMenu(false); onAddL2(node.id) }}
-                  className="w-full text-left px-3 py-2 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors"
+                  className="w-full text-left px-3 py-2 text-[10px] text-text-secondary hover:bg-surface-muted transition-colors"
                 >
                   + Add L2 Capability
                 </button>
                 {node.children.length > 0 && (
                   <button
                     onClick={() => { setShowAddMenu(false); onAddL3(node.children[0].id) }}
-                    className="w-full text-left px-3 py-2 text-[10px] text-[var(--m12-text-secondary)] hover:bg-[var(--m12-bg)] transition-colors"
+                    className="w-full text-left px-3 py-2 text-[10px] text-text-secondary hover:bg-surface-muted transition-colors"
                   >
                     + Add L3 Functionality
                   </button>
                 )}
-                <div className="border-t border-[var(--m12-border)]/20" />
+                <div className="border-t border-border" />
                 <button
                   onClick={() => { setShowAddMenu(false); onAILoad(node.id, node.name) }}
-                  className="w-full text-left px-3 py-2 text-[10px] flex items-center gap-1.5 text-[#8B5CF6] hover:bg-[#8B5CF6]/10 transition-colors"
+                  className="w-full text-left px-3 py-2 text-[10px] flex items-center gap-1.5 text-blue-700 hover:bg-blue-50 transition-colors"
                 >
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                    <path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="currentColor" />
-                  </svg>
+                  <Sparkles size={10} />
                   AI Bulk Load
                 </button>
-                <div className="border-t border-[var(--m12-border)]/20" />
+                <div className="border-t border-border" />
                 <button
                   onClick={() => { setShowAddMenu(false); onRemove(node.id, node.name, node.children.length) }}
-                  className="w-full text-left px-3 py-2 text-[10px] flex items-center gap-1.5 text-red-400 hover:bg-red-400/10 transition-colors"
+                  className="w-full text-left px-3 py-2 text-[10px] flex items-center gap-1.5 text-red-600 hover:bg-red-50 transition-colors"
                 >
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <Trash2 size={10} />
                   Remove Core Area
                 </button>
               </div>
@@ -414,7 +400,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
       </div>
 
       {/* L2/L3 content */}
-      <div className="flex-1 rounded-b-xl border border-t-0 border-[var(--m12-border)]/20 bg-[var(--m12-bg)]/50 p-2 space-y-3 overflow-y-auto group/l2">
+      <div className="flex-1 rounded-b-xl border border-t-0 border-border bg-surface-muted p-2 space-y-3 overflow-y-auto group/l2">
         {node.children.length > 0 ? (
           node.children
             .sort((a, b) => a.sort_order - b.sort_order)
@@ -432,7 +418,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
               />
             ))
         ) : (
-          <div className="text-[10px] text-[var(--m12-text-faint)] italic text-center py-4">
+          <div className="text-[10px] text-text-tertiary italic text-center py-4">
             Drop capabilities here
           </div>
         )}
@@ -605,10 +591,10 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[9px] uppercase tracking-[0.2em] font-[family-name:var(--font-space-mono)] text-[var(--m12-text-muted)] font-bold">
+          <div className="text-[10px] uppercase tracking-[0.2em] font-mono text-text-tertiary font-bold">
             Capability Map
           </div>
-          <div className="text-[10px] text-[var(--m12-text-faint)] mt-0.5">
+          <div className="text-[10px] text-text-tertiary mt-0.5">
             L1 Core Area → L2 Capability → L3 Functionality (SIPOC){!readOnly && <> &nbsp;·&nbsp; Drag to reorganize</>}
           </div>
         </div>
@@ -620,36 +606,27 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
               onKeyDown={e => e.key === 'Enter' && handleAddL1()}
               placeholder="Core area name..."
               autoFocus
-              className="bg-[var(--m12-bg-input)] border border-[var(--m12-border)]/40 rounded-lg px-2.5 py-1.5 text-xs text-[var(--m12-text)] placeholder:text-[var(--m12-text-faint)] focus:outline-none focus:border-[#2563EB]/60 w-48"
+              className="h-8 px-2.5 rounded-lg border border-border bg-surface-input text-[12px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 w-48"
             />
-            <button onClick={handleAddL1} className="bg-[#2563EB] hover:bg-[#3B82F6] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Add</button>
-            <button onClick={() => setAddingL1(false)} className="text-xs text-[var(--m12-text-muted)] px-2">Cancel</button>
+            <Button variant="primary" size="sm" onClick={handleAddL1}>Add</Button>
+            <Button variant="ghost" size="sm" onClick={() => setAddingL1(false)}>Cancel</Button>
           </div>
         ) : (
-          <button
-            onClick={() => setAddingL1(true)}
-            className="flex items-center gap-1.5 bg-[#2563EB] hover:bg-[#3B82F6] text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M5 2v6M2 5h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
+          <Button variant="primary" size="sm" onClick={() => setAddingL1(true)} icon={<Plus size={12} />}>
             Add Core Area
-          </button>
+          </Button>
         ))}
       </div>
 
       {/* Unassigned capabilities (drag these into L1 columns) */}
       {!readOnly && orphans.length > 0 && (
-        <div className="bg-[var(--m12-bg-card)] border border-dashed border-[#EAB308]/40 rounded-xl p-4">
+        <div className="bg-white border border-dashed border-amber-300 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-3">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#EAB308]">
-              <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1" />
-              <path d="M6 3.5v3M6 8.5v.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-            <span className="text-[10px] font-bold text-[#EAB308] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">
+            <AlertCircle size={12} className="text-amber-600" />
+            <span className="text-[10px] font-bold text-amber-700 font-mono uppercase tracking-wider">
               Unassigned Capabilities
             </span>
-            <span className="text-[9px] text-[var(--m12-text-muted)]">— drag these into a Core Area below to organize them</span>
+            <span className="text-[10px] text-text-tertiary">- drag these into a Core Area below to organize them</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {orphans.map(cap => (
@@ -663,11 +640,11 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
                   e.dataTransfer.setData('text/plain', cap.id)
                 }}
                 onDragEnd={() => { draggedId = null; draggedLevel = null }}
-                className="group/orphan flex items-center gap-1.5 bg-[var(--m12-bg)] border border-[var(--m12-border)]/40 rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing hover:border-[#EAB308]/40 transition-colors"
+                className="group/orphan flex items-center gap-1.5 bg-surface-muted border border-border rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing hover:border-amber-300 transition-colors"
               >
-                <span className="text-[var(--m12-text-faint)] text-[9px]">⠿</span>
-                <span className="text-xs font-medium text-[var(--m12-text)]">{cap.name}</span>
-                <span className="text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)]">L{cap.level}</span>
+                <span className="text-text-tertiary text-[10px]">⠿</span>
+                <span className="text-body-sm font-medium text-text-primary">{cap.name}</span>
+                <span className="text-[10px] text-text-tertiary font-mono">L{cap.level}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -675,12 +652,10 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
                       removeCapability(cap.id)
                     }
                   }}
-                  className="opacity-0 group-hover/orphan:opacity-100 ml-1 w-4 h-4 rounded flex items-center justify-center text-[var(--m12-text-muted)] hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
+                  className="opacity-0 group-hover/orphan:opacity-100 ml-1 w-4 h-4 rounded flex items-center justify-center text-text-tertiary hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
                   title="Delete capability"
                 >
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                    <path d="M1.5 6.5l5-5M1.5 1.5l5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                  </svg>
+                  <X size={8} />
                 </button>
               </div>
             ))}
@@ -713,24 +688,25 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 border border-dashed border-[var(--m12-border)]/40 rounded-xl">
-          <div className="text-sm text-[var(--m12-text-muted)] mb-2">No core areas defined</div>
-          <div className="text-[10px] text-[var(--m12-text-faint)]">Add an L1 Core Area to start building your capability hierarchy</div>
-        </div>
+        <EmptyState
+          variant="dashed"
+          title="No core areas defined"
+          description="Add an L1 Core Area to start building your capability hierarchy"
+        />
       )}
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-[8px] text-[var(--m12-text-faint)] font-[family-name:var(--font-space-mono)] uppercase tracking-wider">
+      <div className="flex items-center gap-4 text-[10px] text-text-tertiary font-mono uppercase tracking-wider">
         <span className="flex items-center gap-1">
-          <div className="w-3 h-2 rounded-sm bg-[#2563EB]" /> L1 Core Area
+          <div className="w-3 h-2 rounded-sm bg-brand-500" /> L1 Core Area
         </span>
         <span className="flex items-center gap-1">
-          <div className="w-3 h-2 rounded-sm border-t-2 border-[#2563EB] bg-[var(--m12-bg-card)]" /> L2 Capability
+          <div className="w-3 h-2 rounded-sm border border-border border-t-2 border-t-brand-500 bg-white" /> L2 Capability
         </span>
         <span className="flex items-center gap-1">
-          <div className="w-3 h-2 rounded-sm bg-[#2563EB]/10" /> L3 Functionality (SIPOC)
+          <div className="w-3 h-2 rounded-sm bg-brand-500/10" /> L3 Functionality (SIPOC)
         </span>
-        {!readOnly && <span className="text-[var(--m12-text-faint)]/60">· Drag items to reorganize</span>}
+        {!readOnly && <span className="text-text-tertiary/60">· Drag items to reorganize</span>}
       </div>
     </div>
   )

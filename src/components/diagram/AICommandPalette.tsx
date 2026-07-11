@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { v4 as uuid } from 'uuid'
+import { Check, ImagePlus, Loader2, RefreshCw, Sparkles, X } from 'lucide-react'
+import { Button } from '@/components/common'
 import { useDiagramStore } from '@/lib/diagram/store'
 import type { SystemNode, DataFlowEdge } from '@/lib/diagram/types'
 
@@ -357,30 +359,30 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-xl bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)]/60 rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-2xl bg-white rounded-xl shadow-card-hover overflow-hidden flex flex-col"
       >
         {/* Mode tabs */}
-        <div className="flex border-b border-[var(--m12-border)]/40">
+        <div className="flex border-b border-border">
           <button
             onClick={() => { setMode('generate'); setAnalysis(null) }}
-            className={`flex-1 px-4 py-3 text-xs font-medium transition-colors ${
+            className={`flex-1 px-4 py-3 text-[12px] font-medium transition-colors ${
               mode === 'generate'
-                ? 'text-[#06B6D4] border-b-2 border-[#06B6D4]'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                ? 'text-brand-600 border-b-2 border-brand-500'
+                : 'text-text-secondary hover:text-text-primary border-b-2 border-transparent'
             }`}
           >
             Generate Diagram
           </button>
           <button
             onClick={() => { setMode('analyze'); setAnalysis(null) }}
-            className={`flex-1 px-4 py-3 text-xs font-medium transition-colors ${
+            className={`flex-1 px-4 py-3 text-[12px] font-medium transition-colors ${
               mode === 'analyze'
-                ? 'text-[#06B6D4] border-b-2 border-[#06B6D4]'
-                : 'text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)]'
+                ? 'text-brand-600 border-b-2 border-brand-500'
+                : 'text-text-secondary hover:text-text-primary border-b-2 border-transparent'
             }`}
           >
             Analyze Diagram
@@ -389,9 +391,9 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
 
         {mode === 'generate' ? (
           <div className="p-4">
-            <div className="bg-[var(--m12-bg)] rounded-xl px-4 py-3 border border-[var(--m12-border)]/40 focus-within:border-[#2563EB]">
+            <div className="bg-surface-input rounded-lg px-4 py-3 border border-border focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30">
               <div className="flex items-start gap-3">
-                <span className="text-[#06B6D4] text-sm font-bold font-[family-name:var(--font-space-mono)] mt-1 shrink-0">AI</span>
+                <Sparkles size={18} className="text-amber-500 mt-1 shrink-0" />
                 <textarea
                   ref={inputRef}
                   value={prompt}
@@ -401,20 +403,21 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !loading) handleGenerate()
                   }}
                   placeholder={imageData ? "Describe what to do with this image..." : "Describe your data architecture...\n\nPaste long prompts, requirements, or system descriptions here.\nCtrl+Enter to generate."}
-                  className="flex-1 bg-transparent text-sm text-[var(--m12-text)] outline-none placeholder:text-[var(--m12-border)] resize-none min-h-[80px] max-h-[200px] leading-relaxed w-full"
+                  className="flex-1 bg-transparent text-body-sm text-text-primary outline-none placeholder:text-text-tertiary resize-none min-h-[80px] max-h-[200px] leading-relaxed w-full"
                   rows={4}
                   disabled={loading}
                 />
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-text-tertiary shrink-0">Esc</span>
               </div>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--m12-border)]/20">
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
                 <div className="flex items-center gap-2">
                   {/* Image upload button */}
                   <button
                     onClick={() => fileRef.current?.click()}
                     title="Upload screenshot"
-                    className="text-[var(--m12-text-muted)] hover:text-[#06B6D4] transition-colors shrink-0"
+                    className="text-text-tertiary hover:text-brand-600 transition-colors shrink-0"
                   >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/><path d="M2 11l3-3 2 2 3-4 4 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <ImagePlus size={16} />
                   </button>
                   <input
                     ref={fileRef}
@@ -422,12 +425,14 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                     accept="image/*"
                     onChange={handleImageUpload}
                     className="hidden"
+                    aria-label="Upload screenshot"
+                    title="Upload screenshot"
                   />
                   {loading && (
-                    <div className="w-4 h-4 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin" />
+                    <Loader2 size={16} className="animate-spin text-brand-500" />
                   )}
                 </div>
-                <span className="text-[9px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
+                <span className="text-[10px] text-text-tertiary font-mono">
                   Ctrl+Enter to generate
                 </span>
               </div>
@@ -439,15 +444,17 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                 <img
                   src={imageData}
                   alt="Uploaded screenshot"
-                  className="max-h-32 rounded-lg border border-[var(--m12-border)]/40"
+                  className="max-h-32 rounded-lg border border-border"
                 />
                 <button
                   onClick={() => { setImageData(null); setImageName(null) }}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[var(--m12-bg-secondary)] border border-[var(--m12-border)] rounded-full flex items-center justify-center text-[var(--m12-text-muted)] hover:text-red-400 transition-colors"
+                  title="Remove image"
+                  aria-label="Remove image"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white border border-border rounded-full flex items-center justify-center text-text-tertiary hover:text-red-600 transition-colors shadow-card"
                 >
-                  <svg width="8" height="8" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3L3 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                  <X size={10} />
                 </button>
-                <div className="text-[9px] text-[var(--m12-border)] mt-1 truncate max-w-[200px]">{imageName}</div>
+                <div className="text-[10px] text-text-tertiary mt-1 truncate max-w-[200px]">{imageName}</div>
               </div>
             )}
 
@@ -462,7 +469,7 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                 <button
                   key={q}
                   onClick={() => { setPrompt(q); setTimeout(() => inputRef.current?.focus(), 0) }}
-                  className="text-[10px] bg-[var(--m12-bg)] text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] border border-[var(--m12-border)]/30 hover:border-[var(--m12-border)] px-2.5 py-1 rounded-lg transition-colors"
+                  className="text-[10px] bg-surface-muted text-text-secondary hover:bg-brand-50 hover:text-brand-600 border border-border hover:border-brand-200 px-2.5 py-1 rounded-lg transition-colors"
                 >
                   {q}
                 </button>
@@ -470,45 +477,49 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
             </div>
 
             {error && (
-              <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400">
+              <div className="mt-3 bg-status-red-bg border border-red-200 rounded-lg px-3 py-2 text-body-sm text-status-red">
                 {error}
               </div>
             )}
 
             <div className="mt-3 flex justify-between items-center">
-              <span className="text-[10px] text-[var(--m12-border)] font-[family-name:var(--font-space-mono)]">
+              <span className="text-[10px] text-text-tertiary font-mono">
                 Ctrl+K to toggle
               </span>
-              <button
-                onClick={handleGenerate}
+              <Button
+                variant="primary"
+                size="md"
+                loading={loading}
                 disabled={loading || !prompt.trim()}
-                className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-30 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors"
+                onClick={handleGenerate}
               >
                 {loading ? 'Generating...' : 'Generate'}
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           <div className="p-4">
             {!analysis && !loading && (
               <div className="text-center py-6">
-                <p className="text-sm text-[var(--m12-text-secondary)] mb-4">
+                <p className="text-body-md text-text-secondary mb-4">
                   AI will analyze your current diagram for completeness, missing systems, and data governance.
                 </p>
-                <button
-                  onClick={handleAnalyze}
+                <Button
+                  variant="primary"
+                  size="lg"
+                  icon={<Sparkles size={16} />}
                   disabled={nodes.length === 0}
-                  className="bg-[#2563EB] hover:bg-[#3B82F6] disabled:opacity-30 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
+                  onClick={handleAnalyze}
                 >
                   {nodes.length === 0 ? 'Add systems first' : 'Analyze Diagram'}
-                </button>
+                </Button>
               </div>
             )}
 
             {loading && (
               <div className="text-center py-8">
-                <div className="w-6 h-6 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-xs text-[var(--m12-text-muted)]">Analyzing your diagram...</p>
+                <Loader2 size={24} className="animate-spin text-brand-500 mx-auto mb-3" />
+                <p className="text-body-sm text-text-tertiary">Analyzing your diagram...</p>
               </div>
             )}
 
@@ -516,52 +527,50 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
               <div className="space-y-4 max-h-[50vh] overflow-y-auto">
                 {/* Score */}
                 <div className="flex items-center gap-3">
-                  <div className={`text-2xl font-bold font-[family-name:var(--font-orbitron)] ${
-                    analysis.score >= 80 ? 'text-[#10B981]' :
-                    analysis.score >= 50 ? 'text-[#EAB308]' : 'text-[#EF4444]'
+                  <div className={`text-heading-lg font-bold font-display ${
+                    analysis.score >= 80 ? 'text-status-green' :
+                    analysis.score >= 50 ? 'text-status-yellow' : 'text-status-red'
                   }`}>
                     {analysis.score}
                   </div>
-                  <div className="text-xs text-[var(--m12-text-muted)]">Completeness Score</div>
+                  <div className="text-body-sm text-text-tertiary">Completeness Score</div>
                 </div>
 
                 {/* Missing Systems */}
                 {analysis.missingSystems?.length > 0 && (
-                  <AnalysisSection title="Missing Systems" items={analysis.missingSystems} color="#EF4444" />
+                  <AnalysisSection title="Missing Systems" items={analysis.missingSystems} tone="red" />
                 )}
 
                 {/* Missing Flows */}
                 {analysis.missingFlows?.length > 0 && (
-                  <AnalysisSection title="Missing Data Flows" items={analysis.missingFlows} color="#EAB308" />
+                  <AnalysisSection title="Missing Data Flows" items={analysis.missingFlows} tone="yellow" />
                 )}
 
                 {/* Data Governance */}
                 {analysis.dataGovernance?.length > 0 && (
-                  <AnalysisSection title="Data Governance" items={analysis.dataGovernance} color="#06B6D4" />
+                  <AnalysisSection title="Data Governance" items={analysis.dataGovernance} tone="blue" />
                 )}
 
                 {/* Recommendations */}
                 {analysis.recommendations?.length > 0 && (
-                  <AnalysisSection title="Recommendations" items={analysis.recommendations} color="#10B981" />
+                  <AnalysisSection title="Recommendations" items={analysis.recommendations} tone="green" />
                 )}
 
                 {/* Implement Recommendations */}
-                <div className="pt-3 border-t border-[var(--m12-border)]/40 flex items-center gap-3">
+                <div className="pt-3 border-t border-border flex items-center gap-3">
                   <button
                     onClick={handleImplement}
                     disabled={implementing}
-                    className="flex-1 flex items-center justify-center gap-2 bg-[#10B981] hover:bg-[#059669] disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 bg-status-green hover:bg-green-700 disabled:opacity-50 text-white text-body-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
                   >
                     {implementing ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                         Implementing...
                       </>
                     ) : (
                       <>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path d="M2 8.5l4 4 8-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                        <Check size={16} />
                         Implement Recommendations
                       </>
                     )}
@@ -570,22 +579,19 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
                     onClick={handleAnalyze}
                     disabled={implementing || loading}
                     title="Re-analyze"
-                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--m12-border)]/40 text-[var(--m12-text-muted)] hover:text-[var(--m12-text-secondary)] hover:border-[var(--m12-border)] transition-colors disabled:opacity-30"
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-surface-muted transition-colors disabled:opacity-30"
                   >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                      <path d="M4 6h6a3 3 0 010 6H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M7 3L4 6l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <RefreshCw size={14} />
                   </button>
                 </div>
-                <p className="text-[10px] text-[var(--m12-border)] text-center">
+                <p className="text-[10px] text-text-tertiary text-center">
                   AI will add missing systems and data flows to your diagram. You can undo with Ctrl+Z.
                 </p>
               </div>
             )}
 
             {error && (
-              <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400">
+              <div className="mt-3 bg-status-red-bg border border-red-200 rounded-lg px-3 py-2 text-body-sm text-status-red">
                 {error}
               </div>
             )}
@@ -596,16 +602,24 @@ export default function AICommandPalette({ open, onClose }: AICommandPaletteProp
   )
 }
 
-function AnalysisSection({ title, items, color }: { title: string; items: string[]; color: string }) {
+const ANALYSIS_TONES = {
+  red: { label: 'text-status-red', dot: 'bg-status-red' },
+  yellow: { label: 'text-status-yellow', dot: 'bg-status-yellow' },
+  blue: { label: 'text-status-blue', dot: 'bg-status-blue' },
+  green: { label: 'text-status-green', dot: 'bg-status-green' },
+} as const
+
+function AnalysisSection({ title, items, tone }: { title: string; items: string[]; tone: keyof typeof ANALYSIS_TONES }) {
+  const t = ANALYSIS_TONES[tone]
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider font-[family-name:var(--font-space-mono)] font-bold mb-1.5" style={{ color }}>
+      <div className={`text-[10px] uppercase tracking-wider font-semibold mb-1.5 ${t.label}`}>
         {title}
       </div>
       <div className="space-y-1">
         {items.map((item, i) => (
-          <div key={i} className="flex items-start gap-2 text-xs text-[var(--m12-text-secondary)]">
-            <div className="w-1 h-1 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: color }} />
+          <div key={i} className="flex items-start gap-2 text-body-sm text-text-secondary">
+            <div className={`w-1 h-1 rounded-full mt-1.5 shrink-0 ${t.dot}`} />
             {item}
           </div>
         ))}
