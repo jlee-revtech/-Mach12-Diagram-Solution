@@ -5,7 +5,7 @@ import { ThemeProvider } from '@/lib/theme-context'
 import { AppChrome } from '@/components/studio/AppChrome'
 
 export const metadata: Metadata = {
-  title: 'Mach12 Studio — Data Architecture, Process & Capability Maps',
+  title: 'Solution Architecture Studio | Mach12.ai',
   description:
     'AI-powered SAP data architecture diagrams, BPMN process models, and capability maps for Aerospace & Defense.',
 }
