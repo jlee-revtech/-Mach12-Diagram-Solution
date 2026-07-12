@@ -15,7 +15,7 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Loader2,
-  Map,
+  Map as MapIcon,
   Network,
   Plus,
   RefreshCw,
@@ -379,7 +379,7 @@ export default function Dashboard() {
               title="Capability Maps"
               value={activeMaps.length}
               subtitle={archivedMaps.length > 0 ? `${archivedMaps.length} archived` : undefined}
-              icon={<Map size={16} />}
+              icon={<MapIcon size={16} />}
               color="brand"
             />
             <KpiCard
@@ -687,7 +687,7 @@ export default function Dashboard() {
           activeMaps.length === 0 && archivedMaps.length === 0 ? (
             <EmptyState
               variant="dashed"
-              icon={<Map size={40} />}
+              icon={<MapIcon size={40} />}
               title="No capability maps yet"
               description="Create a SIPOC capability map to model data inputs, outputs, and personas."
               action={
