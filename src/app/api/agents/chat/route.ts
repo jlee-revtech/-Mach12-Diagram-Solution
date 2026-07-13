@@ -196,7 +196,7 @@ async function persistGaps(
 export async function POST(req: NextRequest) {
   const enc = new TextEncoder()
   try {
-    const { agentCode, orgId, messages, pageContext, tenantKey, threadId: reqThreadId, userId, depthMode: reqDepth } = await req.json()
+    const { agentCode, orgId, messages, pageContext, tenantKey, userId, depthMode: reqDepth } = await req.json()
     // Workpackage C: `quick` is the chat default and keeps the historical budgets.
     // `engagement` is billable design work: more iterations, more tokens, deep model.
     const depthMode: DepthMode = reqDepth === 'engagement' ? 'engagement' : 'quick'
@@ -221,33 +221,10 @@ export async function POST(req: NextRequest) {
     const tenant = (tenantKey as string | null) ?? null
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content || ''
 
-    // Thread persistence (best-effort; chat is no longer ephemeral). Create a
-    // thread lazily on the first turn, persist the incoming user message now so
-    // it survives even if the model call fails, and stamp the assistant turn
-    // after it completes. RLS (auth header) scopes every write to the org.
-    const wsId = wsByCode.get(agentCode)?.id ?? null
-    let threadId: string | null = typeof reqThreadId === 'string' && reqThreadId ? reqThreadId : null
-    try {
-      if (!threadId) {
-        const { data: t } = await userDb
-          .from('agent_threads')
-          .insert({
-            organization_id: orgId,
-            agent_code: agentCode,
-            workstream_id: wsId,
-            title: String(lastUser).slice(0, 80) || 'New conversation',
-            created_by: (userId as string | undefined) ?? null,
-          })
-          .select('id')
-          .single()
-        threadId = t?.id ?? null
-      }
-      if (threadId) {
-        await userDb.from('agent_messages').insert({ thread_id: threadId, role: 'user', content: { text: String(lastUser) } })
-      }
-    } catch {
-      /* persistence optional — never block the turn */
-    }
+    // Conversations are ephemeral by design: nothing is written to
+    // agent_threads / agent_messages. The user can download a transcript as
+    // markdown from the chat panel and reload it as context in a later session.
+    const threadId: string | null = null
 
     // Pre-fetch a little baseline knowledge to seed grounding.
     let prefetched = ''
@@ -302,7 +279,6 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         const send = (event: string, data: unknown) => controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
         try {
-          if (threadId) send('thread', { threadId })
           const ctx: ToolContext = {
             modelDb: userDb, orgId, agentWorkstreamCode: agentCode, wsByCode, knowledge, citations,
             tenantKey: tenant, realization, runSubAgent: agent.is_orchestrator ? runSubAgent : undefined,
@@ -324,24 +300,6 @@ export async function POST(req: NextRequest) {
             prefetchedKnowledge: prefetched,
             onTool: (name) => send('status', { label: TOOL_LABELS[name] || name, tool: name }),
           })
-          if (threadId) {
-            try {
-              await userDb.from('agent_messages').insert({
-                thread_id: threadId,
-                role: 'assistant',
-                content: {
-                  text: turn.text,
-                  citations: turn.citations,
-                  recommendations: turn.recommendations,
-                  grounded: turn.grounded,
-                  kbGaps: turn.kbGaps,
-                },
-              })
-              await userDb.from('agent_threads').update({ updated_at: new Date().toISOString() }).eq('id', threadId)
-            } catch {
-              /* persistence optional */
-            }
-          }
           // Honest degradation becomes a work queue: whatever the agent admitted it
           // did not know is now the training backlog (Workpackage D2 / I harvest).
           await persistGaps(userDb, orgId, threadId, turn.kbGaps ?? [])

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Bot, Network, Send, Sparkles, User, X } from 'lucide-react'
+import { Bot, Download, FileUp, Network, Send, Sparkles, User, X } from 'lucide-react'
 import type { Workstream } from '@/lib/workstream/types'
 import type { Recommendation, Citation } from '@/lib/agents/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
@@ -37,12 +37,15 @@ interface Props {
 export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, userId, onClose }: Props) {
   const [agentCode, setAgentCode] = useState(initialAgentCode || 'enterprise')
   const [messages, setMessages] = useState<Msg[]>([])
-  const [threadId, setThreadId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [archOpen, setArchOpen] = useState(false)
+  // Prior history the user chose to reload (.md download from an earlier
+  // session). Sent to the agent as background context, never persisted.
+  const [loadedContext, setLoadedContext] = useState<{ name: string; text: string } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const historyInputRef = useRef<HTMLInputElement>(null)
 
   // The workstream this agent speaks for (enterprise orchestrator has none).
   const workstream = agentCode === 'enterprise' ? null : workstreams.find((w) => w.code === agentCode) ?? null
@@ -50,39 +53,56 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
   useEffect(() => { if (initialAgentCode) setAgentCode(initialAgentCode) }, [initialAgentCode])
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }) }, [messages, status])
 
-  // Rehydrate the most recent conversation for this (org, agent) so chat is no
-  // longer ephemeral. Guarded against races when the agent is switched quickly.
+  // Conversations are fresh by design: nothing is stored server-side. Switching
+  // agents clears the transcript; Download preserves it as a .md the user can
+  // reload into a future session.
   useEffect(() => {
-    let cancelled = false
-    setThreadId(null)
     setMessages([])
-    ;(async () => {
-      try {
-        const res = await fetch(`/api/agents/threads?orgId=${encodeURIComponent(orgId)}&agentCode=${encodeURIComponent(agentCode)}`, {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        })
-        if (!res.ok || cancelled) return
-        const data = (await res.json()) as { thread: { id: string } | null; messages: { role: 'user' | 'assistant'; content: { text?: string; citations?: Citation[]; recommendations?: Recommendation[] } }[] }
-        if (cancelled || !data.thread) return
-        setThreadId(data.thread.id)
-        setMessages(
-          (data.messages || []).map((m) => ({
-            role: m.role,
-            text: m.content?.text ?? '',
-            citations: m.content?.citations,
-            recommendations: m.content?.recommendations,
-          }))
-        )
-      } catch {
-        /* restore is best-effort */
-      }
-    })()
-    return () => { cancelled = true }
   }, [orgId, agentCode])
 
   const agentMeta = agentCode === 'enterprise'
     ? { name: 'Enterprise Architect', tagline: 'Cross-workstream synthesis & routing', color: '#2563EB', icon: 'portfolio' as const }
     : (() => { const w = workstreams.find((x) => x.code === agentCode); const c = WORKSTREAM_BY_CODE[agentCode]; return { name: w?.name || c?.name || agentCode, tagline: c?.agentTagline || '', color: w?.color || '#2563EB', icon: (w?.icon || c?.icon || 'target') as string } })()
+
+  // Serialize the visible transcript as a portable markdown file.
+  const downloadHistory = useCallback(() => {
+    if (messages.length === 0) return
+    const stamp = new Date()
+    const lines: string[] = [
+      `# ${agentMeta.name} conversation`,
+      `_Exported ${stamp.toLocaleString()} from Mach12 Studio_`,
+      '',
+    ]
+    for (const m of messages) {
+      lines.push(m.role === 'user' ? '## You' : `## ${agentMeta.name}`)
+      lines.push('')
+      lines.push(m.text)
+      if (m.recommendations?.length) {
+        lines.push('', '**Recommendations:**')
+        for (const r of m.recommendations) lines.push(`- [${r.pillar}] ${r.title}: ${r.detail}`)
+      }
+      if (m.citations?.length) {
+        lines.push('', '**Sources:** ' + m.citations.map((c) => c.sourceTitle || c.sourceCode).join('; '))
+      }
+      lines.push('')
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const d = stamp.toISOString().slice(0, 16).replace(/[:T]/g, '-')
+    a.href = url
+    a.download = `${agentCode}-conversation-${d}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [messages, agentCode, agentMeta.name])
+
+  const loadHistoryFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const text = await file.text()
+    setLoadedContext({ name: file.name, text: text.slice(0, 60_000) })
+  }, [])
 
   const send = useCallback(async () => {
     const q = input.trim()
@@ -93,10 +113,17 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
     setBusy(true)
     setStatus('Thinking...')
     try {
+      const wire = next.map((m) => ({ role: m.role, content: m.text }))
+      if (loadedContext) {
+        wire.unshift({
+          role: 'user',
+          content: `Background: this is a prior conversation history I downloaded from an earlier session. Use it as context; do not repeat or summarize it unless I ask.\n\n---\n${loadedContext.text}\n---`,
+        })
+      }
       const res = await fetch('/api/agents/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ agentCode, orgId, userId, threadId, messages: next.map((m) => ({ role: m.role, content: m.text })) }),
+        body: JSON.stringify({ agentCode, orgId, userId, messages: wire }),
       })
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}))
@@ -117,7 +144,6 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
           if (!evMatch || !dataMatch) continue
           const ev = evMatch[1]; const data = JSON.parse(dataMatch[1])
           if (ev === 'status') setStatus(data.label + '...')
-          else if (ev === 'thread') { if (data.threadId) setThreadId(data.threadId) }
           else if (ev === 'message') { setMessages((m) => [...m, { role: 'assistant', text: data.text, recommendations: data.recommendations, citations: data.citations }]); setStatus(null) }
           else if (ev === 'error') { setMessages((m) => [...m, { role: 'assistant', text: `⚠️ ${data.error}` }]); setStatus(null) }
         }
@@ -127,7 +153,7 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
     } finally {
       setBusy(false); setStatus(null)
     }
-  }, [input, busy, messages, agentCode, orgId, threadId, userId])
+  }, [input, busy, messages, agentCode, orgId, userId, loadedContext])
 
   return (
     <>
@@ -142,6 +168,33 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${agentMeta.color}1A`, color: agentMeta.color }}>
           <WorkstreamIcon icon={agentMeta.icon} size={16} />
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          icon={<Download size={14} />}
+          title="Download conversation history (.md)"
+          aria-label="Download conversation history"
+          disabled={messages.length === 0}
+          onClick={downloadHistory}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          icon={<FileUp size={14} />}
+          title="Load a downloaded conversation history as context"
+          aria-label="Load conversation history"
+          onClick={() => historyInputRef.current?.click()}
+        />
+        <input
+          ref={historyInputRef}
+          type="file"
+          accept=".md,.txt"
+          onChange={loadHistoryFile}
+          className="hidden"
+          aria-label="Load conversation history file"
+        />
         <Button variant="ghost" size="sm" iconOnly icon={<X size={14} />} title="Close" aria-label="Close" onClick={onClose} />
       </div>
 
@@ -178,6 +231,25 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
             <div className="text-[11px] text-text-tertiary max-w-xs">
               Ask about data architecture, integrations, process design, or persona mapping for this value stream. The agent reads your live model and the SAP / Dassian knowledge base.
             </div>
+            <div className="text-[10px] text-text-tertiary/80 max-w-xs mt-2">
+              Conversations start fresh each session. Use the download button to keep a copy, and the load button to bring one back as context.
+            </div>
+          </div>
+        )}
+        {loadedContext && (
+          <div className="flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
+            <FileUp size={12} className="text-brand-600 shrink-0" />
+            <span className="flex-1 min-w-0 text-[11px] text-brand-700 truncate">
+              Context loaded: {loadedContext.name}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLoadedContext(null)}
+              aria-label="Remove loaded history"
+              className="text-brand-600 hover:text-brand-700 shrink-0"
+            >
+              <X size={12} />
+            </button>
           </div>
         )}
         {messages.map((m, i) => (

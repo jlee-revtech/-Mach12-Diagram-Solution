@@ -3,9 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  Activity,
   Archive,
   ArrowLeftRight,
   BookOpen,
+  FileText,
+  Presentation,
   Boxes,
   Building2,
   ChevronRight,
@@ -30,6 +33,8 @@ import { listDiagrams, createDiagram, archiveDiagram, restoreDiagram } from '@/l
 import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreCapabilityMap, duplicateCapabilityMap } from '@/lib/supabase/capability-maps'
 import { listProcessModels, createProcessModel, archiveProcessModel, restoreProcessModel, duplicateProcessModel } from '@/lib/supabase/process-models'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
+import { listWorkshops } from '@/lib/supabase/workshops'
+import type { Workshop } from '@/lib/workshop/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import type { Workstream } from '@/lib/workstream/types'
 import { importBpmnFile, importHierarchyFile } from '@/lib/process/import'
@@ -38,6 +43,7 @@ import { pushMapToNewDiagram } from '@/lib/sipoc/pushToDiagram'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import CapabilityMapWorkspace from '@/components/capmap/CapabilityMapWorkspace'
+import PersonaCatalog from '@/components/process/PersonaCatalog'
 import type { DiagramRow } from '@/lib/supabase/types'
 import type { CapabilityMapRow } from '@/lib/sipoc/types'
 import type { ProcessModelRow } from '@/lib/process/types'
@@ -54,13 +60,45 @@ import {
 const SELECT_CLASSES =
   'w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none'
 
+/** Bearer headers for the app's own API routes (same pattern as /deliverables). */
+function apiAuthHeaders(): Record<string, string> {
+  try {
+    const key = Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    const raw = key ? localStorage.getItem(key) : null
+    const token = raw ? (JSON.parse(raw)?.access_token ?? null) : null
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
+  }
+}
+
+interface DeliverableSummaryRow {
+  id: string
+  status: string
+}
+
+function relativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(ms / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+  const months = Math.floor(days / 30)
+  return `${months}mo ago`
+}
+
 export default function Dashboard() {
   const [diagrams, setDiagrams] = useState<DiagramRow[]>([])
   const [capabilityMaps, setCapabilityMaps] = useState<CapabilityMapRow[]>([])
   const [processModels, setProcessModels] = useState<ProcessModelRow[]>([])
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
+  const [workshops, setWorkshops] = useState<Workshop[]>([])
+  const [deliverables, setDeliverables] = useState<DeliverableSummaryRow[]>([])
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
-  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process' | 'capmap'>('sipoc')
+  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process' | 'capmap' | 'personas'>('process')
   const router = useRouter()
   const { user, organization, loading } = useAuth()
 
@@ -88,16 +126,23 @@ export default function Dashboard() {
   const loadAll = useCallback(async () => {
     if (!organization) return
     setLoadingDiagrams(true)
-    const [allDiagrams, allMaps, allProcesses, allWorkstreams] = await Promise.all([
+    const [allDiagrams, allMaps, allProcesses, allWorkstreams, allWorkshops, allDeliverables] = await Promise.all([
       listDiagrams(organization.id, true),
       listCapabilityMaps(organization.id, true),
       listProcessModels(organization.id, true),
       listWorkstreams(organization.id),
+      listWorkshops(organization.id).catch(() => [] as Workshop[]),
+      fetch(`/api/deliverables?orgId=${organization.id}`, { headers: apiAuthHeaders() })
+        .then((r) => (r.ok ? r.json() : { deliverables: [] }))
+        .then((res) => (res.deliverables || []) as DeliverableSummaryRow[])
+        .catch(() => [] as DeliverableSummaryRow[]),
     ])
     setDiagrams(allDiagrams)
     setCapabilityMaps(allMaps)
     setProcessModels(allProcesses)
     setWorkstreams(allWorkstreams)
+    setWorkshops(allWorkshops)
+    setDeliverables(allDeliverables)
     setLoadingDiagrams(false)
   }, [organization])
 
@@ -300,6 +345,54 @@ export default function Dashboard() {
   const activeProcesses = processModels.filter((p) => !p.archived_at)
   const archivedProcesses = processModels.filter((p) => p.archived_at)
 
+  // ── Engagement KPIs ────────────────────────────────────────────────
+  // The home KPIs answer "what is moving in this engagement", not "how many
+  // rows exist": momentum this week, the workshop pipeline, deliverables in
+  // flight, and value-stream coverage.
+  const allActiveArtifacts: {
+    id: string
+    title: string
+    type: 'process' | 'diagram' | 'capmap'
+    href: string
+    updated_at: string
+    workstream_id: string | null
+  }[] = [
+    ...activeProcesses.map((p) => ({
+      id: p.id, title: p.title, type: 'process' as const,
+      href: `/process/${p.id}`, updated_at: p.updated_at, workstream_id: p.workstream_id ?? null,
+    })),
+    ...activeDiagrams.map((d) => ({
+      id: d.id, title: d.title, type: 'diagram' as const,
+      href: `/diagram/${d.id}`, updated_at: d.updated_at, workstream_id: d.workstream_id ?? null,
+    })),
+    ...activeMaps.map((m) => ({
+      id: m.id, title: m.title, type: 'capmap' as const,
+      href: `/capability-map/${m.id}`, updated_at: m.updated_at, workstream_id: m.workstream_id ?? null,
+    })),
+  ]
+  const weekAgo = Date.now() - 7 * 86_400_000
+  const activeThisWeek = allActiveArtifacts.filter((a) => new Date(a.updated_at).getTime() >= weekAgo).length
+  const recentActivity = [...allActiveArtifacts]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 6)
+
+  const liveWorkshops = workshops.filter((w) => w.status === 'live')
+  const scheduledWorkshops = workshops
+    .filter((w) => w.status === 'scheduled')
+    .sort((a, b) => (a.scheduled_at || '9999').localeCompare(b.scheduled_at || '9999'))
+  const nextWorkshop = liveWorkshops[0] ?? scheduledWorkshops[0] ?? null
+
+  const deliverablesInFlight = deliverables.filter((d) => d.status === 'draft' || d.status === 'review').length
+  const deliverablesInReview = deliverables.filter((d) => d.status === 'review').length
+  const deliverablesFinal = deliverables.filter((d) => d.status === 'final').length
+
+  const workstreamIds = new Set(workstreams.map((w) => w.id))
+  const coveredWorkstreams = new Set(
+    allActiveArtifacts
+      .map((a) => a.workstream_id)
+      .filter((id): id is string => !!id && workstreamIds.has(id))
+  ).size
+
   // Group data-architecture diagrams by value stream (workstream), ordered by the
   // workstream sort order, with an "Unaligned" bucket last - mirrors how Process
   // Studio organizes its content by value stream.
@@ -362,39 +455,99 @@ export default function Dashboard() {
         ) : (
           <>
             <KpiCard
-              title="Process Models"
-              value={activeProcesses.length}
-              subtitle={archivedProcesses.length > 0 ? `${archivedProcesses.length} archived` : undefined}
-              icon={<Workflow size={16} />}
-              color="brand"
+              title="Active This Week"
+              value={activeThisWeek}
+              subtitle={`of ${allActiveArtifacts.length} artifacts updated in the last 7 days`}
+              icon={<Activity size={16} />}
+              color={activeThisWeek > 0 ? 'green' : 'brand'}
             />
             <KpiCard
-              title="Diagrams"
-              value={activeDiagrams.length}
-              subtitle={archivedDiagrams.length > 0 ? `${archivedDiagrams.length} archived` : undefined}
-              icon={<Network size={16} />}
-              color="brand"
+              title="Workshop Pipeline"
+              value={liveWorkshops.length + scheduledWorkshops.length}
+              subtitle={
+                liveWorkshops.length > 0
+                  ? `${liveWorkshops.length} live now: ${liveWorkshops[0].title}`
+                  : nextWorkshop
+                    ? `Next: ${nextWorkshop.title}`
+                    : 'None scheduled'
+              }
+              icon={<Presentation size={16} />}
+              color={liveWorkshops.length > 0 ? 'green' : 'brand'}
+              onClick={() => router.push('/workshops')}
             />
             <KpiCard
-              title="Capability Maps"
-              value={activeMaps.length}
-              subtitle={archivedMaps.length > 0 ? `${archivedMaps.length} archived` : undefined}
-              icon={<MapIcon size={16} />}
-              color="brand"
+              title="Deliverables In Flight"
+              value={deliverablesInFlight}
+              subtitle={`${deliverablesInReview} in review, ${deliverablesFinal} final`}
+              icon={<FileText size={16} />}
+              color={deliverablesInReview > 0 ? 'yellow' : 'brand'}
+              onClick={() => router.push('/deliverables')}
             />
             <KpiCard
-              title="Workstreams"
-              value={workstreams.length}
-              subtitle="Value streams"
+              title="Value Stream Coverage"
+              value={`${coveredWorkstreams}/${workstreams.length}`}
+              subtitle={
+                workstreams.length > 0 && coveredWorkstreams === workstreams.length
+                  ? 'Every value stream has artifacts'
+                  : `${workstreams.length - coveredWorkstreams} value streams without artifacts yet`
+              }
               icon={<Layers size={16} />}
-              color="brand"
+              color={workstreams.length > 0 && coveredWorkstreams === workstreams.length ? 'green' : 'yellow'}
+              onClick={() => router.push('/workstreams')}
             />
           </>
         )}
       </div>
 
+      {/* Recent activity: pick up where the team left off */}
+      {!loadingDiagrams && recentActivity.length > 0 && (
+        <div className="bg-white rounded-lg border border-border shadow-card overflow-hidden">
+          <div className="flex items-baseline gap-2 px-4 pt-3 pb-2">
+            <h2 className="text-body-md font-semibold text-text-primary">Recent activity</h2>
+            <span className="text-[11px] text-text-tertiary">Pick up where the team left off</span>
+          </div>
+          <ul>
+            {recentActivity.map((a) => {
+              const ws = a.workstream_id ? wsById.get(a.workstream_id) : undefined
+              const TypeIcon = a.type === 'process' ? Workflow : a.type === 'diagram' ? Network : MapIcon
+              const typeLabel = a.type === 'process' ? 'Process' : a.type === 'diagram' ? 'Diagram' : 'Capability Map'
+              return (
+                <li key={`${a.type}-${a.id}`}>
+                  <button
+                    type="button"
+                    onClick={() => router.push(a.href)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 border-t border-border hover:bg-surface-muted/50 transition-colors text-left"
+                  >
+                    <span className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 inline-flex items-center justify-center shrink-0">
+                      <TypeIcon size={14} />
+                    </span>
+                    <span className="flex-1 min-w-0 flex items-center gap-2">
+                      <span className="text-body-sm font-medium text-text-primary truncate">{a.title}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-text-tertiary shrink-0">{typeLabel}</span>
+                      {ws && (
+                        <span className="text-[11px] text-text-tertiary truncate shrink-0 inline-flex items-center gap-1">
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: ws.color || '#2563EB' }}
+                          />
+                          {ws.name}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-[11px] text-text-tertiary tabular-nums shrink-0">
+                      {relativeTime(a.updated_at)}
+                    </span>
+                    <ChevronRight size={14} className="text-text-tertiary shrink-0" />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
       <div className="space-y-4">
-        {/* Pillar filter pills: Process Studio / Data Architecture / Capability Map */}
+        {/* Studio pillars: Process / Data / Capability / Persona */}
         <div className="space-y-2">
           <div className="bg-white rounded-lg border border-border p-1 flex items-center gap-1 w-fit">
             <button
@@ -405,30 +558,37 @@ export default function Dashboard() {
               Process Studio ({activeProcesses.length})
             </button>
             <button
-              onClick={() => setActiveTab(t => (t === 'diagrams' || t === 'sipoc') ? t : 'sipoc')}
-              className={`${pillBase} ${activeTab === 'diagrams' || activeTab === 'sipoc' ? pillActive : pillInactive}`}
+              onClick={() => setActiveTab('diagrams')}
+              className={`${pillBase} ${activeTab === 'diagrams' ? pillActive : pillInactive}`}
             >
               <Database size={14} />
-              Data Architecture ({activeDiagrams.length + activeMaps.length})
+              Data Studio ({activeDiagrams.length})
             </button>
             <button
-              onClick={() => setActiveTab('capmap')}
-              className={`${pillBase} ${activeTab === 'capmap' ? pillActive : pillInactive}`}
+              onClick={() => setActiveTab(t => (t === 'capmap' || t === 'sipoc') ? t : 'capmap')}
+              className={`${pillBase} ${activeTab === 'capmap' || activeTab === 'sipoc' ? pillActive : pillInactive}`}
             >
               <LayoutGrid size={14} />
-              Capability Map
+              Capability Studio ({activeMaps.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('personas')}
+              className={`${pillBase} ${activeTab === 'personas' ? pillActive : pillInactive}`}
+            >
+              <Users size={14} />
+              Persona Studio
             </button>
           </div>
 
-          {/* Sub-pills under Data Architecture: Diagrams + SIPOC Maps */}
-          {(activeTab === 'diagrams' || activeTab === 'sipoc') && (
+          {/* Sub-pills under Capability Studio: the capability board + SIPOC maps */}
+          {(activeTab === 'capmap' || activeTab === 'sipoc') && (
             <div className="flex items-center gap-1 ml-1">
               <button
-                onClick={() => setActiveTab('diagrams')}
-                className={`${subPillBase} ${activeTab === 'diagrams' ? subPillActive : subPillInactive}`}
+                onClick={() => setActiveTab('capmap')}
+                className={`${subPillBase} ${activeTab === 'capmap' ? subPillActive : subPillInactive}`}
               >
-                <Network size={12} />
-                Diagrams ({activeDiagrams.length})
+                <LayoutGrid size={12} />
+                Capability Board
               </button>
               <span className="text-text-tertiary">/</span>
               <button
@@ -786,8 +946,11 @@ export default function Dashboard() {
             </div>
           )
         ) : activeTab === 'capmap' ? (
-          /* ─── Capability Map Tab ───────────────────────── */
+          /* ─── Capability Studio: capability board ──────── */
           <CapabilityMapWorkspace orgId={organization.id} userId={user.id} />
+        ) : activeTab === 'personas' ? (
+          /* ─── Persona Studio ───────────────────────────── */
+          <PersonaCatalog orgId={organization.id} />
         ) : (
           /* ─── Process Studio Tab ───────────────────────── */
           activeProcesses.length === 0 && archivedProcesses.length === 0 ? (

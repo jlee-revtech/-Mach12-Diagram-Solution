@@ -220,7 +220,7 @@ export default function KnowledgePage() {
               icon={showForm ? <X size={14} /> : <Plus size={14} />}
               onClick={() => { setShowForm((s) => !s); setShowUpload(false) }}
             >
-              {showForm ? 'Cancel' : 'Add customer knowledge'}
+              {showForm ? 'Cancel' : 'Add Knowledge'}
             </Button>
           </>
         }
