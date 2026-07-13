@@ -7,6 +7,7 @@ import { renderDocumentHtml } from '@jlee-revtech/agent-core'
 import type PptxGenJSType from 'pptxgenjs'
 import type { Workshop } from '@/lib/workshop/types'
 import { renderWorkshopDiagramSvg } from '@/lib/workshop/diagramSvg'
+import { sectionBlocks, type SectionBlock } from '@/lib/deliverables/blocks'
 
 // Rasterize an SVG string to a PNG data URL via an offscreen canvas at 2x for
 // crispness. Browser-only (uses Image + canvas). Returns '' on any failure so the
@@ -130,8 +131,57 @@ export interface DeliverableDoc {
   subject?: string | null
   status?: string | null
   created_at?: string | null
-  content: { sections?: { key: string; title: string; content: string }[] }
+  content: { sections?: { key: string; title: string; content: string; blocks?: SectionBlock[] }[] }
   evidence?: { key: string; tool: string; ok: boolean; reason?: string }[]
+}
+
+// ─── Enrichment blocks in exports (graceful degradation) ─────────────────────
+// Agent-added blocks (tables, SVG visuals, Data Studio diagram refs) ride along
+// as markdown appended to the section body: tables become REAL tables everywhere
+// (the docx/pptx/html pipelines already parse markdown tables), diagram refs
+// become a pointer line, and SVG visuals become a caption line except in the
+// PPTX export, which embeds them as rasterized slides when possible.
+
+function tableMarkdown(b: Extract<SectionBlock, { kind: 'table' }>): string {
+  const esc = (s: string) => s.replace(/\|/g, '/').replace(/\r?\n/g, ' ')
+  const lines = [
+    ...(b.title ? [`### ${b.title}`] : []),
+    `| ${b.columns.map(esc).join(' | ')} |`,
+    `| ${b.columns.map(() => '---').join(' | ')} |`,
+    ...b.rows.map((r) => `| ${r.map(esc).join(' | ')} |`),
+  ]
+  return lines.join('\n')
+}
+
+function blockFallbackMarkdown(b: SectionBlock, opts: { svgCaptions: boolean }): string {
+  if (b.kind === 'table') return tableMarkdown(b)
+  if (b.kind === 'svg') return opts.svgCaptions ? `(Visual: ${b.title || 'diagram'} - see Mach12 Studio)` : ''
+  return `(Diagram: ${b.title || 'data architecture'} - open in Mach12 Studio, Data Studio)`
+}
+
+/** A section's body with its blocks appended as export-friendly markdown. */
+function sectionExportContent(
+  s: { content: string; blocks?: SectionBlock[] },
+  opts: { svgCaptions: boolean } = { svgCaptions: true },
+): string {
+  const extras = sectionBlocks(s).map((b) => blockFallbackMarkdown(b, opts)).filter(Boolean)
+  return extras.length ? `${s.content}\n\n${extras.join('\n\n')}` : s.content
+}
+
+/** Intrinsic SVG dimensions from viewBox (or width/height attrs), for
+ *  aspect-correct rasterization. Defaults to the authoring-rule 1200x675. */
+function svgDims(svg: string): { w: number; h: number } {
+  const vb = svg.match(/viewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i)
+  if (vb) {
+    const w = parseFloat(vb[1])
+    const h = parseFloat(vb[2])
+    if (w > 0 && h > 0) return { w, h }
+  }
+  const wm = svg.match(/\bwidth\s*=\s*["']([\d.]+)/i)
+  const hm = svg.match(/\bheight\s*=\s*["']([\d.]+)/i)
+  const w = wm ? parseFloat(wm[1]) : 0
+  const h = hm ? parseFloat(hm[1]) : 0
+  return w > 0 && h > 0 ? { w, h } : { w: 1200, h: 675 }
 }
 
 /** Split a markdown block into docx paragraphs and tables. */
@@ -205,7 +255,9 @@ export async function exportDeliverableDocx(d: DeliverableDoc): Promise<void> {
 
   for (const s of sections) {
     children.push(new Paragraph({ text: s.title, heading: HeadingLevel.HEADING_1, spacing: { before: 260, after: 100 } }))
-    children.push(...(await markdownToDocx(s.content)))
+    // Enrichment blocks ride along as markdown: tables render as real Word
+    // tables; SVG visuals and diagram refs degrade to caption lines.
+    children.push(...(await markdownToDocx(sectionExportContent(s))))
   }
 
   const ev = d.evidence ?? []
@@ -245,7 +297,9 @@ export function exportDeliverableHtml(d: DeliverableDoc): void {
   const html = renderDocumentHtml({
     title: d.title,
     subtitle: [d.workstream_code, d.subject].filter(Boolean).join(': ') || undefined,
-    sections: (d.content?.sections ?? []).map((s) => ({ title: s.title, content: s.content })),
+    // Enrichment blocks degrade to markdown: tables render as real HTML tables,
+    // visuals and diagram refs become caption lines.
+    sections: (d.content?.sections ?? []).map((s) => ({ title: s.title, content: sectionExportContent(s) })),
     footer,
   })
   download(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safe(d.title)}.html`)
@@ -342,8 +396,11 @@ export async function exportDeliverablePptx(d: DeliverableDoc): Promise<void> {
 
   for (const section of d.content?.sections ?? []) {
     const heading = section.title || 'Section'
-    const blocks = markdownToPptxBlocks(section.content)
-    if (!blocks.length) continue
+    // Table and diagram-ref blocks ride along as markdown (tables become real
+    // PowerPoint tables); SVG visuals are embedded as their own slides below.
+    const svgVisuals = sectionBlocks(section).filter((b): b is Extract<SectionBlock, { kind: 'svg' }> => b.kind === 'svg')
+    const blocks = markdownToPptxBlocks(sectionExportContent(section, { svgCaptions: false }))
+    if (!blocks.length && !svgVisuals.length) continue
 
     let cont = false
     let pendingText: Exclude<PptxDocBlock, { kind: 'table' }>[] = []
@@ -384,6 +441,26 @@ export async function exportDeliverablePptx(d: DeliverableDoc): Promise<void> {
       pendingLines += l
     }
     flushText()
+
+    // Agent-authored SVG visuals: one slide each, rasterized with the existing
+    // helper and contain-fit. Rasterization failure degrades to a caption line.
+    for (const v of svgVisuals) {
+      const { w, h } = svgDims(v.svg)
+      const data = await svgToPngDataUrl(v.svg, w, h)
+      const s = newSlide(v.title || heading, cont)
+      cont = true
+      if (data) {
+        const boxX = 0.6, boxY = 1.3, boxW = 12.13, boxH = MAX_Y - 1.3
+        let iw = boxW
+        let ih = h > 0 ? iw * (h / w) : boxH
+        if (ih > boxH) { ih = boxH; iw = w > 0 ? ih * (w / h) : boxW }
+        s.addImage({ data, x: boxX + (boxW - iw) / 2, y: boxY + (boxH - ih) / 2, w: iw, h: ih })
+      } else {
+        s.addText(`(Visual: ${v.title || 'diagram'} - see Mach12 Studio)`, {
+          x: BODY_X, y: 1.3, w: BODY_W, h: 0.6, fontSize: 13, color: GREY, valign: 'top',
+        })
+      }
+    }
   }
 
   // Provenance: in GovCon the evidence trail is part of the document.

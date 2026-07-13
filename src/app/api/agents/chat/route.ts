@@ -20,6 +20,8 @@ import {
   type KnowledgeGap,
 } from '@jlee-revtech/agent-core'
 import { sapRealizationFromEnv } from '@/lib/agents/sapRealization'
+import { STUDIO_WRITE_TOOLS, type StudioToolContext } from '@/lib/agents/studioTools'
+import { DELIVERABLE_ENRICH_TOOLS } from '@/lib/agents/deliverableTools'
 
 // The Super Consultant agents run on the shared @jlee-revtech/agent-core brain:
 // one loop + one tool belt for both apps. This route wires the diagram app's
@@ -87,6 +89,22 @@ const TOOL_LABELS: Record<string, string> = {
   create_transport: 'Creating a transport request',
   prepare_config: 'Preparing a configuration change',
   execute_config: 'Executing a configuration change',
+  // Studio write tools (explicit user request only)
+  create_process_model: 'Creating a process model',
+  add_process_nodes: 'Adding process hierarchy nodes',
+  create_diagram: 'Creating a data-architecture diagram',
+  update_capability_status: 'Updating a capability status',
+  add_capability: 'Adding a capability',
+  create_persona: 'Creating a persona',
+  update_persona: 'Updating a persona',
+  // Deliverable enrichment tools
+  list_deliverables: 'Reading your documents',
+  get_deliverable: 'Reading a document in detail',
+  add_deliverable_section: 'Adding a document section',
+  update_deliverable_section: 'Updating a document section',
+  add_section_table: 'Adding a table to the document',
+  add_section_visual: 'Drawing a visual for the document',
+  add_section_diagram_ref: 'Linking a Data Studio diagram into the document',
 }
 
 interface AgentRow {
@@ -121,12 +139,17 @@ function toolsForAgent(isOrchestrator: boolean): AgentTool[] {
   // The Solution Architect: unscoped architecture reads, parallel specialist
   // fan-out, the deterministic consistency scan, conformance, and the blueprint.
   // Its realization tools are read/plan only; it never writes config itself.
+  // Both belts also carry the app-local studio write tools (create/update
+  // Process, Data, Capability, and Persona artifacts on explicit user request)
+  // and the deliverable enrichment tools (sections, tables, visuals, diagram
+  // references on the Documents tab).
   if (isOrchestrator) {
-    return realization
+    const base = realization
       ? SOLUTION_ARCHITECT_TOOLS
       : SOLUTION_ARCHITECT_TOOLS.filter(
           (t) => !['introspect_live_config', 'list_activities', 'compose_config_plan', 'compose_cross_stream_program'].includes(t.name)
         )
+    return [...base, ...STUDIO_WRITE_TOOLS, ...DELIVERABLE_ENRICH_TOOLS]
   }
   // Workstream specialists: architecture + knowledge + conformance + documents,
   // plus the live-SAP realization tools when a realization backend is wired.
@@ -135,6 +158,8 @@ function toolsForAgent(isOrchestrator: boolean): AgentTool[] {
     ...ARCHITECTURE_TOOLS,
     ...(realization ? REALIZATION_TOOLS : []),
     ...CONSULTANT_TOOLS,
+    ...STUDIO_WRITE_TOOLS,
+    ...DELIVERABLE_ENRICH_TOOLS,
   ]
 }
 
@@ -279,11 +304,15 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         const send = (event: string, data: unknown) => controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
         try {
-          const ctx: ToolContext = {
+          // StudioToolContext extends ToolContext with the signed-in user, so the
+          // studio write tools can stamp created_by/updated_by (several tables
+          // gate UPDATE on created_by via RLS).
+          const ctx: StudioToolContext = {
             modelDb: userDb, orgId, agentWorkstreamCode: agentCode, wsByCode, knowledge, citations,
             tenantKey: tenant, realization, runSubAgent: agent.is_orchestrator ? runSubAgent : undefined,
             criteria, kbGaps, anthropicApiKey: ANTHROPIC_KEY, persistDeliverable,
             isArchitect: agent.is_orchestrator, depthMode,
+            studioUserId: (userId as string | undefined) ?? null,
           }
           const history = messages.map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content }))
           const turn = await runAgentTurn({

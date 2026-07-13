@@ -15,9 +15,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, FileText, X } from 'lucide-react'
+import Link from 'next/link'
+import { Check, FileText, Network, Sparkles, X } from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { exportDeliverableDocx, exportDeliverableHtml, exportDeliverablePptx, type DeliverableDoc } from '@/lib/workshop/export'
+import { listWorkstreams } from '@/lib/supabase/workstreams'
+import type { Workstream } from '@/lib/workstream/types'
+import { sectionBlocks, type SectionBlock } from '@/lib/deliverables/blocks'
+import AgentChatPanel from '@/components/agents/AgentChatPanel'
 import { Button, EmptyState, LoadingState, PageHeader } from '@/components/common'
 
 interface DeliverableRow extends DeliverableDoc {
@@ -64,11 +69,13 @@ export default function DeliverablesPage() {
   const { user, organization, loading } = useAuth()
   const [rows, setRows] = useState<DeliverableRow[]>([])
   const [types, setTypes] = useState<TypeInfo[]>([])
+  const [workstreams, setWorkstreams] = useState<Workstream[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [filterType, setFilterType] = useState('')
   const [filterWs, setFilterWs] = useState('')
   const [busy, setBusy] = useState(false)
+  const [enrichOpen, setEnrichOpen] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth')
@@ -79,9 +86,13 @@ export default function DeliverablesPage() {
     if (!organization) return
     setLoadingData(true)
     try {
-      const res = await fetch(`/api/deliverables?orgId=${organization.id}`, { headers: authHeaders() }).then((r) => r.json())
+      const [res, ws] = await Promise.all([
+        fetch(`/api/deliverables?orgId=${organization.id}`, { headers: authHeaders() }).then((r) => r.json()),
+        listWorkstreams(organization.id).catch(() => [] as Workstream[]),
+      ])
       setRows(res.deliverables || [])
       setTypes(res.types || [])
+      setWorkstreams(ws)
     } catch {
       setRows([])
     }
@@ -91,6 +102,22 @@ export default function DeliverablesPage() {
     load()
   }, [load])
 
+  // Re-fetch one document (after the enrichment panel closes) so newly added
+  // sections and blocks appear without a full page reload.
+  const refreshDoc = useCallback(
+    async (id: string) => {
+      if (!organization) return
+      try {
+        const res = await fetch(`/api/deliverables?orgId=${organization.id}&id=${id}`, { headers: authHeaders() }).then((r) => r.json())
+        const fresh = (res.deliverables || [])[0] as DeliverableRow | undefined
+        if (fresh) setRows((rs) => rs.map((r) => (r.id === id ? fresh : r)))
+      } catch {
+        /* keep the stale copy; the next full load refreshes it */
+      }
+    },
+    [organization]
+  )
+
   const filtered = useMemo(
     () => rows.filter((r) => (!filterType || r.dtype === filterType) && (!filterWs || r.workstream_code === filterWs)),
     [rows, filterType, filterWs]
@@ -98,6 +125,20 @@ export default function DeliverablesPage() {
   const current = useMemo(() => filtered.find((r) => r.id === selected) ?? filtered[0] ?? null, [filtered, selected])
   const workstreamCodes = useMemo(() => [...new Set(rows.map((r) => r.workstream_code))].sort(), [rows])
   const typeTitle = (t: string) => types.find((x) => x.type === t)?.title ?? t
+
+  // Scope the enrichment agent to the open document: which deliverable it is and
+  // its section indexes, so the agent targets the deliverable tools correctly.
+  const enrichContext = useMemo(() => {
+    if (!current) return undefined
+    const secs = (current.content?.sections ?? []).map((s, i) => `[${i}] "${s.title}"`).join(', ')
+    return (
+      `The user has deliverable "${current.title}" (id ${current.id}, type ${current.dtype}) open in the Documents tab. ` +
+      `Its sections by 0-based index: ${secs || '(none yet)'}. ` +
+      `When they ask to add or enrich content, use the deliverable tools (get_deliverable, add_deliverable_section, update_deliverable_section, add_section_table, add_section_visual, add_section_diagram_ref) against this deliverable id.`
+    )
+  }, [current])
+  const enrichAgentCode =
+    current && workstreams.some((w) => w.code === current.workstream_code) ? current.workstream_code : 'enterprise'
 
   const setStatus = async (id: string, status: string) => {
     setBusy(true)
@@ -241,6 +282,9 @@ export default function DeliverablesPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 flex-wrap">
+                    <Button variant="ai" size="sm" icon={<Sparkles size={14} />} onClick={() => setEnrichOpen(true)}>
+                      Enrich with agent
+                    </Button>
                     <select
                       className={SELECT_CLS}
                       value={current.status ?? 'draft'}
@@ -274,6 +318,9 @@ export default function DeliverablesPage() {
                     <section key={s.key}>
                       <h3 className="border-b border-border pb-1 text-heading-md text-text-primary">{s.title}</h3>
                       <pre className="mt-3 whitespace-pre-wrap font-sans text-body-md leading-6 text-text-secondary">{s.content}</pre>
+                      {sectionBlocks(s).map((b, i) => (
+                        <BlockView key={`${s.key}-block-${i}`} block={b} />
+                      ))}
                     </section>
                   ))}
                 </div>
@@ -282,7 +329,86 @@ export default function DeliverablesPage() {
           </section>
         </div>
       )}
+
+      {enrichOpen && current && organization && (
+        <AgentChatPanel
+          orgId={organization.id}
+          userId={user?.id}
+          workstreams={workstreams}
+          initialAgentCode={enrichAgentCode}
+          pageContext={enrichContext}
+          onClose={() => {
+            setEnrichOpen(false)
+            refreshDoc(current.id)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+// ─── Enrichment blocks (agent-added tables, visuals, diagram refs) ────────────
+
+function BlockView({ block }: { block: SectionBlock }) {
+  if (block.kind === 'table') {
+    return (
+      <div className="mt-4">
+        {block.title ? <div className="mb-1.5 text-body-sm font-semibold text-text-primary">{block.title}</div> : null}
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-body-sm">
+            <thead className="bg-surface-muted/60">
+              <tr>
+                {block.columns.map((c, i) => (
+                  <th key={i} className="text-label uppercase text-text-secondary text-left px-3 py-2 border-b border-border whitespace-nowrap">
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((r, ri) => (
+                <tr key={ri} className="border-b border-border last:border-0">
+                  {r.map((cell, ci) => (
+                    <td key={ci} className="px-3 py-2 text-text-secondary align-top">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+  if (block.kind === 'svg') {
+    // Rendered via an img data URL so any script content is inert; the server-side
+    // sanitizer in the deliverable tools remains the primary gate.
+    return (
+      <figure className="mt-4 rounded-lg border border-border bg-white p-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`data:image/svg+xml;utf8,${encodeURIComponent(block.svg)}`}
+          alt={block.title || 'Document visual'}
+          className="w-full h-auto"
+        />
+        {block.title ? <figcaption className="mt-2 text-center text-body-sm text-text-tertiary">{block.title}</figcaption> : null}
+      </figure>
+    )
+  }
+  return (
+    <Link
+      href={`/diagram/${block.diagramId}`}
+      className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-surface-muted/40 px-4 py-3 transition-colors hover:border-brand-200 hover:bg-brand-50"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+        <Network size={16} />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-body-sm font-medium text-text-primary">{block.title || 'Data-architecture diagram'}</span>
+        <span className="block text-[11px] text-text-tertiary">Open in Data Studio</span>
+      </span>
+    </Link>
   )
 }
 

@@ -31,10 +31,13 @@ interface Props {
   workstreams: Workstream[]
   initialAgentCode?: string
   userId?: string
+  /** Optional page context forwarded to the agent turn (what the user has open,
+   *  e.g. the deliverable on the Documents tab), so the agent can act on it. */
+  pageContext?: string
   onClose: () => void
 }
 
-export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, userId, onClose }: Props) {
+export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, userId, pageContext, onClose }: Props) {
   const [agentCode, setAgentCode] = useState(initialAgentCode || 'enterprise')
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
@@ -123,7 +126,7 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
       const res = await fetch('/api/agents/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ agentCode, orgId, userId, messages: wire }),
+        body: JSON.stringify({ agentCode, orgId, userId, messages: wire, ...(pageContext ? { pageContext } : {}) }),
       })
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}))
@@ -153,7 +156,7 @@ export default function AgentChatPanel({ orgId, workstreams, initialAgentCode, u
     } finally {
       setBusy(false); setStatus(null)
     }
-  }, [input, busy, messages, agentCode, orgId, userId, loadedContext])
+  }, [input, busy, messages, agentCode, orgId, userId, loadedContext, pageContext])
 
   return (
     <>
