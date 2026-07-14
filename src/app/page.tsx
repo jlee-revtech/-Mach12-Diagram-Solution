@@ -31,7 +31,7 @@ import {
 import { useAuth } from '@/lib/supabase/auth-context'
 import { listDiagrams, createDiagram, archiveDiagram, restoreDiagram } from '@/lib/supabase/diagrams'
 import { listCapabilityMaps, createCapabilityMap, archiveCapabilityMap, restoreCapabilityMap, duplicateCapabilityMap } from '@/lib/supabase/capability-maps'
-import { listProcessModels, createProcessModel, archiveProcessModel, restoreProcessModel, duplicateProcessModel, listProcessLeafCounts } from '@/lib/supabase/process-models'
+import { listProcessModels, createProcessModel, archiveProcessModel, restoreProcessModel, duplicateProcessModel, listProcessOutlines, type ProcessModelOutline } from '@/lib/supabase/process-models'
 import { listCapabilities } from '@/lib/supabase/capmap'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
 import { listWorkshops } from '@/lib/supabase/workshops'
@@ -98,7 +98,7 @@ export default function Dashboard() {
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
   const [workshops, setWorkshops] = useState<Workshop[]>([])
   const [deliverables, setDeliverables] = useState<DeliverableSummaryRow[]>([])
-  const [processLeafCounts, setProcessLeafCounts] = useState<Record<string, number>>({})
+  const [processOutlines, setProcessOutlines] = useState<Record<string, ProcessModelOutline>>({})
   const [capabilityCount, setCapabilityCount] = useState(0)
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
   const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process' | 'capmap' | 'personas'>('process')
@@ -148,10 +148,10 @@ export default function Dashboard() {
     setWorkshops(allWorkshops)
     setDeliverables(allDeliverables)
     setCapabilityCount(allCaps.length)
-    // Per-model leaf (unit-process) counts, so Process Studio counts individual
-    // processes like Data Studio counts individual diagrams.
+    // Per-model L2 outline + leaf (unit-process) counts, so Process Studio lists
+    // navigable L2 groups and counts individual processes like Data Studio.
     const activeProcessIds = allProcesses.filter((p) => !p.archived_at).map((p) => p.id)
-    setProcessLeafCounts(await listProcessLeafCounts(activeProcessIds).catch(() => ({})))
+    setProcessOutlines(await listProcessOutlines(activeProcessIds).catch(() => ({})))
     setLoadingDiagrams(false)
   }, [organization])
 
@@ -427,7 +427,8 @@ export default function Dashboard() {
   // Group process models by value stream (mirrors diagramGroups) and count
   // individual unit-processes, so Process Studio has the same parity as Data
   // Studio: a per-value-stream breakdown with an individual-process total.
-  const totalProcessCount = activeProcesses.reduce((sum, p) => sum + (processLeafCounts[p.id] || 0), 0)
+  const leafCountOf = (p: ProcessModelRow) => processOutlines[p.id]?.leafTotal || 0
+  const totalProcessCount = activeProcesses.reduce((sum, p) => sum + leafCountOf(p), 0)
   const processesByWs = new Map<string, ProcessModelRow[]>()
   for (const p of activeProcesses) {
     const key = p.workstream_id && wsById.has(p.workstream_id) ? p.workstream_id : '__none__'
@@ -444,7 +445,6 @@ export default function Dashboard() {
       : []),
   ]
   for (const g of processGroups) g.processes.sort((a, b) => a.title.localeCompare(b.title))
-  const leafCountOf = (p: ProcessModelRow) => processLeafCounts[p.id] || 0
   const processGroupCount = (g: { processes: ProcessModelRow[] }) => g.processes.reduce((s, p) => s + leafCountOf(p), 0)
 
   const pillBase = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-body-sm font-medium transition-colors'
@@ -1008,79 +1008,105 @@ export default function Dashboard() {
                   <span className="text-body-sm text-text-secondary group-hover:text-text-primary transition-colors">New Process Model</span>
                 </button>
               </div>
-              {/* Grouped by value stream, counting individual processes (mirrors Data Studio) */}
-              {processGroups.map((grp) => (
-                <CollapsibleSection
-                  key={grp.key}
-                  id={grp.key}
-                  storageKey="mach12-studio:process-ws"
-                  tone="neutral"
-                  count={processGroupCount(grp)}
-                  title={
-                    <span className="inline-flex items-center gap-2">
-                      {grp.icon && (
-                        <span
-                          className="w-5 h-5 rounded flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: `${grp.color}1A`, color: grp.color }}
-                        >
-                          <WorkstreamIcon icon={grp.icon} size={12} />
-                        </span>
-                      )}
-                      {grp.name}
-                    </span>
-                  }
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {grp.processes.map((p) => (
-                      <div
-                        key={p.id}
-                        onClick={() => router.push(`/process/${p.id}`)}
-                        className="bg-white rounded-lg border border-border shadow-card p-5 cursor-pointer hover:shadow-card-hover hover:-translate-y-0.5 transition-all"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <h3 className="font-display text-heading-sm text-text-primary truncate flex-1">{p.title}</h3>
-                          <div className="flex items-center gap-1 ml-2 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              iconOnly
-                              aria-label="Duplicate process model"
-                              title="Duplicate process model"
-                              loading={duplicatingProcess === p.id}
-                              icon={<Copy size={14} />}
-                              onClick={(e) => handleDuplicateProcess(p.id, e)}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              iconOnly
-                              aria-label="Archive process model"
-                              title="Archive process model"
-                              icon={<Archive size={14} />}
-                              onClick={(e) => handleArchiveProcess(p.id, e)}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                          <span className="inline-flex items-center gap-1.5 rounded bg-status-blue-bg px-2 py-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-status-blue" />
-                            <span className="text-[10px] font-mono text-status-blue uppercase tracking-wider font-bold">Process</span>
-                          </span>
-                          <span className="text-[11px] text-text-tertiary tabular-nums">
-                            {leafCountOf(p)} {leafCountOf(p) === 1 ? 'process' : 'processes'}
-                          </span>
-                        </div>
-                        {p.description && (
-                          <div className="text-body-sm text-text-secondary mb-2 line-clamp-2">{p.description}</div>
-                        )}
-                        <div className="text-[11px] text-text-tertiary">
-                          Updated {new Date(p.updated_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                    ))}
+              {/* Grouped by value stream; inside each, the model's L2 process groups
+                  are navigable items that open that node in the process tree. */}
+              {processGroups.map((grp) => {
+                const single = grp.processes.length === 1
+                const modelActions = (p: ProcessModelRow) => (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost" size="sm" iconOnly
+                      aria-label="Duplicate process model" title="Duplicate process model"
+                      loading={duplicatingProcess === p.id}
+                      icon={<Copy size={14} />}
+                      onClick={(e) => handleDuplicateProcess(p.id, e)}
+                    />
+                    <Button
+                      variant="ghost" size="sm" iconOnly
+                      aria-label="Archive process model" title="Archive process model"
+                      icon={<Archive size={14} />}
+                      onClick={(e) => handleArchiveProcess(p.id, e)}
+                    />
                   </div>
-                </CollapsibleSection>
-              ))}
+                )
+                return (
+                  <CollapsibleSection
+                    key={grp.key}
+                    id={grp.key}
+                    storageKey="mach12-studio:process-ws"
+                    tone="neutral"
+                    count={processGroupCount(grp)}
+                    actions={single ? modelActions(grp.processes[0]) : undefined}
+                    title={
+                      <span className="inline-flex items-center gap-2">
+                        {grp.icon && (
+                          <span
+                            className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: `${grp.color}1A`, color: grp.color }}
+                          >
+                            <WorkstreamIcon icon={grp.icon} size={12} />
+                          </span>
+                        )}
+                        {grp.name}
+                      </span>
+                    }
+                  >
+                    <div className="space-y-4">
+                      {grp.processes.map((model) => {
+                        const outline = processOutlines[model.id]
+                        const groups = outline?.groups ?? []
+                        return (
+                          <div key={model.id}>
+                            {!single && (
+                              <div className="flex items-center gap-2 mb-2">
+                                <button
+                                  type="button"
+                                  onClick={() => router.push(`/process/${model.id}`)}
+                                  className="text-body-sm font-semibold text-text-primary hover:text-brand-600 transition-colors truncate"
+                                >
+                                  {model.title}
+                                </button>
+                                <span className="text-[11px] text-text-tertiary tabular-nums shrink-0">{outline?.leafTotal ?? 0} processes</span>
+                                <div className="ml-auto shrink-0">{modelActions(model)}</div>
+                              </div>
+                            )}
+                            {groups.length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {groups.map((g) => (
+                                  <button
+                                    key={g.id}
+                                    type="button"
+                                    onClick={() => router.push(`/process/${model.id}?node=${g.id}`)}
+                                    className="group flex items-center gap-2.5 bg-white rounded-lg border border-border shadow-card px-3.5 py-3 text-left transition-all hover:shadow-card-hover hover:border-brand-200 hover:-translate-y-0.5"
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-status-blue shrink-0" />
+                                    <span className="flex-1 min-w-0">
+                                      <span className="block text-body-sm font-medium text-text-primary truncate">{g.name}</span>
+                                      <span className="block text-[11px] text-text-tertiary tabular-nums">
+                                        {g.leafCount} {g.leafCount === 1 ? 'process' : 'processes'}
+                                      </span>
+                                    </span>
+                                    <ChevronRight size={15} className="text-text-tertiary group-hover:text-brand-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/process/${model.id}`)}
+                                className="w-full flex items-center gap-2 rounded-lg border border-dashed border-border px-3.5 py-3 text-left text-body-sm text-text-secondary hover:border-brand-500 hover:text-brand-600 transition-colors"
+                              >
+                                <span className="flex-1">{single ? `Open ${model.title}` : 'Open model'} to add process groups</span>
+                                <ChevronRight size={14} className="shrink-0" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CollapsibleSection>
+                )
+              })}
               {archivedProcesses.length > 0 && (
                 <CollapsibleSection
                   id="archived-process"

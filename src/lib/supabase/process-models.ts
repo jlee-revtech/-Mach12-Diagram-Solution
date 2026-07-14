@@ -155,23 +155,57 @@ export async function listProcessNodes(modelId: string): Promise<ProcessNode[]> 
   )
 }
 
+export interface ProcessGroupOutline { id: string; name: string; leafCount: number }
+export interface ProcessModelOutline { groups: ProcessGroupOutline[]; leafTotal: number }
+
 /**
- * Leaf-node count per model, across many models in one pass. A "leaf" is the
- * unit process (a node no other node parents) — the BPMN-flow-bearing process.
- * Used on the dashboard so Process Studio counts individual processes, like Data
- * Studio counts individual diagrams. Returns a map of modelId → leaf count.
+ * For each model (in one pass), its Level-2 process groups with the count of
+ * leaf "unit processes" under each, plus the model's total leaf count. Powers the
+ * dashboard's Process Studio: each value-stream section lists its L2 groups as
+ * navigable items, and counts reflect individual processes (like Data Studio).
  */
-export async function listProcessLeafCounts(modelIds: string[]): Promise<Record<string, number>> {
+export async function listProcessOutlines(modelIds: string[]): Promise<Record<string, ProcessModelOutline>> {
   if (modelIds.length === 0) return {}
   const inList = modelIds.map(id => `"${id}"`).join(',')
-  const rows = await fetchAllPaginated<{ id: string; process_model_id: string; parent_id: string | null }>(
-    `${URL}/rest/v1/process_nodes?process_model_id=in.(${inList})&select=id,process_model_id,parent_id`,
+  const rows = await fetchAllPaginated<{ id: string; process_model_id: string; parent_id: string | null; level: number; name: string; sort_order: number }>(
+    `${URL}/rest/v1/process_nodes?process_model_id=in.(${inList})&select=id,process_model_id,parent_id,level,name,sort_order&order=sort_order.asc`,
     headers()
   )
-  const parents = new Set(rows.map(r => r.parent_id).filter((p): p is string => !!p))
-  const counts: Record<string, number> = {}
-  for (const r of rows) if (!parents.has(r.id)) counts[r.process_model_id] = (counts[r.process_model_id] || 0) + 1
-  return counts
+  const byModel = new Map<string, typeof rows>()
+  for (const r of rows) {
+    const arr = byModel.get(r.process_model_id) ?? []
+    arr.push(r)
+    byModel.set(r.process_model_id, arr)
+  }
+  const result: Record<string, ProcessModelOutline> = {}
+  for (const [mid, nodes] of byModel) {
+    const childrenOf = new Map<string, typeof nodes>()
+    for (const n of nodes) {
+      if (!n.parent_id) continue
+      const arr = childrenOf.get(n.parent_id) ?? []
+      arr.push(n)
+      childrenOf.set(n.parent_id, arr)
+    }
+    // Count leaf descendants (a node with no children) under `root`.
+    const leafDescendants = (rootId: string): number => {
+      let count = 0
+      const stack = [rootId]
+      while (stack.length) {
+        const kids = childrenOf.get(stack.pop()!) ?? []
+        if (kids.length === 0) count++
+        else for (const k of kids) stack.push(k.id)
+      }
+      return count
+    }
+    const parents = new Set(nodes.map(n => n.parent_id).filter((p): p is string => !!p))
+    const groups = nodes
+      .filter(n => n.level === 2)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(g => ({ id: g.id, name: g.name, leafCount: leafDescendants(g.id) }))
+    const leafTotal = nodes.filter(n => !parents.has(n.id)).length
+    result[mid] = { groups, leafTotal }
+  }
+  return result
 }
 
 export async function createProcessNode(

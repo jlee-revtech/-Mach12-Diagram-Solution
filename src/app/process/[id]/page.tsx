@@ -78,12 +78,15 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
     if (!authLoading && !user) router.push('/auth')
   }, [user, authLoading, router])
 
-  // Load model (once)
+  // Load model (once). If a ?node=<id> is present (e.g. arriving from the
+  // dashboard's L2 group links), select that node in the tree once loaded.
   useEffect(() => {
     if (id && !loadedRef.current) {
       loadedRef.current = true
       useProcessStore.getState().loadModel(id).then(ok => {
-        if (!ok) router.push('/')
+        if (!ok) { router.push('/'); return }
+        const nodeId = new URLSearchParams(window.location.search).get('node')
+        if (nodeId) useProcessStore.getState().setSelectedNode(nodeId)
       })
     }
   }, [id, router])
