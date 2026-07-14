@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const NS = '6f5a1c00-1b2c-4d3e-9f80-mach12reflib'.replace(/[^0-9a-f-]/g, '0')
-const LIB = { code: 'mach12-ad-core', title: 'Mach12 A&D Core Process Reference', version: '1.4.0', source: 'curated' }
+const LIB = { code: 'mach12-ad-core', title: 'Mach12 A&D Core Process Reference', version: '1.5.0', source: 'curated' }
 const libId = uuidv5(LIB.code, NS)
 const id = (path) => uuidv5(path, NS)
 
@@ -728,8 +728,6 @@ const SCENARIOS = [
     children: [
       { name: 'Perform Program Startup and Baseline', lifecycle: 'interim', children: [
         { name: 'Create / Update Baseline Project, WBS & Budget', description: 'Stand up or revise the project, WBS, and distribute undistributed budget.', lifecycle: 'interim', overlays: [ctrl('EVMS', 'EIA-748', 'Performance measurement baseline', 'Maintain a controlled, traceable PMB.')], children: [
-          { name: 'Baseline Update (Off-Ceiling)', description: 'Budget changes that exceed the contract ceiling.', lifecycle: 'interim', variant: 'Off-Ceiling' },
-          { name: 'Baseline Update (On-Ceiling)', description: 'Budget changes within the contract ceiling.', lifecycle: 'interim', variant: 'On-Ceiling' },
           { name: 'Baseline Update (Facilities)', description: 'Facilities project budget baseline.', lifecycle: 'interim', variant: 'Facilities' },
           { name: 'Baseline Update (Tech Investment)', description: 'Technology investment budget baseline.', lifecycle: 'interim', variant: 'Tech Investment' },
           { name: 'Baseline Update (Capital)', description: 'Capital project budget baseline.', lifecycle: 'interim', variant: 'Capital' },

@@ -101,7 +101,7 @@ export default function ProcessNodeDetail({ nodeId }: { nodeId: string }) {
               onBlur={e => { if (!readOnly && e.target.value.trim() !== (node.variant_label || '')) updateNode(node.id, { variant_label: e.target.value.trim() || null }) }}
               readOnly={readOnly}
               aria-label="Variant label"
-              placeholder={readOnly ? '' : 'e.g. Off-Ceiling, Capital'}
+              placeholder={readOnly ? '' : 'e.g. Capital, Facilities'}
               className="w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
             />
           </div>

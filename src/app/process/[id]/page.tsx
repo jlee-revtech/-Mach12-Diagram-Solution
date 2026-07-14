@@ -36,6 +36,38 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
   const loadedRef = useRef(false)
   const orgLoadedRef = useRef<string | null>(null)
 
+  // Resizable hierarchy sidebar (persisted). The tree can nest 4 levels deep with
+  // lifecycle/variant/level tags, so a fixed 288px width truncates names — let the
+  // user drag it wider (220–640px).
+  const [sidebarWidth, setSidebarWidth] = useState(288)
+  const resizingRef = useRef(false)
+  useEffect(() => {
+    const stored = Number(localStorage.getItem('mach12:process-sidebar-w'))
+    if (stored >= 220 && stored <= 640) setSidebarWidth(stored)
+  }, [])
+  const startResize = useCallback((e: React.PointerEvent) => {
+    e.preventDefault()
+    resizingRef.current = true
+    const startX = e.clientX
+    const startW = sidebarWidth
+    const onMove = (ev: PointerEvent) => {
+      if (!resizingRef.current) return
+      setSidebarWidth(Math.min(640, Math.max(220, startW + (ev.clientX - startX))))
+    }
+    const onUp = () => {
+      resizingRef.current = false
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      setSidebarWidth(w => { localStorage.setItem('mach12:process-sidebar-w', String(w)); return w })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [sidebarWidth])
+
   // Collaboration presence
   const collabName = profile?.display_name?.trim() || (user?.email ? user.email.split('@')[0] : '') || 'Anonymous'
   const collab = useProcessCollab(id, user?.id, collabName)
@@ -154,14 +186,23 @@ export default function ProcessModelPage({ params }: { params: Promise<{ id: str
 
       {/* Body */}
       <div className="flex-1 flex min-h-0">
-        {/* Hierarchy sidebar */}
-        <aside className="w-72 shrink-0 border-r border-border bg-white">
+        {/* Hierarchy sidebar (resizable) */}
+        <aside className="shrink-0 border-r border-border bg-white min-w-0" style={{ width: sidebarWidth }}>
           {loading ? (
             <LoadingState variant="inline" compact label="Loading hierarchy..." className="pt-8" />
           ) : (
             <ProcessTree />
           )}
         </aside>
+        {/* Drag handle */}
+        <div
+          onPointerDown={startResize}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize hierarchy panel"
+          title="Drag to resize"
+          className="w-1 shrink-0 cursor-col-resize bg-border/40 hover:bg-brand-400 active:bg-brand-500 transition-colors"
+        />
 
         {/* Detail / canvas area */}
         <main className="flex-1 min-w-0 flex flex-col min-h-0">

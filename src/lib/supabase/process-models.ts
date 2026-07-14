@@ -155,6 +155,25 @@ export async function listProcessNodes(modelId: string): Promise<ProcessNode[]> 
   )
 }
 
+/**
+ * Leaf-node count per model, across many models in one pass. A "leaf" is the
+ * unit process (a node no other node parents) — the BPMN-flow-bearing process.
+ * Used on the dashboard so Process Studio counts individual processes, like Data
+ * Studio counts individual diagrams. Returns a map of modelId → leaf count.
+ */
+export async function listProcessLeafCounts(modelIds: string[]): Promise<Record<string, number>> {
+  if (modelIds.length === 0) return {}
+  const inList = modelIds.map(id => `"${id}"`).join(',')
+  const rows = await fetchAllPaginated<{ id: string; process_model_id: string; parent_id: string | null }>(
+    `${URL}/rest/v1/process_nodes?process_model_id=in.(${inList})&select=id,process_model_id,parent_id`,
+    headers()
+  )
+  const parents = new Set(rows.map(r => r.parent_id).filter((p): p is string => !!p))
+  const counts: Record<string, number> = {}
+  for (const r of rows) if (!parents.has(r.id)) counts[r.process_model_id] = (counts[r.process_model_id] || 0) + 1
+  return counts
+}
+
 export async function createProcessNode(
   modelId: string,
   name: string,

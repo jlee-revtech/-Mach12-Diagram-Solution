@@ -14,7 +14,7 @@
 
 -- ─── Lifecycle + variant on org nodes and reference scenarios ──
 alter table process_nodes add column if not exists lifecycle text;            -- 'as_is'|'to_be'|'interim'|null
-alter table process_nodes add column if not exists variant_label text;        -- e.g. 'Off-Ceiling', 'Capital', 'Labor'
+alter table process_nodes add column if not exists variant_label text;        -- e.g. 'Capital', 'Facilities', 'Labor'
 alter table process_reference_scenarios add column if not exists lifecycle text;
 alter table process_reference_scenarios add column if not exists variant_label text;
 

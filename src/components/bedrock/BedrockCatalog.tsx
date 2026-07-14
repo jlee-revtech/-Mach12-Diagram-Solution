@@ -24,6 +24,8 @@ export default function BedrockCatalog({ orgId, userId }: { orgId: string; userI
   const [busy, setBusy] = useState(false)
   const [newType, setNewType] = useState<SystemType | ''>('')
   const [physInput, setPhysInput] = useState<Record<string, string>>({})
+  const [customLabel, setCustomLabel] = useState('')
+  const [customColor, setCustomColor] = useState('#2563EB')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,6 +53,22 @@ export default function BedrockCatalog({ orgId, userId }: { orgId: string; userI
       const sys = await createBedrockSystem(orgId, userId, { system_type: tmpl.type, label: tmpl.label, description: tmpl.description, color: tmpl.color, sort_order: catalog.length })
       setCatalog(x => [...x, { ...sys, physicals: [] }])
       setNewType('')
+    } finally { setBusy(false) }
+  }
+
+  const handleAddCustom = async () => {
+    const label = customLabel.trim()
+    if (!label || busy) return
+    setBusy(true)
+    try {
+      const sys = await createBedrockSystem(orgId, userId, {
+        system_type: 'custom',
+        label,
+        color: customColor,
+        sort_order: catalog.length,
+      })
+      setCatalog(x => [...x, { ...sys, physicals: [] }])
+      setCustomLabel('')
     } finally { setBusy(false) }
   }
 
@@ -193,12 +211,37 @@ export default function BedrockCatalog({ orgId, userId }: { orgId: string; userI
                 aria-label="Add logical system"
                 className="flex-1 min-w-0 h-9 px-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none"
               >
-                <option value="">Add a system category…</option>
+                <option value="">Add a standard category…</option>
                 {availableTemplates.map(t => <option key={t.type} value={t.type}>{t.label} - {t.description}</option>)}
               </select>
               <Button variant="primary" onClick={handleAddSystem} disabled={busy || !newType}>Add</Button>
             </div>
           )}
+
+          {/* Custom logical system — always available, not limited to the standard palette. */}
+          <div className="pt-3 border-t border-border space-y-2">
+            <label className="block text-label uppercase text-text-secondary">Add a custom logical system</label>
+            <div className="flex gap-2">
+              <input
+                type="color"
+                value={customColor}
+                onChange={e => setCustomColor(e.target.value)}
+                aria-label="Custom system color"
+                title="Color"
+                className="h-9 w-9 shrink-0 rounded-lg border border-border bg-surface-input p-1 cursor-pointer"
+              />
+              <input
+                value={customLabel}
+                onChange={e => setCustomLabel(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddCustom() }}
+                placeholder="e.g. Costpoint, ServiceNow…"
+                aria-label="Custom logical system name"
+                className="flex-1 min-w-0 h-9 px-2 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary placeholder:text-text-tertiary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none"
+              />
+              <Button variant="secondary" onClick={handleAddCustom} disabled={busy || !customLabel.trim()}>Add</Button>
+            </div>
+            <p className="text-[11px] text-text-tertiary">Then add its physical systems (named tools) inline on the card to the left.</p>
+          </div>
         </div>
       </div>
     </div>

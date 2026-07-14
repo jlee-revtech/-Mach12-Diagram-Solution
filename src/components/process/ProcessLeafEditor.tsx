@@ -704,6 +704,28 @@ function Inspector({
                 className="ins-input"
               />
             </Field>
+            <Field label="Persona (swimlane)">
+              <select
+                value={(selectedNode.data as any).personaId || ''}
+                onChange={e => onPatchNode(selectedNode.id, { personaId: e.target.value || null })}
+                aria-label="Persona (swimlane)"
+                className="ins-input"
+              >
+                <option value="">- none -</option>
+                {personas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Role (group of personas)">
+              <select
+                value={(selectedNode.data as any).roleId || ''}
+                onChange={e => onPatchNode(selectedNode.id, { roleId: e.target.value || null })}
+                aria-label="Role (group of personas)"
+                className="ins-input"
+              >
+                <option value="">- none -</option>
+                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </Field>
             <Field label="System">
               <select
                 value={(selectedNode.data as any).systemId || ''}
@@ -716,28 +738,6 @@ function Inspector({
               >
                 <option value="">- none -</option>
                 {systems.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Role (swimlane)">
-              <select
-                value={(selectedNode.data as any).roleId || ''}
-                onChange={e => onPatchNode(selectedNode.id, { roleId: e.target.value || null })}
-                aria-label="Role (swimlane)"
-                className="ins-input"
-              >
-                <option value="">- none -</option>
-                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Persona">
-              <select
-                value={(selectedNode.data as any).personaId || ''}
-                onChange={e => onPatchNode(selectedNode.id, { personaId: e.target.value || null })}
-                aria-label="Persona"
-                className="ins-input"
-              >
-                <option value="">- none -</option>
-                {personas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </Field>
           </>
