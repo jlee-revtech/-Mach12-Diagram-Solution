@@ -457,7 +457,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 max-w-[1400px]">
       <PageHeader
-        title="Studio"
+        title="Solution Architecture Studio"
         icon={<LayoutDashboard size={24} />}
         subtitle={`Process models, data architecture diagrams, and capability maps for ${organization.name}`}
         actions={

@@ -54,6 +54,9 @@ export const NAV_SECTIONS: NavSection[] = [
 ]
 
 export function labelForRoute(pathname: string): string {
+  // The home route is the "Solution Architecture Studio" landing page; the sidebar
+  // keeps the compact "Home" shortcut, but the header shows the full page name.
+  if (pathname === '/') return 'Solution Architecture Studio'
   for (const section of NAV_SECTIONS) {
     for (const item of section.items) {
       if (item.href === pathname) return item.label
