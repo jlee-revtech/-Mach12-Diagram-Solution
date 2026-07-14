@@ -44,7 +44,7 @@ const criteria = createCriteriaClient({
 })
 const realization = sapRealizationFromEnv()
 
-const LIST_COLUMNS = 'id, workstream_code, dtype, title, subject, status, tags, content, evidence, version, created_at, updated_at'
+const LIST_COLUMNS = 'id, workstream_code, dtype, title, subject, status, tags, archived_at, content, evidence, version, created_at, updated_at'
 
 function dbFor(req: NextRequest) {
   const auth = req.headers.get('authorization') || ''
@@ -194,8 +194,11 @@ export async function PATCH(req: NextRequest) {
     const raw = Array.isArray(body.tags) ? body.tags : []
     updates.tags = [...new Set(raw.map((t) => String(t).trim()).filter(Boolean).map((t) => t.slice(0, 60)))]
   }
+  if (body.archived !== undefined) {
+    updates.archived_at = body.archived ? new Date().toISOString() : null
+  }
   if (Object.keys(updates).length === 0) {
-    return json({ error: 'nothing to update (provide status and/or tags)' }, 400)
+    return json({ error: 'nothing to update (provide status, tags, and/or archived)' }, 400)
   }
 
   const db = dbFor(req)

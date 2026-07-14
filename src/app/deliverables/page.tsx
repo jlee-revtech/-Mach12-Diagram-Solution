@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, ChevronDown, FileText, Network, Plus, Sparkles, Tag, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Check, ChevronDown, FileText, Network, Plus, Sparkles, Tag, X } from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { exportDeliverableDocx, exportDeliverableHtml, exportDeliverablePptx, type DeliverableDoc } from '@/lib/workshop/export'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
@@ -30,6 +30,7 @@ interface DeliverableRow extends DeliverableDoc {
   version: number
   updated_at: string | null
   tags?: string[]
+  archived_at?: string | null
 }
 
 interface TypeInfo {
@@ -81,6 +82,7 @@ export default function DeliverablesPage() {
   const [tagDraft, setTagDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [enrichOpen, setEnrichOpen] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth')
@@ -127,13 +129,15 @@ export default function DeliverablesPage() {
     () =>
       rows.filter(
         (r) =>
+          !r.archived_at &&
           (!filterType || r.dtype === filterType) &&
           (!filterWs || r.workstream_code === filterWs) &&
           (!filterTag || (r.tags ?? []).includes(filterTag))
       ),
     [rows, filterType, filterWs, filterTag]
   )
-  const current = useMemo(() => filtered.find((r) => r.id === selected) ?? filtered[0] ?? null, [filtered, selected])
+  const archivedRows = useMemo(() => rows.filter((r) => r.archived_at), [rows])
+  const current = useMemo(() => rows.find((r) => r.id === selected) ?? filtered[0] ?? null, [rows, filtered, selected])
   const workstreamCodes = useMemo(() => [...new Set(rows.map((r) => r.workstream_code))].sort(), [rows])
   const allTags = useMemo(() => [...new Set(rows.flatMap((r) => r.tags ?? []))].sort((a, b) => a.localeCompare(b)), [rows])
   // Friendly labels for deliverable types not in the agent catalog (e.g. published
@@ -252,6 +256,14 @@ export default function DeliverablesPage() {
     await fetch(`/api/deliverables?id=${id}`, { method: 'DELETE', headers: authHeaders() })
     setRows((rs) => rs.filter((r) => r.id !== id))
     if (selected === id) setSelected(null)
+    setBusy(false)
+  }
+
+  const setArchived = async (id: string, archived: boolean) => {
+    setBusy(true)
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, archived_at: archived ? new Date().toISOString() : null } : r)))
+    if (archived && selected === id) setSelected(null)
+    await fetch('/api/deliverables', { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ id, archived }) }).catch(() => load())
     setBusy(false)
   }
 
@@ -385,6 +397,21 @@ export default function DeliverablesPage() {
             ) : (
               <ul className="max-h-[65vh] overflow-y-auto">{filtered.map(renderRow)}</ul>
             )}
+            {archivedRows.length > 0 && (
+              <div className="border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setShowArchived((v) => !v)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-text-tertiary hover:text-text-secondary transition-colors"
+                >
+                  <ChevronDown size={13} className={`shrink-0 transition-transform ${showArchived ? '' : '-rotate-90'}`} />
+                  <Archive size={13} className="shrink-0" />
+                  <span className="flex-1 text-body-sm font-medium">Archived</span>
+                  <span className="text-[11px] tabular-nums">{archivedRows.length}</span>
+                </button>
+                {showArchived && <ul className="opacity-70">{archivedRows.map(renderRow)}</ul>}
+              </div>
+            )}
           </aside>
 
           <section className="bg-white rounded-lg border border-border shadow-card">
@@ -453,6 +480,15 @@ export default function DeliverablesPage() {
                     <Button variant="primary" size="sm" onClick={() => exportDeliverableDocx(current)}>
                       Download Word
                     </Button>
+                    {current.archived_at ? (
+                      <Button variant="secondary" size="sm" icon={<ArchiveRestore size={14} />} disabled={busy} onClick={() => setArchived(current.id, false)}>
+                        Restore
+                      </Button>
+                    ) : (
+                      <Button variant="secondary" size="sm" icon={<Archive size={14} />} disabled={busy} onClick={() => setArchived(current.id, true)}>
+                        Archive
+                      </Button>
+                    )}
                     <Button variant="destructive" size="sm" disabled={busy} onClick={() => remove(current.id)}>
                       Delete
                     </Button>
