@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { SAP_ENTERPRISE_MODEL as M } from '@/lib/sap-model/data'
 import { LoadingState } from '@/components/common'
 import ConfigReport from './ConfigReport'
+import ChangeSetPanel from './ChangeSetPanel'
 
 // React Flow touches window/document — load the canvas client-side only.
 const SapModelCanvas = dynamic(() => import('./SapModelCanvas'), {
@@ -16,15 +17,16 @@ const SapModelCanvas = dynamic(() => import('./SapModelCanvas'), {
   ),
 })
 
-type View = 'schema' | 'instances' | 'report'
+type View = 'schema' | 'instances' | 'report' | 'changes'
 
 const VIEWS: { id: View; label: string; hint: string }[] = [
   { id: 'schema', label: 'Enterprise Schema', hint: 'Entity types & how each assignment is configured' },
   { id: 'instances', label: 'Live Configuration (A000)', hint: 'The real org structure pulled from the system' },
   { id: 'report', label: 'Configuration Report', hint: 'Tabular report-out of every entity' },
+  { id: 'changes', label: 'Changes', hint: 'Draft changes to the org model → generate Configuration Instructions for the workstream agents' },
 ]
 
-export default function SapModelExplorer() {
+export default function SapModelExplorer({ orgId, userId }: { orgId: string; userId: string }) {
   const [view, setView] = useState<View>('schema')
 
   return (
@@ -68,6 +70,8 @@ export default function SapModelExplorer() {
       {/* Content */}
       {view === 'report' ? (
         <ConfigReport model={M} />
+      ) : view === 'changes' ? (
+        <ChangeSetPanel orgId={orgId} userId={userId} />
       ) : (
         <div className="rounded-lg border border-border shadow-card overflow-hidden h-[74vh] min-h-[500px] bg-surface-muted">
           <SapModelCanvas key={view} model={M} mode={view} />
