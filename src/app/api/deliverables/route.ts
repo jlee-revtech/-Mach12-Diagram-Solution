@@ -44,7 +44,7 @@ const criteria = createCriteriaClient({
 })
 const realization = sapRealizationFromEnv()
 
-const LIST_COLUMNS = 'id, workstream_code, dtype, title, subject, status, content, evidence, version, created_at, updated_at'
+const LIST_COLUMNS = 'id, workstream_code, dtype, title, subject, status, tags, content, evidence, version, created_at, updated_at'
 
 function dbFor(req: NextRequest) {
   const auth = req.headers.get('authorization') || ''
@@ -179,12 +179,27 @@ export async function PATCH(req: NextRequest) {
     return json({ error: 'bad request' }, 400)
   }
   const id = String(body.id || '')
-  const status = String(body.status || '')
-  if (!id || !['draft', 'review', 'final'].includes(status)) {
-    return json({ error: 'id and status (draft | review | final) are required' }, 400)
+  if (!id) return json({ error: 'id is required' }, 400)
+
+  const updates: Record<string, unknown> = {}
+  if (body.status !== undefined) {
+    const status = String(body.status)
+    if (!['draft', 'review', 'final'].includes(status)) {
+      return json({ error: 'status must be draft | review | final' }, 400)
+    }
+    updates.status = status
   }
+  if (body.tags !== undefined) {
+    // Normalize: trim, drop empties, dedupe, cap length.
+    const raw = Array.isArray(body.tags) ? body.tags : []
+    updates.tags = [...new Set(raw.map((t) => String(t).trim()).filter(Boolean).map((t) => t.slice(0, 60)))]
+  }
+  if (Object.keys(updates).length === 0) {
+    return json({ error: 'nothing to update (provide status and/or tags)' }, 400)
+  }
+
   const db = dbFor(req)
-  const { error } = await db.from('deliverables').update({ status }).eq('id', id)
+  const { error } = await db.from('deliverables').update(updates).eq('id', id)
   if (error) return json({ error: error.message }, 500)
   return json({ ok: true })
 }

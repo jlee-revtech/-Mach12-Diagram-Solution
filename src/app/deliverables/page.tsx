@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, FileText, Network, Sparkles, X } from 'lucide-react'
+import { Check, ChevronDown, FileText, Network, Plus, Sparkles, Tag, X } from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { exportDeliverableDocx, exportDeliverableHtml, exportDeliverablePptx, type DeliverableDoc } from '@/lib/workshop/export'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
@@ -29,6 +29,7 @@ interface DeliverableRow extends DeliverableDoc {
   id: string
   version: number
   updated_at: string | null
+  tags?: string[]
 }
 
 interface TypeInfo {
@@ -74,6 +75,10 @@ export default function DeliverablesPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [filterType, setFilterType] = useState('')
   const [filterWs, setFilterWs] = useState('')
+  const [filterTag, setFilterTag] = useState('')
+  const [pivotByTag, setPivotByTag] = useState(false)
+  const [collapsedTags, setCollapsedTags] = useState<Set<string>>(new Set())
+  const [tagDraft, setTagDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [enrichOpen, setEnrichOpen] = useState(false)
 
@@ -119,12 +124,46 @@ export default function DeliverablesPage() {
   )
 
   const filtered = useMemo(
-    () => rows.filter((r) => (!filterType || r.dtype === filterType) && (!filterWs || r.workstream_code === filterWs)),
-    [rows, filterType, filterWs]
+    () =>
+      rows.filter(
+        (r) =>
+          (!filterType || r.dtype === filterType) &&
+          (!filterWs || r.workstream_code === filterWs) &&
+          (!filterTag || (r.tags ?? []).includes(filterTag))
+      ),
+    [rows, filterType, filterWs, filterTag]
   )
   const current = useMemo(() => filtered.find((r) => r.id === selected) ?? filtered[0] ?? null, [filtered, selected])
   const workstreamCodes = useMemo(() => [...new Set(rows.map((r) => r.workstream_code))].sort(), [rows])
-  const typeTitle = (t: string) => types.find((x) => x.type === t)?.title ?? t
+  const allTags = useMemo(() => [...new Set(rows.flatMap((r) => r.tags ?? []))].sort((a, b) => a.localeCompare(b)), [rows])
+  // Friendly labels for deliverable types not in the agent catalog (e.g. published
+  // workshop readouts, which are authored, not agent-generated).
+  const CUSTOM_TYPE_TITLES: Record<string, string> = { workshop_readout: 'Workshop Readout' }
+  const typeTitle = (t: string) => types.find((x) => x.type === t)?.title ?? CUSTOM_TYPE_TITLES[t] ?? t
+
+  // Focus a specific document when arriving via ?selected=<id> (e.g. right after
+  // publishing a workshop to Deliverables).
+  useEffect(() => {
+    const sel = new URLSearchParams(window.location.search).get('selected')
+    if (sel) setSelected(sel)
+  }, [])
+
+  const UNTAGGED = '— Untagged'
+  // Pivot: one group per tag (a document with N tags appears in N groups), plus an
+  // "Untagged" bucket. Ordered by tag name, Untagged last.
+  const tagGroups = useMemo(() => {
+    const byTag = new Map<string, DeliverableRow[]>()
+    for (const r of filtered) {
+      const tags = r.tags && r.tags.length ? r.tags : [UNTAGGED]
+      for (const t of tags) {
+        if (!byTag.has(t)) byTag.set(t, [])
+        byTag.get(t)!.push(r)
+      }
+    }
+    return [...byTag.entries()]
+      .sort(([a], [b]) => (a === UNTAGGED ? 1 : b === UNTAGGED ? -1 : a.localeCompare(b)))
+      .map(([tag, list]) => ({ tag, list }))
+  }, [filtered])
 
   // Scope the enrichment agent to the open document: which deliverable it is and
   // its section indexes, so the agent targets the deliverable tools correctly.
@@ -145,6 +184,66 @@ export default function DeliverablesPage() {
     await fetch('/api/deliverables', { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ id, status }) })
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)))
     setBusy(false)
+  }
+
+  const setTags = async (id: string, tags: string[]) => {
+    // Normalize client-side to match the API (trim, dedupe, non-empty).
+    const clean = [...new Set(tags.map((t) => t.trim()).filter(Boolean))]
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, tags: clean } : r)))
+    await fetch('/api/deliverables', { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ id, tags: clean }) }).catch(() => load())
+  }
+  const addTag = (r: DeliverableRow, tag: string) => {
+    const t = tag.trim()
+    if (!t) return
+    setTags(r.id, [...(r.tags ?? []), t])
+    setTagDraft('')
+  }
+  const removeTag = (r: DeliverableRow, tag: string) => setTags(r.id, (r.tags ?? []).filter((x) => x !== tag))
+  const toggleTagCollapse = (tag: string) =>
+    setCollapsedTags((prev) => {
+      const next = new Set(prev)
+      next.has(tag) ? next.delete(tag) : next.add(tag)
+      return next
+    })
+
+  const renderRow = (r: DeliverableRow) => {
+    const gathered = (r.evidence ?? []).filter((e) => e.ok).length
+    const total = (r.evidence ?? []).length
+    return (
+      <li key={r.id}>
+        <button
+          type="button"
+          onClick={() => setSelected(r.id)}
+          className={`w-full border-b border-border last:border-0 px-4 py-3 text-left transition-colors ${
+            current?.id === r.id ? 'bg-brand-50' : 'hover:bg-surface-muted/50'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <span className="text-body-sm font-medium text-text-primary">{r.title}</span>
+            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase font-medium ${STATUS_STYLE[r.status ?? 'draft']}`}>
+              {r.status}
+            </span>
+          </div>
+          <div className="mt-1 text-body-sm text-text-secondary">
+            {typeTitle(r.dtype)} &middot; <span className="font-mono">{r.workstream_code}</span>
+          </div>
+          {(r.tags ?? []).length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {(r.tags ?? []).map((t) => (
+                <span key={t} className="inline-flex items-center gap-1 rounded bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.5 text-[10px]">
+                  <Tag size={9} />
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="mt-1 text-[11px] text-text-tertiary">
+            {gathered}/{total} evidence slots filled
+            {r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString()}` : ''}
+          </div>
+        </button>
+      </li>
+    )
   }
 
   const remove = async (id: string) => {
@@ -234,38 +333,58 @@ export default function DeliverablesPage() {
                   </option>
                 ))}
               </select>
+              <div className="flex items-center gap-2">
+                <select
+                  className={`flex-1 min-w-0 ${SELECT_CLS}`}
+                  value={filterTag}
+                  aria-label="Filter by tag"
+                  disabled={allTags.length === 0}
+                  onChange={(e) => setFilterTag(e.target.value)}
+                >
+                  <option value="">{allTags.length ? 'All tags' : 'No tags yet'}</option>
+                  {allTags.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setPivotByTag((v) => !v)}
+                  title="Group the list by tag"
+                  className={`shrink-0 inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border text-body-sm transition-colors ${
+                    pivotByTag ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'
+                  }`}
+                >
+                  <Tag size={13} />
+                  Pivot
+                </button>
+              </div>
             </div>
-            <ul className="max-h-[65vh] overflow-y-auto">
-              {filtered.map((r) => {
-                const gathered = (r.evidence ?? []).filter((e) => e.ok).length
-                const total = (r.evidence ?? []).length
-                return (
-                  <li key={r.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelected(r.id)}
-                      className={`w-full border-b border-border last:border-0 px-4 py-3 text-left transition-colors ${
-                        current?.id === r.id ? 'bg-brand-50' : 'hover:bg-surface-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-body-sm font-medium text-text-primary">{r.title}</span>
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase font-medium ${STATUS_STYLE[r.status ?? 'draft']}`}>
-                          {r.status}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-body-sm text-text-secondary">
-                        {typeTitle(r.dtype)} &middot; <span className="font-mono">{r.workstream_code}</span>
-                      </div>
-                      <div className="mt-1 text-[11px] text-text-tertiary">
-                        {gathered}/{total} evidence slots filled
-                        {r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString()}` : ''}
-                      </div>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+            {pivotByTag ? (
+              <div className="max-h-[65vh] overflow-y-auto">
+                {tagGroups.map(({ tag, list }) => {
+                  const collapsed = collapsedTags.has(tag)
+                  return (
+                    <div key={tag}>
+                      <button
+                        type="button"
+                        onClick={() => toggleTagCollapse(tag)}
+                        className="w-full sticky top-0 z-10 flex items-center gap-2 bg-surface-muted/80 backdrop-blur px-3 py-2 border-b border-border text-left"
+                      >
+                        <ChevronDown size={13} className={`shrink-0 text-text-tertiary transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+                        <Tag size={12} className="shrink-0 text-brand-500" />
+                        <span className="flex-1 truncate text-body-sm font-semibold text-text-primary">{tag}</span>
+                        <span className="text-[11px] text-text-tertiary tabular-nums">{list.length}</span>
+                      </button>
+                      {!collapsed && <ul>{list.map(renderRow)}</ul>}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <ul className="max-h-[65vh] overflow-y-auto">{filtered.map(renderRow)}</ul>
+            )}
           </aside>
 
           <section className="bg-white rounded-lg border border-border shadow-card">
@@ -280,6 +399,35 @@ export default function DeliverablesPage() {
                       {typeTitle(current.dtype)} &middot; <span className="font-mono">{current.workstream_code}</span>
                       {current.subject ? ` · ${current.subject}` : ''}
                     </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Tag size={12} className="text-text-tertiary" />
+                      {(current.tags ?? []).map((t) => (
+                        <span key={t} className="group inline-flex items-center gap-1 rounded bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.5 text-[11px]">
+                          {t}
+                          <button type="button" aria-label={`Remove tag ${t}`} onClick={() => removeTag(current, t)} className="opacity-60 hover:opacity-100 hover:text-red-600">
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        value={tagDraft}
+                        onChange={(e) => setTagDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') addTag(current, tagDraft)
+                          if (e.key === 'Backspace' && !tagDraft && (current.tags ?? []).length) removeTag(current, current.tags![current.tags!.length - 1])
+                        }}
+                        onBlur={() => addTag(current, tagDraft)}
+                        placeholder="+ tag"
+                        aria-label="Add a tag"
+                        list="deliverable-tags"
+                        className="w-24 rounded border border-border bg-surface-input px-1.5 py-0.5 text-[11px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                      />
+                      <datalist id="deliverable-tags">
+                        {allTags.map((t) => (
+                          <option key={t} value={t} />
+                        ))}
+                      </datalist>
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 flex-wrap">
                     <Button variant="ai" size="sm" icon={<Sparkles size={14} />} onClick={() => setEnrichOpen(true)}>

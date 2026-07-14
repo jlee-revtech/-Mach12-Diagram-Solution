@@ -15,10 +15,11 @@ import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/
 import { createTranscription, type TranscriptionProvider } from '@/lib/workshop/transcription'
 import { exportRecapDocx, exportRecapPptx, exportFacilitationPptx } from '@/lib/workshop/export'
 import { loadFacilitationDeck } from '@/lib/workshop/deck'
+import { publishWorkshopToDeliverables } from '@/lib/workshop/publishToDeliverable'
 import type { WorkshopRecapData } from '@jlee-revtech/agent-core'
 import type { Workstream } from '@/lib/workstream/types'
 import {
-  Archive, ArrowLeft, ChevronDown, ClipboardList, Download, Link2, Mic,
+  Archive, ArrowLeft, ChevronDown, ClipboardList, Download, FileText, Link2, Mic,
   MoreHorizontal, Play, Plus, Presentation, RefreshCw, RotateCcw, Settings2,
   Sparkles, Upload,
 } from 'lucide-react'
@@ -279,6 +280,22 @@ export default function WorkshopRoomPage() {
       )
     } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
   }, [ws])
+
+  // Publish the workshop to the Deliverables section as a readout document (with
+  // its diagrams as svg blocks), then jump there so it can be downloaded as
+  // PPTX / Word / HTML with the rest of the engagement's deliverables.
+  const publishToDeliverables = useCallback(async () => {
+    if (!ws || !organization) return
+    setBusy('publish')
+    try {
+      const deck = await loadFacilitationDeck(null, ws.id)
+      if (deck.slides.length === 0) throw new Error('No facilitation content yet. Generate a section first.')
+      const id = await publishWorkshopToDeliverables(ws.id, organization.id, user?.id, {
+        workstreamCode: ws.workstream_codes?.[0] || 'enterprise',
+      })
+      router.push(`/deliverables?selected=${id}`)
+    } catch (e) { alert(e instanceof Error ? e.message : 'Failed to publish') } finally { setBusy(null) }
+  }, [ws, organization, user?.id, router])
 
   const setStatus = useCallback(async (status: Workshop['status']) => {
     if (!ws) return
@@ -570,6 +587,9 @@ export default function WorkshopRoomPage() {
                           <div className="my-1 border-t border-border" />
                           <button onClick={() => { setSectionsMenu(false); downloadFacilitationPptx() }} disabled={!hasAnyContent || busy === 'deck'} className={roomMenuItemCls}>
                             <Download size={14} className="mt-0.5 shrink-0" /> {busy === 'deck' ? 'Preparing deck...' : 'Download facilitation deck (PPTX)'}
+                          </button>
+                          <button onClick={() => { setSectionsMenu(false); publishToDeliverables() }} disabled={!hasAnyContent || busy === 'publish'} className={roomMenuItemCls}>
+                            <FileText size={14} className="mt-0.5 shrink-0" /> {busy === 'publish' ? 'Publishing...' : 'Publish to Deliverables'}
                           </button>
                           <button onClick={() => { setSectionsMenu(false); setShareOpen(true) }} className={roomMenuItemCls}>
                             <Link2 size={14} className="mt-0.5 shrink-0" /> Share prep (public link)
