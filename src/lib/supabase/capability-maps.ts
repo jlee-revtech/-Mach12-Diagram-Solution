@@ -11,6 +11,9 @@ import type {
   SystemDataElement,
   SipocComment,
   SipocRegion,
+  SipocLinkSource,
+  SipocLinkDownstream,
+  OrgOutputRef,
 } from '@/lib/sipoc/types'
 import type { Workstream } from '@/lib/workstream/types'
 
@@ -225,7 +228,8 @@ export async function createCapabilityInput(
   informationProductId: string,
   sortOrder: number,
   supplierPersonaIds: string[] = [],
-  sourceSystemIds: string[] = []
+  sourceSystemIds: string[] = [],
+  sourceOutputId: string | null = null
 ): Promise<CapabilityInput> {
   const res = await fetch(`${URL}/rest/v1/capability_inputs`, {
     method: 'POST',
@@ -235,6 +239,7 @@ export async function createCapabilityInput(
       information_product_id: informationProductId,
       supplier_persona_ids: supplierPersonaIds,
       source_system_ids: sourceSystemIds,
+      source_output_id: sourceOutputId,
       sort_order: sortOrder,
     }),
   })
@@ -245,7 +250,7 @@ export async function createCapabilityInput(
 
 export async function updateCapabilityInput(
   id: string,
-  updates: Partial<Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'feeding_system_id' | 'dimensions' | 'tag_ids' | 'sort_order' | 'archived_at'>>
+  updates: Partial<Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'feeding_system_id' | 'dimensions' | 'tag_ids' | 'sort_order' | 'archived_at' | 'source_output_id'>>
 ): Promise<void> {
   const res = await fetch(`${URL}/rest/v1/capability_inputs?id=eq.${id}`, {
     method: 'PATCH',
@@ -325,6 +330,109 @@ export async function deleteCapabilityOutput(id: string): Promise<void> {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.message || 'Failed to delete capability output')
   }
+}
+
+// ─── SIPOC output → input sequence links ───────────────
+
+// Resolve, for a set of upstream output ids, the process + map each lives in.
+// Keyed by output id. Powers "⬅ from {process}" provenance on linked inputs.
+export async function resolveInputSources(sourceOutputIds: string[]): Promise<Record<string, SipocLinkSource>> {
+  const ids = Array.from(new Set(sourceOutputIds.filter(Boolean)))
+  if (ids.length === 0) return {}
+  const select = 'id,information_product_id,capabilities(id,name,capability_map_id,capability_maps(id,title))'
+  const res = await fetch(
+    `${URL}/rest/v1/capability_outputs?id=in.(${ids.join(',')})&select=${select}`,
+    { headers: headers() }
+  )
+  if (!res.ok) return {}
+  const rows = (await res.json()) as Array<{
+    id: string
+    information_product_id: string
+    capabilities?: { id: string; name: string; capability_map_id: string; capability_maps?: { id: string; title: string } }
+  }>
+  const out: Record<string, SipocLinkSource> = {}
+  for (const r of rows) {
+    const cap = r.capabilities
+    const map = cap?.capability_maps
+    if (!cap || !map) continue
+    out[r.id] = {
+      outputId: r.id,
+      informationProductId: r.information_product_id,
+      capabilityId: cap.id,
+      capabilityName: cap.name,
+      mapId: map.id,
+      mapTitle: map.title,
+    }
+  }
+  return out
+}
+
+// Resolve, for a set of output ids in the current map, the downstream inputs
+// (in ANY map) that link back to them. Keyed by output id → list.
+// Powers "➡ feeds {process(es)}" on outputs.
+export async function resolveOutputDownstream(outputIds: string[]): Promise<Record<string, SipocLinkDownstream[]>> {
+  const ids = Array.from(new Set(outputIds.filter(Boolean)))
+  if (ids.length === 0) return {}
+  const select = 'id,capability_id,source_output_id,capabilities(id,name,capability_map_id,capability_maps(id,title))'
+  const res = await fetch(
+    `${URL}/rest/v1/capability_inputs?source_output_id=in.(${ids.join(',')})&archived_at=is.null&select=${select}`,
+    { headers: headers() }
+  )
+  if (!res.ok) return {}
+  const rows = (await res.json()) as Array<{
+    id: string
+    source_output_id: string | null
+    capabilities?: { id: string; name: string; capability_map_id: string; capability_maps?: { id: string; title: string } }
+  }>
+  const out: Record<string, SipocLinkDownstream[]> = {}
+  for (const r of rows) {
+    const cap = r.capabilities
+    const map = cap?.capability_maps
+    if (!cap || !map || !r.source_output_id) continue
+    ;(out[r.source_output_id] ||= []).push({
+      inputId: r.id,
+      capabilityId: cap.id,
+      capabilityName: cap.name,
+      mapId: map.id,
+      mapTitle: map.title,
+    })
+  }
+  return out
+}
+
+// List every non-archived Output across the org's L3 processes (non-archived
+// maps), with process + map + IP context. Powers the "link upstream output"
+// picker. RLS restricts capability_outputs to the caller's org, so no explicit
+// org filter is needed.
+export async function listOrgOutputsForLinking(): Promise<OrgOutputRef[]> {
+  const select = 'id,information_product_id,information_products(id,name,category),capabilities!inner(id,name,level,capability_map_id,capability_maps!inner(id,title,archived_at))'
+  const url = `${URL}/rest/v1/capability_outputs?archived_at=is.null&select=${select}`
+  const rows = await fetchAllPaginated<{
+    id: string
+    information_product_id: string
+    information_products?: { id: string; name: string; category?: string | null }
+    capabilities?: { id: string; name: string; level: number; capability_map_id: string; capability_maps?: { id: string; title: string; archived_at?: string | null } }
+  }>(url, headers())
+  const out: OrgOutputRef[] = []
+  for (const r of rows) {
+    const cap = r.capabilities
+    const map = cap?.capability_maps
+    const ip = r.information_products
+    if (!cap || !map || !ip) continue
+    if (cap.level !== 3) continue
+    if (map.archived_at) continue
+    out.push({
+      outputId: r.id,
+      informationProductId: r.information_product_id,
+      ipName: ip.name,
+      ipCategory: ip.category || undefined,
+      capabilityId: cap.id,
+      capabilityName: cap.name,
+      mapId: map.id,
+      mapTitle: map.title,
+    })
+  }
+  return out
 }
 
 // ─── Personas (org-scoped) ─────────────────────────────

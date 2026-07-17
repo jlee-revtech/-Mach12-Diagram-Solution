@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Maximize2, Minimize2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Maximize2, Minimize2, Link2, Unlink, ExternalLink, ArrowRight, X } from 'lucide-react'
 import { Button } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import type { Persona, InformationProduct, LogicalSystem, Dimension, Tag } from '@/lib/sipoc/types'
+import type { Persona, InformationProduct, LogicalSystem, Dimension, Tag, OrgOutputRef, SipocLinkSource, CapabilityInput } from '@/lib/sipoc/types'
 import { PERSONA_COLORS, IP_CATEGORIES, TAG_COLORS } from '@/lib/sipoc/types'
+import { listOrgOutputsForLinking } from '@/lib/supabase/capability-maps'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 
 // ─── Inline quick-create input ──────────────────────────
@@ -801,6 +803,231 @@ function RollupSummary({ rollup, capabilityId }: { rollup: import('@/lib/sipoc/t
   )
 }
 
+// ─── Upstream Output Picker (link an output from another process) ──
+function UpstreamOutputPicker({ capabilityId, onPick, onClose }: {
+  capabilityId: string
+  onPick: (output: OrgOutputRef) => void
+  onClose: () => void
+}) {
+  const [outputs, setOutputs] = useState<OrgOutputRef[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('')
+  const inputs = useSIPOCStore(s => s.inputs)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listOrgOutputsForLinking()
+      .then(list => { if (!cancelled) { setOutputs(list); setLoading(false) } })
+      .catch(() => { if (!cancelled) setLoading(false) })
+    setTimeout(() => searchRef.current?.focus(), 50)
+    return () => { cancelled = true }
+  }, [])
+
+  // Outputs already linked as a source on THIS capability — hide to avoid dupes.
+  const alreadyLinked = new Set(
+    (inputs[capabilityId] || []).filter(i => i.source_output_id).map(i => i.source_output_id)
+  )
+
+  const f = filter.trim().toLowerCase()
+  const candidates = outputs.filter(o =>
+    o.capabilityId !== capabilityId &&        // not this process's own output
+    !alreadyLinked.has(o.outputId) &&         // not already linked here
+    (!f ||
+      o.ipName.toLowerCase().includes(f) ||
+      o.capabilityName.toLowerCase().includes(f) ||
+      o.mapTitle.toLowerCase().includes(f))
+  )
+
+  // Group by map → process for scannability
+  const groups = new Map<string, { mapTitle: string; capName: string; items: OrgOutputRef[] }>()
+  for (const o of candidates) {
+    const key = `${o.mapId}::${o.capabilityId}`
+    if (!groups.has(key)) groups.set(key, { mapTitle: o.mapTitle, capName: o.capabilityName, items: [] })
+    groups.get(key)!.items.push(o)
+  }
+  const groupList = [...groups.values()].sort((a, b) =>
+    a.mapTitle.localeCompare(b.mapTitle) || a.capName.localeCompare(b.capName)
+  )
+  groupList.forEach(g => g.items.sort((a, b) => a.ipName.localeCompare(b.ipName)))
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="w-[34rem] max-w-[94vw] max-h-[82vh] flex flex-col bg-white border border-border rounded-xl shadow-card-hover overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Link2 size={15} className="text-indigo-500" />
+            <h3 className="text-heading-sm font-display text-text-primary">Link an upstream output</h3>
+          </div>
+          <Button variant="ghost" size="sm" iconOnly icon={<X size={16} />} aria-label="Close" onClick={onClose} />
+        </div>
+        <div className="px-5 pt-3 pb-2 border-b border-border">
+          <p className="text-[11px] text-text-tertiary leading-snug mb-2">
+            Pick an <span className="text-status-green font-medium">Output</span> from another process. It becomes an
+            Input here to show the sequence — its suppliers, systems and data objects are inherited, so you don&apos;t
+            re-enter them.
+          </p>
+          <input
+            ref={searchRef}
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            placeholder="Search outputs, processes, or maps..."
+            className="w-full h-9 px-3 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary placeholder:text-text-tertiary focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 focus:outline-none"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          {loading ? (
+            <div className="text-body-sm text-text-tertiary py-6 text-center">Loading outputs…</div>
+          ) : groupList.length === 0 ? (
+            <div className="text-body-sm text-text-tertiary py-6 text-center italic">
+              {outputs.length === 0 ? 'No outputs found in any map yet.' : 'No matching outputs.'}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {groupList.map(g => (
+                <div key={`${g.mapTitle}::${g.capName}`}>
+                  <div className="flex items-center gap-1.5 px-1 mb-1">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary truncate">
+                      {g.mapTitle}
+                    </span>
+                    <span className="text-text-tertiary/50">/</span>
+                    <span className="text-[10px] font-semibold text-text-secondary truncate">{g.capName}</span>
+                  </div>
+                  <div className="space-y-1">
+                    {g.items.map(o => (
+                      <button
+                        key={o.outputId}
+                        type="button"
+                        onClick={() => onPick(o)}
+                        className="w-full text-left px-3 py-2 rounded-lg border border-border hover:border-indigo-400/60 hover:bg-indigo-50/50 transition-colors flex items-center gap-2 group"
+                      >
+                        <div className="w-1 h-4 rounded-full bg-[#10B981]/60 shrink-0" />
+                        <span className="text-body-sm text-text-primary flex-1 truncate">{o.ipName}</span>
+                        {o.ipCategory && (
+                          <span className="text-[10px] font-mono uppercase text-text-tertiary shrink-0">{o.ipCategory}</span>
+                        )}
+                        <Link2 size={12} className="text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Linked Input Row (fed by another process's output) ──
+function LinkedInputRow({ input, capabilityId, orgId, source, expanded, onToggle, onOpenSource, registerRef }: {
+  input: CapabilityInput
+  capabilityId: string
+  orgId: string
+  source: SipocLinkSource | null
+  expanded: boolean
+  onToggle: () => void
+  onOpenSource: (mapId: string, capId: string) => void
+  registerRef: (el: HTMLDivElement | null) => void
+}) {
+  const informationProducts = useSIPOCStore(s => s.informationProducts)
+  const unlinkInput = useSIPOCStore(s => s.unlinkInput)
+  const archiveInput = useSIPOCStore(s => s.archiveInput)
+  const removeInput = useSIPOCStore(s => s.removeInput)
+  const updateInputTags = useSIPOCStore(s => s.updateInputTags)
+  const ip = informationProducts.find(p => p.id === input.information_product_id)
+
+  return (
+    <div
+      ref={registerRef}
+      className={`border rounded-lg overflow-hidden transition-colors ${expanded ? 'border-indigo-300' : 'border-indigo-200'} bg-indigo-50/40`}
+    >
+      <div
+        className="flex items-center gap-2 px-2.5 py-2 cursor-pointer hover:bg-white/60 transition-colors"
+        onClick={onToggle}
+      >
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className={`shrink-0 text-indigo-400 transition-transform ${expanded ? 'rotate-90' : ''}`}>
+          <path d="M2 1l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <Link2 size={11} className="text-indigo-500 shrink-0" />
+        {ip ? (
+          <span className="text-body-sm font-medium text-text-primary flex-1 min-w-0 truncate">{ip.name}</span>
+        ) : (
+          <span className="text-body-sm font-medium italic text-text-tertiary flex-1 truncate">(deleted)</span>
+        )}
+        <span
+          className="inline-flex items-center gap-1 rounded bg-indigo-100 text-indigo-700 text-[10px] px-1.5 py-0.5 max-w-[150px] shrink-0"
+          title={source ? `Fed by ${source.capabilityName} in ${source.mapTitle}` : 'Linked upstream output'}
+        >
+          <ArrowRight size={9} className="rotate-180 shrink-0" />
+          <span className="truncate">{source ? source.capabilityName : 'linked'}</span>
+        </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); archiveInput(input.id, capabilityId) }}
+          className="text-text-tertiary hover:text-brand-600 transition-colors shrink-0"
+          title="Unassign from L3 (keeps the link; restore from Archived)"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <rect x="1" y="2" width="8" height="2" stroke="currentColor" strokeWidth="1"/>
+            <path d="M2 4v5h6V4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4 6h2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+          </svg>
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); removeInput(input.id, capabilityId) }}
+          className="text-text-tertiary hover:text-red-600 transition-colors shrink-0"
+          title="Delete this linked input"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      {expanded && (
+        <div className="px-2.5 pb-2.5 space-y-2 border-t border-indigo-200/70 pt-2">
+          <div className="text-[10px] text-text-secondary leading-snug bg-white/60 border border-indigo-100 rounded-md px-2 py-1.5">
+            Inherited from{' '}
+            <span className="font-semibold text-indigo-700">{source?.capabilityName || 'upstream process'}</span>
+            {source?.mapTitle && <span className="text-text-tertiary"> · {source.mapTitle}</span>}.
+            {' '}Suppliers, systems and data objects come from the source output — no need to re-enter them here.
+          </div>
+          <div className="flex items-center gap-1.5">
+            {source && (
+              <Button
+                variant="secondary"
+                size="sm"
+                trailingIcon={<ExternalLink size={11} />}
+                onClick={() => onOpenSource(source.mapId, source.capabilityId)}
+              >
+                Open source
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Unlink size={11} />}
+              onClick={() => unlinkInput(input.id, capabilityId)}
+              title="Break the link and keep this as a normal, editable input"
+            >
+              Unlink
+            </Button>
+          </div>
+          {/* Tags still allowed on a linked input for filtering */}
+          <div>
+            <div className="text-label uppercase text-text-secondary mb-1">Tags</div>
+            <TagPicker
+              selectedIds={input.tag_ids || []}
+              onChange={ids => updateInputTags(input.id, capabilityId, ids)}
+              orgId={orgId}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Capability Detail Editor ───────────────────────────
 function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId: string }) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
@@ -864,6 +1091,15 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const updateOutputTags = useSIPOCStore(s => s.updateOutputTags)
   const addInformationProduct = useSIPOCStore(s => s.addInformationProduct)
   const updateInformationProduct = useSIPOCStore(s => s.updateInformationProduct)
+  const inputSources = useSIPOCStore(s => s.inputSources)
+  const outputDownstream = useSIPOCStore(s => s.outputDownstream)
+  const linkUpstreamOutput = useSIPOCStore(s => s.linkUpstreamOutput)
+
+  const router = useRouter()
+  const [linkPickerOpen, setLinkPickerOpen] = useState(false)
+  const openLinkedProcess = useCallback((mapId: string, capId: string) => {
+    router.push(`/capability-map/${mapId}?cap=${capId}`)
+  }, [router])
 
   const capability = capabilities.find(c => c.id === capabilityId)
   const getRollup = useSIPOCStore(s => s.getRollup)
@@ -1113,6 +1349,22 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
         <div className="space-y-2">
           {activeInputs.map(input => {
             const ip = informationProducts.find(p => p.id === input.information_product_id)
+            // Inputs fed by another process's output render as a compact, inherited row.
+            if (input.source_output_id) {
+              return (
+                <LinkedInputRow
+                  key={input.id}
+                  input={input}
+                  capabilityId={capabilityId}
+                  orgId={orgId}
+                  source={inputSources[input.source_output_id] || null}
+                  expanded={expandedItems.has(input.id)}
+                  onToggle={() => toggleItem(input.id)}
+                  onOpenSource={openLinkedProcess}
+                  registerRef={(el) => { itemRefs.current[input.id] = el }}
+                />
+              )
+            }
             const isDragging = dragState?.side === 'input' && dragState.id === input.id
             const drop = dropTarget?.side === 'input' && dropTarget.id === input.id ? dropTarget : null
             return (
@@ -1394,6 +1646,23 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
 
           {/* Quick-create new IP as input */}
           <QuickAdd placeholder="New input info product..." onAdd={handleQuickCreateAndAddInput} />
+
+          {/* Link an upstream process's output as an input (shows sequence, no re-entry) */}
+          <button
+            type="button"
+            onClick={() => setLinkPickerOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-lg border border-dashed border-indigo-300 text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
+          >
+            <Link2 size={11} />
+            Link an upstream output
+          </button>
+          {linkPickerOpen && (
+            <UpstreamOutputPicker
+              capabilityId={capabilityId}
+              onPick={async (output) => { await linkUpstreamOutput(capabilityId, output); setLinkPickerOpen(false) }}
+              onClose={() => setLinkPickerOpen(false)}
+            />
+          )}
         </div>
       </div>
 
@@ -1466,6 +1735,25 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
                     </svg>
                   </button>
                 </div>
+                {/* Feeds → downstream processes (this output linked as their input) */}
+                {(outputDownstream[output.id] || []).length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap px-2.5 pb-1.5">
+                    <ArrowRight size={10} className="text-[#10B981] shrink-0" />
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary mr-0.5">feeds</span>
+                    {(outputDownstream[output.id] || []).map(d => (
+                      <button
+                        key={d.inputId}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openLinkedProcess(d.mapId, d.capabilityId) }}
+                        className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] px-1.5 py-0.5 max-w-[150px] hover:bg-emerald-100 transition-colors"
+                        title={`Feeds ${d.capabilityName} in ${d.mapTitle}`}
+                      >
+                        <span className="truncate">{d.capabilityName}</span>
+                        <ExternalLink size={9} className="shrink-0 opacity-60" />
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {expandedItems.has(output.id) && <div className="px-2.5 pb-2.5 space-y-2 border-t border-border pt-2">
                 {/* Tags (reusable, org-scoped) */}
                 <div>

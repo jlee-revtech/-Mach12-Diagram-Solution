@@ -15,6 +15,9 @@ import type {
   SystemDataElement,
   SipocComment,
   SipocRegion,
+  SipocLinkSource,
+  SipocLinkDownstream,
+  OrgOutputRef,
 } from './types'
 import * as api from '@/lib/supabase/capability-maps'
 import type { Workstream } from '@/lib/workstream/types'
@@ -37,6 +40,10 @@ interface SIPOCState {
   capabilities: Capability[]
   inputs: Record<string, CapabilityInput[]>   // keyed by capability_id
   outputs: Record<string, CapabilityOutput[]>  // keyed by capability_id
+
+  // Cross-map SIPOC sequence links (resolved provenance)
+  inputSources: Record<string, SipocLinkSource>          // keyed by upstream output id
+  outputDownstream: Record<string, SipocLinkDownstream[]> // keyed by output id (this map's outputs)
 
   // UI state
   readOnly: boolean
@@ -65,6 +72,11 @@ interface SIPOCState {
   reorderCapability: (id: string, newSortOrder: number) => Promise<void>
   setSelectedCapability: (id: string | null) => void
   getCapabilityTree: () => import('./types').CapabilityTreeNode[]
+
+  // ─── SIPOC sequence links ─────────────────────────────
+  loadLinks: () => Promise<void>
+  linkUpstreamOutput: (capabilityId: string, output: OrgOutputRef) => Promise<void>
+  unlinkInput: (inputId: string, capabilityId: string) => Promise<void>
 
   // ─── Input CRUD ───────────────────────────────────────
   addInput: (capabilityId: string, informationProductId: string) => Promise<void>
@@ -295,6 +307,8 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   capabilities: [],
   inputs: {},
   outputs: {},
+  inputSources: {},
+  outputDownstream: {},
   readOnly: false,
   setReadOnly: (v) => set({ readOnly: v }),
   selectedCapabilityId: null,
@@ -337,7 +351,9 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       outputs[c.id] = outputResults[i]
     })
 
-    set({ map, capabilities, inputs, outputs, loading: false })
+    set({ map, capabilities, inputs, outputs, inputSources: {}, outputDownstream: {}, loading: false })
+    // Resolve cross-map sequence links (provenance) in the background — non-blocking.
+    get().loadLinks()
     const dTotal = performance.now() - t0
     const inputCount = inputResults.reduce((n, r) => n + r.length, 0)
     const outputCount = outputResults.reduce((n, r) => n + r.length, 0)
@@ -474,6 +490,89 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     return buildTree(null)
   },
 
+  // ─── SIPOC sequence links ─────────────────────────────
+
+  loadLinks: async () => {
+    const { inputs, outputs } = get()
+    const srcIds = Array.from(new Set(
+      Object.values(inputs).flat()
+        .filter(i => !i.archived_at && i.source_output_id)
+        .map(i => i.source_output_id as string)
+    ))
+    const outIds = Object.values(outputs).flat()
+      .filter(o => !o.archived_at)
+      .map(o => o.id)
+    try {
+      const [sources, downstream] = await Promise.all([
+        api.resolveInputSources(srcIds),
+        api.resolveOutputDownstream(outIds),
+      ])
+      set({ inputSources: sources, outputDownstream: downstream })
+    } catch (e) {
+      console.error('Failed to load SIPOC sequence links:', e)
+    }
+  },
+
+  linkUpstreamOutput: async (capabilityId, output) => {
+    const currentInputs = get().inputs[capabilityId] || []
+    // Intentionally NO metadata merge — a linked input inherits from the source
+    // output; suppliers/systems/dimensions are not duplicated onto this row.
+    const input = await api.createCapabilityInput(
+      capabilityId, output.informationProductId, currentInputs.length, [], [], output.outputId,
+    )
+    const cap = get().capabilities.find(c => c.id === capabilityId)
+    const map = get().map
+    // Optimistic forward provenance (this input ⬅ source output)
+    const inputSources: Record<string, SipocLinkSource> = {
+      ...get().inputSources,
+      [output.outputId]: {
+        outputId: output.outputId,
+        informationProductId: output.informationProductId,
+        capabilityId: output.capabilityId,
+        capabilityName: output.capabilityName,
+        mapId: output.mapId,
+        mapTitle: output.mapTitle,
+      },
+    }
+    // Optimistic reverse provenance (source output ➡ this input) when the source
+    // output lives in the currently-loaded map.
+    const outputDownstream = { ...get().outputDownstream }
+    const sourceOutputInThisMap = (get().outputs[output.capabilityId] || []).some(o => o.id === output.outputId)
+    if (map && sourceOutputInThisMap) {
+      const list = outputDownstream[output.outputId] ? [...outputDownstream[output.outputId]] : []
+      if (!list.some(d => d.inputId === input.id)) {
+        list.push({
+          inputId: input.id,
+          capabilityId,
+          capabilityName: cap?.name || '(process)',
+          mapId: map.id,
+          mapTitle: map.title,
+        })
+      }
+      outputDownstream[output.outputId] = list
+    }
+    set({
+      inputs: { ...get().inputs, [capabilityId]: [...currentInputs, input] },
+      inputSources,
+      outputDownstream,
+    })
+    // Reconcile with the server (covers cross-map reverse links).
+    get().loadLinks()
+  },
+
+  unlinkInput: async (inputId, capabilityId) => {
+    await api.updateCapabilityInput(inputId, { source_output_id: null })
+    set({
+      inputs: {
+        ...get().inputs,
+        [capabilityId]: (get().inputs[capabilityId] || []).map(i =>
+          i.id === inputId ? { ...i, source_output_id: null } : i
+        ),
+      },
+    })
+    await get().loadLinks()
+  },
+
   // ─── Input CRUD ───────────────────────────────────────
 
   addInput: async (capabilityId, informationProductId) => {
@@ -490,6 +589,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   removeInput: async (inputId, capabilityId) => {
+    const wasLinked = !!(get().inputs[capabilityId] || []).find(i => i.id === inputId)?.source_output_id
     set({
       inputs: {
         ...get().inputs,
@@ -497,6 +597,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       },
     })
     await api.deleteCapabilityInput(inputId)
+    if (wasLinked) get().loadLinks()
   },
 
   reorderInputs: async (capabilityId, orderedIds) => {
@@ -516,6 +617,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
 
   archiveInput: async (inputId, capabilityId) => {
     const now = new Date().toISOString()
+    const wasLinked = !!(get().inputs[capabilityId] || []).find(i => i.id === inputId)?.source_output_id
     set({
       inputs: {
         ...get().inputs,
@@ -523,9 +625,11 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       },
     })
     await api.updateCapabilityInput(inputId, { archived_at: now })
+    if (wasLinked) get().loadLinks()
   },
 
   unarchiveInput: async (inputId, capabilityId) => {
+    const isLinked = !!(get().inputs[capabilityId] || []).find(i => i.id === inputId)?.source_output_id
     set({
       inputs: {
         ...get().inputs,
@@ -533,6 +637,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       },
     })
     await api.updateCapabilityInput(inputId, { archived_at: null })
+    if (isLinked) get().loadLinks()
   },
 
   updateInputSuppliers: async (inputId, capabilityId, personaIds) => {
@@ -628,6 +733,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   removeOutput: async (outputId, capabilityId) => {
+    const hadDownstream = (get().outputDownstream[outputId] || []).length > 0
     set({
       outputs: {
         ...get().outputs,
@@ -635,6 +741,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       },
     })
     await api.deleteCapabilityOutput(outputId)
+    if (hadDownstream) get().loadLinks()
   },
 
   reorderOutputs: async (capabilityId, orderedIds) => {
@@ -654,6 +761,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
 
   archiveOutput: async (outputId, capabilityId) => {
     const now = new Date().toISOString()
+    const hadDownstream = (get().outputDownstream[outputId] || []).length > 0
     set({
       outputs: {
         ...get().outputs,
@@ -661,6 +769,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
       },
     })
     await api.updateCapabilityOutput(outputId, { archived_at: now })
+    if (hadDownstream) get().loadLinks()
   },
 
   unarchiveOutput: async (outputId, capabilityId) => {

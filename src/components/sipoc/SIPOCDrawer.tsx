@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   X,
   Check,
@@ -18,6 +19,9 @@ import {
   Lock,
   Workflow,
   User,
+  Link2,
+  ArrowRight,
+  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
@@ -215,9 +219,12 @@ function HFlowArrow({ color }: { color: string }) {
 
 function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { input: HydratedCapability['inputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean; capabilityId: string }) {
   const readOnly = useSIPOCStore(s => s.readOnly)
+  const inputSources = useSIPOCStore(s => s.inputSources)
+  const router = useRouter()
+  const source = input.source_output_id ? inputSources[input.source_output_id] : null
   const hasSuppliers = input.supplierPersonas.length > 0
   const hasSystems = input.sourceSystems.length > 0
-  const hasLeft = hasSuppliers || hasSystems
+  const hasLeft = hasSuppliers || hasSystems || !!source
 
   return (
     <div className="flex items-stretch gap-0 group/lane">
@@ -227,6 +234,28 @@ function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { i
         <div className="absolute top-1.5 right-1.5 z-10">
           <ArtifactCommentBadge capabilityId={capabilityId} region="S" itemId={input.id} />
         </div>
+        {source && (
+          <div className="mb-1.5">
+            {readOnly ? (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] px-2 py-1 max-w-full">
+                <Link2 size={11} className="shrink-0" />
+                <span className="truncate">{source.capabilityName}</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); router.push(`/capability-map/${source.mapId}?cap=${source.capabilityId}`) }}
+                className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] px-2 py-1 max-w-full hover:bg-indigo-100 transition-colors"
+                title={`Fed by ${source.capabilityName} in ${source.mapTitle}`}
+              >
+                <Link2 size={11} className="shrink-0" />
+                <span className="truncate">{source.capabilityName}</span>
+                <ExternalLink size={9} className="shrink-0 opacity-60" />
+              </button>
+            )}
+            <div className="text-[9px] text-text-tertiary uppercase tracking-wider mt-0.5 pl-0.5">upstream process</div>
+          </div>
+        )}
         {hasSuppliers && (
           <div className="space-y-1 mb-1.5">
             {input.supplierPersonas.map(p => (
@@ -296,6 +325,9 @@ function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { i
 
 function OutputLane({ output, onRemove, onClickCard, showDims, capabilityId }: { output: HydratedCapability['outputs'][number]; onRemove: () => void; onClickCard: () => void; showDims?: boolean; capabilityId: string }) {
   const readOnly = useSIPOCStore(s => s.readOnly)
+  const outputDownstream = useSIPOCStore(s => s.outputDownstream)
+  const router = useRouter()
+  const downstream = outputDownstream[output.id] || []
   const hasConsumers = output.consumerPersonas.length > 0
   const hasSystems = output.destinationSystems.length > 0
 
@@ -334,6 +366,29 @@ function OutputLane({ output, onRemove, onClickCard, showDims, capabilityId }: {
                 {si > 0 && <MiniLineageArrow />}
                 <SystemChip system={sys} small />
               </div>
+            ))}
+          </div>
+        )}
+        {/* Feeds → downstream processes (this output linked as their input) */}
+        {downstream.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap mt-1.5 pl-1">
+            <ArrowRight size={10} className="text-emerald-600 shrink-0" />
+            <span className="text-[10px] text-text-tertiary uppercase mr-0.5">feeds</span>
+            {downstream.map(d => readOnly ? (
+              <span key={d.inputId} className="inline-flex items-center rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] px-1.5 py-0.5 max-w-[130px] truncate" title={`Feeds ${d.capabilityName} in ${d.mapTitle}`}>
+                {d.capabilityName}
+              </span>
+            ) : (
+              <button
+                key={d.inputId}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); router.push(`/capability-map/${d.mapId}?cap=${d.capabilityId}`) }}
+                className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] px-1.5 py-0.5 max-w-[140px] hover:bg-emerald-100 transition-colors"
+                title={`Feeds ${d.capabilityName} in ${d.mapTitle}`}
+              >
+                <span className="truncate">{d.capabilityName}</span>
+                <ExternalLink size={9} className="shrink-0 opacity-60" />
+              </button>
             ))}
           </div>
         )}

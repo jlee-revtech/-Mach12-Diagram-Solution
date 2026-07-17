@@ -169,9 +169,48 @@ export interface CapabilityInput {
   feeding_system_id: string | null   // single system that feeds the process
   dimensions: Dimension[]
   tag_ids?: string[]
+  // When set, this input is fed by another process's Output (the upstream
+  // capability_outputs row). The upstream PROCESS is the effective supplier;
+  // suppliers/systems/dimensions are inherited from the source, not re-entered.
+  source_output_id?: string | null
   sort_order: number
   archived_at?: string | null
   created_at: string
+}
+
+// ─── Cross-map SIPOC sequence links ────────────────────
+// Resolved provenance for a linked input: which upstream output (and the
+// process + map it lives in) feeds this input.
+export interface SipocLinkSource {
+  outputId: string
+  informationProductId: string
+  capabilityId: string
+  capabilityName: string
+  mapId: string
+  mapTitle: string
+}
+
+// Resolved provenance for an output: the downstream input(s) it feeds, and
+// the process + map each of those inputs lives in.
+export interface SipocLinkDownstream {
+  inputId: string
+  capabilityId: string
+  capabilityName: string
+  mapId: string
+  mapTitle: string
+}
+
+// A single output available to be linked as an upstream source, with the
+// process + map context needed for the picker.
+export interface OrgOutputRef {
+  outputId: string
+  informationProductId: string
+  ipName: string
+  ipCategory?: string
+  capabilityId: string
+  capabilityName: string
+  mapId: string
+  mapTitle: string
 }
 
 // ─── Capability Outputs (with consumer tags) ───────────

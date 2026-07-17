@@ -12,9 +12,10 @@ import CapabilityMapView from '@/components/sipoc/CapabilityMapView'
 import AIBulkLoadPanel from '@/components/sipoc/AIBulkLoadPanel'
 import AIAutoFillBlankL3sPanel from '@/components/sipoc/AIAutoFillBlankL3sPanel'
 import DataArchitectureView from '@/components/sipoc/DataArchitectureView'
+import ProcessFlowView from '@/components/sipoc/ProcessFlowView'
 import VersionBadge from '@/components/VersionBadge'
 import { Button, LoadingState } from '@/components/common'
-import { ArrowLeft, Share2, Network, Download, Sparkles, FileText, Plus, X, Pencil } from 'lucide-react'
+import { ArrowLeft, Share2, Network, Download, Sparkles, FileText, Plus, X, Pencil, Waypoints } from 'lucide-react'
 import { createCapabilityMapShare, listCapabilityMapShares, deleteCapabilityMapShare, type CapabilityMapShare } from '@/lib/supabase/capability-maps'
 import { useCapabilityMapCollab } from '@/lib/collab/useCapabilityMapCollab'
 import { CapabilityMapCollabProvider } from '@/lib/collab/CapabilityMapCollabContext'
@@ -42,6 +43,7 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
   const [aiPromptOverride, setAiPromptOverride] = useState<string | null>(null)
   const [showExecSummary, setShowExecSummary] = useState(false)
   const [showDataArch, setShowDataArch] = useState(false)
+  const [showProcessFlow, setShowProcessFlow] = useState(false)
   const [bulkLoadTarget, setBulkLoadTarget] = useState<{ id: string; name: string } | null>(null)
   const [showAutoFill, setShowAutoFill] = useState(false)
   const loadedRef = useRef(false)
@@ -139,6 +141,21 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
       useSIPOCStore.getState().loadOrgEntities(organization.id)
     }
   }, [organization])
+
+  // Deep-link: ?cap=<id> auto-opens that capability's SIPOC (used by cross-map
+  // sequence links so "from →" / "feeds →" jumps land on the linked process).
+  // Read from window (not useSearchParams) to avoid the Suspense-boundary build
+  // requirement on this client page.
+  const capSelectedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (loading || !map || typeof window === 'undefined') return
+    const capParam = new URLSearchParams(window.location.search).get('cap')
+    if (!capParam || capSelectedRef.current === capParam) return
+    if (useSIPOCStore.getState().capabilities.some(c => c.id === capParam)) {
+      capSelectedRef.current = capParam
+      useSIPOCStore.getState().setSelectedCapability(capParam)
+    }
+  }, [loading, map])
 
   // Sync title input
   useEffect(() => {
@@ -341,6 +358,17 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
+        {/* Process Sequence (cross-map output → input flow) */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowProcessFlow(true)}
+          title="View the output → input sequence linking processes across maps"
+          icon={<Waypoints size={12} />}
+        >
+          Process Flow
+        </Button>
+
         {/* Data Architecture button */}
         <Button
           variant="secondary"
@@ -426,6 +454,11 @@ export default function CapabilityMapPage({ params }: { params: Promise<{ id: st
       {/* Data & System Architecture */}
       {showDataArch && (
         <DataArchitectureView onClose={() => setShowDataArch(false)} />
+      )}
+
+      {/* Process Sequence (cross-map output → input flow) */}
+      {showProcessFlow && (
+        <ProcessFlowView onClose={() => setShowProcessFlow(false)} />
       )}
 
       {/* AI Bulk Load Panel */}
