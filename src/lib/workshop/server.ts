@@ -72,6 +72,46 @@ export async function workstreamName(db: SupabaseClient, orgId: string, code: st
   return (data?.name as string) || code
 }
 
+/** Assemble the facilitator-attachment context for prep generation: each
+ *  attachment's extracted text under a file-name heading, capped to totalChars
+ *  (split evenly across attachments so one big file cannot crowd out the rest). */
+export async function assembleAttachmentsContext(
+  db: SupabaseClient,
+  workshopId: string,
+  totalChars = 18000,
+): Promise<string | undefined> {
+  const { data } = await db
+    .from('workshop_attachments')
+    .select('file_name, extracted_text, status')
+    .eq('workshop_id', workshopId)
+    .eq('status', 'extracted')
+    .order('created_at', { ascending: true })
+  const rows = (data || []).filter((r) => (r.extracted_text as string | null)?.trim())
+  if (!rows.length) return undefined
+  const per = Math.max(1500, Math.floor(totalChars / rows.length))
+  const parts = rows.map((r) => {
+    let text = (r.extracted_text as string).trim()
+    if (text.length > per) text = text.slice(0, per) + '\n...(truncated)'
+    return `### ${r.file_name as string}\n${text}`
+  })
+  return parts.join('\n\n').slice(0, totalChars + 200)
+}
+
+/** The workshop's primary workstream roster (code -> name), filtered to codes
+ *  still in the workshop's active set. */
+export async function primaryRoster(
+  db: SupabaseClient,
+  orgId: string,
+  workshop: { workstream_codes?: string[] | null; primary_workstream_codes?: string[] | null },
+): Promise<{ code: string; name: string }[]> {
+  const active = new Set(workshop.workstream_codes || [])
+  const primaries = (workshop.primary_workstream_codes || []).filter((c) => active.has(c))
+  if (!primaries.length) return []
+  const roster = await workstreamRoster(db, orgId, primaries)
+  // Keep codes that lack a workstreams row resolvable by echoing the code.
+  return primaries.map((c) => roster.find((r) => r.code === c) || { code: c, name: c })
+}
+
 /** Recent transcript lines for facilitation/capture, oldest-first. */
 export async function recentTranscript(
   db: SupabaseClient,

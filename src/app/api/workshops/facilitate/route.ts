@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       objective: ws.objective || undefined,
       customerName: ws.customer_name || undefined,
       workstreams: roster,
+      primaryWorkstreamCodes: (ws.primary_workstream_codes || []) as string[],
       focusAreas: (ws.focus_areas || []) as WorkshopFocus[],
     })
 

@@ -11,7 +11,7 @@ import type { AgendaContentRow } from '@/lib/supabase/workshops'
 import { sectionMetaFor, CONTENT_STATUS_META } from './sectionMeta'
 
 export default function SectionCard({
-  item, index, content, workstream, selected, onSelect,
+  item, index, content, workstream, selected, onSelect, isPrimary,
 }: {
   item: WorkshopAgendaItem
   index: number
@@ -19,6 +19,8 @@ export default function SectionCard({
   workstream?: Workstream | null
   selected: boolean
   onSelect: () => void
+  /** 055: this section's workstream is a primary workstream of the workshop. */
+  isPrimary?: boolean
 }) {
   const meta = sectionMetaFor(item.section_kind)
   const status = content?.status ?? 'empty'
@@ -47,6 +49,14 @@ export default function SectionCard({
             title={wsName || undefined}
           >
             {wsName}
+          </span>
+        )}
+        {isPrimary && (
+          <span
+            className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 shrink-0"
+            title="Primary workstream: the other workstreams frame their input through this lens"
+          >
+            ★ Primary
           </span>
         )}
         <span className="ml-auto flex items-center gap-2 shrink-0">

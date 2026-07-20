@@ -5,7 +5,7 @@
 import type {
   Workshop, WorkshopParticipant, WorkshopAgendaItem, WorkshopScenario,
   WorkshopMessage, WorkshopCapture, WorkshopStatus, WorkshopFocus, WorkshopBriefData,
-  CaptureStatus, AgendaStatus, SectionKind,
+  CaptureStatus, AgendaStatus, SectionKind, WorkshopAttachment,
 } from '@/lib/workshop/types'
 import type { SectionContent, ClarifyingQuestion, KbGap } from '@jlee-revtech/agent-core'
 
@@ -61,7 +61,8 @@ export async function createWorkshop(
   userId: string | null,
   data: {
     title: string; topic?: string; objective?: string; customer_name?: string
-    focus_areas?: WorkshopFocus[]; workstream_codes?: string[]; scheduled_at?: string
+    focus_areas?: WorkshopFocus[]; workstream_codes?: string[]; primary_workstream_codes?: string[]
+    scheduled_at?: string
     duration_minutes?: number
     settings?: Record<string, unknown>
   },
@@ -81,6 +82,7 @@ export async function updateWorkshop(
   updates: Partial<{
     title: string; topic: string; objective: string; customer_name: string
     status: WorkshopStatus; focus_areas: WorkshopFocus[]; workstream_codes: string[]
+    primary_workstream_codes: string[]
     scheduled_at: string | null; started_at: string | null; ended_at: string | null
     brief: WorkshopBriefData | null; recap: unknown; settings: Record<string, unknown>; archived_at: string | null
     facilitation_prompt: string | null
@@ -91,6 +93,22 @@ export async function updateWorkshop(
     headers: headers('return=minimal'),
     body: JSON.stringify(updates),
   })
+}
+
+// ─── Attachments (055) ──────────────────────────────────────
+// Uploads go through POST /api/workshops/attachments (server-side text
+// extraction); list + delete run under the user's RLS like the other children.
+
+export async function listAttachments(workshopId: string): Promise<WorkshopAttachment[]> {
+  const res = await fetch(
+    `${URL}/rest/v1/workshop_attachments?workshop_id=eq.${workshopId}&select=id,workshop_id,file_name,format,pages,size_bytes,chars,status,note,created_by,created_at&order=created_at.asc`,
+    { headers: headers() },
+  )
+  return res.ok ? res.json() : []
+}
+
+export async function deleteAttachment(id: string): Promise<void> {
+  await fetch(`${URL}/rest/v1/workshop_attachments?id=eq.${id}`, { method: 'DELETE', headers: headers() })
 }
 
 // ─── Public read-only share (stored in workshops.settings.share) ────────────

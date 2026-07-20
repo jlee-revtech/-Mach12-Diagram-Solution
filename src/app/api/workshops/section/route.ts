@@ -4,7 +4,7 @@ import {
   type SectionKind, type SectionContent, type WorkstreamSectionContent,
   type ClarifyingQuestion, type KbGap, type WorkshopFocus, type KnowledgeClient,
 } from '@jlee-revtech/agent-core'
-import { serverModelDb, assemblePreRead, workstreamName } from '@/lib/workshop/server'
+import { serverModelDb, assemblePreRead, workstreamName, assembleAttachmentsContext, primaryRoster } from '@/lib/workshop/server'
 
 // Generate (or revise) the facilitation content for one agenda section.
 // Branches by section_kind: overview (no grounding), workstream (arch pre-read +
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     // Load + org-scope the workshop.
     const { data: ws } = await db
       .from('workshops')
-      .select('id, topic, title, customer_name, objective, duration_minutes, workstream_codes, facilitation_prompt')
+      .select('id, topic, title, customer_name, objective, duration_minutes, workstream_codes, primary_workstream_codes, facilitation_prompt')
       .eq('id', workshopId)
       .eq('organization_id', orgId)
       .maybeSingle()
@@ -101,11 +101,18 @@ export async function POST(req: NextRequest) {
       .maybeSingle<ContentRow>()
     const priorContent = (priorRow?.content as SectionContent | null) || undefined
 
+    // 055: the primary-workstream lens + facilitator attachments, threaded into
+    // every section kind.
+    const primaries = await primaryRoster(db, orgId, ws as { workstream_codes?: string[] | null; primary_workstream_codes?: string[] | null })
+    const primaryCodes = primaries.map((p) => p.code)
+    const attachmentsContext = await assembleAttachmentsContext(db, workshopId)
+
     // ─── Grounding, branched by section kind ──────────────────────
     let modelContext: string | undefined
     let knowledgeContext: string | undefined
     let knowledgeThin = false
     let wsName: string | undefined
+    let isPrimary = false
     let workstreamDecisions:
       | {
           workstreamCode: string
@@ -113,13 +120,68 @@ export async function POST(req: NextRequest) {
           decisions: { title: string; recommendation: string; rationale?: string }[]
         }[]
       | undefined
+    let primaryDecisions: typeof workstreamDecisions
+
+    // Gather workstream sections' recommended decisions from the authored
+    // content, restricted to the given codes (evaluation: every active
+    // workstream; integrated sections: the primary workstream(s) only).
+    const gatherDecisions = async (codeFilter: Set<string>, includeUncoded = false) => {
+      const { data: rows } = await db
+        .from('workshop_agenda_content')
+        .select('agenda_item_id, section_kind, content, version')
+        .eq('workshop_id', workshopId)
+      const wsRows = (rows || []).filter(
+        (r): r is ContentRow =>
+          r.section_kind === 'workstream' && !!r.content && (r.content as SectionContent).kind === 'workstream' &&
+          ((r.content as WorkstreamSectionContent).workstreamCode
+            ? codeFilter.has((r.content as WorkstreamSectionContent).workstreamCode)
+            : includeUncoded),
+      )
+      const byCode = new Map<
+        string,
+        { workstreamCode: string; workstreamName?: string; decisions: { title: string; recommendation: string; rationale?: string }[] }
+      >()
+      for (const r of wsRows) {
+        const c = r.content as WorkstreamSectionContent
+        const code = c.workstreamCode
+        const entry = byCode.get(code) || {
+          workstreamCode: code,
+          workstreamName: c.workstreamName || (await workstreamName(db, orgId, code)),
+          decisions: [],
+        }
+        for (const d of c.keyDecisions || []) {
+          // recommendedDecision.rationale is string[] (content reframe); the
+          // decisions contract expects a single string, so join the bullets.
+          // Defensive against old rows that persisted a plain string.
+          const rat = d.recommendedDecision?.rationale
+          entry.decisions.push({
+            title: d.title,
+            recommendation: d.recommendedDecision?.recommendation,
+            rationale: Array.isArray(rat) ? rat.join('; ') : (rat || undefined),
+          })
+        }
+        byCode.set(code, entry)
+      }
+      return Array.from(byCode.values())
+    }
 
     if (sectionKind === 'workstream') {
       const code = item.workstream_code || ''
       wsName = code ? await workstreamName(db, orgId, code) : undefined
+      isPrimary = !!code && primaryCodes.includes(code)
+      // Integrated section: ground it on the primary sections' decisions so far.
+      if (code && !isPrimary && primaryCodes.length) {
+        const gathered = await gatherDecisions(new Set(primaryCodes))
+        primaryDecisions = gathered.length ? gathered : undefined
+      }
       if (code) {
-        // (a) architecture pre-read scoped to this single workstream.
-        modelContext = (await assemblePreRead(db, orgId, [code])) || undefined
+        // (a) architecture pre-read: this workstream, plus the primary
+        // workstream(s) when this is an integrated section so the model sees
+        // the architecture it is framing its input against.
+        const preReadCodes = isPrimary || !primaryCodes.length
+          ? [code]
+          : [code, ...primaryCodes.filter((c) => c !== code)]
+        modelContext = (await assemblePreRead(db, orgId, preReadCodes)) || undefined
         // (b) RAG grounding scoped to this workstream.
         const query = [item.title, objective, topic, wsName].filter(Boolean).join(' — ')
         try {
@@ -141,46 +203,11 @@ export async function POST(req: NextRequest) {
         knowledgeThin = true
       }
     } else if (sectionKind === 'evaluation') {
-      // Gather every workstream section's recommended decisions.
-      const { data: rows } = await db
-        .from('workshop_agenda_content')
-        .select('agenda_item_id, section_kind, content, version')
-        .eq('workshop_id', workshopId)
-      // Exclude hidden workstreams (removed from the workshop's active set).
-      const activeCodes = new Set((ws.workstream_codes as string[] | null) || [])
-      const wsRows = (rows || []).filter(
-        (r): r is ContentRow =>
-          r.section_kind === 'workstream' && !!r.content && (r.content as SectionContent).kind === 'workstream' &&
-          (!(r.content as WorkstreamSectionContent).workstreamCode || activeCodes.has((r.content as WorkstreamSectionContent).workstreamCode)),
-      )
-      const decisionsByCode = new Map<
-        string,
-        { workstreamCode: string; workstreamName?: string; decisions: { title: string; recommendation: string; rationale?: string }[] }
-      >()
-      for (const r of wsRows) {
-        const c = r.content as WorkstreamSectionContent
-        const code = c.workstreamCode
-        const entry = decisionsByCode.get(code) || {
-          workstreamCode: code,
-          workstreamName: c.workstreamName || (await workstreamName(db, orgId, code)),
-          decisions: [],
-        }
-        for (const d of c.keyDecisions || []) {
-          // recommendedDecision.rationale is now string[] (content reframe); the
-          // evaluation input contract still expects a single string, so join the
-          // bullets. Defensive against old rows that persisted a plain string.
-          const r = d.recommendedDecision?.rationale
-          entry.decisions.push({
-            title: d.title,
-            recommendation: d.recommendedDecision?.recommendation,
-            rationale: Array.isArray(r) ? r.join('; ') : (r || undefined),
-          })
-        }
-        decisionsByCode.set(code, entry)
-      }
-      workstreamDecisions = Array.from(decisionsByCode.values())
+      // Gather every active workstream section's recommended decisions
+      // (excludes hidden workstreams removed from the workshop's active set).
+      workstreamDecisions = await gatherDecisions(new Set((ws.workstream_codes as string[] | null) || []), true)
     }
-    // overview: no grounding.
+    // overview: no model/RAG grounding (attachments still apply).
 
     // ─── Generate ──────────────────────────────────────────────────
     const result = await generateSectionContent({
@@ -192,11 +219,15 @@ export async function POST(req: NextRequest) {
       workstream: sectionKind === 'workstream' && item.workstream_code
         ? { code: item.workstream_code, name: wsName || item.workstream_code }
         : undefined,
+      primaryWorkstreams: primaries.length ? primaries : undefined,
+      isPrimary,
+      primaryDecisions,
       focus,
       timeboxMinutes,
       durationMinutes,
       modelContext,
       knowledgeContext,
+      attachmentsContext,
       knowledgeThin,
       priorContent,
       feedback: feedback || undefined,

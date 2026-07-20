@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { generateBrief, type WorkshopFocus, type SectionKind } from '@jlee-revtech/agent-core'
-import { serverModelDb, workstreamRoster, assemblePreRead } from '@/lib/workshop/server'
+import { serverModelDb, workstreamRoster, assemblePreRead, assembleAttachmentsContext } from '@/lib/workshop/server'
 
 // Generate a pre-workshop Brief: a timeboxed agenda, a pre-read of the customer's
 // real architecture for the topic, the gaps/decisions to drive, and the probing
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       objective,
       customerName,
       workstreamCodes,
+      primaryWorkstreamCodes,
       focusAreas,
       scenarios,
       durationMinutes,
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       objective?: string
       customerName?: string
       workstreamCodes?: string[]
+      primaryWorkstreamCodes?: string[]
       focusAreas?: WorkshopFocus[]
       scenarios?: { title: string; description?: string; focusType?: WorkshopFocus }[]
       durationMinutes?: number
@@ -51,25 +53,37 @@ export async function POST(req: NextRequest) {
     // Workshop-level guidance (047): honor the persisted facilitation_prompt when a
     // workshop id is supplied, else the guidance passed in the body. Threaded into
     // generateBrief so "Regenerate brief" honors the same steer as every section.
+    // 055: the same workshop read supplies primary_workstream_codes; attachments
+    // are assembled into facilitator-provided context.
     let effectiveGuidance = (guidance || '').trim() || undefined
-    if (workshopId && !effectiveGuidance) {
+    let primaryCodes = (primaryWorkstreamCodes || []).filter((c) => codes.includes(c))
+    let attachmentsContext: string | undefined
+    if (workshopId) {
       const { data: gws } = await db
         .from('workshops')
-        .select('facilitation_prompt')
+        .select('facilitation_prompt, primary_workstream_codes')
         .eq('id', workshopId)
         .eq('organization_id', orgId)
-        .maybeSingle<{ facilitation_prompt: string | null }>()
-      effectiveGuidance = (gws?.facilitation_prompt || '').trim() || undefined
+        .maybeSingle<{ facilitation_prompt: string | null; primary_workstream_codes: string[] | null }>()
+      if (!effectiveGuidance) effectiveGuidance = (gws?.facilitation_prompt || '').trim() || undefined
+      if (!primaryCodes.length) {
+        primaryCodes = (gws?.primary_workstream_codes || []).filter((c) => codes.includes(c))
+      }
+      attachmentsContext = await assembleAttachmentsContext(db, workshopId)
     }
+    const rosterByCode = new Map(workstreams.map((w) => [w.code, w]))
+    const primaryWorkstreams = primaryCodes.map((c) => rosterByCode.get(c) || { code: c, name: c })
 
     const brief = await generateBrief({
       topic,
       objective,
       customerName,
       workstreams: workstreams.length ? workstreams : codes.map((c) => ({ code: c, name: c })),
+      primaryWorkstreams: primaryWorkstreams.length ? primaryWorkstreams : undefined,
       focusAreas,
       scenarios,
       modelPreRead,
+      attachmentsContext,
       durationMinutes,
       guidance: effectiveGuidance,
       anthropicApiKey: ANTHROPIC_KEY,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, ArchiveRestore, MoreHorizontal, Plus, Presentation, RotateCcw } from 'lucide-react'
+import { Archive, ArchiveRestore, MoreHorizontal, Plus, Presentation, RotateCcw, Star } from 'lucide-react'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
 import { listWorkshops, createWorkshop, archiveWorkshop, restoreWorkshop, restartWorkshop } from '@/lib/supabase/workshops'
@@ -39,6 +39,9 @@ export default function WorkshopsPage() {
   const [objective, setObjective] = useState('')
   const [customer, setCustomer] = useState('')
   const [wsCodes, setWsCodes] = useState<string[]>([])
+  // 055: the primary workstream(s); the other ("integrated") workstreams frame
+  // their prep input through this lens.
+  const [primaryCodes, setPrimaryCodes] = useState<string[]>([])
   const [focus, setFocus] = useState<WorkshopFocus[]>(['process', 'data'])
   const [durationMinutes, setDurationMinutes] = useState<number>(DEFAULT_DURATION_MINUTES)
 
@@ -94,6 +97,7 @@ export default function WorkshopsPage() {
         objective: objective.trim() || undefined,
         customer_name: customer.trim() || undefined,
         workstream_codes: wsCodes,
+        primary_workstream_codes: primaryCodes.filter((c) => wsCodes.includes(c)),
         focus_areas: focus,
         duration_minutes: durationMinutes,
         settings: { voice: true },
@@ -103,7 +107,7 @@ export default function WorkshopsPage() {
       alert(e instanceof Error ? e.message : 'Failed to create workshop')
       setCreating(false)
     }
-  }, [organization, user, title, topic, objective, customer, wsCodes, focus, durationMinutes, router])
+  }, [organization, user, title, topic, objective, customer, wsCodes, primaryCodes, focus, durationMinutes, router])
 
   if (loading || !user || !organization) return null
 
@@ -146,19 +150,38 @@ export default function WorkshopsPage() {
             <Field label="Objective"><input value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="The outcome you want" className={inputCls} /></Field>
           </div>
           <div className="mb-4">
-            <div className="text-label uppercase text-text-secondary mb-2">Value streams / agents in the room *</div>
+            <div className="text-label uppercase text-text-secondary mb-1">Value streams / agents in the room *</div>
+            <div className="text-[11px] text-text-tertiary mb-2">Star the primary workstream(s). The other workstreams frame their input through that lens during prep.</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {workstreams.map((w) => {
                 const on = wsCodes.includes(w.code)
+                const isPrim = on && primaryCodes.includes(w.code)
                 const color = w.color || '#2563EB'
                 return (
-                  <button key={w.id} onClick={() => setWsCodes((a) => toggle(a, w.code))}
+                  <button key={w.id}
+                    onClick={() => {
+                      setWsCodes((a) => toggle(a, w.code))
+                      if (on) setPrimaryCodes((p) => p.filter((c) => c !== w.code))
+                    }}
                     className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${on ? '' : 'border-border hover:bg-surface-muted'}`}
-                    style={on ? { borderColor: color, backgroundColor: `${color}14` } : undefined}>
+                    style={on ? { borderColor: isPrim ? '#D97706' : color, backgroundColor: `${color}14` } : undefined}>
                     <div className="w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1A`, color }}>
                       <WorkstreamIcon icon={w.icon} size={13} />
                     </div>
-                    <span className="text-[11px] text-text-primary leading-tight truncate">{w.name}</span>
+                    <span className="text-[11px] text-text-primary leading-tight truncate flex-1">{w.name}</span>
+                    {on && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); setPrimaryCodes((p) => toggle(p, w.code)) }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setPrimaryCodes((p) => toggle(p, w.code)) } }}
+                        title={isPrim ? 'Unmark as primary' : 'Mark as the primary workstream'}
+                        aria-label={isPrim ? `Unmark ${w.name} as primary` : `Mark ${w.name} as primary`}
+                        className={`shrink-0 rounded p-0.5 transition-colors ${isPrim ? 'text-amber-500 hover:text-amber-600' : 'text-gray-300 hover:text-amber-400'}`}
+                      >
+                        <Star size={14} fill={isPrim ? 'currentColor' : 'none'} />
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -261,7 +284,8 @@ export default function WorkshopsPage() {
                 {(w.workstream_codes || []).slice(0, 4).map((c) => {
                   const ws = workstreams.find((x) => x.code === c)
                   const color = ws?.color || '#2563EB'
-                  return <span key={c} className="text-[10px] px-1.5 py-0.5 rounded" style={{ color, backgroundColor: `${color}1A` }}>{ws?.name?.split('(')[0].trim() || c}</span>
+                  const prim = (w.primary_workstream_codes || []).includes(c)
+                  return <span key={c} className="text-[10px] px-1.5 py-0.5 rounded" style={{ color, backgroundColor: `${color}1A` }} title={prim ? 'Primary workstream' : undefined}>{prim ? '★ ' : ''}{ws?.name?.split('(')[0].trim() || c}</span>
                 })}
                 {(w.workstream_codes || []).length > 4 && <span className="text-[10px] text-text-tertiary">+{w.workstream_codes.length - 4}</span>}
               </div>

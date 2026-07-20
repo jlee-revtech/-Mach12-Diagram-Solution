@@ -1,6 +1,6 @@
 {
   "name": "mach12-diagram",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3003",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
-    "@jlee-revtech/agent-core": "^0.12.0",
+    "@jlee-revtech/agent-core": "^0.13.0",
     "@radix-ui/react-tooltip": "^1.2.12",
     "@supabase/supabase-js": "^2.39.8",
     "@tanstack/react-table": "^8.21.3",

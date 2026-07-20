@@ -58,6 +58,9 @@ export interface Workshop {
   status: WorkshopStatus
   focus_areas: WorkshopFocus[]
   workstream_codes: string[]
+  // 055: the workstream(s) this workshop is anchored on. Non-primary
+  // ("integrated") workstreams frame their prep input through this lens.
+  primary_workstream_codes?: string[] | null
   duration_minutes: number | null
   scheduled_at: string | null
   started_at: string | null
@@ -107,6 +110,23 @@ export interface WorkshopAgendaItem {
   workstream_code?: string | null
   created_at: string
   updated_at: string
+}
+
+// 055: facilitator-uploaded reference documents; text extracted server-side and
+// threaded as context into the brief and every section generate.
+export interface WorkshopAttachment {
+  id: string
+  workshop_id: string
+  file_name: string
+  format: string | null
+  pages: number | null
+  size_bytes: number | null
+  extracted_text: string | null
+  chars: number
+  status: 'extracted' | 'no_text' | 'failed'
+  note: string | null
+  created_by: string | null
+  created_at: string
 }
 
 export interface WorkshopScenario {

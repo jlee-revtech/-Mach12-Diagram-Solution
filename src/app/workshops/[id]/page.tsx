@@ -8,9 +8,10 @@ import {
   getWorkshop, updateWorkshop, listAgenda, updateAgendaItem, updateWorkshopDuration,
   listMessages, addMessage, listCaptures, updateCapture, setParticipants,
   listAgendaContent, restartWorkshop, archiveWorkshop, readWorkshopShare, addWorkshopAgendaItem,
+  listAttachments, deleteAttachment,
   type AgendaContentRow, type WorkshopShare,
 } from '@/lib/supabase/workshops'
-import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType } from '@/lib/workshop/types'
+import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType, WorkshopAttachment } from '@/lib/workshop/types'
 import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
 import { createTranscription, type TranscriptionProvider } from '@/lib/workshop/transcription'
 import { exportRecapDocx, exportRecapPptx, exportFacilitationPptx } from '@/lib/workshop/export'
@@ -20,8 +21,8 @@ import type { WorkshopRecapData } from '@jlee-revtech/agent-core'
 import type { Workstream } from '@/lib/workstream/types'
 import {
   Archive, ArrowLeft, ChevronDown, ClipboardList, Download, FileText, Link2, Mic,
-  MoreHorizontal, Play, Plus, Presentation, RefreshCw, RotateCcw, Settings2,
-  Sparkles, Upload,
+  MoreHorizontal, Paperclip, Play, Plus, Presentation, RefreshCw, RotateCcw, Settings2,
+  Sparkles, Trash2, Upload,
 } from 'lucide-react'
 import { Button, EmptyState } from '@/components/common'
 import VersionBadge from '@/components/VersionBadge'
@@ -66,6 +67,8 @@ export default function WorkshopRoomPage() {
   const [regenProgress, setRegenProgress] = useState<{ done: number; total: number } | null>(null)
   const [messages, setMessages] = useState<WorkshopMessage[]>([])
   const [captures, setCaptures] = useState<WorkshopCapture[]>([])
+  // 055: prep attachments, read as context by the brief + every section generate.
+  const [attachments, setAttachments] = useState<WorkshopAttachment[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [fac, setFac] = useState<FacResult | null>(null)
   const [input, setInput] = useState('')
@@ -91,10 +94,10 @@ export default function WorkshopRoomPage() {
 
   const load = useCallback(async () => {
     if (!organization || !id) return
-    const [w, s, a, ct, m, c] = await Promise.all([
-      getWorkshop(id), listWorkstreams(organization.id), listAgenda(id), listAgendaContent(id), listMessages(id), listCaptures(id),
+    const [w, s, a, ct, m, c, att] = await Promise.all([
+      getWorkshop(id), listWorkstreams(organization.id), listAgenda(id), listAgendaContent(id), listMessages(id), listCaptures(id), listAttachments(id),
     ])
-    setWs(w); setStreams(s); setAgenda(a); setContent(ct); setMessages(m); setCaptures(c)
+    setWs(w); setStreams(s); setAgenda(a); setContent(ct); setMessages(m); setCaptures(c); setAttachments(att)
     if (w?.duration_minutes) setDurationMinutes(w.duration_minutes)
     setFacPrompt(w?.facilitation_prompt || '')
     if (w?.recap) setRecap(w.recap as WorkshopRecapData)
@@ -164,10 +167,37 @@ export default function WorkshopRoomPage() {
     if (ws) await updateWorkshopDuration(ws.id, minutes)
   }, [ws])
 
+  // ─── Prep attachments (055) ───────────────────────────────
+  // Upload goes through the server route (text extraction); list + delete run
+  // under the user's RLS. Extracted text is threaded as context into the brief
+  // and every section generate server-side.
+  const uploadAttachment = useCallback(async (file: File) => {
+    if (!ws || !organization) return
+    setBusy('attach')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('workshopId', ws.id)
+      form.append('orgId', organization.id)
+      const res = await fetch('/api/workshops/attachments', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      setAttachments(await listAttachments(ws.id))
+    } catch (e) { alert(e instanceof Error ? e.message : 'Upload failed') } finally { setBusy(null) }
+  }, [ws, organization])
+
+  const removeAttachment = useCallback(async (att: WorkshopAttachment) => {
+    if (!ws) return
+    if (!confirm(`Remove "${att.file_name}" from this workshop's prep context?`)) return
+    await deleteAttachment(att.id)
+    setAttachments((prev) => prev.filter((a) => a.id !== att.id))
+  }, [ws])
+
   // Add/hide workstreams (non-destructive). Hiding just drops the code from the
   // workshop's active set (agenda item + content are kept, filtered from view);
   // adding a brand-new workstream creates a fresh section to author into.
-  const applyWorkstreams = useCallback(async (selectedCodes: string[]) => {
+  // 055: also persists the primary workstream set from the dialog.
+  const applyWorkstreams = useCallback(async (selectedCodes: string[], primaryCodes: string[]) => {
     if (!ws) return
     const current = ws.workstream_codes || []
     const existingWsCodes = new Set(
@@ -185,8 +215,8 @@ export default function WorkshopRoomPage() {
     }
     // Keep the evaluation section last if new workstream sections pushed past it.
     if (evalItem && insertAt !== evalItem.sort_order) await updateAgendaItem(evalItem.id, { sort_order: insertAt })
-    await updateWorkshop(ws.id, { workstream_codes: selectedCodes })
-    setWs((prev) => (prev ? { ...prev, workstream_codes: selectedCodes } : prev))
+    await updateWorkshop(ws.id, { workstream_codes: selectedCodes, primary_workstream_codes: primaryCodes })
+    setWs((prev) => (prev ? { ...prev, workstream_codes: selectedCodes, primary_workstream_codes: primaryCodes } : prev))
     await load()
   }, [ws, agenda, streams, load])
 
@@ -470,6 +500,7 @@ export default function WorkshopRoomPage() {
         <ManageWorkstreamsDialog
           streams={streams}
           activeCodes={ws.workstream_codes || []}
+          primaryCodes={ws.primary_workstream_codes || []}
           codesWithContent={codesWithContent}
           onClose={() => setManageWsOpen(false)}
           onSave={applyWorkstreams}
@@ -488,11 +519,16 @@ export default function WorkshopRoomPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {roster.map((r) => (
-            <div key={r.code} title={r.name} className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: `${r.color || '#2563EB'}1A`, color: r.color || '#2563EB' }}>
-              {r.name.split('(')[0].trim().split(/[\s-]/).map((x) => x[0]).slice(0, 2).join('')}
-            </div>
-          ))}
+          {roster.map((r) => {
+            const prim = (ws.primary_workstream_codes || []).includes(r.code)
+            return (
+              <div key={r.code} title={prim ? `${r.name} (primary workstream)` : r.name}
+                className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold"
+                style={{ backgroundColor: `${r.color || '#2563EB'}1A`, color: r.color || '#2563EB', ...(prim ? { boxShadow: '0 0 0 2px #F59E0B' } : {}) }}>
+                {r.name.split('(')[0].trim().split(/[\s-]/).map((x) => x[0]).slice(0, 2).join('')}
+              </div>
+            )
+          })}
           {!hasBrief && <Button variant="primary" size="sm" onClick={generateBrief} disabled={busy === 'brief'}>{busy === 'brief' ? 'Preparing...' : 'Generate Brief'}</Button>}
           {hasBrief && !isLive && ws.status !== 'completed' && (
             <button onClick={() => setStatus('live')} className="bg-status-green hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors">Start Workshop</button>
@@ -524,7 +560,7 @@ export default function WorkshopRoomPage() {
       {!isLive && ws.status !== 'completed' ? (
         !hasBrief ? (
           <div className="flex-1 overflow-auto p-8">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto space-y-4">
               <EmptyState
                 variant="dashed"
                 icon={<Presentation size={40} />}
@@ -544,6 +580,12 @@ export default function WorkshopRoomPage() {
                     </Button>
                   </div>
                 }
+              />
+              <AttachmentsCard
+                attachments={attachments}
+                busy={busy === 'attach'}
+                onUpload={uploadAttachment}
+                onRemove={removeAttachment}
               />
             </div>
           </div>
@@ -643,6 +685,13 @@ export default function WorkshopRoomPage() {
                 </div>
               </div>
 
+              <AttachmentsCard
+                attachments={attachments}
+                busy={busy === 'attach'}
+                onUpload={uploadAttachment}
+                onRemove={removeAttachment}
+              />
+
               <div className="space-y-2">
                 {visibleAgenda.map((a, i) => (
                   <SectionCard
@@ -653,6 +702,7 @@ export default function WorkshopRoomPage() {
                     workstream={wsByCode(a.workstream_code)}
                     selected={selectedItemId === a.id}
                     onSelect={() => setSelectedItemId(a.id)}
+                    isPrimary={!!a.workstream_code && (ws.primary_workstream_codes || []).includes(a.workstream_code)}
                   />
                 ))}
               </div>
@@ -904,6 +954,91 @@ function RecapView({ ws, recap, captures, streams, onSet, busy, onRegen }: {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <div><div className="text-label uppercase text-text-secondary mb-2">{title}</div>{children}</div>
+}
+
+// ─── Prep attachments (055) ──────────────────────────────────
+// Reference documents the facilitator loads into the prep. Extracted text is
+// threaded as context into the brief and every section generate server-side.
+function AttachmentsCard({ attachments, busy, onUpload, onRemove }: {
+  attachments: WorkshopAttachment[]
+  busy: boolean
+  onUpload: (file: File) => void
+  onRemove: (att: WorkshopAttachment) => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const fmtSize = (n: number | null) => {
+    if (!n) return ''
+    if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`
+    return `${Math.max(1, Math.round(n / 1024))} KB`
+  }
+  return (
+    <div className="rounded-lg border border-border bg-white shadow-card p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] uppercase tracking-wide text-text-secondary flex items-center gap-1.5">
+          <Paperclip size={11} /> Prep attachments {attachments.length > 0 && <span>({attachments.length})</span>}
+        </div>
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-border text-text-secondary hover:bg-surface-muted hover:text-text-primary disabled:opacity-40 transition-colors"
+        >
+          <Upload size={11} /> {busy ? 'Reading...' : 'Add document'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.markdown,.csv"
+          className="hidden"
+          aria-label="Upload a prep attachment"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) onUpload(f)
+            e.target.value = ''
+          }}
+        />
+      </div>
+      {attachments.length === 0 ? (
+        <div className="text-[11px] text-text-tertiary leading-snug">
+          Load reference documents (PDF, Word, PowerPoint, Excel, text). The agents read them as context when preparing the brief and every section.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {attachments.map((a) => (
+            <div key={a.id} className="flex items-start gap-2 rounded-lg border border-border px-2.5 py-1.5">
+              <FileText size={13} className="text-text-tertiary mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] text-text-primary leading-snug truncate" title={a.file_name}>{a.file_name}</div>
+                <div className="text-[10px] text-text-tertiary mt-0.5">
+                  {[
+                    a.format?.toUpperCase(),
+                    a.pages ? `${a.pages} ${a.format === 'pptx' ? 'slides' : a.format === 'xlsx' ? 'sheets' : 'pages'}` : null,
+                    fmtSize(a.size_bytes),
+                    a.status === 'extracted' ? `${Math.round(a.chars / 1000)}k chars read` : null,
+                  ].filter(Boolean).join(' · ')}
+                </div>
+                {a.status !== 'extracted' && (
+                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-1 leading-snug">
+                    {a.note || 'This file could not be read as context.'}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => onRemove(a)}
+                title={`Remove ${a.file_name}`}
+                aria-label={`Remove ${a.file_name}`}
+                className="shrink-0 p-1 rounded text-text-tertiary hover:text-status-red hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+          <div className="text-[10px] text-text-tertiary leading-snug">
+            Read as context by Generate Brief and every section generate. Regenerate after adding or removing documents.
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Captures ────────────────────────────────────────────────
