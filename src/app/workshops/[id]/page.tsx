@@ -12,7 +12,7 @@ import {
   type AgendaContentRow, type WorkshopShare,
 } from '@/lib/supabase/workshops'
 import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType, WorkshopAttachment } from '@/lib/workshop/types'
-import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
+import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES, FOCUS_AREAS, ARCHETYPE_OPTIONS } from '@/lib/workshop/types'
 import { createTranscription, type TranscriptionProvider } from '@/lib/workshop/transcription'
 import { exportRecapDocx, exportRecapPptx, exportFacilitationPptx } from '@/lib/workshop/export'
 import { loadFacilitationDeck } from '@/lib/workshop/deck'
@@ -20,9 +20,9 @@ import { publishWorkshopToDeliverables } from '@/lib/workshop/publishToDeliverab
 import type { WorkshopRecapData } from '@jlee-revtech/agent-core'
 import type { Workstream } from '@/lib/workstream/types'
 import {
-  Archive, ArrowLeft, ChevronDown, ClipboardList, Download, FileText, Link2, Mic,
+  Archive, ArrowLeft, ChevronDown, ClipboardList, Download, FileText, Info, Link2, Mic,
   MoreHorizontal, Paperclip, Play, Plus, Presentation, RefreshCw, RotateCcw, Settings2,
-  Sparkles, Trash2, Upload,
+  Sparkles, Star, Trash2, Upload, X,
 } from 'lucide-react'
 import { Button, EmptyState } from '@/components/common'
 import VersionBadge from '@/components/VersionBadge'
@@ -80,6 +80,9 @@ export default function WorkshopRoomPage() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [manageWsOpen, setManageWsOpen] = useState(false)
+  // Inputs & Brief dialog: the workshop's driving inputs + the full brief,
+  // reachable any time from the prep toolbar.
+  const [inputsOpen, setInputsOpen] = useState(false)
   const [sectionsMenu, setSectionsMenu] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const voiceRef = useRef<TranscriptionProvider | null>(null)
@@ -505,6 +508,17 @@ export default function WorkshopRoomPage() {
           onChange={(share: WorkshopShare) => setWs((prev) => (prev ? { ...prev, settings: { ...(prev.settings || {}), share } } : prev))}
         />
       )}
+      {inputsOpen && (
+        <WorkshopInputsDialog
+          ws={ws}
+          streams={streams}
+          attachments={attachments}
+          agenda={visibleAgenda}
+          durationMinutes={durationMinutes}
+          onClose={() => setInputsOpen(false)}
+          onStart={() => { setInputsOpen(false); setStatus('live') }}
+        />
+      )}
       {manageWsOpen && (
         <ManageWorkstreamsDialog
           streams={streams}
@@ -611,6 +625,13 @@ export default function WorkshopRoomPage() {
               <div className="flex items-center justify-between gap-2">
                 <div className="text-label uppercase text-text-secondary shrink-0">Sections</div>
                 <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="secondary" size="sm" iconOnly
+                    icon={<Info size={13} />}
+                    onClick={() => setInputsOpen(true)}
+                    title="Workshop inputs and brief: the setup that drove the brief, plus the objectives, pre-read, and questions"
+                    aria-label="Workshop inputs and brief"
+                  />
                   <select value={durationMinutes} onChange={(e) => saveDuration(Number(e.target.value))} title="Workshop length" aria-label="Workshop length"
                     className="h-8 px-2 rounded-lg border border-border bg-surface-input text-[11px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500">
                     {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
@@ -638,6 +659,13 @@ export default function WorkshopRoomPage() {
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setSectionsMenu(false)} />
                         <div className="absolute right-0 top-9 z-20 w-64 rounded-lg border border-border bg-white shadow-dropdown py-1 animate-slide-in-up">
+                          <button onClick={() => { setSectionsMenu(false); setInputsOpen(true) }} className={roomMenuItemCls}>
+                            <Info size={14} className="mt-0.5 shrink-0" />
+                            <span>
+                              Workshop inputs &amp; brief
+                              <span className="block text-[10px] text-text-tertiary mt-0.5">The setup that drove the brief, plus its questions</span>
+                            </span>
+                          </button>
                           <button onClick={() => { setSectionsMenu(false); setManageWsOpen(true) }} className={roomMenuItemCls}>
                             <Settings2 size={14} className="mt-0.5 shrink-0" /> Add or hide workstreams
                           </button>
@@ -985,6 +1013,121 @@ function RecapView({ ws, recap, captures, streams, onSet, busy, onRegen }: {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <div><div className="text-label uppercase text-text-secondary mb-2">{title}</div>{children}</div>
+}
+
+// ─── Workshop inputs & brief dialog ──────────────────────────
+// Everything that DROVE the brief (type, topic, objective, customer, focus,
+// length, workstreams + primary, guidance, attachments) plus the generated
+// brief itself (objectives, agenda, pre-read, gaps, questions, risks), so the
+// setup is always reachable from the prep view after the brief exists.
+function WorkshopInputsDialog({ ws, streams, attachments, agenda, durationMinutes, onClose, onStart }: {
+  ws: Workshop
+  streams: Workstream[]
+  attachments: WorkshopAttachment[]
+  agenda: WorkshopAgendaItem[]
+  durationMinutes: number
+  onClose: () => void
+  onStart: () => void
+}) {
+  const archetypeMeta = ARCHETYPE_OPTIONS.find((a) => a.key === (ws.archetype === 'assessment' ? 'assessment' : 'decision'))
+  const durationLabel = DURATION_OPTIONS.find((d) => d.minutes === (ws.duration_minutes || durationMinutes))?.label
+    || `${ws.duration_minutes || durationMinutes} minutes`
+  const primary = new Set(ws.primary_workstream_codes || [])
+  const focusMeta = (ws.focus_areas || []).map((f) => FOCUS_AREAS.find((x) => x.key === f)?.label || f)
+  const guidance = (ws.facilitation_prompt || '').trim()
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-[46rem] max-w-[94vw] max-h-[88vh] flex flex-col bg-white rounded-xl shadow-card-hover overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0">
+          <div>
+            <h3 className="text-heading-sm font-display text-text-primary">Workshop inputs &amp; brief</h3>
+            <div className="text-[11px] text-text-tertiary">The inputs below drive Generate Brief and every section generate. Regenerate after changing them.</div>
+          </div>
+          <Button variant="ghost" size="sm" iconOnly icon={<X size={14} />} title="Close" aria-label="Close" onClick={onClose} />
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* Setup inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+            <InputRow label="Workshop type">
+              <div className="text-[12px] text-text-primary font-medium">{archetypeMeta?.label}</div>
+              {archetypeMeta?.blurb && <div className="text-[10px] text-text-tertiary leading-snug mt-0.5">{archetypeMeta.blurb}</div>}
+            </InputRow>
+            <InputRow label="Length"><div className="text-[12px] text-text-primary">{durationLabel}</div></InputRow>
+            <InputRow label="Customer"><div className="text-[12px] text-text-primary">{ws.customer_name || <Missing />}</div></InputRow>
+            <InputRow label="Topic"><div className="text-[12px] text-text-primary">{ws.topic || ws.title}</div></InputRow>
+            <InputRow label="Objective" full>
+              <div className="text-[12px] text-text-primary leading-snug">{ws.objective || <Missing label="None set; the brief was driven by the topic alone" />}</div>
+            </InputRow>
+            <InputRow label="Focus areas" full>
+              {focusMeta.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {focusMeta.map((f, i) => <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-brand-50 text-brand-600">{f}</span>)}
+                </div>
+              ) : <Missing />}
+            </InputRow>
+            <InputRow label="Value streams in the room" full>
+              <div className="flex flex-wrap gap-1.5">
+                {(ws.workstream_codes || []).map((c) => {
+                  const s = streams.find((x) => x.code === c)
+                  const color = s?.color || '#2563EB'
+                  const isPrim = primary.has(c)
+                  return (
+                    <span key={c} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full" style={{ color, backgroundColor: `${color}1A` }} title={isPrim ? 'Primary workstream: the others frame their input through this lens' : undefined}>
+                      {isPrim && <Star size={9} fill="currentColor" className="text-amber-500" />}
+                      {s?.name?.split('(')[0].trim() || c}
+                    </span>
+                  )
+                })}
+              </div>
+            </InputRow>
+            <InputRow label="Guidance for all content" full>
+              {guidance
+                ? <div className="text-[11px] text-text-secondary leading-snug whitespace-pre-wrap bg-brand-50 border border-brand-200 rounded-lg px-2.5 py-1.5">{guidance}</div>
+                : <Missing label="None set; add it in the Sections panel" />}
+            </InputRow>
+            <InputRow label={`Prep attachments (${attachments.length})`} full>
+              {attachments.length ? (
+                <ul className="space-y-1">
+                  {attachments.map((a) => (
+                    <li key={a.id} className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                      <FileText size={11} className="text-text-tertiary shrink-0" />
+                      <span className="truncate">{a.file_name}</span>
+                      <span className="text-[10px] text-text-tertiary shrink-0">
+                        {a.status === 'extracted' ? `${Math.round(a.chars / 1000)}k chars read` : 'not readable'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <Missing label="None uploaded" />}
+            </InputRow>
+          </div>
+
+          {/* The generated brief (objectives, agenda, pre-read, gaps, questions, risks) */}
+          {ws.brief ? (
+            <div className="pt-4 border-t border-border">
+              <BriefView ws={ws} agenda={agenda} onStart={onStart} />
+            </div>
+          ) : (
+            <div className="pt-4 border-t border-border text-[11px] text-text-tertiary">No brief has been generated yet.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function InputRow({ label, full, children }: { label: string; full?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={full ? 'sm:col-span-2' : undefined}>
+      <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-0.5">{label}</div>
+      {children}
+    </div>
+  )
+}
+
+function Missing({ label }: { label?: string }) {
+  return <span className="text-[11px] text-text-tertiary italic">{label || 'Not set'}</span>
 }
 
 // ─── Prep attachments (055) ──────────────────────────────────
