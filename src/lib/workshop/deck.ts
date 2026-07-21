@@ -97,6 +97,61 @@ export function normalizeSectionContent(content: SectionContent): SectionContent
       ...notes,
     } as unknown as SectionContent
   }
+  // 056 assessment archetype: per-workstream discovery section.
+  if (c.kind === 'assessment') {
+    const asOpps = (v: unknown) => (Array.isArray(v) ? v : []).map((o) => {
+      const oo = (o ?? {}) as Record<string, unknown>
+      return {
+        id: String(oo.id ?? ''),
+        title: String(oo.title ?? ''),
+        ...(oo.summary ? { summary: String(oo.summary) } : {}),
+        painPoints: asArr(oo.painPoints),
+        ...(oo.impact ? { impact: oo.impact } : {}),
+        ...(oo.effort ? { effort: oo.effort } : {}),
+      }
+    })
+    return {
+      kind: 'assessment',
+      workstreamCode: String(c.workstreamCode ?? ''),
+      ...(c.workstreamName ? { workstreamName: String(c.workstreamName) } : {}),
+      framing: asArr(c.framing),
+      assessmentQuestions: asArr(c.assessmentQuestions),
+      discoveryQuestions: asArr(c.discoveryQuestions),
+      processOpportunities: asOpps(c.processOpportunities),
+      dataOpportunities: asOpps(c.dataOpportunities),
+      technologyOpportunities: asOpps(c.technologyOpportunities),
+      ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      ...notes,
+    } as unknown as SectionContent
+  }
+  // 056 assessment archetype: the AI-sequenced opportunity roadmap.
+  if (c.kind === 'roadmap') {
+    return {
+      kind: 'roadmap',
+      summary: String(c.summary ?? ''),
+      quickWins: asArr(c.quickWins),
+      dependencies: (Array.isArray(c.dependencies) ? c.dependencies : []).map((d) => {
+        const dd = (d ?? {}) as Record<string, unknown>
+        return {
+          prerequisite: String(dd.prerequisite ?? ''),
+          dependent: String(dd.dependent ?? ''),
+          reason: String(dd.reason ?? ''),
+        }
+      }),
+      phases: (Array.isArray(c.phases) ? c.phases : []).map((p) => {
+        const pp = (p ?? {}) as Record<string, unknown>
+        return {
+          name: String(pp.name ?? ''),
+          ...(pp.timeframe ? { timeframe: String(pp.timeframe) } : {}),
+          opportunities: asArr(pp.opportunities),
+          rationale: asArr(pp.rationale),
+        }
+      }),
+      ...(c.risks != null ? { risks: asArr(c.risks) } : {}),
+      ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      ...notes,
+    } as unknown as SectionContent
+  }
   // overview
   return {
     kind: 'overview',
@@ -175,7 +230,7 @@ export async function loadFacilitationDeck(
   // Build sections from agenda items (already in sort_order) that HAVE content.
   const sections: DeckSection[] = []
   for (const item of agenda) {
-    if (item.section_kind === 'workstream' && item.workstream_code && !activeCodes.has(item.workstream_code)) continue
+    if ((item.section_kind === 'workstream' || item.section_kind === 'assessment') && item.workstream_code && !activeCodes.has(item.workstream_code)) continue
     const row = contentByItem.get(item.id)
     if (!row?.content) continue
     sections.push({

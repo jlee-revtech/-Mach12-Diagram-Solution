@@ -7,8 +7,8 @@ import { useAuth } from '@/lib/supabase/auth-context'
 import { listWorkstreams } from '@/lib/supabase/workstreams'
 import { listWorkshops, createWorkshop, archiveWorkshop, restoreWorkshop, restartWorkshop } from '@/lib/supabase/workshops'
 import type { Workstream } from '@/lib/workstream/types'
-import type { Workshop, WorkshopFocus } from '@/lib/workshop/types'
-import { FOCUS_AREAS, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES } from '@/lib/workshop/types'
+import type { Workshop, WorkshopFocus, WorkshopArchetype } from '@/lib/workshop/types'
+import { FOCUS_AREAS, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES, ARCHETYPE_OPTIONS, DEFAULT_ARCHETYPE } from '@/lib/workshop/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import { Button, PageHeader, EmptyState, LoadingState } from '@/components/common'
 
@@ -34,6 +34,7 @@ export default function WorkshopsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   // new-workshop form
+  const [archetype, setArchetype] = useState<WorkshopArchetype>(DEFAULT_ARCHETYPE)
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
   const [objective, setObjective] = useState('')
@@ -93,6 +94,7 @@ export default function WorkshopsPage() {
     try {
       const w = await createWorkshop(organization.id, user?.id ?? null, {
         title: title.trim(),
+        archetype,
         topic: topic.trim() || title.trim(),
         objective: objective.trim() || undefined,
         customer_name: customer.trim() || undefined,
@@ -107,7 +109,7 @@ export default function WorkshopsPage() {
       alert(e instanceof Error ? e.message : 'Failed to create workshop')
       setCreating(false)
     }
-  }, [organization, user, title, topic, objective, customer, wsCodes, primaryCodes, focus, durationMinutes, router])
+  }, [organization, user, archetype, title, topic, objective, customer, wsCodes, primaryCodes, focus, durationMinutes, router])
 
   if (loading || !user || !organization) return null
 
@@ -143,6 +145,21 @@ export default function WorkshopsPage() {
       {showNew && (
         <div className="bg-white border border-border rounded-lg shadow-card p-5">
           <h2 className="text-heading-sm font-display text-text-primary mb-4">New workshop</h2>
+          <div className="mb-4">
+            <div className="text-label uppercase text-text-secondary mb-2">Workshop type *</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {ARCHETYPE_OPTIONS.map((a) => {
+                const on = archetype === a.key
+                return (
+                  <button key={a.key} onClick={() => setArchetype(a.key)}
+                    className={`text-left rounded-lg border px-3.5 py-2.5 transition-colors ${on ? 'border-brand-500 bg-brand-50' : 'border-border hover:bg-surface-muted'}`}>
+                    <div className={`text-[12px] font-medium ${on ? 'text-brand-600' : 'text-text-primary'}`}>{a.label}</div>
+                    <div className="text-[11px] text-text-tertiary leading-snug mt-0.5">{a.blurb}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <Field label="Title *"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Offer-to-Cash To-Be Design" className={inputCls} /></Field>
             <Field label="Customer"><input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="e.g. Vanguard Aerospace" className={inputCls} /></Field>

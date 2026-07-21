@@ -12,9 +12,10 @@
 import type { ReactNode } from 'react'
 import type {
   SectionContent, OverviewSectionContent, WorkstreamSectionContent,
-  EvaluationSectionContent, KeyDecision, WorkshopDiagram,
+  EvaluationSectionContent, AssessmentSectionContent, RoadmapSectionContent,
+  KeyDecision, OpportunityItem, WorkshopDiagram,
 } from '@jlee-revtech/agent-core'
-import { CONFIDENCE_META } from './sectionMeta'
+import { CONFIDENCE_META, LEVEL_META } from './sectionMeta'
 import { DiagramCard } from './DiagramView'
 import CommentAnchor from './CommentAnchor'
 import { normalizeSectionContent, sectionNotes } from '@/lib/workshop/deck'
@@ -47,6 +48,8 @@ export function NotesReadBlock({ notes, base }: { notes: string[]; base?: string
 function ContentBody({ content, base }: { content: SectionContent; base?: string }) {
   if (content.kind === 'overview') return <OverviewBody c={content} base={base} />
   if (content.kind === 'workstream') return <WorkstreamBody c={content} base={base} />
+  if (content.kind === 'assessment') return <AssessmentBody c={content} base={base} />
+  if (content.kind === 'roadmap') return <RoadmapBody c={content} base={base} />
   return <EvaluationBody c={content} base={base} />
 }
 
@@ -203,6 +206,142 @@ function DecisionCard({ d, base, idx }: { d: KeyDecision; base?: string; idx: nu
           <DiagramCard diagram={d.diagram} width={520} />
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Assessment / Discovery (056) ────────────────────────────────────────────
+
+function OpportunityCard({ o, base }: { o: OpportunityItem; base?: string }) {
+  const impact = o.impact ? LEVEL_META[o.impact] : null
+  const effort = o.effort ? LEVEL_META[o.effort] : null
+  return (
+    <div className="group border border-border rounded-lg p-2.5">
+      <div className="flex items-start gap-1.5">
+        <span className="flex-1 text-[11px] font-medium text-text-primary leading-snug">{o.title}</span>
+        {impact && <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: `${impact.color}1A`, color: impact.color }}>Impact {impact.label}</span>}
+        {effort && <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: `${effort.color}1A`, color: effort.color }}>Effort {effort.label}</span>}
+        {base && <CommentAnchor anchor={base} label={o.title} />}
+      </div>
+      {o.summary && <p className="text-[10px] text-text-tertiary leading-snug mt-0.5">{o.summary}</p>}
+      {(o.painPoints || []).length > 0 && (
+        <div className="mt-1.5">
+          <div className="text-[10px] uppercase tracking-wide text-amber-700 mb-0.5">Addresses</div>
+          <Bullets items={o.painPoints} marker="▸" color="#D97706" anchorPrefix={base ? `${base}:painPoints` : undefined} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OpportunityGroup({ title, color, items, base }: { title: string; color: string; items: OpportunityItem[]; base?: string }) {
+  if (!items?.length) return null
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color }}>{title}</div>
+      <div className="space-y-2">
+        {items.map((o, i) => <OpportunityCard key={o.id || i} o={o} base={base ? `${base}:${i}` : undefined} />)}
+      </div>
+    </div>
+  )
+}
+
+function AssessmentBody({ c, base }: { c: AssessmentSectionContent; base?: string }) {
+  const framing = asBullets(c.framing)
+  const assessQ = asBullets(c.assessmentQuestions)
+  const discQ = asBullets(c.discoveryQuestions)
+  const hasOpps = (c.processOpportunities?.length || 0) + (c.dataOpportunities?.length || 0) + (c.technologyOpportunities?.length || 0) > 0
+  return (
+    <div className="space-y-3">
+      {(framing.length > 0 || assessQ.length > 0 || discQ.length > 0) && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4 space-y-3">
+          {framing.length > 0 && (
+            <Block title="What we are assessing" color="#059669"><Bullets items={framing} color="#059669" anchorPrefix={at(base, 'framing')} /></Block>
+          )}
+          {assessQ.length > 0 && (
+            <div className={framing.length > 0 ? 'pt-2 border-t border-border' : ''}>
+              <Block title="Assessment questions" color="#2563EB"><Bullets items={assessQ} marker="?" color="#2563EB" anchorPrefix={at(base, 'assessmentQuestions')} /></Block>
+            </div>
+          )}
+          {discQ.length > 0 && (
+            <div className={framing.length > 0 || assessQ.length > 0 ? 'pt-2 border-t border-border' : ''}>
+              <Block title="Discovery questions" color="#D97706"><Bullets items={discQ} marker="?" color="#D97706" anchorPrefix={at(base, 'discoveryQuestions')} /></Block>
+            </div>
+          )}
+        </div>
+      )}
+      {hasOpps && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4 space-y-3">
+          <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Candidate opportunities to validate in the room</div>
+          <OpportunityGroup title="Process opportunities" color="#2563EB" items={c.processOpportunities || []} base={at(base, 'processOpportunities')} />
+          <OpportunityGroup title="Data opportunities" color="#0891B2" items={c.dataOpportunities || []} base={at(base, 'dataOpportunities')} />
+          <OpportunityGroup title="Technology opportunities" color="#7C3AED" items={c.technologyOpportunities || []} base={at(base, 'technologyOpportunities')} />
+        </div>
+      )}
+      <SectionDiagrams diagrams={c.diagrams} />
+    </div>
+  )
+}
+
+function RoadmapBody({ c, base }: { c: RoadmapSectionContent; base?: string }) {
+  const quickWins = asBullets(c.quickWins)
+  const risks = asBullets(c.risks)
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-[#D97706]/40 bg-[#D97706]/5 p-4 space-y-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-[#D97706] mb-1">Opportunity roadmap</div>
+          <div className="group flex items-start gap-1">
+            <span className="flex-1 text-[12px] text-text-primary font-medium leading-snug">{c.summary}</span>
+            {base && <CommentAnchor anchor={at(base, 'summary')!} label={c.summary} />}
+          </div>
+        </div>
+        {quickWins.length > 0 && (
+          <Block title="Quick wins" color="#059669"><Bullets items={quickWins} marker="★" color="#059669" anchorPrefix={at(base, 'quickWins')} /></Block>
+        )}
+        {risks.length > 0 && (
+          <Block title="Sequencing risks" color="#DC2626"><Bullets items={risks} marker="⚠" color="#DC2626" anchorPrefix={at(base, 'risks')} /></Block>
+        )}
+      </div>
+
+      {(c.phases || []).length > 0 && (
+        <div className="space-y-2">
+          {(c.phases || []).map((p, i) => (
+            <div key={i} className="bg-white border border-border rounded-lg shadow-card p-3">
+              <div className="group flex items-center gap-2 mb-1.5">
+                <span className="text-[10px] font-bold text-white bg-[#D97706] rounded-full w-5 h-5 flex items-center justify-center shrink-0">{i + 1}</span>
+                <span className="flex-1 text-[12px] font-semibold text-text-primary">{p.name}{p.timeframe ? ` (${p.timeframe})` : ''}</span>
+                {base && <CommentAnchor anchor={at(base, `phases:${i}`)!} label={p.name} />}
+              </div>
+              {(p.opportunities || []).length > 0 && (
+                <div className="mb-1.5"><Bullets items={p.opportunities} marker="▸" color="#D97706" anchorPrefix={at(base, `phases:${i}:opportunities`)} /></div>
+              )}
+              {(p.rationale || []).length > 0 && (
+                <div className="pt-1.5 border-t border-border">
+                  <Block title="Why now"><Bullets items={asBullets(p.rationale)} anchorPrefix={at(base, `phases:${i}:rationale`)} /></Block>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(c.dependencies || []).length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-3">
+          <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1.5">Sequencing dependencies</div>
+          <ul className="space-y-1">
+            {(c.dependencies || []).map((d, i) => (
+              <li key={i} className="group text-[11px] text-text-secondary flex gap-2 leading-snug">
+                <span className="text-[#D97706]">⇢</span>
+                <span className="flex-1"><span className="font-medium text-text-primary">{d.dependent}</span> needs <span className="font-medium text-text-primary">{d.prerequisite}</span> first: {d.reason}</span>
+                {base && <CommentAnchor anchor={at(base, `dependencies:${i}`)!} label={`${d.dependent} needs ${d.prerequisite}`} />}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <SectionDiagrams diagrams={c.diagrams} />
     </div>
   )
 }

@@ -200,20 +200,24 @@ export default function WorkshopRoomPage() {
   const applyWorkstreams = useCallback(async (selectedCodes: string[], primaryCodes: string[]) => {
     if (!ws) return
     const current = ws.workstream_codes || []
+    // 056: per-workstream sections are 'workstream' (decision archetype) or
+    // 'assessment' (assessment archetype); the closing synthesis is
+    // 'evaluation' or 'roadmap' respectively.
+    const perWsKind = ws.archetype === 'assessment' ? 'assessment' : 'workstream'
     const existingWsCodes = new Set(
-      agenda.filter((a) => a.section_kind === 'workstream' && a.workstream_code).map((a) => a.workstream_code),
+      agenda.filter((a) => (a.section_kind === 'workstream' || a.section_kind === 'assessment') && a.workstream_code).map((a) => a.workstream_code),
     )
     const toAdd = selectedCodes.filter((c) => !current.includes(c))
-    const evalItem = agenda.find((a) => a.section_kind === 'evaluation')
+    const evalItem = agenda.find((a) => a.section_kind === 'evaluation' || a.section_kind === 'roadmap')
     const maxSort = agenda.reduce((m, a) => Math.max(m, a.sort_order), 0)
     let insertAt = evalItem ? evalItem.sort_order : maxSort + 1
     for (const code of toAdd) {
       if (existingWsCodes.has(code)) continue // un-hiding: its section already exists
       const wsName = streams.find((s) => s.code === code)?.name || code
-      await addWorkshopAgendaItem(ws.id, { title: wsName, section_kind: 'workstream', workstream_code: code, sort_order: insertAt, status: 'pending' })
+      await addWorkshopAgendaItem(ws.id, { title: wsName, section_kind: perWsKind, workstream_code: code, sort_order: insertAt, status: 'pending' })
       insertAt += 1
     }
-    // Keep the evaluation section last if new workstream sections pushed past it.
+    // Keep the closing synthesis section last if new sections pushed past it.
     if (evalItem && insertAt !== evalItem.sort_order) await updateAgendaItem(evalItem.id, { sort_order: insertAt })
     await updateWorkshop(ws.id, { workstream_codes: selectedCodes, primary_workstream_codes: primaryCodes })
     setWs((prev) => (prev ? { ...prev, workstream_codes: selectedCodes, primary_workstream_codes: primaryCodes } : prev))
@@ -456,13 +460,18 @@ export default function WorkshopRoomPage() {
   // in the DB but are filtered out of the prep view, the deck, and the roster.
   const activeCodes = new Set(ws.workstream_codes || [])
   const isVisibleItem = (a: WorkshopAgendaItem) =>
-    a.section_kind !== 'workstream' || !a.workstream_code || activeCodes.has(a.workstream_code)
+    (a.section_kind !== 'workstream' && a.section_kind !== 'assessment') || !a.workstream_code || activeCodes.has(a.workstream_code)
   const visibleAgenda = agenda.filter(isVisibleItem)
   const visibleItemIds = new Set(visibleAgenda.map((a) => a.id))
   const selectedItem = agenda.find((a) => a.id === selectedItemId) ?? null
   const evaluationItem = visibleAgenda.find((a) => a.section_kind === 'evaluation') ?? null
   const hasWorkstreamContent = visibleAgenda.some(
     (a) => a.section_kind === 'workstream' && !!contentByItem.get(a.id)?.content,
+  )
+  // 056 assessment archetype: the closing roadmap card, gated on assessment content.
+  const roadmapItem = visibleAgenda.find((a) => a.section_kind === 'roadmap') ?? null
+  const hasAssessmentContent = visibleAgenda.some(
+    (a) => a.section_kind === 'assessment' && !!contentByItem.get(a.id)?.content,
   )
   // Enable the Workshop Experience once any visible section has authored content.
   const hasAnyContent = content.some((c) => !!c.content && visibleItemIds.has(c.agenda_item_id))
@@ -513,6 +522,10 @@ export default function WorkshopRoomPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-body-md font-semibold text-text-primary truncate">{ws.title}</h1>
               <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${isLive ? 'bg-status-green-bg text-status-green' : 'bg-gray-100 text-gray-500'}`}>{ws.status}</span>
+              <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${ws.archetype === 'assessment' ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-600'}`}
+                title={ws.archetype === 'assessment' ? 'Assessment / Discovery workshop: conversational assessment driven to opportunities and a roadmap' : 'Key Design Decision workshop: decision analysis and recommendation'}>
+                {ws.archetype === 'assessment' ? 'Assessment' : 'Design Decision'}
+              </span>
               <VersionBadge />
             </div>
             {ws.customer_name && <div className="text-[11px] text-text-tertiary">{ws.customer_name}</div>}
@@ -565,7 +578,9 @@ export default function WorkshopRoomPage() {
                 variant="dashed"
                 icon={<Presentation size={40} />}
                 title="Prep the workshop"
-                description={`The consultant agents will read ${ws.customer_name || 'the customer'}'s architecture for this topic and prepare a timeboxed agenda, a pre-read, the gaps to drive, and the questions to ask.`}
+                description={ws.archetype === 'assessment'
+                  ? `The consultant agents will read ${ws.customer_name || 'the customer'}'s architecture for this topic and prepare a conversational assessment: a timeboxed agenda, assessment and discovery questions per workstream, candidate process / data / technology opportunities, and a closing Opportunity Roadmap.`
+                  : `The consultant agents will read ${ws.customer_name || 'the customer'}'s architecture for this topic and prepare a timeboxed agenda, a pre-read, the gaps to drive, and the questions to ask.`}
                 action={
                   <div className="flex flex-col items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -719,6 +734,22 @@ export default function WorkshopRoomPage() {
                     title={hasWorkstreamContent ? 'Generate the cross-workstream evaluation' : 'Generate at least one workstream section first'}
                   >
                     {busy === `section:${evaluationItem.id}` ? 'Synthesizing...' : 'Generate Solution Architecture Evaluation'}
+                  </button>
+                </div>
+              )}
+
+              {/* Opportunity Roadmap action (056 assessment archetype) */}
+              {roadmapItem && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <div className="text-body-sm font-medium text-text-primary mb-0.5">Opportunity Roadmap</div>
+                  <div className="text-[11px] text-text-tertiary mb-2">Reads every assessment section&apos;s process, data, and technology opportunities, detects the dependencies between them, and drafts the sequenced roadmap. Generate the assessment sections first.</div>
+                  <button
+                    onClick={() => runSection(roadmapItem.id)}
+                    disabled={!hasAssessmentContent || busy === `section:${roadmapItem.id}`}
+                    className="text-[11px] px-2.5 py-1 rounded bg-[#D97706] hover:bg-[#F59E0B] disabled:opacity-40 text-white font-medium transition-colors"
+                    title={hasAssessmentContent ? 'Sequence the opportunities into a draft roadmap' : 'Generate at least one assessment section first'}
+                  >
+                    {busy === `section:${roadmapItem.id}` ? 'Sequencing...' : 'Generate Opportunity Roadmap'}
                   </button>
                 </div>
               )}

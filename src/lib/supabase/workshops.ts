@@ -5,7 +5,7 @@
 import type {
   Workshop, WorkshopParticipant, WorkshopAgendaItem, WorkshopScenario,
   WorkshopMessage, WorkshopCapture, WorkshopStatus, WorkshopFocus, WorkshopBriefData,
-  CaptureStatus, AgendaStatus, SectionKind, WorkshopAttachment,
+  CaptureStatus, AgendaStatus, SectionKind, WorkshopAttachment, WorkshopArchetype,
 } from '@/lib/workshop/types'
 import type { SectionContent, ClarifyingQuestion, KbGap } from '@jlee-revtech/agent-core'
 
@@ -61,6 +61,7 @@ export async function createWorkshop(
   userId: string | null,
   data: {
     title: string; topic?: string; objective?: string; customer_name?: string
+    archetype?: WorkshopArchetype
     focus_areas?: WorkshopFocus[]; workstream_codes?: string[]; primary_workstream_codes?: string[]
     scheduled_at?: string
     duration_minutes?: number

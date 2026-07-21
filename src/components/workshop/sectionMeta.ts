@@ -9,6 +9,16 @@ export const SECTION_META: Record<SectionKind, { label: string; color: string; i
   overview: { label: 'Overview', color: '#0891B2', icon: '◆' },
   workstream: { label: 'Workstream', color: '#2563EB', icon: '▧' },
   evaluation: { label: 'Evaluation', color: '#7C3AED', icon: '⚖' },
+  // 056 assessment archetype
+  assessment: { label: 'Assessment', color: '#059669', icon: '◎' },
+  roadmap: { label: 'Roadmap', color: '#D97706', icon: '➔' },
+}
+
+// Impact / effort badge for opportunity items (assessment archetype).
+export const LEVEL_META: Record<'low' | 'medium' | 'high', { label: string; color: string }> = {
+  low: { label: 'Low', color: '#6B7280' },
+  medium: { label: 'Medium', color: '#2563EB' },
+  high: { label: 'High', color: '#059669' },
 }
 
 // Content-status pill. Derived from the loaded content row (empty when no row).

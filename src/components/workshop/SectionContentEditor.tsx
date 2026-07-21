@@ -738,7 +738,12 @@ export default function SectionContentEditor({ value, onChange, generateDiagram,
   const kindEditor =
     value.kind === 'overview' ? <OverviewEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
     : value.kind === 'workstream' ? <WorkstreamEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
-    : <EvaluationEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+    : value.kind === 'evaluation' ? <EvaluationEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+    // assessment / roadmap (056): no structured hand-editor yet; these sections
+    // are revised via the AI prompt box (the Edit entry point is hidden for them).
+    : <div className="text-[11px] text-text-tertiary bg-white border border-border rounded-lg px-3 py-2">
+        Hand-editing is not available for this section type yet. Use the prompt box to revise it with AI.
+      </div>
 
   // "Notes & Considerations" is an app-level field carried on every kind. Edit it
   // here uniformly; it renders in prep and as a slide in the Workshop Experience.

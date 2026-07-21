@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import {
   generateSectionContent, createKnowledgeClient,
   type SectionKind, type SectionContent, type WorkstreamSectionContent,
+  type AssessmentSectionContent, type OpportunityItem,
   type ClarifyingQuestion, type KbGap, type WorkshopFocus, type KnowledgeClient,
 } from '@jlee-revtech/agent-core'
 import { serverModelDb, assemblePreRead, workstreamName, assembleAttachmentsContext, primaryRoster } from '@/lib/workshop/server'
@@ -121,6 +122,21 @@ export async function POST(req: NextRequest) {
         }[]
       | undefined
     let primaryDecisions: typeof workstreamDecisions
+    // roadmap only (056): every assessment section's candidate opportunities.
+    let workstreamOpportunities:
+      | {
+          workstreamCode: string
+          workstreamName?: string
+          opportunities: {
+            title: string
+            dimension: 'process' | 'data' | 'technology'
+            summary?: string
+            painPoints?: string[]
+            impact?: string
+            effort?: string
+          }[]
+        }[]
+      | undefined
 
     // Gather workstream sections' recommended decisions from the authored
     // content, restricted to the given codes (evaluation: every active
@@ -165,12 +181,52 @@ export async function POST(req: NextRequest) {
       return Array.from(byCode.values())
     }
 
-    if (sectionKind === 'workstream') {
+    // 056: gather every assessment section's candidate opportunities for the
+    // roadmap synthesis, restricted to the active workstream codes.
+    const gatherOpportunities = async (codeFilter: Set<string>) => {
+      const { data: rows } = await db
+        .from('workshop_agenda_content')
+        .select('agenda_item_id, section_kind, content, version')
+        .eq('workshop_id', workshopId)
+      const aRows = (rows || []).filter(
+        (r): r is ContentRow =>
+          r.section_kind === 'assessment' && !!r.content && (r.content as SectionContent).kind === 'assessment' &&
+          (!(r.content as AssessmentSectionContent).workstreamCode || codeFilter.has((r.content as AssessmentSectionContent).workstreamCode)),
+      )
+      const out: NonNullable<typeof workstreamOpportunities> = []
+      for (const r of aRows) {
+        const c = r.content as AssessmentSectionContent
+        const pack = (items: OpportunityItem[] | undefined, dimension: 'process' | 'data' | 'technology') =>
+          (items || []).map((o) => ({
+            title: o.title,
+            dimension,
+            ...(o.summary ? { summary: o.summary } : {}),
+            ...(o.painPoints?.length ? { painPoints: o.painPoints } : {}),
+            ...(o.impact ? { impact: o.impact } : {}),
+            ...(o.effort ? { effort: o.effort } : {}),
+          }))
+        const opportunities = [
+          ...pack(c.processOpportunities, 'process'),
+          ...pack(c.dataOpportunities, 'data'),
+          ...pack(c.technologyOpportunities, 'technology'),
+        ]
+        if (!opportunities.length) continue
+        out.push({
+          workstreamCode: c.workstreamCode || 'unknown',
+          workstreamName: c.workstreamName || (c.workstreamCode ? await workstreamName(db, orgId, c.workstreamCode) : undefined),
+          opportunities,
+        })
+      }
+      return out
+    }
+
+    if (sectionKind === 'workstream' || sectionKind === 'assessment') {
       const code = item.workstream_code || ''
       wsName = code ? await workstreamName(db, orgId, code) : undefined
       isPrimary = !!code && primaryCodes.includes(code)
-      // Integrated section: ground it on the primary sections' decisions so far.
-      if (code && !isPrimary && primaryCodes.length) {
+      // Integrated decision section: ground it on the primary sections' decisions
+      // so far (assessment sections carry questions, not decisions).
+      if (sectionKind === 'workstream' && code && !isPrimary && primaryCodes.length) {
         const gathered = await gatherDecisions(new Set(primaryCodes))
         primaryDecisions = gathered.length ? gathered : undefined
       }
@@ -206,6 +262,10 @@ export async function POST(req: NextRequest) {
       // Gather every active workstream section's recommended decisions
       // (excludes hidden workstreams removed from the workshop's active set).
       workstreamDecisions = await gatherDecisions(new Set((ws.workstream_codes as string[] | null) || []), true)
+    } else if (sectionKind === 'roadmap') {
+      // 056: gather every active assessment section's opportunities for sequencing.
+      const gathered = await gatherOpportunities(new Set((ws.workstream_codes as string[] | null) || []))
+      workstreamOpportunities = gathered.length ? gathered : undefined
     }
     // overview: no model/RAG grounding (attachments still apply).
 
@@ -216,12 +276,13 @@ export async function POST(req: NextRequest) {
       objective,
       topic,
       customerName,
-      workstream: sectionKind === 'workstream' && item.workstream_code
+      workstream: (sectionKind === 'workstream' || sectionKind === 'assessment') && item.workstream_code
         ? { code: item.workstream_code, name: wsName || item.workstream_code }
         : undefined,
       primaryWorkstreams: primaries.length ? primaries : undefined,
       isPrimary,
       primaryDecisions,
+      workstreamOpportunities,
       focus,
       timeboxMinutes,
       durationMinutes,
@@ -247,7 +308,7 @@ export async function POST(req: NextRequest) {
 
     // ─── App-side KB-gap injection (PLAN §5 step 7) ────────────────
     let kbGaps: KbGap[] = result.kbGaps || []
-    if (kbGaps.length === 0 && knowledgeThin && sectionKind === 'workstream' && item.workstream_code) {
+    if (kbGaps.length === 0 && knowledgeThin && (sectionKind === 'workstream' || sectionKind === 'assessment') && item.workstream_code) {
       kbGaps = [
         {
           workstreamCode: item.workstream_code,

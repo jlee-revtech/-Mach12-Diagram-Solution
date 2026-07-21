@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       customerName: ws.customer_name || undefined,
       workstreams: roster,
       primaryWorkstreamCodes: (ws.primary_workstream_codes || []) as string[],
+      archetype: ws.archetype === 'assessment' ? 'assessment' : 'decision',
       focusAreas: (ws.focus_areas || []) as WorkshopFocus[],
     })
 

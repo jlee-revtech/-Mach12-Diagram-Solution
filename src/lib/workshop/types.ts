@@ -1,6 +1,10 @@
 // Workshop domain types (mirror the workshop_* tables in migration 040).
 
 export type WorkshopStatus = 'draft' | 'scheduled' | 'live' | 'completed' | 'archived'
+// 056: the workshop's shape. 'decision' = Key Design Decision (analysis +
+// recommendation); 'assessment' = Assessment / Discovery (conversational,
+// questions -> opportunities -> AI-sequenced roadmap).
+export type WorkshopArchetype = 'decision' | 'assessment'
 export type WorkshopFocus = 'process' | 'data' | 'integration' | 'capability' | 'poc' | 'discussion'
 export type CaptureType =
   | 'decision' | 'action' | 'deliverable' | 'risk' | 'question' | 'architecture_change' | 'parking_lot'
@@ -16,6 +20,21 @@ export const FOCUS_AREAS: { key: WorkshopFocus; label: string; blurb: string }[]
   { key: 'capability', label: 'Capabilities', blurb: 'Capability fit and assignment' },
   { key: 'poc', label: 'PoC / Demo', blurb: 'Walk a proof of concept, get feedback' },
 ]
+
+// Enumerated workshop archetypes. Selectable (never free text), per Josh's rule.
+export const ARCHETYPE_OPTIONS: { key: WorkshopArchetype; label: string; blurb: string }[] = [
+  {
+    key: 'decision',
+    label: 'Key Design Decision',
+    blurb: 'Decision analysis and recommendation per workstream, reconciled by a Solution Architecture Evaluation.',
+  },
+  {
+    key: 'assessment',
+    label: 'Assessment / Discovery',
+    blurb: 'Conversational current-state assessment: assessment questions, discovery questions, process / data / technology opportunities, and an AI-sequenced Opportunity Roadmap.',
+  },
+]
+export const DEFAULT_ARCHETYPE: WorkshopArchetype = 'decision'
 
 // Enumerated workshop lengths. Selectable (never free text), per Josh's rule.
 export const DURATION_OPTIONS: { minutes: number; label: string }[] = [
@@ -56,6 +75,8 @@ export interface Workshop {
   objective: string | null
   customer_name: string | null
   status: WorkshopStatus
+  // 056: decision (default) or assessment.
+  archetype?: WorkshopArchetype | null
   focus_areas: WorkshopFocus[]
   workstream_codes: string[]
   // 055: the workstream(s) this workshop is anchored on. Non-primary
@@ -90,8 +111,9 @@ export interface WorkshopParticipant {
   created_at: string
 }
 
-// Facilitation-content classification (migration 046)
-export type SectionKind = 'overview' | 'workstream' | 'evaluation'
+// Facilitation-content classification (migration 046; 056 adds the
+// assessment-archetype kinds).
+export type SectionKind = 'overview' | 'workstream' | 'evaluation' | 'assessment' | 'roadmap'
 
 export interface WorkshopAgendaItem {
   id: string

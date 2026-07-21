@@ -336,7 +336,9 @@ export default function SectionEditor({
           {item.objective && <p className="text-[11px] text-text-tertiary mt-0.5">{item.objective}</p>}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {view?.content && (
+          {/* The structured hand-editor supports the decision-archetype shapes;
+              assessment/roadmap sections are revised via the prompt box instead. */}
+          {view?.content && item.section_kind !== 'assessment' && item.section_kind !== 'roadmap' && (
             <Button
               variant="secondary" size="sm"
               icon={<Pencil size={12} />}
@@ -361,6 +363,11 @@ export default function SectionEditor({
       {item.section_kind === 'evaluation' && (
         <div className="text-[11px] text-text-tertiary bg-white border border-[#7C3AED]/30 rounded-lg px-3 py-2">
           This section synthesizes across the workstream recommendations. Generate the workstream sections first, then generate this to reconcile where they diverge.
+        </div>
+      )}
+      {item.section_kind === 'roadmap' && (
+        <div className="text-[11px] text-text-tertiary bg-white border border-[#D97706]/30 rounded-lg px-3 py-2">
+          This section reads every assessment section&apos;s opportunities, detects the dependencies between them, and drafts the sequenced Opportunity Roadmap. Generate the assessment sections first.
         </div>
       )}
 
