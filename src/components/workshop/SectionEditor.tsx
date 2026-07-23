@@ -336,9 +336,10 @@ export default function SectionEditor({
           {item.objective && <p className="text-[11px] text-text-tertiary mt-0.5">{item.objective}</p>}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* The structured hand-editor supports the decision-archetype shapes;
-              assessment/roadmap sections are revised via the prompt box instead. */}
-          {view?.content && item.section_kind !== 'assessment' && item.section_kind !== 'roadmap' && (
+          {/* Every section kind has a structured hand-editor (decision archetype:
+              overview / workstream / evaluation; assessment archetype: assessment /
+              roadmap), so Edit shows wherever there is generated content. */}
+          {view?.content && (
             <Button
               variant="secondary" size="sm"
               icon={<Pencil size={12} />}

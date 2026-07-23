@@ -16,6 +16,8 @@ import { ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react'
 import type {
   SectionContent, OverviewSectionContent, WorkstreamSectionContent,
   EvaluationSectionContent, FutureStateOption, KeyDecision, EvaluationDivergence,
+  AssessmentSectionContent, RoadmapSectionContent, OpportunityItem,
+  RoadmapDependency, RoadmapPhase,
   WorkshopDiagram, WorkshopDiagramType,
 } from '@jlee-revtech/agent-core'
 import { DiagramCard } from './DiagramView'
@@ -534,6 +536,66 @@ function DivergenceEditor({ dv, onChange, onRemove, i, len, onMove }: {
   )
 }
 
+// A candidate opportunity on an assessment section. Impact and effort are
+// enumerated, so they are selects rather than free text.
+function OpportunityEditor({ o, onChange, onRemove, i, len, onMove }: {
+  o: OpportunityItem; onChange: (o: OpportunityItem) => void; onRemove: () => void
+  i: number; len: number; onMove: (dir: -1 | 1) => void
+}) {
+  return (
+    <div className={`${CARD} space-y-2`}>
+      <div className="flex items-center gap-1.5">
+        <input className={`${INPUT} font-medium`} value={o.title} placeholder="Opportunity title" onChange={(e) => onChange({ ...o, title: e.target.value })} />
+        <RowControls i={i} len={len} onMove={onMove} onRemove={onRemove} />
+      </div>
+      <TextAreaField label="Summary" value={o.summary ?? ''} placeholder="One short sentence" onChange={(v) => onChange({ ...o, summary: v || undefined })} />
+      <StringListEditor label="Pain points addressed" color="#DC2626" items={o.painPoints ?? []} placeholder="Pain point or friction" addLabel="Pain point" onChange={(painPoints) => onChange({ ...o, painPoints })} />
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Impact">
+          <select aria-label="Impact" title="Impact" className={DIAGRAM_SELECT}
+            value={o.impact ?? ''} onChange={(e) => onChange({ ...o, impact: (e.target.value || undefined) as OpportunityItem['impact'] })}>
+            <option value="">Unset</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </Field>
+        <Field label="Effort">
+          <select aria-label="Effort" title="Effort" className={DIAGRAM_SELECT}
+            value={o.effort ?? ''} onChange={(e) => onChange({ ...o, effort: (e.target.value || undefined) as OpportunityItem['effort'] })}>
+            <option value="">Unset</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+// The three opportunity dimensions (process / data / technology) share one shape,
+// so they share one list editor. `slug` seeds stable ids for hand-added rows.
+function OpportunityListEditor({ label, slug, items, onChange }: {
+  label: string; slug: string; items: OpportunityItem[]; onChange: (next: OpportunityItem[]) => void
+}) {
+  const list = items ?? []
+  return (
+    <Field label={label}>
+      <div className="space-y-2">
+        {list.map((o, i) => (
+          <OpportunityEditor key={o.id || i} o={o} i={i} len={list.length}
+            onChange={(no) => onChange(replaceAt(list, i, no))}
+            onMove={(dir) => onChange(move(list, i, dir))}
+            onRemove={() => onChange(removeAt(list, i))} />
+        ))}
+        <button type="button" className={ADD_BTN}
+          onClick={() => onChange([...list, { id: `${slug}-${list.length + 1}`, title: '', painPoints: [] }])}>+ Opportunity</button>
+      </div>
+    </Field>
+  )
+}
+
 // ─── Per-kind editors ────────────────────────────────────────────────────────
 function OverviewEditor({ c, onChange, gen, genContent }: { c: OverviewSectionContent; onChange: (c: OverviewSectionContent) => void; gen?: GenerateDiagramFn; genContent?: GenerateContentFn }) {
   return (
@@ -726,6 +788,125 @@ function DecisionCriteriaEditor({ c, onChange }: { c: EvaluationSectionContent; 
   )
 }
 
+// 056 assessment archetype: per-workstream discovery. Framing, the two question
+// banks, and the three opportunity dimensions the roadmap section reads from.
+function AssessmentEditor({ c, onChange, gen, genContent }: { c: AssessmentSectionContent; onChange: (c: AssessmentSectionContent) => void; gen?: GenerateDiagramFn; genContent?: GenerateContentFn }) {
+  const wsContext = c.workstreamName || c.workstreamCode || undefined
+  const withWs = (s: string) => (wsContext ? `${wsContext}: ${s}` : s)
+  return (
+    <div className="space-y-3">
+      <TextField label="Workstream name" value={c.workstreamName ?? ''} placeholder="Value stream name" onChange={(v) => onChange({ ...c, workstreamName: v || undefined })} />
+      <StringListEditor label="What we are assessing" color="#2563EB" items={c.framing ?? []} placeholder="What is being assessed and why it matters" addLabel="Framing point" onChange={(framing) => onChange({ ...c, framing })} />
+      {genContent && (
+        <AiContentBar label="Generate framing with AI" placeholder="e.g. Why MRP design quality drives everything downstream for a defense manufacturer."
+          onRun={async (p) => { const b = await genContent({ target: 'bullets', prompt: p, context: withWs('what we are assessing and why it matters') }); if (b?.length) onChange({ ...c, framing: [...(c.framing ?? []), ...b] }) }} />
+      )}
+
+      <StringListEditor label="Assessment questions" color="#0891B2" items={c.assessmentQuestions ?? []} placeholder="Current-state fact-finding question" addLabel="Assessment question" onChange={(assessmentQuestions) => onChange({ ...c, assessmentQuestions })} />
+      {genContent && (
+        <AiContentBar label="Generate assessment questions with AI" placeholder="e.g. Fact-finding questions on MRP configuration, work centers, and lead times."
+          onRun={async (p) => { const b = await genContent({ target: 'bullets', prompt: p, context: withWs('current-state fact-finding questions to ask the room') }); if (b?.length) onChange({ ...c, assessmentQuestions: [...(c.assessmentQuestions ?? []), ...b] }) }} />
+      )}
+
+      <StringListEditor label="Discovery questions" color="#D97706" items={c.discoveryQuestions ?? []} placeholder="Open-ended question that surfaces pain" addLabel="Discovery question" onChange={(discoveryQuestions) => onChange({ ...c, discoveryQuestions })} />
+      {genContent && (
+        <AiContentBar label="Generate discovery questions with AI" placeholder="e.g. Open-ended questions that surface workarounds between an MRP run and the shop floor."
+          onRun={async (p) => { const b = await genContent({ target: 'bullets', prompt: p, context: withWs('open-ended discovery questions that surface pain points and friction') }); if (b?.length) onChange({ ...c, discoveryQuestions: [...(c.discoveryQuestions ?? []), ...b] }) }} />
+      )}
+
+      <OpportunityListEditor label="Process opportunities" slug="process" items={c.processOpportunities ?? []} onChange={(processOpportunities) => onChange({ ...c, processOpportunities })} />
+      <OpportunityListEditor label="Data opportunities" slug="data" items={c.dataOpportunities ?? []} onChange={(dataOpportunities) => onChange({ ...c, dataOpportunities })} />
+      <OpportunityListEditor label="Technology opportunities" slug="technology" items={c.technologyOpportunities ?? []} onChange={(technologyOpportunities) => onChange({ ...c, technologyOpportunities })} />
+
+      <DiagramListEditor diagrams={c.diagrams} gen={gen} context={wsContext} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+    </div>
+  )
+}
+
+// A sequencing dependency between two opportunities (referenced by title).
+function DependencyEditor({ d, onChange, onRemove, i, len, onMove }: {
+  d: RoadmapDependency; onChange: (d: RoadmapDependency) => void; onRemove: () => void
+  i: number; len: number; onMove: (dir: -1 | 1) => void
+}) {
+  return (
+    <div className={`${CARD} space-y-2`}>
+      <div className="flex items-center gap-1.5">
+        <input className={INPUT} value={d.prerequisite} placeholder="Must land first" onChange={(e) => onChange({ ...d, prerequisite: e.target.value })} />
+        <span className="text-[11px] text-text-tertiary shrink-0">before</span>
+        <input className={INPUT} value={d.dependent} placeholder="Depends on it" onChange={(e) => onChange({ ...d, dependent: e.target.value })} />
+        <RowControls i={i} len={len} onMove={onMove} onRemove={onRemove} />
+      </div>
+      <TextAreaField label="Reason" value={d.reason} placeholder="Why the sequence matters" onChange={(v) => onChange({ ...d, reason: v })} />
+    </div>
+  )
+}
+
+function PhaseEditor({ p, onChange, onRemove, i, len, onMove }: {
+  p: RoadmapPhase; onChange: (p: RoadmapPhase) => void; onRemove: () => void
+  i: number; len: number; onMove: (dir: -1 | 1) => void
+}) {
+  return (
+    <div className={`${CARD} space-y-2`}>
+      <div className="flex items-center gap-1.5">
+        <input className={`${INPUT} font-medium`} value={p.name} placeholder="Phase name" onChange={(e) => onChange({ ...p, name: e.target.value })} />
+        <input className={`${INPUT} w-32`} value={p.timeframe ?? ''} placeholder="0-3 months" onChange={(e) => onChange({ ...p, timeframe: e.target.value || undefined })} />
+        <RowControls i={i} len={len} onMove={onMove} onRemove={onRemove} />
+      </div>
+      <StringListEditor label="Opportunities in this phase" color="#0891B2" items={p.opportunities ?? []} placeholder="Opportunity title" addLabel="Opportunity" onChange={(opportunities) => onChange({ ...p, opportunities })} />
+      <StringListEditor label="Rationale" color="#3B82F6" items={p.rationale ?? []} placeholder="Why these belong here" addLabel="Rationale point" onChange={(rationale) => onChange({ ...p, rationale })} />
+    </div>
+  )
+}
+
+// 056 assessment archetype: the sequenced Opportunity Roadmap synthesized across
+// every assessment section.
+function RoadmapEditor({ c, onChange, gen, genContent }: { c: RoadmapSectionContent; onChange: (c: RoadmapSectionContent) => void; gen?: GenerateDiagramFn; genContent?: GenerateContentFn }) {
+  const dependencies = c.dependencies ?? []
+  const phases = c.phases ?? []
+  return (
+    <div className="space-y-3">
+      <TextAreaField label="Summary" rows={3} value={c.summary} placeholder="One or two sentences framing the roadmap" onChange={(v) => onChange({ ...c, summary: v })} />
+      <StringListEditor label="Quick wins" color="#059669" items={c.quickWins ?? []} placeholder="Opportunity title that can start now" addLabel="Quick win" onChange={(quickWins) => onChange({ ...c, quickWins })} />
+      {genContent && (
+        <AiContentBar label="Generate quick wins with AI" placeholder="e.g. High-impact, low-effort moves that need no integration work."
+          onRun={async (p) => { const b = await genContent({ target: 'bullets', prompt: p, context: 'quick wins: high-impact low-effort opportunities that can start now' }); if (b?.length) onChange({ ...c, quickWins: [...(c.quickWins ?? []), ...b] }) }} />
+      )}
+
+      <Field label="Dependencies">
+        <div className="space-y-2">
+          {dependencies.map((d, i) => (
+            <DependencyEditor key={i} d={d} i={i} len={dependencies.length}
+              onChange={(nd) => onChange({ ...c, dependencies: replaceAt(dependencies, i, nd) })}
+              onMove={(dir) => onChange({ ...c, dependencies: move(dependencies, i, dir) })}
+              onRemove={() => onChange({ ...c, dependencies: removeAt(dependencies, i) })} />
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...c, dependencies: [...dependencies, { prerequisite: '', dependent: '', reason: '' }] })}>+ Dependency</button>
+        </div>
+      </Field>
+
+      <Field label="Phases">
+        <div className="space-y-2">
+          {phases.map((p, i) => (
+            <PhaseEditor key={i} p={p} i={i} len={phases.length}
+              onChange={(np) => onChange({ ...c, phases: replaceAt(phases, i, np) })}
+              onMove={(dir) => onChange({ ...c, phases: move(phases, i, dir) })}
+              onRemove={() => onChange({ ...c, phases: removeAt(phases, i) })} />
+          ))}
+          <button type="button" className={ADD_BTN} onClick={() => onChange({ ...c, phases: [...phases, { name: '', opportunities: [], rationale: [] }] })}>+ Phase</button>
+        </div>
+      </Field>
+
+      <StringListEditor label="Risks" color="#DC2626" items={c.risks ?? []} placeholder="Risk to the sequencing" addLabel="Risk" onChange={(risks) => onChange({ ...c, risks: risks.length ? risks : undefined })} />
+      {genContent && (
+        <AiContentBar label="Generate risks with AI" placeholder="e.g. Risks to the phasing: master data readiness, change saturation, integration lead times."
+          onRun={async (p) => { const b = await genContent({ target: 'bullets', prompt: p, context: 'risks to the sequencing of this opportunity roadmap' }); if (b?.length) onChange({ ...c, risks: [...(c.risks ?? []), ...b] }) }} />
+      )}
+
+      <DiagramListEditor diagrams={c.diagrams} gen={gen} context={c.summary || undefined} onChange={(diagrams) => onChange({ ...c, diagrams: diagrams.length ? diagrams : undefined })} />
+    </div>
+  )
+}
+
 // ─── Public component ────────────────────────────────────────────────────────
 export default function SectionContentEditor({ value, onChange, generateDiagram, generateContent }: {
   value: SectionContent
@@ -739,8 +920,8 @@ export default function SectionContentEditor({ value, onChange, generateDiagram,
     value.kind === 'overview' ? <OverviewEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
     : value.kind === 'workstream' ? <WorkstreamEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
     : value.kind === 'evaluation' ? <EvaluationEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
-    // assessment / roadmap (056): no structured hand-editor yet; these sections
-    // are revised via the AI prompt box (the Edit entry point is hidden for them).
+    : value.kind === 'assessment' ? <AssessmentEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
+    : value.kind === 'roadmap' ? <RoadmapEditor c={value} onChange={onChange} gen={generateDiagram} genContent={generateContent} />
     : <div className="text-[11px] text-text-tertiary bg-white border border-border rounded-lg px-3 py-2">
         Hand-editing is not available for this section type yet. Use the prompt box to revise it with AI.
       </div>
