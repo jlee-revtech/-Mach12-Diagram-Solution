@@ -16,6 +16,8 @@ import type {
   PersonaRoleLink,
 } from '@/lib/process/types'
 
+import { sbFetch } from './fetch'
+
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -53,7 +55,7 @@ async function fetchAllPaginated<T>(url: string, hdrs: Record<string, string>, p
   let from = 0
   while (true) {
     const to = from + pageSize - 1
-    const res = await fetch(url, {
+    const res = await sbFetch(url, {
       headers: { ...hdrs, 'Range-Unit': 'items', 'Range': `${from}-${to}` },
     })
     if (!res.ok) {
@@ -72,7 +74,7 @@ async function fetchAllPaginated<T>(url: string, hdrs: Record<string, string>, p
 
 export async function listProcessModels(orgId: string, includeArchived = false): Promise<ProcessModelRow[]> {
   const archiveFilter = includeArchived ? '' : '&archived_at=is.null'
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_models?organization_id=eq.${orgId}${archiveFilter}&select=*&order=updated_at.desc`,
     { headers: headers() }
   )
@@ -81,7 +83,7 @@ export async function listProcessModels(orgId: string, includeArchived = false):
 }
 
 export async function getProcessModel(id: string): Promise<ProcessModelRow | null> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_models?id=eq.${id}&select=*`,
     { headers: headers() }
   )
@@ -91,7 +93,7 @@ export async function getProcessModel(id: string): Promise<ProcessModelRow | nul
 }
 
 export async function createProcessModel(orgId: string, userId: string, title?: string): Promise<ProcessModelRow> {
-  const res = await fetch(`${URL}/rest/v1/process_models`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_models`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -111,7 +113,7 @@ export async function updateProcessModel(
   userId: string,
   updates: { title?: string; description?: string; source_reference_id?: string | null }
 ): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_models?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_models?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ ...updates, updated_by: userId }),
@@ -123,7 +125,7 @@ export async function updateProcessModel(
 }
 
 export async function archiveProcessModel(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_models?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_models?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ archived_at: new Date().toISOString() }),
@@ -135,7 +137,7 @@ export async function archiveProcessModel(id: string): Promise<void> {
 }
 
 export async function restoreProcessModel(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_models?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_models?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ archived_at: null }),
@@ -219,7 +221,7 @@ export async function createProcessNode(
 ): Promise<ProcessNode> {
   const lvl = level ?? 1
   const isLeaf = lvl >= 3
-  const res = await fetch(`${URL}/rest/v1/process_nodes`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_nodes`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -242,7 +244,7 @@ export async function updateProcessNode(
   id: string,
   updates: Partial<Pick<ProcessNode, 'name' | 'description' | 'color' | 'parent_id' | 'level' | 'node_kind' | 'sort_order' | 'is_leaf' | 'sipoc_capability_id' | 'scope_item_ref' | 'lifecycle' | 'variant_label'>>
 ): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_nodes?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_nodes?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -254,7 +256,7 @@ export async function updateProcessNode(
 }
 
 export async function deleteProcessNode(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_nodes?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_nodes?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -267,7 +269,7 @@ export async function deleteProcessNode(id: string): Promise<void> {
 // ─── Leaf BPMN graph (single jsonb blob, like saveDiagram) ─
 
 export async function saveProcessGraph(nodeId: string, graph: ProcessGraph): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_nodes?id=eq.${nodeId}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_nodes?id=eq.${nodeId}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ graph_data: graph }),
@@ -281,7 +283,7 @@ export async function saveProcessGraph(nodeId: string, graph: ProcessGraph): Pro
 // ─── Process Node Lanes (normalized lane → system map) ─
 
 export async function listProcessNodeLanes(nodeId: string): Promise<ProcessNodeLane[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_node_lanes?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
     { headers: headers() }
   )
@@ -296,11 +298,11 @@ export async function upsertProcessNodeLane(
 ): Promise<ProcessNodeLane> {
   // PostgREST upsert keyed on (process_node_id, lane_key) requires a unique
   // constraint; we keep it simple — delete-then-insert on the (node, key) pair.
-  await fetch(
+  await sbFetch(
     `${URL}/rest/v1/process_node_lanes?process_node_id=eq.${nodeId}&lane_key=eq.${encodeURIComponent(laneKey)}`,
     { method: 'DELETE', headers: headers() }
   )
-  const res = await fetch(`${URL}/rest/v1/process_node_lanes`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_node_lanes`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ process_node_id: nodeId, lane_key: laneKey, ...data }),
@@ -311,7 +313,7 @@ export async function upsertProcessNodeLane(
 }
 
 export async function deleteProcessNodeLane(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_node_lanes?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_node_lanes?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -414,7 +416,7 @@ export async function createProcessModelShare(
   userId: string,
   expiresAt?: string | null
 ): Promise<ProcessModelShare> {
-  const res = await fetch(`${URL}/rest/v1/process_model_shares`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_model_shares`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -431,7 +433,7 @@ export async function createProcessModelShare(
 }
 
 export async function listProcessModelShares(modelId: string): Promise<ProcessModelShare[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_model_shares?process_model_id=eq.${modelId}&select=*&order=created_at.desc`,
     { headers: headers() }
   )
@@ -440,7 +442,7 @@ export async function listProcessModelShares(modelId: string): Promise<ProcessMo
 }
 
 export async function deleteProcessModelShare(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_model_shares?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_model_shares?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -451,7 +453,7 @@ export async function deleteProcessModelShare(id: string): Promise<void> {
 }
 
 export async function getProcessShareByCode(code: string): Promise<ProcessModelShare | null> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_model_shares?code=eq.${code}&select=*`,
     { headers: anonHeaders() }
   )
@@ -467,7 +469,7 @@ export async function getProcessShareByCode(code: string): Promise<ProcessModelS
 
 export async function listReferenceLibraries(activeOnly = true): Promise<ReferenceLibraryRow[]> {
   const filter = activeOnly ? '&is_active=eq.true' : ''
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_reference_libraries?select=*${filter}&order=published_at.desc`,
     { headers: headers() }
   )
@@ -484,7 +486,7 @@ export async function listReferenceScenarios(libraryId: string): Promise<Referen
 }
 
 export async function getReferenceScenario(id: string): Promise<ReferenceScenario | null> {
-  const res = await fetch(`${URL}/rest/v1/process_reference_scenarios?id=eq.${id}&select=*`, { headers: headers() })
+  const res = await sbFetch(`${URL}/rest/v1/process_reference_scenarios?id=eq.${id}&select=*`, { headers: headers() })
   if (!res.ok) return null
   const arr = await res.json()
   return arr.length ? arr[0] : null
@@ -492,7 +494,7 @@ export async function getReferenceScenario(id: string): Promise<ReferenceScenari
 
 export async function listReferenceOverlays(libraryId: string): Promise<ProcessOverlay[]> {
   // Overlays joined to scenarios of this library. PostgREST embedded filter.
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_reference_overlays?select=*,process_reference_scenarios!inner(library_id)&process_reference_scenarios.library_id=eq.${libraryId}`,
     { headers: headers() }
   )
@@ -568,7 +570,7 @@ export async function instantiateReferenceScenario(
 // ─── Process overlays (org-scoped A&D know-how) ────────
 
 export async function listProcessOverlays(nodeId: string): Promise<ProcessOverlay[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_overlays?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
     { headers: headers() }
   )
@@ -582,7 +584,7 @@ export async function createProcessOverlay(
   payload: OverlayPayload,
   sortOrder = 0,
 ): Promise<ProcessOverlay> {
-  const res = await fetch(`${URL}/rest/v1/process_overlays`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_overlays`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ process_node_id: nodeId, overlay_kind: overlayKind, payload, sort_order: sortOrder }),
@@ -593,7 +595,7 @@ export async function createProcessOverlay(
 }
 
 export async function updateProcessOverlay(id: string, payload: OverlayPayload): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_overlays?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_overlays?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ payload }),
@@ -605,7 +607,7 @@ export async function updateProcessOverlay(id: string, payload: OverlayPayload):
 }
 
 export async function deleteProcessOverlay(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_overlays?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_overlays?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -616,7 +618,7 @@ export async function deleteProcessOverlay(id: string): Promise<void> {
 }
 
 export async function listProcessOverlaysAnon(nodeId: string): Promise<ProcessOverlay[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_overlays?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
     { headers: anonHeaders() }
   )
@@ -641,7 +643,7 @@ export async function listProcessRolesAnon(orgId: string): Promise<ProcessRole[]
 }
 
 export async function createProcessRole(orgId: string, data: { name: string; description?: string; color?: string }): Promise<ProcessRole> {
-  const res = await fetch(`${URL}/rest/v1/process_roles`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_roles`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, ...data }),
@@ -652,20 +654,20 @@ export async function createProcessRole(orgId: string, data: { name: string; des
 }
 
 export async function updateProcessRole(id: string, updates: Partial<Pick<ProcessRole, 'name' | 'description' | 'color'>>): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_roles?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_roles?id=eq.${id}`, {
     method: 'PATCH', headers: { ...headers(), 'Prefer': 'return=minimal' }, body: JSON.stringify(updates),
   })
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update role') }
 }
 
 export async function deleteProcessRole(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_roles?id=eq.${id}`, { method: 'DELETE', headers: headers() })
+  const res = await sbFetch(`${URL}/rest/v1/process_roles?id=eq.${id}`, { method: 'DELETE', headers: headers() })
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to delete role') }
 }
 
 export async function listPersonaRoleLinks(orgId: string): Promise<PersonaRoleLink[]> {
   // Links for personas in this org (filter via embedded persona).
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/persona_roles?select=*,personas!inner(organization_id)&personas.organization_id=eq.${orgId}`,
     { headers: headers() }
   )
@@ -677,7 +679,7 @@ export async function listPersonaRoleLinks(orgId: string): Promise<PersonaRoleLi
 }
 
 export async function addPersonaRole(personaId: string, roleId: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/persona_roles`, {
+  const res = await sbFetch(`${URL}/rest/v1/persona_roles`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=minimal,resolution=ignore-duplicates' },
     body: JSON.stringify({ persona_id: personaId, role_id: roleId }),
@@ -686,7 +688,7 @@ export async function addPersonaRole(personaId: string, roleId: string): Promise
 }
 
 export async function removePersonaRole(personaId: string, roleId: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/persona_roles?persona_id=eq.${personaId}&role_id=eq.${roleId}`, {
+  const res = await sbFetch(`${URL}/rest/v1/persona_roles?persona_id=eq.${personaId}&role_id=eq.${roleId}`, {
     method: 'DELETE', headers: headers(),
   })
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to unlink role') }
@@ -706,7 +708,7 @@ export async function createRicefw(
   orgId: string,
   data: { code: string; ricefw_type: RicefwType; title: string; description?: string; status?: RicefwStatus; complexity?: string; process_node_id?: string | null },
 ): Promise<RicefwItem> {
-  const res = await fetch(`${URL}/rest/v1/process_ricefw`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_ricefw`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, status: 'identified', ...data }),
@@ -720,7 +722,7 @@ export async function updateRicefw(
   id: string,
   updates: Partial<Pick<RicefwItem, 'code' | 'ricefw_type' | 'title' | 'description' | 'status' | 'complexity' | 'process_node_id'>>,
 ): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_ricefw?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_ricefw?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -729,14 +731,14 @@ export async function updateRicefw(
 }
 
 export async function deleteRicefw(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_ricefw?id=eq.${id}`, { method: 'DELETE', headers: headers() })
+  const res = await sbFetch(`${URL}/rest/v1/process_ricefw?id=eq.${id}`, { method: 'DELETE', headers: headers() })
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to delete RICEFW item') }
 }
 
 // ─── Interface / integration register (per node) ───────
 
 export async function listProcessInterfaces(nodeId: string): Promise<ProcessInterface[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_interfaces?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
     { headers: headers() }
   )
@@ -748,7 +750,7 @@ export async function createProcessInterface(
   nodeId: string,
   data: Partial<Pick<ProcessInterface, 'source_system_id' | 'target_system_id' | 'direction' | 'frequency' | 'integration_tech' | 'interface_ref' | 'description' | 'sort_order'>>,
 ): Promise<ProcessInterface> {
-  const res = await fetch(`${URL}/rest/v1/process_interfaces`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_interfaces`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ process_node_id: nodeId, ...data }),
@@ -759,12 +761,12 @@ export async function createProcessInterface(
 }
 
 export async function deleteProcessInterface(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_interfaces?id=eq.${id}`, { method: 'DELETE', headers: headers() })
+  const res = await sbFetch(`${URL}/rest/v1/process_interfaces?id=eq.${id}`, { method: 'DELETE', headers: headers() })
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to delete interface') }
 }
 
 export async function listProcessInterfacesAnon(nodeId: string): Promise<ProcessInterface[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_interfaces?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
     { headers: anonHeaders() }
   )
@@ -785,7 +787,7 @@ export interface ProcessNodeLink {
 }
 
 export async function listProcessNodeLinks(nodeId: string): Promise<ProcessNodeLink[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_node_links?process_node_id=eq.${nodeId}&select=*&order=created_at.desc`,
     { headers: headers() }
   )
@@ -800,7 +802,7 @@ export async function createProcessNodeLink(
   userId: string,
   label?: string | null,
 ): Promise<ProcessNodeLink> {
-  const res = await fetch(`${URL}/rest/v1/process_node_links`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_node_links`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ process_node_id: nodeId, link_kind: linkKind, target_id: targetId, label: label ?? null, created_by: userId }),
@@ -811,7 +813,7 @@ export async function createProcessNodeLink(
 }
 
 export async function deleteProcessNodeLink(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/process_node_links?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/process_node_links?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -822,7 +824,7 @@ export async function deleteProcessNodeLink(id: string): Promise<void> {
 }
 
 export async function listProcessNodeLinksAnon(nodeId: string): Promise<ProcessNodeLink[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_node_links?process_node_id=eq.${nodeId}&select=*&order=created_at.desc`,
     { headers: anonHeaders() }
   )
@@ -833,7 +835,7 @@ export async function listProcessNodeLinksAnon(nodeId: string): Promise<ProcessN
 // ─── Anon fetchers (shared read-only views) ────────────
 
 export async function getProcessModelAnon(id: string): Promise<ProcessModelRow | null> {
-  const res = await fetch(`${URL}/rest/v1/process_models?id=eq.${id}&select=*`, { headers: anonHeaders() })
+  const res = await sbFetch(`${URL}/rest/v1/process_models?id=eq.${id}&select=*`, { headers: anonHeaders() })
   if (!res.ok) return null
   const arr = await res.json()
   return arr.length ? arr[0] : null
@@ -847,7 +849,7 @@ export async function listProcessNodesAnon(modelId: string): Promise<ProcessNode
 }
 
 export async function listProcessNodeLanesAnon(nodeId: string): Promise<ProcessNodeLane[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/process_node_lanes?process_node_id=eq.${nodeId}&select=*&order=sort_order.asc`,
     { headers: anonHeaders() }
   )

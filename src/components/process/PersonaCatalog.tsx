@@ -27,14 +27,23 @@ export default function PersonaCatalog({ orgId }: { orgId: string }) {
   const [links, setLinks] = useState<PersonaRoleLink[]>([])
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [newPersona, setNewPersona] = useState('')
   const [newRole, setNewRole] = useState('')
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    const [p, r, l, w] = await Promise.all([listPersonas(orgId), listProcessRoles(orgId), listPersonaRoleLinks(orgId), listWorkstreams(orgId)])
-    setPersonas(p); setRoles(r); setLinks(l); setWorkstreams(w); setLoading(false)
+    setLoading(true); setLoadError(null)
+    try {
+      const [p, r, l, w] = await Promise.all([listPersonas(orgId), listProcessRoles(orgId), listPersonaRoleLinks(orgId), listWorkstreams(orgId)])
+      setPersonas(p); setRoles(r); setLinks(l); setWorkstreams(w)
+    } catch (err) {
+      // Without this the rejected Promise.all left `loading` true forever and
+      // the page sat on the spinner with nothing to click.
+      setLoadError(err instanceof Error ? err.message : 'Could not reach the catalog.')
+    } finally {
+      setLoading(false)
+    }
   }, [orgId])
   useEffect(() => { load() }, [load])
 
@@ -140,6 +149,14 @@ export default function PersonaCatalog({ orgId }: { orgId: string }) {
   ]
 
   if (loading) return <LoadingState label="Loading persona catalog..." />
+
+  if (loadError) return (
+    <div className="rounded-lg border border-status-red-border bg-status-red-bg px-4 py-6 text-center">
+      <p className="text-body-sm text-text-primary font-semibold mb-1">Could not load the persona catalog</p>
+      <p className="text-[11px] text-text-tertiary mb-4">{loadError}</p>
+      <Button onClick={load}>Retry</Button>
+    </div>
+  )
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -17,6 +17,8 @@ import type {
 } from '@/lib/sipoc/types'
 import type { Workstream } from '@/lib/workstream/types'
 
+import { sbFetch } from './fetch'
+
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -50,7 +52,7 @@ async function fetchAllPaginated<T>(url: string, hdrs: Record<string, string>, p
   let from = 0
   while (true) {
     const to = from + pageSize - 1
-    const res = await fetch(url, {
+    const res = await sbFetch(url, {
       headers: { ...hdrs, 'Range-Unit': 'items', 'Range': `${from}-${to}` },
     })
     if (!res.ok) {
@@ -69,7 +71,7 @@ async function fetchAllPaginated<T>(url: string, hdrs: Record<string, string>, p
 
 export async function listCapabilityMaps(orgId: string, includeArchived = false): Promise<CapabilityMapRow[]> {
   const archiveFilter = includeArchived ? '' : '&archived_at=is.null'
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_maps?organization_id=eq.${orgId}${archiveFilter}&select=*&order=updated_at.desc`,
     { headers: headers() }
   )
@@ -78,7 +80,7 @@ export async function listCapabilityMaps(orgId: string, includeArchived = false)
 }
 
 export async function getCapabilityMap(id: string): Promise<CapabilityMapRow | null> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_maps?id=eq.${id}&select=*`,
     { headers: headers() }
   )
@@ -88,7 +90,7 @@ export async function getCapabilityMap(id: string): Promise<CapabilityMapRow | n
 }
 
 export async function createCapabilityMap(orgId: string, userId: string, title?: string): Promise<CapabilityMapRow> {
-  const res = await fetch(`${URL}/rest/v1/capability_maps`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_maps`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -108,7 +110,7 @@ export async function updateCapabilityMap(
   userId: string,
   updates: { title?: string; description?: string }
 ): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_maps?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_maps?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ ...updates, updated_by: userId }),
@@ -120,7 +122,7 @@ export async function updateCapabilityMap(
 }
 
 export async function archiveCapabilityMap(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_maps?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_maps?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ archived_at: new Date().toISOString() }),
@@ -132,7 +134,7 @@ export async function archiveCapabilityMap(id: string): Promise<void> {
 }
 
 export async function restoreCapabilityMap(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_maps?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_maps?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ archived_at: null }),
@@ -146,7 +148,7 @@ export async function restoreCapabilityMap(id: string): Promise<void> {
 // ─── Capabilities ──────────────────────────────────────
 
 export async function listCapabilities(mapId: string): Promise<Capability[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capabilities?capability_map_id=eq.${mapId}&select=*&order=sort_order.asc`,
     { headers: headers() }
   )
@@ -155,7 +157,7 @@ export async function listCapabilities(mapId: string): Promise<Capability[]> {
 }
 
 export async function getCapability(id: string): Promise<Capability | null> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capabilities?id=eq.${id}&select=*`,
     { headers: headers() }
   )
@@ -172,7 +174,7 @@ export async function createCapability(
   level?: number,
   color?: string | null,
 ): Promise<Capability> {
-  const res = await fetch(`${URL}/rest/v1/capabilities`, {
+  const res = await sbFetch(`${URL}/rest/v1/capabilities`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -190,7 +192,7 @@ export async function createCapability(
 }
 
 export async function updateCapability(id: string, updates: Partial<Pick<Capability, 'name' | 'description' | 'system_id' | 'sort_order' | 'parent_id' | 'level' | 'color' | 'features' | 'use_cases' | 'depends_on_capability_ids' | 'status'>>): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capabilities?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capabilities?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -202,7 +204,7 @@ export async function updateCapability(id: string, updates: Partial<Pick<Capabil
 }
 
 export async function deleteCapability(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capabilities?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capabilities?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -215,7 +217,7 @@ export async function deleteCapability(id: string): Promise<void> {
 // ─── Capability Inputs ─────────────────────────────────
 
 export async function listCapabilityInputs(capabilityId: string): Promise<CapabilityInput[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_inputs?capability_id=eq.${capabilityId}&select=*&order=sort_order.asc`,
     { headers: headers() }
   )
@@ -231,7 +233,7 @@ export async function createCapabilityInput(
   sourceSystemIds: string[] = [],
   sourceOutputId: string | null = null
 ): Promise<CapabilityInput> {
-  const res = await fetch(`${URL}/rest/v1/capability_inputs`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_inputs`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -252,7 +254,7 @@ export async function updateCapabilityInput(
   id: string,
   updates: Partial<Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'feeding_system_id' | 'dimensions' | 'tag_ids' | 'sort_order' | 'archived_at' | 'source_output_id'>>
 ): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_inputs?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_inputs?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -264,7 +266,7 @@ export async function updateCapabilityInput(
 }
 
 export async function deleteCapabilityInput(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_inputs?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_inputs?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -277,7 +279,7 @@ export async function deleteCapabilityInput(id: string): Promise<void> {
 // ─── Capability Outputs ────────────────────────────────
 
 export async function listCapabilityOutputs(capabilityId: string): Promise<CapabilityOutput[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_outputs?capability_id=eq.${capabilityId}&select=*&order=sort_order.asc`,
     { headers: headers() }
   )
@@ -291,7 +293,7 @@ export async function createCapabilityOutput(
   sortOrder: number,
   consumerPersonaIds: string[] = []
 ): Promise<CapabilityOutput> {
-  const res = await fetch(`${URL}/rest/v1/capability_outputs`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_outputs`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -310,7 +312,7 @@ export async function updateCapabilityOutput(
   id: string,
   updates: Partial<Pick<CapabilityOutput, 'consumer_persona_ids' | 'destination_system_ids' | 'dimensions' | 'tag_ids' | 'sort_order' | 'archived_at'>>
 ): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_outputs?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_outputs?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -322,7 +324,7 @@ export async function updateCapabilityOutput(
 }
 
 export async function deleteCapabilityOutput(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_outputs?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_outputs?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -340,7 +342,7 @@ export async function resolveInputSources(sourceOutputIds: string[]): Promise<Re
   const ids = Array.from(new Set(sourceOutputIds.filter(Boolean)))
   if (ids.length === 0) return {}
   const select = 'id,information_product_id,capabilities(id,name,capability_map_id,capability_maps(id,title))'
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_outputs?id=in.(${ids.join(',')})&select=${select}`,
     { headers: headers() }
   )
@@ -374,7 +376,7 @@ export async function resolveOutputDownstream(outputIds: string[]): Promise<Reco
   const ids = Array.from(new Set(outputIds.filter(Boolean)))
   if (ids.length === 0) return {}
   const select = 'id,capability_id,source_output_id,capabilities(id,name,capability_map_id,capability_maps(id,title))'
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_inputs?source_output_id=in.(${ids.join(',')})&archived_at=is.null&select=${select}`,
     { headers: headers() }
   )
@@ -445,7 +447,7 @@ export async function listPersonas(orgId: string): Promise<Persona[]> {
 }
 
 export async function createPersona(orgId: string, data: { name: string; role?: string; description?: string; color?: string }): Promise<Persona> {
-  const res = await fetch(`${URL}/rest/v1/personas`, {
+  const res = await sbFetch(`${URL}/rest/v1/personas`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, ...data }),
@@ -456,7 +458,7 @@ export async function createPersona(orgId: string, data: { name: string; role?: 
 }
 
 export async function updatePersona(id: string, updates: Partial<Pick<Persona, 'name' | 'role' | 'description' | 'color'>>): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/personas?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/personas?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -468,7 +470,7 @@ export async function updatePersona(id: string, updates: Partial<Pick<Persona, '
 }
 
 export async function deletePersona(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/personas?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/personas?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -488,7 +490,7 @@ export async function listInformationProducts(orgId: string): Promise<Informatio
 }
 
 export async function createInformationProduct(orgId: string, data: { name: string; description?: string; category?: string }): Promise<InformationProduct> {
-  const res = await fetch(`${URL}/rest/v1/information_products`, {
+  const res = await sbFetch(`${URL}/rest/v1/information_products`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, ...data }),
@@ -499,7 +501,7 @@ export async function createInformationProduct(orgId: string, data: { name: stri
 }
 
 export async function updateInformationProduct(id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category' | 'data_element_ids'>>): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/information_products?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/information_products?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -511,7 +513,7 @@ export async function updateInformationProduct(id: string, updates: Partial<Pick
 }
 
 export async function deleteInformationProduct(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/information_products?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/information_products?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -531,7 +533,7 @@ export async function listLogicalSystems(orgId: string): Promise<LogicalSystem[]
 }
 
 export async function createLogicalSystem(orgId: string, data: { name: string; system_type?: string; description?: string; color?: string }): Promise<LogicalSystem> {
-  const res = await fetch(`${URL}/rest/v1/logical_systems`, {
+  const res = await sbFetch(`${URL}/rest/v1/logical_systems`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, ...data }),
@@ -542,7 +544,7 @@ export async function createLogicalSystem(orgId: string, data: { name: string; s
 }
 
 export async function updateLogicalSystem(id: string, updates: Partial<Pick<LogicalSystem, 'name' | 'system_type' | 'description' | 'color'>>): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/logical_systems?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/logical_systems?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -554,7 +556,7 @@ export async function updateLogicalSystem(id: string, updates: Partial<Pick<Logi
 }
 
 export async function deleteLogicalSystem(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/logical_systems?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/logical_systems?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -574,7 +576,7 @@ export async function listTags(orgId: string): Promise<Tag[]> {
 }
 
 export async function createTag(orgId: string, data: { name: string; color?: string; description?: string }): Promise<Tag> {
-  const res = await fetch(`${URL}/rest/v1/tags`, {
+  const res = await sbFetch(`${URL}/rest/v1/tags`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, ...data }),
@@ -585,7 +587,7 @@ export async function createTag(orgId: string, data: { name: string; color?: str
 }
 
 export async function updateTag(id: string, updates: Partial<Pick<Tag, 'name' | 'color' | 'description'>>): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/tags?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/tags?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -597,7 +599,7 @@ export async function updateTag(id: string, updates: Partial<Pick<Tag, 'name' | 
 }
 
 export async function deleteTag(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/tags?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/tags?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -617,7 +619,7 @@ export async function listSystemDataElements(orgId: string): Promise<SystemDataE
 }
 
 export async function createSystemDataElement(orgId: string, data: { name: string; description?: string }): Promise<SystemDataElement> {
-  const res = await fetch(`${URL}/rest/v1/system_data_elements`, {
+  const res = await sbFetch(`${URL}/rest/v1/system_data_elements`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, ...data }),
@@ -628,7 +630,7 @@ export async function createSystemDataElement(orgId: string, data: { name: strin
 }
 
 export async function deleteSystemDataElement(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/system_data_elements?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/system_data_elements?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -641,7 +643,7 @@ export async function deleteSystemDataElement(id: string): Promise<void> {
 // ─── Capability Templates (org-scoped) ─────────────────
 
 export async function listCapabilityTemplates(orgId: string): Promise<CapabilityTemplateRow[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_templates?organization_id=eq.${orgId}&select=*&order=name.asc`,
     { headers: headers() }
   )
@@ -656,7 +658,7 @@ export async function createCapabilityTemplate(
   description: string | null,
   templateData: CapabilityTemplateRow['template_data']
 ): Promise<CapabilityTemplateRow> {
-  const res = await fetch(`${URL}/rest/v1/capability_templates`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_templates`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, name, description, created_by: userId, template_data: templateData }),
@@ -667,7 +669,7 @@ export async function createCapabilityTemplate(
 }
 
 export async function deleteCapabilityTemplate(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_templates?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_templates?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -702,7 +704,7 @@ export async function createCapabilityMapShare(
   userId: string,
   expiresAt?: string | null
 ): Promise<CapabilityMapShare> {
-  const res = await fetch(`${URL}/rest/v1/capability_map_shares`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_map_shares`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -719,7 +721,7 @@ export async function createCapabilityMapShare(
 }
 
 export async function listCapabilityMapShares(mapId: string): Promise<CapabilityMapShare[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_map_shares?capability_map_id=eq.${mapId}&select=*&order=created_at.desc`,
     { headers: headers() }
   )
@@ -728,7 +730,7 @@ export async function listCapabilityMapShares(mapId: string): Promise<Capability
 }
 
 export async function deleteCapabilityMapShare(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/capability_map_shares?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/capability_map_shares?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -740,7 +742,7 @@ export async function deleteCapabilityMapShare(id: string): Promise<void> {
 
 export async function getShareByCode(code: string): Promise<(CapabilityMapShare & { map_title?: string }) | null> {
   // Fetch share — anon key works here (RLS allows public SELECT on shares)
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_map_shares?code=eq.${code}&select=*`,
     { headers: { 'Content-Type': 'application/json', 'apikey': ANON, 'Accept': 'application/json' } }
   )
@@ -759,14 +761,14 @@ function anonHeaders(): Record<string, string> {
 }
 
 export async function getCapabilityMapAnon(id: string): Promise<CapabilityMapRow | null> {
-  const res = await fetch(`${URL}/rest/v1/capability_maps?id=eq.${id}&select=*`, { headers: anonHeaders() })
+  const res = await sbFetch(`${URL}/rest/v1/capability_maps?id=eq.${id}&select=*`, { headers: anonHeaders() })
   if (!res.ok) return null
   const arr = await res.json()
   return arr.length ? arr[0] : null
 }
 
 export async function listCapabilitiesAnon(mapId: string): Promise<Capability[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capabilities?capability_map_id=eq.${mapId}&select=*&order=sort_order.asc`,
     { headers: anonHeaders() }
   )
@@ -775,7 +777,7 @@ export async function listCapabilitiesAnon(mapId: string): Promise<Capability[]>
 }
 
 export async function listCapabilityInputsAnon(capId: string): Promise<CapabilityInput[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_inputs?capability_id=eq.${capId}&select=*&order=sort_order.asc`,
     { headers: anonHeaders() }
   )
@@ -784,7 +786,7 @@ export async function listCapabilityInputsAnon(capId: string): Promise<Capabilit
 }
 
 export async function listCapabilityOutputsAnon(capId: string): Promise<CapabilityOutput[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/capability_outputs?capability_id=eq.${capId}&select=*&order=sort_order.asc`,
     { headers: anonHeaders() }
   )
@@ -870,7 +872,7 @@ async function postComment(
   hdrs: Record<string, string>,
   payload: CreateSipocCommentInput,
 ): Promise<SipocComment> {
-  const res = await fetch(`${URL}/rest/v1/sipoc_comments`, {
+  const res = await sbFetch(`${URL}/rest/v1/sipoc_comments`, {
     method: 'POST',
     headers: { ...hdrs, 'Prefer': 'return=representation' },
     body: JSON.stringify({
@@ -897,7 +899,7 @@ export async function createSipocCommentAnon(payload: CreateSipocCommentInput): 
 }
 
 export async function deleteSipocComment(id: string): Promise<void> {
-  await fetch(`${URL}/rest/v1/sipoc_comments?id=eq.${id}`, {
+  await sbFetch(`${URL}/rest/v1/sipoc_comments?id=eq.${id}`, {
     method: 'DELETE',
     headers: headers(),
   })
@@ -917,7 +919,7 @@ async function patchThreadResolution(
     ? `&item_id=eq.${itemId}`
     : `&item_id=is.null`
   const url = `${URL}/rest/v1/sipoc_comments?capability_map_id=eq.${capabilityMapId}&capability_id=eq.${capabilityId}&region=eq.${region}${itemFilter}`
-  const res = await fetch(url, {
+  const res = await sbFetch(url, {
     method: 'PATCH',
     headers: { ...hdrs, 'Prefer': 'return=minimal' },
     body: JSON.stringify(body),

@@ -1,6 +1,8 @@
 import type { Workstream, WorkstreamRollup, WorkstreamEntityType, WorkstreamAlignment } from '@/lib/workstream/types'
 import { STANDARD_WORKSTREAMS } from '@/lib/workstream/catalog'
 
+import { sbFetch } from './fetch'
+
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -31,7 +33,7 @@ function headers(): Record<string, string> {
 
 export async function listWorkstreams(orgId: string, includeArchived = false): Promise<Workstream[]> {
   const archiveFilter = includeArchived ? '' : '&archived_at=is.null'
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/workstreams?organization_id=eq.${orgId}${archiveFilter}&select=*&order=sort_order.asc,name.asc`,
     { headers: headers() }
   )
@@ -40,7 +42,7 @@ export async function listWorkstreams(orgId: string, includeArchived = false): P
 }
 
 export async function getWorkstreamRollups(orgId: string): Promise<WorkstreamRollup[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/workstream_rollup?organization_id=eq.${orgId}&select=*`,
     { headers: headers() }
   )
@@ -53,7 +55,7 @@ export async function createWorkstream(
   userId: string,
   data: { code: string; name: string; description?: string; color?: string; icon?: string; sort_order?: number }
 ): Promise<Workstream> {
-  const res = await fetch(`${URL}/rest/v1/workstreams`, {
+  const res = await sbFetch(`${URL}/rest/v1/workstreams`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, created_by: userId, ...data }),
@@ -67,7 +69,7 @@ export async function updateWorkstream(
   id: string,
   updates: Partial<Pick<Workstream, 'name' | 'description' | 'color' | 'icon' | 'sort_order' | 'archived_at'>>
 ): Promise<void> {
-  await fetch(`${URL}/rest/v1/workstreams?id=eq.${id}`, {
+  await sbFetch(`${URL}/rest/v1/workstreams?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify(updates),
@@ -93,7 +95,7 @@ export async function seedStandardWorkstreams(orgId: string, userId: string): Pr
     sort_order: w.sortOrder,
     is_standard: true,
   }))
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/workstreams?on_conflict=organization_id,code`,
     {
       method: 'POST',
@@ -133,7 +135,7 @@ export async function setEntityWorkstream(
   workstreamId: string | null
 ): Promise<void> {
   const table = ENTITY_TABLE[entity]
-  await fetch(`${URL}/rest/v1/${table}?id=eq.${id}`, {
+  await sbFetch(`${URL}/rest/v1/${table}?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
     body: JSON.stringify({ workstream_id: workstreamId }),
@@ -146,7 +148,7 @@ export async function listAlignmentsForEntity(
   entityType: WorkstreamEntityType,
   entityId: string
 ): Promise<WorkstreamAlignment[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/workstream_alignments?entity_type=eq.${entityType}&entity_id=eq.${entityId}&select=*`,
     { headers: headers() }
   )
@@ -161,7 +163,7 @@ export async function addAlignment(
   entityType: WorkstreamEntityType,
   entityId: string
 ): Promise<void> {
-  await fetch(`${URL}/rest/v1/workstream_alignments?on_conflict=workstream_id,entity_type,entity_id`, {
+  await sbFetch(`${URL}/rest/v1/workstream_alignments?on_conflict=workstream_id,entity_type,entity_id`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
     body: JSON.stringify({
@@ -179,7 +181,7 @@ export async function removeAlignment(
   entityType: WorkstreamEntityType,
   entityId: string
 ): Promise<void> {
-  await fetch(
+  await sbFetch(
     `${URL}/rest/v1/workstream_alignments?workstream_id=eq.${workstreamId}&entity_type=eq.${entityType}&entity_id=eq.${entityId}`,
     { method: 'DELETE', headers: { ...headers(), 'Prefer': 'return=minimal' } }
   )

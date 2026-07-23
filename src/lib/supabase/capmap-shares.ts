@@ -7,6 +7,8 @@ import type { CapabilityWithSystems, CapabilitySystemLink, Capability } from '@/
 import type { BedrockSystem, BedrockPhysicalSystem, BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import type { Workstream } from '@/lib/workstream/types'
 
+import { sbFetch } from './fetch'
+
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -34,7 +36,7 @@ async function fetchAllPaginated<T>(url: string, hdrs: Record<string, string>, p
   const all: T[] = []
   let from = 0
   while (true) {
-    const res = await fetch(url, { headers: { ...hdrs, 'Range-Unit': 'items', 'Range': `${from}-${from + pageSize - 1}` } })
+    const res = await sbFetch(url, { headers: { ...hdrs, 'Range-Unit': 'items', 'Range': `${from}-${from + pageSize - 1}` } })
     if (!res.ok) { if (res.status === 416) break; return all }
     const chunk = (await res.json()) as T[]
     all.push(...chunk)
@@ -63,7 +65,7 @@ function generateShareCode(): string {
 // ─── Authed CRUD (org members) ─────────────────────────
 
 export async function createCmCapabilityShare(orgId: string, userId: string, expiresAt?: string | null): Promise<CmCapabilityShare> {
-  const res = await fetch(`${URL}/rest/v1/cm_capability_shares`, {
+  const res = await sbFetch(`${URL}/rest/v1/cm_capability_shares`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Prefer': 'return=representation' },
     body: JSON.stringify({ organization_id: orgId, code: generateShareCode(), created_by: userId || null, expires_at: expiresAt || null }),
@@ -74,7 +76,7 @@ export async function createCmCapabilityShare(orgId: string, userId: string, exp
 }
 
 export async function listCmCapabilityShares(orgId: string): Promise<CmCapabilityShare[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/cm_capability_shares?organization_id=eq.${orgId}&select=*&order=created_at.desc`,
     { headers: authHeaders() }
   )
@@ -83,7 +85,7 @@ export async function listCmCapabilityShares(orgId: string): Promise<CmCapabilit
 }
 
 export async function deleteCmCapabilityShare(id: string): Promise<void> {
-  const res = await fetch(`${URL}/rest/v1/cm_capability_shares?id=eq.${id}`, {
+  const res = await sbFetch(`${URL}/rest/v1/cm_capability_shares?id=eq.${id}`, {
     method: 'DELETE',
     headers: { ...authHeaders(), 'Prefer': 'return=minimal' },
   })
@@ -96,7 +98,7 @@ export async function deleteCmCapabilityShare(id: string): Promise<void> {
 // ─── Anon (public read-only via code) ──────────────────
 
 export async function getCmShareByCode(code: string): Promise<CmCapabilityShare | null> {
-  const res = await fetch(`${URL}/rest/v1/cm_capability_shares?code=eq.${encodeURIComponent(code)}&select=*`, { headers: anonHeaders() })
+  const res = await sbFetch(`${URL}/rest/v1/cm_capability_shares?code=eq.${encodeURIComponent(code)}&select=*`, { headers: anonHeaders() })
   if (!res.ok) return null
   const arr = await res.json()
   if (!arr.length) return null
@@ -125,8 +127,8 @@ export async function listCapabilityMapAnon(orgId: string): Promise<CapabilityWi
 
 export async function listBedrockCatalogAnon(orgId: string): Promise<BedrockSystemWithPhysicals[]> {
   const [sysRes, physRes] = await Promise.all([
-    fetch(`${URL}/rest/v1/bedrock_systems?organization_id=eq.${orgId}&archived_at=is.null&select=*&order=sort_order.asc,label.asc`, { headers: anonHeaders() }),
-    fetch(`${URL}/rest/v1/bedrock_physical_systems?select=*,bedrock_systems!inner(organization_id)&bedrock_systems.organization_id=eq.${orgId}&order=sort_order.asc`, { headers: anonHeaders() }),
+    sbFetch(`${URL}/rest/v1/bedrock_systems?organization_id=eq.${orgId}&archived_at=is.null&select=*&order=sort_order.asc,label.asc`, { headers: anonHeaders() }),
+    sbFetch(`${URL}/rest/v1/bedrock_physical_systems?select=*,bedrock_systems!inner(organization_id)&bedrock_systems.organization_id=eq.${orgId}&order=sort_order.asc`, { headers: anonHeaders() }),
   ])
   if (!sysRes.ok) return []
   const systems: BedrockSystem[] = await sysRes.json()
@@ -144,7 +146,7 @@ export async function listBedrockCatalogAnon(orgId: string): Promise<BedrockSyst
 }
 
 export async function listWorkstreamsAnon(orgId: string): Promise<Workstream[]> {
-  const res = await fetch(
+  const res = await sbFetch(
     `${URL}/rest/v1/workstreams?organization_id=eq.${orgId}&archived_at=is.null&select=*&order=sort_order.asc,name.asc`,
     { headers: anonHeaders() }
   )
