@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import {
   generateSectionContent, createKnowledgeClient,
   type SectionKind, type SectionContent, type WorkstreamSectionContent,
-  type AssessmentSectionContent, type OpportunityItem,
+  type AssessmentSectionContent, type OpportunityItem, type TrainingSectionContent,
   type ClarifyingQuestion, type KbGap, type WorkshopFocus, type KnowledgeClient,
 } from '@jlee-revtech/agent-core'
 import { serverModelDb, assemblePreRead, workstreamName, assembleAttachmentsContext, primaryRoster } from '@/lib/workshop/server'
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     // Load + org-scope the workshop.
     const { data: ws } = await db
       .from('workshops')
-      .select('id, topic, title, customer_name, objective, duration_minutes, workstream_codes, primary_workstream_codes, facilitation_prompt')
+      .select('id, topic, title, customer_name, objective, duration_minutes, workstream_codes, primary_workstream_codes, facilitation_prompt, systems_in_scope')
       .eq('id', workshopId)
       .eq('organization_id', orgId)
       .maybeSingle()
@@ -89,6 +89,7 @@ export async function POST(req: NextRequest) {
     // Workshop-level guidance (047): threaded into every section generate as
     // `guidance`, SEPARATE from the per-section `feedback` revise instruction.
     const guidance = ((ws.facilitation_prompt as string | null) || '').trim() || undefined
+    const systemsInScope = ((ws.systems_in_scope as string[] | null) || []).filter(Boolean)
     const sectionKind: SectionKind = (item.section_kind as SectionKind) || 'overview'
     const timeboxMinutes = item.timebox_minutes ?? undefined
     const focus = (item.focus_type as WorkshopFocus) || undefined
@@ -135,6 +136,16 @@ export async function POST(req: NextRequest) {
             impact?: string
             effort?: string
           }[]
+        }[]
+      | undefined
+    // curriculum + certification only (057): every training section's modules.
+    let workstreamModules:
+      | {
+          workstreamCode: string
+          workstreamName?: string
+          roleTitle?: string
+          modules: { title: string; system?: string; objectives?: string[] }[]
+          businessProcess?: string[]
         }[]
       | undefined
 
@@ -220,7 +231,39 @@ export async function POST(req: NextRequest) {
       return out
     }
 
-    if (sectionKind === 'workstream' || sectionKind === 'assessment') {
+    // 057: gather every training section's role + modules for the Learning Path
+    // and Knowledge Check, restricted to the active workstream codes.
+    const gatherModules = async (codeFilter: Set<string>) => {
+      const { data: rows } = await db
+        .from('workshop_agenda_content')
+        .select('agenda_item_id, section_kind, content, version')
+        .eq('workshop_id', workshopId)
+      const tRows = (rows || []).filter(
+        (r): r is ContentRow =>
+          r.section_kind === 'training' && !!r.content && (r.content as SectionContent).kind === 'training' &&
+          (!(r.content as TrainingSectionContent).workstreamCode || codeFilter.has((r.content as TrainingSectionContent).workstreamCode)),
+      )
+      const out: NonNullable<typeof workstreamModules> = []
+      for (const r of tRows) {
+        const c = r.content as TrainingSectionContent
+        const modules = (c.toolTraining || []).map((m) => ({
+          title: m.title,
+          ...(m.system ? { system: m.system } : {}),
+          ...(m.learningObjectives?.length ? { objectives: m.learningObjectives } : {}),
+        }))
+        if (!modules.length && !(c.businessProcess || []).length) continue
+        out.push({
+          workstreamCode: c.workstreamCode || 'unknown',
+          workstreamName: c.workstreamName || (c.workstreamCode ? await workstreamName(db, orgId, c.workstreamCode) : undefined),
+          ...(c.roleTitle ? { roleTitle: c.roleTitle } : {}),
+          modules,
+          ...((c.businessProcess || []).length ? { businessProcess: c.businessProcess.map((s) => s.label) } : {}),
+        })
+      }
+      return out
+    }
+
+    if (sectionKind === 'workstream' || sectionKind === 'assessment' || sectionKind === 'training') {
       const code = item.workstream_code || ''
       wsName = code ? await workstreamName(db, orgId, code) : undefined
       isPrimary = !!code && primaryCodes.includes(code)
@@ -266,6 +309,11 @@ export async function POST(req: NextRequest) {
       // 056: gather every active assessment section's opportunities for sequencing.
       const gathered = await gatherOpportunities(new Set((ws.workstream_codes as string[] | null) || []))
       workstreamOpportunities = gathered.length ? gathered : undefined
+    } else if (sectionKind === 'curriculum' || sectionKind === 'certification') {
+      // 057: gather every active training section's modules for the Learning Path
+      // (curriculum) and the Knowledge Check (certification).
+      const gathered = await gatherModules(new Set((ws.workstream_codes as string[] | null) || []))
+      workstreamModules = gathered.length ? gathered : undefined
     }
     // overview: no model/RAG grounding (attachments still apply).
 
@@ -276,13 +324,15 @@ export async function POST(req: NextRequest) {
       objective,
       topic,
       customerName,
-      workstream: (sectionKind === 'workstream' || sectionKind === 'assessment') && item.workstream_code
+      workstream: (sectionKind === 'workstream' || sectionKind === 'assessment' || sectionKind === 'training') && item.workstream_code
         ? { code: item.workstream_code, name: wsName || item.workstream_code }
         : undefined,
       primaryWorkstreams: primaries.length ? primaries : undefined,
       isPrimary,
       primaryDecisions,
       workstreamOpportunities,
+      workstreamModules,
+      systemsInScope: systemsInScope.length ? systemsInScope : undefined,
       focus,
       timeboxMinutes,
       durationMinutes,
@@ -308,7 +358,7 @@ export async function POST(req: NextRequest) {
 
     // ─── App-side KB-gap injection (PLAN §5 step 7) ────────────────
     let kbGaps: KbGap[] = result.kbGaps || []
-    if (kbGaps.length === 0 && knowledgeThin && (sectionKind === 'workstream' || sectionKind === 'assessment') && item.workstream_code) {
+    if (kbGaps.length === 0 && knowledgeThin && (sectionKind === 'workstream' || sectionKind === 'assessment' || sectionKind === 'training') && item.workstream_code) {
       kbGaps = [
         {
           workstreamCode: item.workstream_code,

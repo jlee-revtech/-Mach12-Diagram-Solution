@@ -203,25 +203,31 @@ export default function WorkshopRoomPage() {
   const applyWorkstreams = useCallback(async (selectedCodes: string[], primaryCodes: string[]) => {
     if (!ws) return
     const current = ws.workstream_codes || []
-    // 056: per-workstream sections are 'workstream' (decision archetype) or
-    // 'assessment' (assessment archetype); the closing synthesis is
-    // 'evaluation' or 'roadmap' respectively.
-    const perWsKind = ws.archetype === 'assessment' ? 'assessment' : 'workstream'
+    // 056/057: per-workstream sections are 'workstream' (decision), 'assessment'
+    // (assessment), or 'training' (training archetype); the closing synthesis is
+    // 'evaluation', 'roadmap', or the training pair 'curriculum' + 'certification'.
+    const perWsKind = ws.archetype === 'assessment' ? 'assessment' : ws.archetype === 'training' ? 'training' : 'workstream'
     const existingWsCodes = new Set(
-      agenda.filter((a) => (a.section_kind === 'workstream' || a.section_kind === 'assessment') && a.workstream_code).map((a) => a.workstream_code),
+      agenda.filter((a) => (a.section_kind === 'workstream' || a.section_kind === 'assessment' || a.section_kind === 'training') && a.workstream_code).map((a) => a.workstream_code),
     )
     const toAdd = selectedCodes.filter((c) => !current.includes(c))
-    const evalItem = agenda.find((a) => a.section_kind === 'evaluation' || a.section_kind === 'roadmap')
+    // The closing synthesis section(s); training has two (curriculum then
+    // certification), so anchor on the earliest closing item and shift them all.
+    const closingKinds = new Set(['evaluation', 'roadmap', 'curriculum', 'certification'])
+    const closingItems = agenda.filter((a) => a.section_kind && closingKinds.has(a.section_kind)).sort((a, b) => a.sort_order - b.sort_order)
+    const firstClosing = closingItems[0]
     const maxSort = agenda.reduce((m, a) => Math.max(m, a.sort_order), 0)
-    let insertAt = evalItem ? evalItem.sort_order : maxSort + 1
+    let insertAt = firstClosing ? firstClosing.sort_order : maxSort + 1
     for (const code of toAdd) {
       if (existingWsCodes.has(code)) continue // un-hiding: its section already exists
       const wsName = streams.find((s) => s.code === code)?.name || code
       await addWorkshopAgendaItem(ws.id, { title: wsName, section_kind: perWsKind, workstream_code: code, sort_order: insertAt, status: 'pending' })
       insertAt += 1
     }
-    // Keep the closing synthesis section last if new sections pushed past it.
-    if (evalItem && insertAt !== evalItem.sort_order) await updateAgendaItem(evalItem.id, { sort_order: insertAt })
+    // Keep the closing synthesis section(s) last if new sections pushed past them.
+    if (firstClosing && insertAt !== firstClosing.sort_order) {
+      for (const c of closingItems) { await updateAgendaItem(c.id, { sort_order: insertAt }); insertAt += 1 }
+    }
     await updateWorkshop(ws.id, { workstream_codes: selectedCodes, primary_workstream_codes: primaryCodes })
     setWs((prev) => (prev ? { ...prev, workstream_codes: selectedCodes, primary_workstream_codes: primaryCodes } : prev))
     await load()
@@ -463,7 +469,7 @@ export default function WorkshopRoomPage() {
   // in the DB but are filtered out of the prep view, the deck, and the roster.
   const activeCodes = new Set(ws.workstream_codes || [])
   const isVisibleItem = (a: WorkshopAgendaItem) =>
-    (a.section_kind !== 'workstream' && a.section_kind !== 'assessment') || !a.workstream_code || activeCodes.has(a.workstream_code)
+    (a.section_kind !== 'workstream' && a.section_kind !== 'assessment' && a.section_kind !== 'training') || !a.workstream_code || activeCodes.has(a.workstream_code)
   const visibleAgenda = agenda.filter(isVisibleItem)
   const visibleItemIds = new Set(visibleAgenda.map((a) => a.id))
   const selectedItem = agenda.find((a) => a.id === selectedItemId) ?? null
@@ -475,6 +481,13 @@ export default function WorkshopRoomPage() {
   const roadmapItem = visibleAgenda.find((a) => a.section_kind === 'roadmap') ?? null
   const hasAssessmentContent = visibleAgenda.some(
     (a) => a.section_kind === 'assessment' && !!contentByItem.get(a.id)?.content,
+  )
+  // 057 training archetype: the closing Learning Path + Knowledge Check cards,
+  // both gated on at least one training section having authored content.
+  const curriculumItem = visibleAgenda.find((a) => a.section_kind === 'curriculum') ?? null
+  const certificationItem = visibleAgenda.find((a) => a.section_kind === 'certification') ?? null
+  const hasTrainingContent = visibleAgenda.some(
+    (a) => a.section_kind === 'training' && !!contentByItem.get(a.id)?.content,
   )
   // Enable the Workshop Experience once any visible section has authored content.
   const hasAnyContent = content.some((c) => !!c.content && visibleItemIds.has(c.agenda_item_id))
@@ -536,9 +549,9 @@ export default function WorkshopRoomPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-body-md font-semibold text-text-primary truncate">{ws.title}</h1>
               <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${isLive ? 'bg-status-green-bg text-status-green' : 'bg-gray-100 text-gray-500'}`}>{ws.status}</span>
-              <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${ws.archetype === 'assessment' ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-600'}`}
-                title={ws.archetype === 'assessment' ? 'Assessment / Discovery workshop: conversational assessment driven to opportunities and a roadmap' : 'Key Design Decision workshop: decision analysis and recommendation'}>
-                {ws.archetype === 'assessment' ? 'Assessment' : 'Design Decision'}
+              <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${ws.archetype === 'assessment' ? 'bg-amber-100 text-amber-700' : ws.archetype === 'training' ? 'bg-emerald-100 text-emerald-700' : 'bg-brand-50 text-brand-600'}`}
+                title={ws.archetype === 'assessment' ? 'Assessment / Discovery workshop: conversational assessment driven to opportunities and a roadmap' : ws.archetype === 'training' ? 'Training / Enablement workshop: per-role training build-out, a Learning Path, and a Knowledge Check' : 'Key Design Decision workshop: decision analysis and recommendation'}>
+                {ws.archetype === 'assessment' ? 'Assessment' : ws.archetype === 'training' ? 'Training' : 'Design Decision'}
               </span>
               <VersionBadge />
             </div>
@@ -778,6 +791,38 @@ export default function WorkshopRoomPage() {
                     title={hasAssessmentContent ? 'Sequence the opportunities into a draft roadmap' : 'Generate at least one assessment section first'}
                   >
                     {busy === `section:${roadmapItem.id}` ? 'Sequencing...' : 'Generate Opportunity Roadmap'}
+                  </button>
+                </div>
+              )}
+
+              {/* Learning Path action (057 training archetype) */}
+              {curriculumItem && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <div className="text-body-sm font-medium text-text-primary mb-0.5">Learning Path</div>
+                  <div className="text-[11px] text-text-tertiary mb-2">Reads every role&apos;s training modules, detects the prerequisites between them, and sequences a phased learning path with per-role tracks. Generate the training sections first.</div>
+                  <button
+                    onClick={() => runSection(curriculumItem.id)}
+                    disabled={!hasTrainingContent || busy === `section:${curriculumItem.id}`}
+                    className="text-[11px] px-2.5 py-1 rounded bg-[#059669] hover:bg-[#10B981] disabled:opacity-40 text-white font-medium transition-colors"
+                    title={hasTrainingContent ? 'Sequence the modules into a learning path' : 'Generate at least one training section first'}
+                  >
+                    {busy === `section:${curriculumItem.id}` ? 'Sequencing...' : 'Generate Learning Path'}
+                  </button>
+                </div>
+              )}
+
+              {/* Knowledge Check action (057 training archetype) */}
+              {certificationItem && (
+                <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
+                  <div className="text-body-sm font-medium text-text-primary mb-0.5">Knowledge Check</div>
+                  <div className="text-[11px] text-text-tertiary mb-2">Builds scenario-based exercises, quiz questions with answer keys, and a competency sign-off checklist grounded in the modules trained. Generate the training sections first.</div>
+                  <button
+                    onClick={() => runSection(certificationItem.id)}
+                    disabled={!hasTrainingContent || busy === `section:${certificationItem.id}`}
+                    className="text-[11px] px-2.5 py-1 rounded bg-[#0891B2] hover:bg-[#06B6D4] disabled:opacity-40 text-white font-medium transition-colors"
+                    title={hasTrainingContent ? 'Build the knowledge check' : 'Generate at least one training section first'}
+                  >
+                    {busy === `section:${certificationItem.id}` ? 'Building...' : 'Generate Knowledge Check'}
                   </button>
                 </div>
               )}

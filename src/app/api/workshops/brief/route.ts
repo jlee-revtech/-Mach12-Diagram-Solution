@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       primaryWorkstreamCodes,
       archetype,
       focusAreas,
+      systemsInScope,
       scenarios,
       durationMinutes,
       guidance,
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
       primaryWorkstreamCodes?: string[]
       archetype?: WorkshopArchetype
       focusAreas?: WorkshopFocus[]
+      systemsInScope?: string[]
       scenarios?: { title: string; description?: string; focusType?: WorkshopFocus }[]
       durationMinutes?: number
       guidance?: string
@@ -59,20 +61,22 @@ export async function POST(req: NextRequest) {
     // are assembled into facilitator-provided context.
     let effectiveGuidance = (guidance || '').trim() || undefined
     let primaryCodes = (primaryWorkstreamCodes || []).filter((c) => codes.includes(c))
-    let effectiveArchetype: WorkshopArchetype = archetype === 'assessment' ? 'assessment' : 'decision'
+    let effectiveArchetype: WorkshopArchetype = normalizeArchetype(archetype)
+    let effectiveSystems: string[] = (systemsInScope || []).filter(Boolean)
     let attachmentsContext: string | undefined
     if (workshopId) {
       const { data: gws } = await db
         .from('workshops')
-        .select('facilitation_prompt, primary_workstream_codes, archetype')
+        .select('facilitation_prompt, primary_workstream_codes, archetype, systems_in_scope')
         .eq('id', workshopId)
         .eq('organization_id', orgId)
-        .maybeSingle<{ facilitation_prompt: string | null; primary_workstream_codes: string[] | null; archetype: string | null }>()
+        .maybeSingle<{ facilitation_prompt: string | null; primary_workstream_codes: string[] | null; archetype: string | null; systems_in_scope: string[] | null }>()
       if (!effectiveGuidance) effectiveGuidance = (gws?.facilitation_prompt || '').trim() || undefined
       if (!primaryCodes.length) {
         primaryCodes = (gws?.primary_workstream_codes || []).filter((c) => codes.includes(c))
       }
-      if (!archetype) effectiveArchetype = gws?.archetype === 'assessment' ? 'assessment' : 'decision'
+      if (!archetype) effectiveArchetype = normalizeArchetype(gws?.archetype)
+      if (!effectiveSystems.length) effectiveSystems = (gws?.systems_in_scope || []).filter(Boolean)
       attachmentsContext = await assembleAttachmentsContext(db, workshopId)
     }
     const rosterByCode = new Map(workstreams.map((w) => [w.code, w]))
@@ -86,6 +90,7 @@ export async function POST(req: NextRequest) {
       archetype: effectiveArchetype,
       primaryWorkstreams: primaryWorkstreams.length ? primaryWorkstreams : undefined,
       focusAreas,
+      systemsInScope: effectiveSystems.length ? effectiveSystems : undefined,
       scenarios,
       modelPreRead,
       attachmentsContext,
@@ -145,6 +150,12 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'bad request' }, 400)
   }
+}
+
+// Coerce any stored/passed archetype value to a known WorkshopArchetype
+// (defaults to 'decision', today's behavior).
+function normalizeArchetype(a: string | null | undefined): WorkshopArchetype {
+  return a === 'assessment' || a === 'training' ? a : 'decision'
 }
 
 function json(body: unknown, status: number) {

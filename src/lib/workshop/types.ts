@@ -3,8 +3,10 @@
 export type WorkshopStatus = 'draft' | 'scheduled' | 'live' | 'completed' | 'archived'
 // 056: the workshop's shape. 'decision' = Key Design Decision (analysis +
 // recommendation); 'assessment' = Assessment / Discovery (conversational,
-// questions -> opportunities -> AI-sequenced roadmap).
-export type WorkshopArchetype = 'decision' | 'assessment'
+// questions -> opportunities -> AI-sequenced roadmap). 057: 'training' =
+// Enablement / Training (topic -> per-role build-out -> Learning Path + Knowledge
+// Check).
+export type WorkshopArchetype = 'decision' | 'assessment' | 'training'
 export type WorkshopFocus = 'process' | 'data' | 'integration' | 'capability' | 'poc' | 'discussion'
 export type CaptureType =
   | 'decision' | 'action' | 'deliverable' | 'risk' | 'question' | 'architecture_change' | 'parking_lot'
@@ -33,8 +35,31 @@ export const ARCHETYPE_OPTIONS: { key: WorkshopArchetype; label: string; blurb: 
     label: 'Assessment / Discovery',
     blurb: 'Conversational current-state assessment: assessment questions, discovery questions, process / data / technology opportunities, and an AI-sequenced Opportunity Roadmap.',
   },
+  {
+    key: 'training',
+    label: 'Training / Enablement',
+    blurb: 'Set a training topic, align agents to it, and the agents build the training per role: role context, business process, data integrations, and hands-on tool training, then a Learning Path and a Knowledge Check.',
+  },
 ]
 export const DEFAULT_ARCHETYPE: WorkshopArchetype = 'decision'
+
+// Enumerated tools / technology in scope for a workshop (training especially).
+// Selectable (never free text), per Josh's rule; the "Other" free-add lets a
+// facilitator name a system not on the canonical list.
+export const SYSTEMS_IN_SCOPE_OPTIONS: { key: string; label: string }[] = [
+  { key: 'S/4HANA', label: 'SAP S/4HANA' },
+  { key: 'Dassian', label: 'Dassian A&D' },
+  { key: 'Twenty5 IPE', label: 'Twenty5 IPE' },
+  { key: 'Ariba', label: 'SAP Ariba' },
+  { key: 'Fieldglass', label: 'SAP Fieldglass' },
+  { key: 'SAP Analytics Cloud', label: 'SAP Analytics Cloud (SAC)' },
+  { key: 'SAP BTP', label: 'SAP BTP' },
+  { key: 'SuccessFactors', label: 'SAP SuccessFactors' },
+  { key: 'Concur', label: 'SAP Concur' },
+  { key: 'Tesseract PPM', label: 'Tesseract PPM' },
+  { key: 'Contract Studio', label: 'Mach12 Contract Studio' },
+  { key: 'Solution Studio', label: 'Mach12 Solution Studio' },
+]
 
 // Enumerated workshop lengths. Selectable (never free text), per Josh's rule.
 export const DURATION_OPTIONS: { minutes: number; label: string }[] = [
@@ -82,6 +107,8 @@ export interface Workshop {
   // 055: the workstream(s) this workshop is anchored on. Non-primary
   // ("integrated") workstreams frame their prep input through this lens.
   primary_workstream_codes?: string[] | null
+  // 057: the tools / technology in scope for the session (training especially).
+  systems_in_scope?: string[] | null
   duration_minutes: number | null
   scheduled_at: string | null
   started_at: string | null
@@ -112,8 +139,10 @@ export interface WorkshopParticipant {
 }
 
 // Facilitation-content classification (migration 046; 056 adds the
-// assessment-archetype kinds).
-export type SectionKind = 'overview' | 'workstream' | 'evaluation' | 'assessment' | 'roadmap'
+// assessment-archetype kinds; 057 adds the training-archetype kinds).
+export type SectionKind =
+  | 'overview' | 'workstream' | 'evaluation' | 'assessment' | 'roadmap'
+  | 'training' | 'curriculum' | 'certification'
 
 export interface WorkshopAgendaItem {
   id: string

@@ -9,11 +9,13 @@
 // CommentAnchor so reviewers on the public share link can comment in place. Without
 // a CommentsProvider, CommentAnchor renders nothing, so the prep view is unchanged.
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type {
   SectionContent, OverviewSectionContent, WorkstreamSectionContent,
   EvaluationSectionContent, AssessmentSectionContent, RoadmapSectionContent,
+  TrainingSectionContent, CurriculumSectionContent, CertificationSectionContent,
   KeyDecision, OpportunityItem, WorkshopDiagram,
+  TrainingModule, TrainingIntegration, WorkshopScreenshot,
 } from '@jlee-revtech/agent-core'
 import { CONFIDENCE_META, LEVEL_META } from './sectionMeta'
 import { DiagramCard } from './DiagramView'
@@ -21,12 +23,22 @@ import CommentAnchor from './CommentAnchor'
 import { normalizeSectionContent, sectionNotes } from '@/lib/workshop/deck'
 import { readSynthesis, sortByPriority, PRIORITY_META } from '@/lib/workshop/decisionCriteria'
 
+// 057: capture context threaded down to the training tool-module screenshots.
+// Present only in the prep editor (where workshopId + agendaItemId are known and
+// the row is writable); absent on the public share page (read-only images).
+export interface ScreenshotCaptureCtx {
+  workshopId: string
+  orgId: string
+  agendaItemId: string
+  onCaptured: (updatedContent: SectionContent) => void
+}
+
 // Public entry: normalize (so old-shape rows never throw), then render the body +
 // the notes block.
-export default function SectionContentView({ content, anchorBase }: { content: SectionContent; anchorBase?: string }) {
+export default function SectionContentView({ content, anchorBase, capture }: { content: SectionContent; anchorBase?: string; capture?: ScreenshotCaptureCtx }) {
   return (
     <>
-      <ContentBody content={normalizeSectionContent(content)} base={anchorBase} />
+      <ContentBody content={normalizeSectionContent(content)} base={anchorBase} capture={capture} />
       <NotesReadBlock notes={sectionNotes(content)} base={anchorBase} />
     </>
   )
@@ -45,11 +57,14 @@ export function NotesReadBlock({ notes, base }: { notes: string[]; base?: string
   )
 }
 
-function ContentBody({ content, base }: { content: SectionContent; base?: string }) {
+function ContentBody({ content, base, capture }: { content: SectionContent; base?: string; capture?: ScreenshotCaptureCtx }) {
   if (content.kind === 'overview') return <OverviewBody c={content} base={base} />
   if (content.kind === 'workstream') return <WorkstreamBody c={content} base={base} />
   if (content.kind === 'assessment') return <AssessmentBody c={content} base={base} />
   if (content.kind === 'roadmap') return <RoadmapBody c={content} base={base} />
+  if (content.kind === 'training') return <TrainingBody c={content} base={base} capture={capture} />
+  if (content.kind === 'curriculum') return <CurriculumBody c={content} base={base} />
+  if (content.kind === 'certification') return <CertificationBody c={content} base={base} />
   return <EvaluationBody c={content} base={base} />
 }
 
@@ -338,6 +353,332 @@ function RoadmapBody({ c, base }: { c: RoadmapSectionContent; base?: string }) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      <SectionDiagrams diagrams={c.diagrams} />
+    </div>
+  )
+}
+
+// ─── Training / Enablement (057) ─────────────────────────────────────────────
+
+const DIRECTION_LABEL: Record<string, string> = { inbound: 'Inbound', outbound: 'Outbound', bidirectional: 'Bidirectional' }
+
+// A tool screenshot. Renders the captured image when present; otherwise a
+// placeholder with the hint. When a capture ctx is supplied (prep editor only),
+// it exposes a URL field + Capture button that drives the Playwright route.
+function ScreenshotSlot({ shot, moduleId, capture }: { shot: WorkshopScreenshot; moduleId: string; capture?: ScreenshotCaptureCtx }) {
+  const [url, setUrl] = useState(shot.url || '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const runCapture = async () => {
+    if (!capture) return
+    const target = url.trim()
+    if (!target) { setErr('Enter a URL to capture'); return }
+    setBusy(true); setErr(null)
+    try {
+      const res = await fetch('/api/workshops/screenshot', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workshopId: capture.workshopId, orgId: capture.orgId, agendaItemId: capture.agendaItemId, moduleId, url: target }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Capture failed')
+      capture.onCaptured(data.content as SectionContent)
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Capture failed') }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-surface-muted/40 p-2">
+      {shot.imageUrl ? (
+        <figure className="space-y-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={shot.imageUrl} alt={shot.caption || shot.hint} className="w-full max-w-full rounded border border-border" />
+          <figcaption className="text-[10px] text-text-tertiary">{shot.caption || shot.hint}</figcaption>
+        </figure>
+      ) : (
+        <div className="flex items-start gap-2">
+          <span className="text-[11px]" aria-hidden>🖼</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Screenshot {shot.status === 'requested' ? '(suggested)' : ''}</div>
+            <div className="text-[11px] text-text-secondary leading-snug">{shot.hint}</div>
+          </div>
+        </div>
+      )}
+      {capture && (
+        <div className="mt-2 flex items-center gap-1.5">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder={shot.url ? shot.url : 'URL to capture (Fiori app, demo system, docs)'}
+            className="flex-1 h-7 px-2 rounded border border-border bg-white text-[11px] focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none"
+          />
+          <button
+            onClick={runCapture}
+            disabled={busy}
+            className="text-[11px] px-2 py-1 rounded bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white font-medium whitespace-nowrap transition-colors"
+          >
+            {busy ? 'Capturing…' : shot.imageUrl ? 'Recapture' : 'Capture'}
+          </button>
+        </div>
+      )}
+      {err && <div className="mt-1 text-[10px] text-red-700">{err}</div>}
+    </div>
+  )
+}
+
+function IntegrationCard({ di }: { di: TrainingIntegration }) {
+  return (
+    <div className="border border-border rounded-lg p-2.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] font-medium text-text-primary">{di.title}</span>
+        {(di.systems || []).length > 0 && (
+          <span className="text-[10px] text-text-tertiary font-mono">{di.systems.join(' ↔ ')}</span>
+        )}
+        {di.direction && (
+          <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700">{DIRECTION_LABEL[di.direction] || di.direction}</span>
+        )}
+      </div>
+      {di.note && <p className="text-[10px] text-text-tertiary leading-snug mt-0.5">{di.note}</p>}
+      {(di.dataObjects || []).length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {di.dataObjects!.map((d, i) => <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-muted text-text-secondary">{d}</span>)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ModuleCard({ m, base, capture }: { m: TrainingModule; base?: string; capture?: ScreenshotCaptureCtx }) {
+  return (
+    <div className="bg-white border border-border rounded-lg shadow-card p-4 space-y-2.5">
+      <div className="group flex items-start gap-2">
+        <span className="flex-1 text-[12px] font-semibold text-text-primary leading-snug">{m.title}</span>
+        {m.system && <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 shrink-0">{m.system}</span>}
+        {base && <CommentAnchor anchor={base} label={m.title} />}
+      </div>
+      {(m.learningObjectives || []).length > 0 && (
+        <Block title="You will be able to" color="#059669"><Bullets items={m.learningObjectives} marker="✓" color="#059669" anchorPrefix={base ? `${base}:objectives` : undefined} /></Block>
+      )}
+      {(m.keySteps || []).length > 0 && (
+        <Block title="Steps" color="#2563EB">
+          <ol className="space-y-1">
+            {m.keySteps.map((s, i) => (
+              <li key={i} className="text-[11px] text-text-secondary flex gap-2 leading-snug">
+                <span className="text-brand-500 font-medium shrink-0">{i + 1}.</span>
+                <span className="flex-1">{s}</span>
+              </li>
+            ))}
+          </ol>
+        </Block>
+      )}
+      {(m.transactions || []).length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {m.transactions!.map((t, i) => <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-50 text-brand-600">{t}</span>)}
+        </div>
+      )}
+      {(m.tips || []).length > 0 && (
+        <Block title="Tips" color="#D97706"><Bullets items={m.tips!} marker="▸" color="#D97706" /></Block>
+      )}
+      {m.screenshot && <ScreenshotSlot shot={m.screenshot} moduleId={m.id} capture={capture} />}
+    </div>
+  )
+}
+
+function TrainingBody({ c, base, capture }: { c: TrainingSectionContent; base?: string; capture?: ScreenshotCaptureCtx }) {
+  const roleContext = asBullets(c.roleContext)
+  const process = c.businessProcess || []
+  const integrations = c.dataIntegrations || []
+  const modules = c.toolTraining || []
+  const exercises = asBullets(c.exercises)
+  return (
+    <div className="space-y-3">
+      {(roleContext.length > 0 || c.roleTitle) && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4 space-y-2">
+          {c.roleTitle && <div className="text-body-md font-semibold text-emerald-700">{c.roleTitle}</div>}
+          {roleContext.length > 0 && <Block title="Role context" color="#059669"><Bullets items={roleContext} color="#059669" anchorPrefix={at(base, 'roleContext')} /></Block>}
+        </div>
+      )}
+
+      {process.length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4">
+          <Block title="Business process" color="#2563EB">
+            <ol className="space-y-1">
+              {process.map((s, i) => (
+                <li key={i} className="group text-[11px] text-text-secondary flex gap-2 leading-snug">
+                  <span className="text-white bg-brand-500 rounded-full w-4 h-4 flex items-center justify-center shrink-0 text-[9px] font-bold mt-0.5">{i + 1}</span>
+                  <span className="flex-1"><span className="text-text-primary">{s.label}</span>{s.sublabel ? <span className="text-text-tertiary"> · {s.sublabel}</span> : null}</span>
+                  {base && <CommentAnchor anchor={at(base, `businessProcess:${i}`)!} label={s.label} />}
+                </li>
+              ))}
+            </ol>
+          </Block>
+        </div>
+      )}
+
+      {integrations.length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4">
+          <Block title="Data integrations" color="#0891B2">
+            <div className="space-y-2">
+              {integrations.map((di, i) => <IntegrationCard key={di.id || i} di={di} />)}
+            </div>
+          </Block>
+        </div>
+      )}
+
+      {modules.length > 0 && <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Tool &amp; technology training</div>}
+      {modules.map((m, i) => <ModuleCard key={m.id || i} m={m} base={at(base, `toolTraining:${i}`)} capture={capture} />)}
+
+      {exercises.length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4">
+          <Block title="Exercises" color="#7C3AED"><Bullets items={exercises} marker="▸" color="#7C3AED" anchorPrefix={at(base, 'exercises')} /></Block>
+        </div>
+      )}
+
+      <SectionDiagrams diagrams={c.diagrams} />
+    </div>
+  )
+}
+
+function CurriculumBody({ c, base }: { c: CurriculumSectionContent; base?: string }) {
+  const foundations = asBullets(c.foundations)
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-[#0891B2]/40 bg-[#0891B2]/5 p-4 space-y-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-[#0891B2] mb-1">Learning path</div>
+          <div className="group flex items-start gap-1">
+            <span className="flex-1 text-[12px] text-text-primary font-medium leading-snug">{c.summary}</span>
+            {base && <CommentAnchor anchor={at(base, 'summary')!} label={c.summary} />}
+          </div>
+        </div>
+        {foundations.length > 0 && (
+          <Block title="Foundations (everyone)" color="#059669"><Bullets items={foundations} marker="◆" color="#059669" anchorPrefix={at(base, 'foundations')} /></Block>
+        )}
+      </div>
+
+      {(c.phases || []).length > 0 && (
+        <div className="space-y-2">
+          {(c.phases || []).map((p, i) => (
+            <div key={i} className="bg-white border border-border rounded-lg shadow-card p-3">
+              <div className="group flex items-center gap-2 mb-1.5">
+                <span className="text-[10px] font-bold text-white bg-[#0891B2] rounded-full w-5 h-5 flex items-center justify-center shrink-0">{i + 1}</span>
+                <span className="flex-1 text-[12px] font-semibold text-text-primary">{p.name}{p.timeframe ? ` (${p.timeframe})` : ''}</span>
+                {base && <CommentAnchor anchor={at(base, `phases:${i}`)!} label={p.name} />}
+              </div>
+              {(p.modules || []).length > 0 && (
+                <div className="mb-1.5"><Bullets items={p.modules} marker="▸" color="#0891B2" anchorPrefix={at(base, `phases:${i}:modules`)} /></div>
+              )}
+              {(p.rationale || []).length > 0 && (
+                <div className="pt-1.5 border-t border-border">
+                  <Block title="Why here"><Bullets items={asBullets(p.rationale)} anchorPrefix={at(base, `phases:${i}:rationale`)} /></Block>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(c.tracks || []).length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4">
+          <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-2">Role tracks</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {(c.tracks || []).map((t, i) => (
+              <div key={i} className="border border-border rounded-lg p-2.5">
+                <div className="text-[11px] font-semibold text-emerald-700 mb-1">{t.role}</div>
+                <ol className="space-y-0.5">
+                  {(t.modules || []).map((m, j) => (
+                    <li key={j} className="text-[11px] text-text-secondary flex gap-1.5 leading-snug"><span className="text-text-tertiary">{j + 1}.</span><span className="flex-1">{m}</span></li>
+                  ))}
+                </ol>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(c.prerequisites || []).length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-3">
+          <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1.5">Prerequisites</div>
+          <ul className="space-y-1">
+            {(c.prerequisites || []).map((d, i) => (
+              <li key={i} className="text-[11px] text-text-secondary flex gap-2 leading-snug">
+                <span className="text-[#0891B2]">⇢</span>
+                <span className="flex-1"><span className="font-medium text-text-primary">{d.dependent}</span> needs <span className="font-medium text-text-primary">{d.prerequisite}</span> first: {d.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <SectionDiagrams diagrams={c.diagrams} />
+    </div>
+  )
+}
+
+function CertificationBody({ c, base }: { c: CertificationSectionContent; base?: string }) {
+  return (
+    <div className="space-y-3">
+      {c.summary && (
+        <div className="rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED]/5 p-4">
+          <div className="text-[10px] uppercase tracking-wide text-[#7C3AED] mb-1">Knowledge check</div>
+          <div className="group flex items-start gap-1">
+            <span className="flex-1 text-[12px] text-text-primary font-medium leading-snug">{c.summary}</span>
+            {base && <CommentAnchor anchor={at(base, 'summary')!} label={c.summary} />}
+          </div>
+        </div>
+      )}
+
+      {(c.exercises || []).length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4 space-y-2.5">
+          <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Hands-on exercises</div>
+          {(c.exercises || []).map((e, i) => (
+            <div key={e.id || i} className="border border-border rounded-lg p-3">
+              <div className="group flex items-start gap-2 mb-1">
+                <span className="flex-1 text-[12px] font-semibold text-text-primary">{e.title}</span>
+                {e.role && <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 shrink-0">{e.role}</span>}
+                {base && <CommentAnchor anchor={at(base, `exercises:${i}`)!} label={e.title} />}
+              </div>
+              <p className="text-[11px] text-text-secondary leading-snug mb-1.5">{e.scenario}</p>
+              {(e.steps || []).length > 0 && <div className="mb-1.5"><Block title="Steps"><Bullets items={e.steps!} /></Block></div>}
+              {(e.successCriteria || []).length > 0 && (
+                <Block title="Success criteria" color="#059669"><Bullets items={e.successCriteria} marker="✓" color="#059669" /></Block>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(c.quizQuestions || []).length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4">
+          <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1.5">Knowledge-check questions</div>
+          <ol className="space-y-2">
+            {(c.quizQuestions || []).map((q, i) => (
+              <li key={q.id || i} className="text-[11px] leading-snug">
+                <div className="flex gap-2">
+                  <span className="text-[#7C3AED] font-medium shrink-0">{i + 1}.</span>
+                  <div className="flex-1">
+                    <span className="text-text-primary">{q.question}</span>{q.role ? <span className="text-text-tertiary"> ({q.role})</span> : null}
+                    {q.answer && <div className="text-[10px] text-text-tertiary mt-0.5">Answer: {q.answer}</div>}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {(c.signoffChecklist || []).length > 0 && (
+        <div className="bg-white border border-border rounded-lg shadow-card p-4">
+          <Block title="Competency sign-off" color="#059669">
+            <ul className="space-y-1">
+              {(c.signoffChecklist || []).map((s, i) => (
+                <li key={i} className="text-[11px] text-text-secondary flex gap-2 leading-snug"><span className="text-status-green">☐</span><span className="flex-1">{s}</span></li>
+              ))}
+            </ul>
+          </Block>
         </div>
       )}
 

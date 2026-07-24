@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { buildFacilitatorPersona, runFacilitation, type WorkshopFocus } from '@jlee-revtech/agent-core'
+import { buildFacilitatorPersona, runFacilitation, type WorkshopFocus, type WorkshopArchetype } from '@jlee-revtech/agent-core'
 import { serverModelDb, loadWorkshopForOrg, workstreamRoster, recentTranscript } from '@/lib/workshop/server'
 
 // One live facilitation beat: read the running transcript + agenda and return the
@@ -24,8 +24,9 @@ export async function POST(req: NextRequest) {
       customerName: ws.customer_name || undefined,
       workstreams: roster,
       primaryWorkstreamCodes: (ws.primary_workstream_codes || []) as string[],
-      archetype: ws.archetype === 'assessment' ? 'assessment' : 'decision',
+      archetype: ((ws.archetype === 'assessment' || ws.archetype === 'training') ? ws.archetype : 'decision') as WorkshopArchetype,
       focusAreas: (ws.focus_areas || []) as WorkshopFocus[],
+      systemsInScope: ((ws.systems_in_scope || []) as string[]).filter(Boolean),
     })
 
     const [transcript, agendaRows] = await Promise.all([

@@ -152,6 +152,94 @@ export function normalizeSectionContent(content: SectionContent): SectionContent
       ...notes,
     } as unknown as SectionContent
   }
+  // 057 training archetype: per-role training build-out.
+  if (c.kind === 'training') {
+    return {
+      kind: 'training',
+      workstreamCode: String(c.workstreamCode ?? ''),
+      ...(c.workstreamName ? { workstreamName: String(c.workstreamName) } : {}),
+      ...(c.roleTitle ? { roleTitle: String(c.roleTitle) } : {}),
+      roleContext: asArr(c.roleContext),
+      businessProcess: (Array.isArray(c.businessProcess) ? c.businessProcess : []).map((s) => {
+        const ss = (s ?? {}) as Record<string, unknown>
+        return { label: String(ss.label ?? ''), ...(ss.sublabel ? { sublabel: String(ss.sublabel) } : {}) }
+      }),
+      dataIntegrations: (Array.isArray(c.dataIntegrations) ? c.dataIntegrations : []).map((di) => {
+        const d = (di ?? {}) as Record<string, unknown>
+        return {
+          id: String(d.id ?? ''),
+          title: String(d.title ?? ''),
+          systems: asArr(d.systems),
+          ...(d.direction ? { direction: d.direction } : {}),
+          ...(d.dataObjects != null ? { dataObjects: asArr(d.dataObjects) } : {}),
+          ...(d.note ? { note: String(d.note) } : {}),
+        }
+      }),
+      toolTraining: (Array.isArray(c.toolTraining) ? c.toolTraining : []).map((m) => {
+        const mm = (m ?? {}) as Record<string, unknown>
+        return {
+          id: String(mm.id ?? ''),
+          title: String(mm.title ?? ''),
+          ...(mm.system ? { system: String(mm.system) } : {}),
+          learningObjectives: asArr(mm.learningObjectives),
+          keySteps: asArr(mm.keySteps),
+          ...(mm.transactions != null ? { transactions: asArr(mm.transactions) } : {}),
+          ...(mm.tips != null ? { tips: asArr(mm.tips) } : {}),
+          ...(mm.screenshot ? { screenshot: mm.screenshot } : {}),
+        }
+      }),
+      ...(c.exercises != null ? { exercises: asArr(c.exercises) } : {}),
+      ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      ...notes,
+    } as unknown as SectionContent
+  }
+  // 057 training archetype: the sequenced Learning Path.
+  if (c.kind === 'curriculum') {
+    return {
+      kind: 'curriculum',
+      summary: String(c.summary ?? ''),
+      foundations: asArr(c.foundations),
+      tracks: (Array.isArray(c.tracks) ? c.tracks : []).map((t) => {
+        const tt = (t ?? {}) as Record<string, unknown>
+        return { role: String(tt.role ?? ''), modules: asArr(tt.modules) }
+      }),
+      prerequisites: (Array.isArray(c.prerequisites) ? c.prerequisites : []).map((d) => {
+        const dd = (d ?? {}) as Record<string, unknown>
+        return { prerequisite: String(dd.prerequisite ?? ''), dependent: String(dd.dependent ?? ''), reason: String(dd.reason ?? '') }
+      }),
+      phases: (Array.isArray(c.phases) ? c.phases : []).map((p) => {
+        const pp = (p ?? {}) as Record<string, unknown>
+        return { name: String(pp.name ?? ''), ...(pp.timeframe ? { timeframe: String(pp.timeframe) } : {}), modules: asArr(pp.modules), rationale: asArr(pp.rationale) }
+      }),
+      ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      ...notes,
+    } as unknown as SectionContent
+  }
+  // 057 training archetype: the Knowledge Check.
+  if (c.kind === 'certification') {
+    return {
+      kind: 'certification',
+      summary: String(c.summary ?? ''),
+      exercises: (Array.isArray(c.exercises) ? c.exercises : []).map((e) => {
+        const ee = (e ?? {}) as Record<string, unknown>
+        return {
+          id: String(ee.id ?? ''),
+          title: String(ee.title ?? ''),
+          ...(ee.role ? { role: String(ee.role) } : {}),
+          scenario: String(ee.scenario ?? ''),
+          ...(ee.steps != null ? { steps: asArr(ee.steps) } : {}),
+          successCriteria: asArr(ee.successCriteria),
+        }
+      }),
+      quizQuestions: (Array.isArray(c.quizQuestions) ? c.quizQuestions : []).map((q) => {
+        const qq = (q ?? {}) as Record<string, unknown>
+        return { id: String(qq.id ?? ''), question: String(qq.question ?? ''), ...(qq.role ? { role: String(qq.role) } : {}), ...(qq.answer ? { answer: String(qq.answer) } : {}) }
+      }),
+      signoffChecklist: asArr(c.signoffChecklist),
+      ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      ...notes,
+    } as unknown as SectionContent
+  }
   // overview
   return {
     kind: 'overview',
@@ -230,7 +318,7 @@ export async function loadFacilitationDeck(
   // Build sections from agenda items (already in sort_order) that HAVE content.
   const sections: DeckSection[] = []
   for (const item of agenda) {
-    if ((item.section_kind === 'workstream' || item.section_kind === 'assessment') && item.workstream_code && !activeCodes.has(item.workstream_code)) continue
+    if ((item.section_kind === 'workstream' || item.section_kind === 'assessment' || item.section_kind === 'training') && item.workstream_code && !activeCodes.has(item.workstream_code)) continue
     const row = contentByItem.get(item.id)
     if (!row?.content) continue
     sections.push({

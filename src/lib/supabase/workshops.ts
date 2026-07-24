@@ -63,6 +63,7 @@ export async function createWorkshop(
     title: string; topic?: string; objective?: string; customer_name?: string
     archetype?: WorkshopArchetype
     focus_areas?: WorkshopFocus[]; workstream_codes?: string[]; primary_workstream_codes?: string[]
+    systems_in_scope?: string[]
     scheduled_at?: string
     duration_minutes?: number
     settings?: Record<string, unknown>
@@ -84,6 +85,7 @@ export async function updateWorkshop(
     title: string; topic: string; objective: string; customer_name: string
     status: WorkshopStatus; focus_areas: WorkshopFocus[]; workstream_codes: string[]
     primary_workstream_codes: string[]
+    systems_in_scope: string[]
     scheduled_at: string | null; started_at: string | null; ended_at: string | null
     brief: WorkshopBriefData | null; recap: unknown; settings: Record<string, unknown>; archived_at: string | null
     facilitation_prompt: string | null

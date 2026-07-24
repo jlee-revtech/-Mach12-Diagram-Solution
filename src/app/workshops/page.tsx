@@ -8,7 +8,7 @@ import { listWorkstreams } from '@/lib/supabase/workstreams'
 import { listWorkshops, createWorkshop, archiveWorkshop, restoreWorkshop, restartWorkshop } from '@/lib/supabase/workshops'
 import type { Workstream } from '@/lib/workstream/types'
 import type { Workshop, WorkshopFocus, WorkshopArchetype } from '@/lib/workshop/types'
-import { FOCUS_AREAS, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES, ARCHETYPE_OPTIONS, DEFAULT_ARCHETYPE } from '@/lib/workshop/types'
+import { FOCUS_AREAS, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES, ARCHETYPE_OPTIONS, DEFAULT_ARCHETYPE, SYSTEMS_IN_SCOPE_OPTIONS } from '@/lib/workshop/types'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import { Button, PageHeader, EmptyState, LoadingState } from '@/components/common'
 
@@ -45,6 +45,10 @@ export default function WorkshopsPage() {
   const [primaryCodes, setPrimaryCodes] = useState<string[]>([])
   const [focus, setFocus] = useState<WorkshopFocus[]>(['process', 'data'])
   const [durationMinutes, setDurationMinutes] = useState<number>(DEFAULT_DURATION_MINUTES)
+  // 057: tools / technology in scope (training especially). canonical chips +
+  // free-add for anything not on the list.
+  const [systems, setSystems] = useState<string[]>([])
+  const [customSystem, setCustomSystem] = useState('')
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth')
@@ -100,6 +104,7 @@ export default function WorkshopsPage() {
         customer_name: customer.trim() || undefined,
         workstream_codes: wsCodes,
         primary_workstream_codes: primaryCodes.filter((c) => wsCodes.includes(c)),
+        systems_in_scope: systems,
         focus_areas: focus,
         duration_minutes: durationMinutes,
         settings: { voice: true },
@@ -109,7 +114,7 @@ export default function WorkshopsPage() {
       alert(e instanceof Error ? e.message : 'Failed to create workshop')
       setCreating(false)
     }
-  }, [organization, user, archetype, title, topic, objective, customer, wsCodes, primaryCodes, focus, durationMinutes, router])
+  }, [organization, user, archetype, title, topic, objective, customer, wsCodes, primaryCodes, systems, focus, durationMinutes, router])
 
   if (loading || !user || !organization) return null
 
@@ -227,6 +232,53 @@ export default function WorkshopsPage() {
                 {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
               </select>
               <div className="text-[11px] text-text-tertiary mt-1.5">Agenda timeboxes and per-section depth scale to this length.</div>
+            </div>
+          </div>
+          <div className="mb-5">
+            <div className="text-label uppercase text-text-secondary mb-1">Tools / technology in scope</div>
+            <div className="text-[11px] text-text-tertiary mb-2">
+              The systems this session covers. {archetype === 'training' ? 'The agents build hands-on tool training for each of these.' : 'Threaded into the brief and every section as prep context.'}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {SYSTEMS_IN_SCOPE_OPTIONS.map((s) => {
+                const on = systems.includes(s.key)
+                return (
+                  <button key={s.key} type="button" onClick={() => setSystems((a) => toggle(a, s.key))}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+                      on ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'
+                    }`}>
+                    {s.label}
+                  </button>
+                )
+              })}
+              {/* custom (free-added) systems not on the canonical list */}
+              {systems.filter((c) => !SYSTEMS_IN_SCOPE_OPTIONS.some((o) => o.key === c)).map((c) => (
+                <button key={c} type="button" onClick={() => setSystems((a) => a.filter((x) => x !== c))}
+                  className="rounded-full border border-brand-500 bg-brand-50 text-brand-600 px-3 py-1 text-[11px] font-medium">
+                  {c} ✕
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                value={customSystem}
+                onChange={(e) => setCustomSystem(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    const v = customSystem.trim()
+                    if (v && !systems.includes(v)) setSystems((a) => [...a, v])
+                    setCustomSystem('')
+                  }
+                }}
+                placeholder="Add another system (e.g. Kinaxis, Coupa)"
+                className={`${inputCls} max-w-xs`}
+              />
+              <Button variant="ghost" size="sm" onClick={() => {
+                const v = customSystem.trim()
+                if (v && !systems.includes(v)) setSystems((a) => [...a, v])
+                setCustomSystem('')
+              }}>Add</Button>
             </div>
           </div>
           <div className="flex items-center gap-2">

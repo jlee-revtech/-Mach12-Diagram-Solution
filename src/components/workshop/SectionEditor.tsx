@@ -105,6 +105,22 @@ export default function SectionEditor({
     }
   }
 
+  // 057: a tool-training screenshot was captured (Playwright route patched the
+  // content row server-side and returned the updated content). Refresh the local
+  // view and notify the parent so the image renders immediately.
+  const onScreenshotCaptured = (updatedContent: SectionContent) => {
+    const result: SectionResult = {
+      content: updatedContent,
+      clarifyingQuestions: view?.clarifyingQuestions ?? [],
+      kbGaps: view?.kbGaps ?? [],
+      groundingUsed: view?.groundingUsed ?? false,
+      version: view?.version ?? 1,
+      status: view?.status ?? 'final',
+    }
+    setLocal(result)
+    onSaved(result)
+  }
+
   // Auto-save: whenever the draft changes, debounce a save. Skips the initial draft
   // (equals the loaded content) and any state that was just persisted.
   useEffect(() => {
@@ -371,6 +387,21 @@ export default function SectionEditor({
           This section reads every assessment section&apos;s opportunities, detects the dependencies between them, and drafts the sequenced Opportunity Roadmap. Generate the assessment sections first.
         </div>
       )}
+      {item.section_kind === 'training' && (
+        <div className="text-[11px] text-text-tertiary bg-white border border-[#059669]/30 rounded-lg px-3 py-2">
+          Builds the training for this role: role context, the business process it runs, the data integrations it depends on, and hands-on tool training grounded in the systems in scope. Add a URL under a tool module&apos;s screenshot to capture the real screen.
+        </div>
+      )}
+      {item.section_kind === 'curriculum' && (
+        <div className="text-[11px] text-text-tertiary bg-white border border-[#0891B2]/30 rounded-lg px-3 py-2">
+          This section reads every role&apos;s training modules, detects the prerequisites between them, and sequences a phased Learning Path with per-role tracks. Generate the training sections first.
+        </div>
+      )}
+      {item.section_kind === 'certification' && (
+        <div className="text-[11px] text-text-tertiary bg-white border border-[#7C3AED]/30 rounded-lg px-3 py-2">
+          This section builds a Knowledge Check: scenario-based exercises, quiz questions with answer keys, and a competency sign-off checklist grounded in the modules trained. Generate the training sections first.
+        </div>
+      )}
 
       {error && <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
@@ -378,7 +409,10 @@ export default function SectionEditor({
           page). It normalizes internally, so old-shape rows never throw. */}
       {view?.content ? (
         <>
-          <SectionContentView content={view.content} />
+          <SectionContentView
+            content={view.content}
+            capture={item.section_kind === 'training' ? { workshopId, orgId, agendaItemId: item.id, onCaptured: onScreenshotCaptured } : undefined}
+          />
           {item.section_kind === 'evaluation' && (
             <SynthesizeCriteriaButton content={view.content} busy={synthesizing} onSynthesize={synthesizeCriteria} />
           )}

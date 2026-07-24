@@ -12,6 +12,10 @@ export const SECTION_META: Record<SectionKind, { label: string; color: string; i
   // 056 assessment archetype
   assessment: { label: 'Assessment', color: '#059669', icon: '◎' },
   roadmap: { label: 'Roadmap', color: '#D97706', icon: '➔' },
+  // 057 training archetype
+  training: { label: 'Training', color: '#059669', icon: '▤' },
+  curriculum: { label: 'Learning Path', color: '#0891B2', icon: '≣' },
+  certification: { label: 'Knowledge Check', color: '#7C3AED', icon: '✓' },
 }
 
 // Impact / effort badge for opportunity items (assessment archetype).

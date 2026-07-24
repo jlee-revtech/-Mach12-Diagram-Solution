@@ -1,6 +1,6 @@
 {
   "name": "mach12-diagram",
-  "version": "0.18.3",
+  "version": "0.19.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3003",
@@ -10,8 +10,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
-    "@jlee-revtech/agent-core": "^0.14.0",
+    "@jlee-revtech/agent-core": "^0.15.0",
     "@radix-ui/react-tooltip": "^1.2.12",
+    "@sparticuz/chromium": "^149.0.0",
     "@supabase/supabase-js": "^2.39.8",
     "@tanstack/react-table": "^8.21.3",
     "@xyflow/react": "^12.8.3",
@@ -25,6 +26,7 @@
     "lib0": "^0.2.117",
     "lucide-react": "^1.24.0",
     "next": "^16.1.6",
+    "playwright-core": "^1.61.1",
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
