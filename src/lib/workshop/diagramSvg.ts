@@ -154,12 +154,14 @@ function elbowPath(d: string): string {
 
 // A short opaque label chip centered on (cx, cy) so an edge label never sits
 // transparently on a line or a box.
-function edgeLabelChip(label: string, cx: number, cy: number, fontSize = 11): string {
-  const w = estTextWidth(label, fontSize) + 10
+function edgeLabelChip(label: string, cx: number, cy: number, fontSize = 11, width?: number): string {
+  const w = width ?? estTextWidth(label, fontSize) + 12
   const h = fontSize + 7
+  // Ellipsize to the chip so text never spills past the opaque background.
+  const shown = ellipsize(label, fontSize, w - 12)
   return (
     roundRect(cx - w / 2, cy - h / 2, w, h, 3, BRAND.surface, BRAND.border, 1) +
-    textLine(label, cx, cy + fontSize * 0.35, fontSize, BRAND.slate, { anchor: 'middle' })
+    textLine(shown, cx, cy + fontSize * 0.35, fontSize, BRAND.slate, { anchor: 'middle' })
   )
 }
 
@@ -578,10 +580,13 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
   const NODE_PAD_X = 12
   const NODE_PAD_Y = 10
   const NODE_GAP = 20
-  const BAND_GAP = 40
   const NODE_H = 40
   const MIN_NODE_W = 84
   const MAX_NODE_W = 190
+  const CHIP_FS = 11
+  const CHIP_H = CHIP_FS + 7 // matches edgeLabelChip height
+  const LANE_STEP = CHIP_H + 5 // vertical pitch when edge labels must stack
+  const MIN_BAND_GAP = 44 // floor; grows below to fit stacked edge labels
 
   // Measure every band's node widths FIRST (node width logic unchanged), then grow
   // the SVG so the widest row fits instead of clipping off the right edge.
@@ -606,23 +611,69 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
   const availW = width - f.padX * 2 - LABEL_GUTTER
   const bandX = f.padX + LABEL_GUTTER
 
-  // Place every node. Keep an index of node-label -> geometry (for the first
-  // occurrence) so connections can dock to face centers.
+  // Place node X positions first (independent of Y). Index node-label ->
+  // { box, band } for the first occurrence so connections dock to face centers and
+  // labels know which gap they cross. Y is assigned after the gap height is known.
   interface NodeBox { x: number; y: number; w: number; h: number; lines: string[] }
-  const nodeByLabel = new Map<string, NodeBox>()
-  const bands: { label: string; y: number; nodes: NodeBox[] }[] = []
-
-  let y = f.contentTop
-  measuredBands.forEach((mb) => {
+  const nodeInfoByLabel = new Map<string, { box: NodeBox; band: number }>()
+  const bands: { label: string; y: number; nodes: NodeBox[] }[] = measuredBands.map((mb, bi) => {
     // Center the row within the band area (the SVG is now wide enough to hold it).
     let x = bandX + Math.max(0, (availW - mb.rowW) / 2)
     const nodes: NodeBox[] = mb.measured.map((m) => {
-      const box: NodeBox = { x, y, w: m.w, h: NODE_H, lines: m.lines }
+      const box: NodeBox = { x, y: 0, w: m.w, h: NODE_H, lines: m.lines }
       x += m.w + NODE_GAP
-      if (!nodeByLabel.has(m.name)) nodeByLabel.set(m.name, box)
+      if (!nodeInfoByLabel.has(m.name)) nodeInfoByLabel.set(m.name, { box, band: bi })
       return box
     })
-    bands.push({ label: mb.label, y, nodes })
+    return { label: mb.label, y: 0, nodes }
+  })
+
+  // Edge labels: assign every labeled cross-band connection to a horizontal lane in
+  // the gap below its UPPER band, so chips never overlap each other or sit on an
+  // intermediate band's nodes (skill 2.6 / 3.4). Computed here because it drives how
+  // tall the band gap must be. Placement is independent of Y.
+  interface Chip { cx: number; w: number; gap: number; lane: number; label: string }
+  const conns = (d.connections ?? []).filter((c) => c && c.from && c.to)
+  const chips: Chip[] = []
+  for (const c of conns) {
+    if (!c.label) continue
+    const A = nodeInfoByLabel.get(String(c.from))
+    const B = nodeInfoByLabel.get(String(c.to))
+    if (!A || !B || A.band === B.band) continue
+    const w = Math.min(estTextWidth(String(c.label), CHIP_FS) + 12, Math.max(80, availW))
+    const rawCx = (A.box.x + A.box.w / 2 + B.box.x + B.box.w / 2) / 2
+    const cx = Math.max(f.padX + w / 2 + 2, Math.min(width - f.padX - w / 2 - 2, rawCx))
+    chips.push({ cx, w, gap: Math.min(A.band, B.band), lane: 0, label: String(c.label) })
+  }
+  const lanesInGap = new Map<number, number>()
+  const chipsByGap = new Map<number, Chip[]>()
+  for (const ch of chips) {
+    const arr = chipsByGap.get(ch.gap) ?? []
+    arr.push(ch)
+    chipsByGap.set(ch.gap, arr)
+  }
+  let maxLanes = 1
+  for (const [g, arr] of chipsByGap) {
+    arr.sort((p, q) => p.cx - q.cx) // left-to-right, then greedily stack overlaps
+    const laneRight: number[] = [] // rightmost edge used in each lane so far
+    for (const ch of arr) {
+      let lane = 0
+      while (lane < laneRight.length && ch.cx - ch.w / 2 < laneRight[lane] + 10) lane++
+      ch.lane = lane
+      laneRight[lane] = ch.cx + ch.w / 2
+    }
+    lanesInGap.set(g, laneRight.length)
+    maxLanes = Math.max(maxLanes, laneRight.length)
+  }
+
+  // Uniform band gap tall enough to hold the deepest label stack (keeps the grid).
+  const BAND_GAP = Math.max(MIN_BAND_GAP, maxLanes * LANE_STEP + NODE_PAD_Y + 12)
+
+  // Assign Y now that the gap height is known.
+  let y = f.contentTop
+  bands.forEach((band) => {
+    band.y = y
+    band.nodes.forEach((n) => { n.y = y })
     y += NODE_H + BAND_GAP
   })
 
@@ -647,31 +698,41 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
     })
   })
 
-  // Connections. Orthogonal V-H-V routing through the mid gutter between bands.
+  // Connectors: orthogonal V-H-V routing between bands. Labels are drawn separately
+  // (below) in their assigned lanes so multiple edges never collide.
   const GAP = 6
-  const conns = (d.connections ?? []).filter((c) => c && c.from && c.to)
-  conns.forEach((c) => {
-    const a = nodeByLabel.get(String(c.from))
-    const b = nodeByLabel.get(String(c.to))
-    if (!a || !b) return
+  for (const c of conns) {
+    const A = nodeInfoByLabel.get(String(c.from))
+    const B = nodeInfoByLabel.get(String(c.to))
+    if (!A || !B) continue
+    const a = A.box
+    const b = B.box
     const ax = a.x + a.w / 2
     const bx = b.x + b.w / 2
-    if (Math.abs(a.y - b.y) < 1) {
-      // Same band: route down-out, across the gutter below, and back up-in so the
+    if (A.band === B.band) {
+      // Same band: route down-out, across the gap below, and back up-in so the
       // connector never runs through the sibling nodes between them.
       const ay = a.y + a.h
       const midY = ay + BAND_GAP / 2
       out += elbowPath(`M ${ax.toFixed(1)} ${ay.toFixed(1)} V ${midY.toFixed(1)} H ${bx.toFixed(1)} V ${(b.y + b.h + GAP).toFixed(1)}`)
-      // (arrow enters the target from below in the degenerate same-band case)
-    } else {
-      const downward = b.y > a.y
-      const ay = downward ? a.y + a.h : a.y
-      const by = downward ? b.y : b.y + b.h
-      const midY = (ay + by) / 2
-      out += elbowPath(`M ${ax.toFixed(1)} ${ay.toFixed(1)} V ${midY.toFixed(1)} H ${bx.toFixed(1)} V ${(by + (downward ? -GAP : GAP)).toFixed(1)}`)
-      if (c.label) out += edgeLabelChip(String(c.label), (ax + bx) / 2, midY)
+      continue
     }
-  })
+    const downward = b.y > a.y
+    const ay = downward ? a.y + a.h : a.y
+    const by = downward ? b.y : b.y + b.h
+    const midY = (ay + by) / 2
+    out += elbowPath(`M ${ax.toFixed(1)} ${ay.toFixed(1)} V ${midY.toFixed(1)} H ${bx.toFixed(1)} V ${(by + (downward ? -GAP : GAP)).toFixed(1)}`)
+  }
+
+  // Edge label chips, drawn last (on top of the connectors), each at its lane's Y so
+  // stacked labels in the same gap never overlap.
+  const gapCenterY = (g: number) => bands[g].y + NODE_H + BAND_GAP / 2
+  for (const ch of chips) {
+    const lanes = lanesInGap.get(ch.gap) ?? 1
+    const stackTop = gapCenterY(ch.gap) - (lanes * LANE_STEP) / 2 + LANE_STEP / 2
+    const cy = stackTop + ch.lane * LANE_STEP
+    out += edgeLabelChip(ch.label, ch.cx, cy, CHIP_FS, ch.w)
+  }
 
   return shell(out, width, Math.ceil(height), d, f)
 }
