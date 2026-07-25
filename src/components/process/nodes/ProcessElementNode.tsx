@@ -140,9 +140,13 @@ function ProcessElementNodeComponent({ id, data, selected }: NodeProps & { data:
 
   // ─── Activities: rounded rect ───
   const isSub = data.elementType === 'subProcess'
+  // Assigned Fiori/Dassian tile (or t-code) rendered as a footer strip, so
+  // system/tile assignments are visible on the canvas, not only the inspector.
+  const tileMeta = data.fioriTile?.title || data.fioriApp || null
+  const footer = tileMeta || data.tcode || null
   return (
     <div
-      className="group relative bg-[var(--m12-bg-card)] flex items-center justify-center px-3"
+      className={`group relative bg-[var(--m12-bg-card)] flex items-center justify-center px-3 ${footer ? 'pb-4' : ''}`}
       style={{
         width: 150, minHeight: 64,
         border: `1.5px solid ${selected ? '#0EA5E9' : 'var(--m12-border)'}`,
@@ -170,6 +174,16 @@ function ProcessElementNodeComponent({ id, data, selected }: NodeProps & { data:
         />
       ) : (
         <span className="text-[11px] font-medium text-[var(--m12-text)] text-center leading-tight">{data.label}</span>
+      )}
+      {!editing && footer && (
+        <span
+          className="absolute bottom-1 left-2 right-2 text-[8px] leading-none text-[var(--m12-text-muted)] text-center truncate font-[family-name:var(--font-space-mono)]"
+          title={`${tileMeta ?? ''}${tileMeta && data.tcode ? ' · ' : ''}${data.tcode ?? ''}`}
+        >
+          {tileMeta}
+          {tileMeta && data.tcode ? ' · ' : ''}
+          {data.tcode}
+        </span>
       )}
     </div>
   )

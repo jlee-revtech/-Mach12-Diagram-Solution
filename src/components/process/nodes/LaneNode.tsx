@@ -30,15 +30,18 @@ function LaneNodeComponent({ data, selected }: NodeProps & { data: LaneNodeData 
         pointerEvents: 'none',
       }}
     >
-      {/* Left gutter: vertical label band — the only interactive part */}
+      {/* Left gutter: vertical label band — the only interactive part.
+          Clamped to the lane height with an ellipsis so long persona/role
+          names never spill into neighboring lanes; full text on hover. */}
       <div
         data-lane-gutter="true"
-        className="absolute left-0 top-0 bottom-0 w-9 flex items-center justify-center cursor-pointer"
+        className="absolute left-0 top-0 bottom-0 w-9 flex items-center justify-center cursor-pointer overflow-hidden"
         style={{ background: `${color}1A`, borderRight: `1px solid ${color}40`, pointerEvents: 'auto' }}
+        title={`${data.label}${sub ? ` · ${sub}` : ''}`}
       >
         <span
-          className="text-[10px] font-bold uppercase tracking-wider text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)] whitespace-nowrap"
-          style={{ transform: 'rotate(180deg)', writingMode: 'vertical-rl' }}
+          className="text-[10px] font-bold uppercase tracking-wider text-[var(--m12-text-secondary)] font-[family-name:var(--font-space-mono)] whitespace-nowrap overflow-hidden text-ellipsis"
+          style={{ transform: 'rotate(180deg)', writingMode: 'vertical-rl', maxHeight: 'calc(100% - 12px)' }}
         >
           {data.label}
           {sub ? ` · ${sub}` : ''}

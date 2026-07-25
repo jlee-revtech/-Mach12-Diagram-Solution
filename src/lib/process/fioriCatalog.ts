@@ -78,13 +78,145 @@ export const FIORI_CATALOG: FioriTile[] = [
   // ── Plant Maintenance / Quality ──
   F('pm-manage-maint-orders', 'Manage Maintenance Orders', 'Plant Maintenance'),
   F('qm-record-results', 'Record Inspection Results', 'Quality'),
-  // ── Bank ──
+  // ── Bank / Treasury ──
   F('tr-manage-banks', 'Manage Banks', 'Treasury · Bank'),
   F('tr-bank-statements', 'Manage Incoming Bank Statements', 'Treasury · Bank'),
+  F('tr-cash-position', 'Manage Cash Position', 'Treasury · Cash'),
+  F('tr-cash-flow-analyzer', 'Cash Flow Analyzer', 'Treasury · Cash'),
+  F('tr-manage-bank-accounts', 'Manage Bank Accounts', 'Treasury · Bank'),
+  F('tr-track-bank-transfers', 'Track Bank Transfers', 'Treasury · Bank'),
   // ── HCM / Time ──
   F('hcm-my-timesheet', 'My Timesheet', 'HCM · Time', 'F1823'),
   F('hcm-approve-timesheets', 'Approve Timesheets', 'HCM · Time'),
   F('hcm-run-payroll', 'Run Payroll', 'HCM · Payroll'),
+  F('hcm-record-working-times', 'Record Working Times (CATS)', 'HCM · Time', 'CAT2'),
+  F('hcm-transfer-time-data', 'Transfer Time Data to Controlling', 'HCM · Time', 'CAT7'),
+  F('hcm-maintain-hr-master', 'Maintain HR Master Data', 'HCM · Core', 'PA30'),
+  F('hcm-org-management', 'Organizational Management', 'HCM · Core', 'PPOME'),
+
+  // ── Finance: Close / Consolidation ──
+  F('fi-manage-recurring-journal', 'Manage Recurring Journal Entries', 'Finance · Close'),
+  F('fi-post-currency-adjustments', 'Post Currency Adjustments', 'Finance · Close'),
+  F('fi-manage-closing-tasks', 'Manage Closing Tasks', 'Finance · Close'),
+  F('fi-trial-balance', 'Trial Balance', 'Finance · Reporting'),
+  F('fi-financial-statement', 'Display Financial Statement', 'Finance · Reporting'),
+  F('fi-gr-manage-group-structure', 'Manage Group Structure', 'Finance · Consolidation'),
+  F('fi-gr-run-consolidation', 'Run Consolidation Tasks', 'Finance · Consolidation'),
+  F('fi-gr-group-data-analysis', 'Group Data Analysis', 'Finance · Consolidation'),
+  // ── Finance: AP / AR extras ──
+  F('fi-post-incoming-payments', 'Post Incoming Payments', 'Finance · AR', 'F1345'),
+  F('fi-enter-incoming-invoice', 'Enter Incoming Invoice', 'Finance · AP', 'MIRO'),
+  F('fi-manage-payment-proposals', 'Manage Payment Proposals', 'Finance · AP'),
+  F('fi-manage-dunning', 'Manage Dunning Notices', 'Finance · AR'),
+  F('fi-manage-credit-accounts', 'Manage Credit Accounts', 'Finance · AR'),
+  F('fi-manage-dispute-cases', 'Manage Dispute Cases', 'Finance · AR'),
+  // ── Margin Analysis ──
+  F('co-market-segments', 'Analyze Market Segments (Margin Analysis)', 'Controlling'),
+  F('co-pl-analysis', 'P&L Statement Analysis', 'Controlling'),
+
+  // ── Sales / Billing extras ──
+  F('sd-create-sales-contract', 'Create Sales Contracts', 'Sales', 'VA41'),
+  F('sd-manage-sales-contracts', 'Manage Sales Contracts', 'Sales'),
+  F('sd-manage-customer-returns', 'Manage Customer Returns', 'Sales'),
+  F('sd-manage-credit-memo-requests', 'Manage Credit Memo Requests', 'Sales'),
+  F('sd-create-billing-documents', 'Create Billing Documents', 'Sales · Billing', 'VF01'),
+  F('sd-resource-related-billing', 'Resource-Related Billing', 'Sales · Billing', 'DP91'),
+  F('sd-sales-order-fulfillment', 'Sales Order Fulfillment Monitor', 'Sales'),
+  F('sd-manage-debit-memo-requests', 'Manage Debit Memo Requests', 'Sales · Billing'),
+
+  // ── Procurement extras ──
+  F('mm-manage-rfq', 'Manage Requests for Quotation', 'Procurement'),
+  F('mm-manage-supplier-quotations', 'Manage Supplier Quotations', 'Procurement'),
+  F('mm-manage-purchase-contracts', 'Manage Purchase Contracts', 'Procurement'),
+  F('mm-manage-scheduling-agreements', 'Manage Scheduling Agreements', 'Procurement'),
+  F('mm-manage-service-entry', 'Manage Service Entry Sheets', 'Procurement'),
+  F('mm-manage-sources-of-supply', 'Manage Sources of Supply', 'Procurement'),
+  F('mm-monitor-po-items', 'Monitor Purchase Order Items', 'Procurement'),
+  F('mm-manage-info-records', 'Manage Purchasing Info Records', 'Procurement'),
+  F('mm-manage-supplier-invoices', 'Manage Supplier Invoices', 'Procurement'),
+
+  // ── Inventory / Warehouse / Logistics ──
+  F('im-manage-stock', 'Manage Stock', 'Inventory'),
+  F('im-stock-single-material', 'Stock - Single Material', 'Inventory'),
+  F('im-transfer-stock', 'Transfer Stock - In-Plant', 'Inventory'),
+  F('im-physical-inventory', 'Manage Physical Inventory Documents', 'Inventory'),
+  F('im-count-physical-inventory', 'Count Physical Inventory', 'Inventory'),
+  F('ewm-warehouse-tasks', 'Process Warehouse Tasks', 'Warehouse (EWM)'),
+  F('ewm-manage-handling-units', 'Manage Handling Units', 'Warehouse (EWM)'),
+  F('ewm-manage-inbound-deliveries', 'Manage Inbound Deliveries', 'Warehouse (EWM)'),
+  F('le-create-outbound-delivery', 'Create Outbound Delivery', 'Logistics', 'VL01N'),
+  F('le-manage-outbound-deliveries', 'Manage Outbound Deliveries', 'Logistics'),
+  F('le-pick-outbound-delivery', 'Pick Outbound Delivery', 'Logistics'),
+  F('le-post-goods-issue', 'Post Goods Issue', 'Logistics', 'VL02N'),
+  F('tm-manage-freight-orders', 'Manage Freight Orders', 'Transportation (TM)'),
+  F('tm-track-shipments', 'Track Shipments', 'Transportation (TM)'),
+
+  // ── Production extras ──
+  F('pp-create-production-order', 'Create Production Order', 'Production', 'CO01'),
+  F('pp-convert-planned-orders', 'Convert Planned Orders', 'Production'),
+  F('pp-monitor-material-coverage', 'Monitor Material Coverage', 'Production · MRP', 'MD04'),
+  F('pp-manage-pirs', 'Manage Planned Independent Requirements', 'Production · Planning', 'MD61'),
+  F('pp-release-production-orders', 'Release Production Orders', 'Production'),
+  F('pp-manage-work-centers', 'Manage Work Centers', 'Production', 'CR02'),
+  F('pp-manage-production-versions', 'Manage Production Versions', 'Production'),
+  F('pp-shop-floor-dispatching', 'Dispatch Production Operations', 'Production'),
+
+  // ── Quality Management ──
+  F('qm-manage-inspection-lots', 'Manage Inspection Lots', 'Quality', 'QA32'),
+  F('qm-manage-usage-decisions', 'Manage Usage Decisions', 'Quality'),
+  F('qm-manage-quality-notifications', 'Manage Quality Notifications', 'Quality', 'QM01'),
+  F('qm-manage-quality-tasks', 'Manage Quality Tasks', 'Quality'),
+  F('qm-manage-inspection-plans', 'Manage Inspection Plans', 'Quality', 'QP01'),
+  F('qm-quality-certificates', 'Manage Quality Certificates', 'Quality'),
+  F('qm-manage-control-charts', 'Manage Control Charts', 'Quality'),
+  F('qm-calibration', 'Manage Calibration of Test Equipment', 'Quality'),
+
+  // ── Engineering / PLM ──
+  F('plm-manage-documents', 'Manage Documents (DMS)', 'Engineering · PLM', 'CV01N'),
+  F('plm-manage-material-bom', 'Maintain Material BOM', 'Engineering · PLM', 'CS01'),
+  F('plm-manage-change-records', 'Manage Engineering Change Records', 'Engineering · PLM', 'CC01'),
+  F('plm-manage-routings', 'Maintain Routings', 'Engineering · PLM', 'CA01'),
+  F('plm-manage-characteristics', 'Manage Characteristics', 'Engineering · PLM', 'CT04'),
+  F('plm-manage-classes', 'Manage Classification', 'Engineering · PLM', 'CL02'),
+  F('plm-handover-to-manufacturing', 'Hand Over Product Structure to Manufacturing', 'Engineering · PLM'),
+  F('plm-manage-product-structure', 'Manage Product Structure', 'Engineering · PLM'),
+
+  // ── Enterprise Asset Management (PM) ──
+  F('pm-manage-maint-notifications', 'Manage Maintenance Notifications', 'Plant Maintenance', 'IW21'),
+  F('pm-create-maint-request', 'Create Maintenance Request', 'Plant Maintenance'),
+  F('pm-manage-equipment', 'Manage Equipment (Technical Objects)', 'Plant Maintenance', 'IE01'),
+  F('pm-manage-functional-locations', 'Manage Functional Locations', 'Plant Maintenance', 'IL01'),
+  F('pm-manage-maintenance-plans', 'Manage Maintenance Plans', 'Plant Maintenance', 'IP42'),
+  F('pm-schedule-maintenance-plans', 'Schedule Maintenance Plans', 'Plant Maintenance', 'IP10'),
+  F('pm-confirm-maintenance-jobs', 'Confirm Maintenance Jobs', 'Plant Maintenance', 'IW41'),
+
+  // ── Service / MRO ──
+  F('cs-manage-service-orders', 'Manage Service Orders', 'Service · MRO'),
+  F('cs-manage-service-notifications', 'Manage Service Notifications', 'Service · MRO'),
+  F('cs-manage-service-contracts', 'Manage Service Contracts', 'Service · MRO'),
+  F('cs-manage-warranty-claims', 'Manage Warranty Claims', 'Service · MRO'),
+  F('cs-manage-inhouse-repairs', 'Manage In-House Repairs', 'Service · MRO'),
+  F('cs-manage-returns-for-repair', 'Manage Customer Returns for Repair', 'Service · MRO'),
+
+  // ── Trade Compliance (GTS) ──
+  F('gts-trade-compliance-cockpit', 'Trade Compliance Cockpit (GTS)', 'Trade Compliance'),
+  F('gts-manage-export-licenses', 'Manage Export Licenses (GTS)', 'Trade Compliance'),
+  F('gts-classify-products', 'Classify Products - Legal Control (GTS)', 'Trade Compliance'),
+
+  // ── Master Data ──
+  F('md-manage-business-partner', 'Manage Business Partner Master Data', 'Master Data', 'BP'),
+  F('md-manage-customer-master', 'Manage Customer Master Data', 'Master Data'),
+  F('md-manage-supplier-master', 'Manage Supplier Master Data', 'Master Data'),
+  F('md-manage-product-master', 'Manage Product Master Data', 'Master Data'),
+  F('md-mass-maintenance', 'Mass Maintenance of Master Data', 'Master Data', 'MM17'),
+
+  // ── Cross-App / Workflow / Analytics ──
+  F('ca-my-inbox', 'My Inbox (Approvals)', 'Cross-App', 'F0862'),
+  F('ca-manage-workflows', 'Manage Workflows', 'Cross-App'),
+  F('ca-manage-situations', 'Manage Situation Types', 'Cross-App'),
+  F('ca-query-browser', 'Query Browser', 'Analytics'),
+  F('ca-manage-kpis', 'Manage KPIs and Reports', 'Analytics'),
+  F('ca-manage-teams', 'Manage Teams and Responsibilities', 'Cross-App'),
 
   // ── Dassian A&D add-on tiles ──
   D('dsn-ppc-workbench', 'PPC Workbench', 'Dassian · Project'),

@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const NS = '6f5a1c00-1b2c-4d3e-9f80-mach12reflib'.replace(/[^0-9a-f-]/g, '0')
-const LIB = { code: 'mach12-ad-core', title: 'Mach12 A&D Core Process Reference', version: '1.5.0', source: 'curated' }
+const LIB = { code: 'mach12-ad-core', title: 'Mach12 A&D Core Process Reference', version: '1.6.0', source: 'curated' }
 const libId = uuidv5(LIB.code, NS)
 const id = (path) => uuidv5(path, NS)
 
