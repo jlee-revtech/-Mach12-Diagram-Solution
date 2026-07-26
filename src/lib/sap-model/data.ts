@@ -1,7 +1,8 @@
 // AUTO-GENERATED SNAPSHOT — SAP Enterprise Data Model (controlling area A000)
 // Source: live pull from the connected S/4HANA sandbox (vhcals4hcs, client 100) via the
-// SAP-Vibe MCP server (ZCL_M12_ORG_MODEL_DUMP + ZCL_M12_PC_HIER_DUMP), on 2026-06-26.
-// This is real configuration data, not mock data. Regenerate by re-running the dump classes.
+// SAP-Vibe MCP server (ZCL_M12_ORG_MODEL_DUMP + ZCL_M12_PC_HIER_DUMP), on 2026-07-26.
+// This is real configuration data, not mock data. Regenerate with
+// scripts/gen-sap-model-data.mjs (see its header for the workflow).
 import type { SapEnterpriseModel } from './types'
 
 export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
@@ -9,7 +10,7 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
     "system": "vhcals4hcs (S/4HANA CAL sandbox)",
     "client": "100",
     "controllingArea": "A000",
-    "pulledOn": "2026-06-26",
+    "pulledOn": "2026-07-26",
     "via": "SAP-Vibe MCP → ZCL_M12_ORG_MODEL_DUMP"
   },
   "controllingArea": {
@@ -27,9 +28,9 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "currency": "USD",
       "chart": "YCOA",
       "plantCount": 6,
-      "profitCenterCount": 18,
-      "costCenterCount": 110,
-      "wbsRaCount": 142,
+      "profitCenterCount": 19,
+      "costCenterCount": 114,
+      "wbsRaCount": 248,
       "salesOrgs": [
         "1710",
         "FOBP",
@@ -41,6 +42,21 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
         "FOBP",
         "FORP"
       ]
+    },
+    {
+      "bukrs": "5070",
+      "name": "Company Code 5070",
+      "country": "US",
+      "currency": "USD",
+      "chart": "YCOA",
+      "plantCount": 1,
+      "profitCenterCount": 12,
+      "costCenterCount": 2,
+      "wbsRaCount": 5,
+      "salesOrgs": [
+        "5070"
+      ],
+      "purchasingOrgs": []
     },
     {
       "bukrs": "1010",
@@ -65,7 +81,7 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "country": "GB",
       "currency": "GBP",
       "chart": "YCOA",
-      "plantCount": 1,
+      "plantCount": 2,
       "profitCenterCount": 18,
       "costCenterCount": 2,
       "wbsRaCount": 2,
@@ -75,18 +91,120 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "purchasingOrgs": []
     },
     {
-      "bukrs": "5070",
-      "name": "Company Code 5070",
+      "bukrs": "1100",
+      "name": "MOOG Inc",
+      "country": "US",
+      "currency": "USD",
+      "chart": "YCOA",
+      "plantCount": 16,
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
+      "purchasingOrgs": []
+    },
+    {
+      "bukrs": "1300",
+      "name": "MCL",
+      "country": "US",
+      "currency": "GBP",
+      "chart": "YCOA",
+      "plantCount": 2,
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
+      "purchasingOrgs": []
+    },
+    {
+      "bukrs": "1600",
+      "name": "MITC",
       "country": "US",
       "currency": "USD",
       "chart": "YCOA",
       "plantCount": 1,
-      "profitCenterCount": 12,
-      "costCenterCount": 2,
-      "wbsRaCount": 5,
-      "salesOrgs": [
-        "5070"
-      ],
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
+      "purchasingOrgs": []
+    },
+    {
+      "bukrs": "1700",
+      "name": "Cork",
+      "country": "US",
+      "currency": "EUR",
+      "chart": "YCOA",
+      "plantCount": 1,
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
+      "purchasingOrgs": []
+    },
+    {
+      "bukrs": "2000",
+      "name": "Moog Inc",
+      "country": "US",
+      "currency": "USD",
+      "chart": "2000",
+      "plantCount": 2,
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
+      "purchasingOrgs": []
+    },
+    {
+      "bukrs": "2200",
+      "name": "Baguio",
+      "country": "US",
+      "currency": "PHP",
+      "chart": "YCOA",
+      "plantCount": 2,
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
+      "purchasingOrgs": []
+    },
+    {
+      "bukrs": "2300",
+      "name": "MCL",
+      "country": "US",
+      "currency": "GBP",
+      "chart": "YCOA",
+      "plantCount": 1,
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
+      "purchasingOrgs": []
+    },
+    {
+      "bukrs": "2600",
+      "name": "MITC",
+      "country": "US",
+      "currency": "USD",
+      "chart": "YCOA",
+      "plantCount": 1,
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
+      "purchasingOrgs": []
+    },
+    {
+      "bukrs": "2700",
+      "name": "Dublin",
+      "country": "US",
+      "currency": "EUR",
+      "chart": "YCOA",
+      "plantCount": 1,
+      "profitCenterCount": 0,
+      "costCenterCount": 0,
+      "wbsRaCount": 0,
+      "salesOrgs": [],
       "purchasingOrgs": []
     },
     {
@@ -106,6 +224,38 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
     }
   ],
   "plants": [
+    {
+      "werks": "1720",
+      "name": "Plant 2 US",
+      "bukrs": "1710",
+      "storageLocations": [
+        "",
+        "172A"
+      ]
+    },
+    {
+      "werks": "1710",
+      "name": "Plant 1 US",
+      "bukrs": "1710",
+      "storageLocations": [
+        "171A",
+        "171B",
+        "171C",
+        "171D",
+        "171E",
+        "171F",
+        "171H",
+        "171Q",
+        "171R",
+        "171S",
+        "171T",
+        "171V",
+        "A339",
+        "TEST",
+        "VAN1",
+        "Z041"
+      ]
+    },
     {
       "werks": "1010",
       "name": "Plant 1 DE",
@@ -127,52 +277,12 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       ]
     },
     {
-      "werks": "1500",
-      "name": "Plant 1 GB",
-      "bukrs": "1500",
-      "storageLocations": []
-    },
-    {
-      "werks": "1710",
-      "name": "Plant 1 US",
+      "werks": "FORP",
+      "name": "Plant 2 US (Remote Plant)",
       "bukrs": "1710",
       "storageLocations": [
-        "171A",
-        "171B",
-        "171C",
-        "171D",
-        "171E",
-        "171F",
-        "171H",
-        "171Q",
-        "171R",
-        "171S",
-        "171T",
-        "171V",
-        "VAN1"
+        "FORN"
       ]
-    },
-    {
-      "werks": "1720",
-      "name": "Plant 2 US",
-      "bukrs": "1710",
-      "storageLocations": [
-        "172A"
-      ]
-    },
-    {
-      "werks": "2000",
-      "name": "MOOG US Plant A",
-      "bukrs": "1710",
-      "storageLocations": [
-        "0001"
-      ]
-    },
-    {
-      "werks": "2010",
-      "name": "MOOG US Plant B",
-      "bukrs": "1710",
-      "storageLocations": []
     },
     {
       "werks": "FOBP",
@@ -181,14 +291,6 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "storageLocations": [
         "FOBN",
         "FOBW"
-      ]
-    },
-    {
-      "werks": "FORP",
-      "name": "Plant 2 US (Remote Plant)",
-      "bukrs": "1710",
-      "storageLocations": [
-        "FORN"
       ]
     },
     {
@@ -202,24 +304,264 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "name": "Plant 1 US",
       "bukrs": "6050",
       "storageLocations": []
+    },
+    {
+      "werks": "2000",
+      "name": "MOOG US Plant A",
+      "bukrs": "1710",
+      "storageLocations": [
+        "0001",
+        "2010",
+        "CAG1",
+        "TEST"
+      ]
+    },
+    {
+      "werks": "2010",
+      "name": "MOOG US Plant B",
+      "bukrs": "1710",
+      "storageLocations": []
+    },
+    {
+      "werks": "1500",
+      "name": "Plant 1 GB",
+      "bukrs": "1500",
+      "storageLocations": []
+    },
+    {
+      "werks": "2002",
+      "name": "Engines PLT 11",
+      "bukrs": "2000",
+      "storageLocations": [
+        "2002"
+      ]
+    },
+    {
+      "werks": "2201",
+      "name": "Baguio Steel Stores",
+      "bukrs": "2200",
+      "storageLocations": [
+        "2201"
+      ]
+    },
+    {
+      "werks": "2202",
+      "name": "IG Baguio Steel Stores",
+      "bukrs": "2200",
+      "storageLocations": [
+        "2202"
+      ]
+    },
+    {
+      "werks": "2301",
+      "name": "Tewkesbury",
+      "bukrs": "2300",
+      "storageLocations": [
+        "2301"
+      ]
+    },
+    {
+      "werks": "2001",
+      "name": "Moog Inc Plant",
+      "bukrs": "2000",
+      "storageLocations": [
+        "2001",
+        "SL01",
+        "SL02",
+        "SL03",
+        "SL04",
+        "SL05",
+        "SL06",
+        "SL07",
+        "SL08"
+      ]
+    },
+    {
+      "werks": "2601",
+      "name": "MITC",
+      "bukrs": "2600",
+      "storageLocations": [
+        "2601"
+      ]
+    },
+    {
+      "werks": "2701",
+      "name": "Dublin",
+      "bukrs": "2700",
+      "storageLocations": [
+        "2701"
+      ]
+    },
+    {
+      "werks": "1101",
+      "name": "PLT 1-6,17 Steel Stores",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1101"
+      ]
+    },
+    {
+      "werks": "1105",
+      "name": "Torrance",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1105"
+      ]
+    },
+    {
+      "werks": "1124",
+      "name": "AIM",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1124"
+      ]
+    },
+    {
+      "werks": "1125",
+      "name": "Mineral Wells",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1125"
+      ]
+    },
+    {
+      "werks": "1102",
+      "name": "Space Fluids Steel Store PLT20",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1102"
+      ]
+    },
+    {
+      "werks": "1104",
+      "name": "Defense TWS/Missiles SLC",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1104"
+      ]
+    },
+    {
+      "werks": "1106",
+      "name": "Mechanism Chatsworth",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1106"
+      ]
+    },
+    {
+      "werks": "1107",
+      "name": "Structures Mountain View",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1107"
+      ]
+    },
+    {
+      "werks": "1108",
+      "name": "Defense TWS Santa Barbara",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1108"
+      ]
+    },
+    {
+      "werks": "1109",
+      "name": "Avionics Gilbert",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1109"
+      ]
+    },
+    {
+      "werks": "1111",
+      "name": "Vehicles Arvada",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1111"
+      ]
+    },
+    {
+      "werks": "1112",
+      "name": "Defense Naval Orrville",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1112"
+      ]
+    },
+    {
+      "werks": "1113",
+      "name": "Defense Orlando",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1113"
+      ]
+    },
+    {
+      "werks": "1114",
+      "name": "HVS Huntsville",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1114"
+      ]
+    },
+    {
+      "werks": "1126",
+      "name": "Engines Niagara Falls",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1126"
+      ]
+    },
+    {
+      "werks": "1127",
+      "name": "A&amp;A (70) PLT 27",
+      "bukrs": "1100",
+      "storageLocations": [
+        "1127"
+      ]
+    },
+    {
+      "werks": "1401",
+      "name": "Luton",
+      "bukrs": "1300",
+      "storageLocations": [
+        "1401"
+      ]
+    },
+    {
+      "werks": "1303",
+      "name": "GBAD Tewkesbury",
+      "bukrs": "1300",
+      "storageLocations": [
+        "1303"
+      ]
+    },
+    {
+      "werks": "1501",
+      "name": "Wolves",
+      "bukrs": "1500",
+      "storageLocations": [
+        "1501"
+      ]
+    },
+    {
+      "werks": "1602",
+      "name": "MITC Genesys",
+      "bukrs": "1600",
+      "storageLocations": [
+        "1602"
+      ]
+    },
+    {
+      "werks": "1702",
+      "name": "Cork",
+      "bukrs": "1700",
+      "storageLocations": [
+        "1702"
+      ]
     }
   ],
   "salesOrgs": [
-    {
-      "vkorg": "1010",
-      "name": "Dom. Sales Org DE",
-      "bukrs": "1010"
-    },
-    {
-      "vkorg": "1500",
-      "name": "Fluor Limited UK",
-      "bukrs": "1500"
-    },
-    {
-      "vkorg": "1710",
-      "name": "Dom. Sales Org US",
-      "bukrs": "1710"
-    },
     {
       "vkorg": "FOBP",
       "name": "Sales Org. FOBP",
@@ -231,6 +573,16 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "bukrs": "1710"
     },
     {
+      "vkorg": "1010",
+      "name": "Dom. Sales Org DE",
+      "bukrs": "1010"
+    },
+    {
+      "vkorg": "1710",
+      "name": "Dom. Sales Org US",
+      "bukrs": "1710"
+    },
+    {
       "vkorg": "5070",
       "name": "MX",
       "bukrs": "5070"
@@ -239,6 +591,11 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "vkorg": "6050",
       "name": "MD",
       "bukrs": "6050"
+    },
+    {
+      "vkorg": "1500",
+      "name": "Fluor Limited UK",
+      "bukrs": "1500"
     }
   ],
   "purchasingOrgs": [
@@ -297,12 +654,16 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
     "byCompanyCode": {
       "1010": 1,
       "1500": 18,
-      "1710": 18,
+      "1710": 19,
       "5070": 12,
       "6050": 12
     },
-    "total": 120,
+    "total": 121,
     "sample": [
+      {
+        "prctr": "0000099999",
+        "name": "Dummy Profit Center"
+      },
       {
         "prctr": "0100000001",
         "name": "Home Office"
@@ -360,12 +721,8 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
         "name": "Program C PC"
       },
       {
-        "prctr": "QCHECK",
-        "name": "Quality Check"
-      },
-      {
-        "prctr": "T-PCB98",
-        "name": "Production Logistics"
+        "prctr": "M12-MDG01",
+        "name": "MDG demo profit cent"
       }
     ]
   },
@@ -373,98 +730,98 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
     "byCompanyCode": {
       "1010": 26,
       "1500": 2,
-      "1710": 110,
+      "1710": 114,
       "5070": 2,
       "6050": 3
     },
-    "total": 143,
+    "total": 147,
     "sample": [
       {
-        "kostl": "12876",
+        "kostl": "0000012876",
         "name": "Quality - UK",
         "bukrs": "1710",
         "prctr": "0121000001"
       },
       {
-        "kostl": "12878",
+        "kostl": "0000012878",
         "name": "Proj Mgmt-FB",
         "bukrs": "1710",
         "prctr": "0121000001"
       },
       {
-        "kostl": "12881",
+        "kostl": "0000012881",
         "name": "Proj Ctrls-FB",
         "bukrs": "1710",
         "prctr": "0121000001"
       },
       {
-        "kostl": "10101101",
-        "name": "Financials (DE)",
-        "bukrs": "1010",
-        "prctr": "YB600"
+        "kostl": "0000012888",
+        "name": "Piping-FB",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "10101201",
-        "name": "Purch &amp; Store 1 (DE)",
-        "bukrs": "1010",
-        "prctr": "YB700"
+        "kostl": "0000012889",
+        "name": "Elect/Ctrl Sys-FB",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "10101202",
-        "name": "Purch &amp; Store 2 (DE)",
-        "bukrs": "1010",
-        "prctr": "YB700"
+        "kostl": "0000013570",
+        "name": "HSE - Farnborough",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "15001303",
-        "name": "Con Field Staff",
-        "bukrs": "1500",
-        "prctr": "YB110"
+        "kostl": "0000014597",
+        "name": "PDDM-FB",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "15001304",
-        "name": "Con Field Staff",
-        "bukrs": "1500",
-        "prctr": "YB110"
+        "kostl": "0000014598",
+        "name": "Proj Info Mgmt-FB",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "51000003",
-        "name": "BDS Fringe",
-        "bukrs": "5070",
-        "prctr": "0120000001"
+        "kostl": "0000014706",
+        "name": "Mechanical-FB",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "53000001",
-        "name": "BDS Elec Eng",
-        "bukrs": "5070",
-        "prctr": "0121000002"
+        "kostl": "0000014813",
+        "name": "Eng Mgmt-Farnborough",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "51000004",
-        "name": "BGS Fringe",
-        "bukrs": "6050",
-        "prctr": "0132000001"
+        "kostl": "0000015031",
+        "name": "SC Mgmt - FB",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "53000000",
-        "name": "AuO Engineering",
-        "bukrs": "6050",
-        "prctr": "0132000001"
+        "kostl": "0000015033",
+        "name": "Const Perm-FB",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       },
       {
-        "kostl": "53000002",
-        "name": "BGS Elec Eng",
-        "bukrs": "6050",
-        "prctr": "0133000002"
+        "kostl": "0000021143",
+        "name": "Proj Admin Svcs-FB",
+        "bukrs": "1710",
+        "prctr": "0121000001"
       }
     ]
   },
   "raKeys": [
     {
       "key": "Y00001",
-      "count": 117,
+      "count": 223,
       "levels": {
-        "2": 114,
+        "2": 220,
         "3": 3
       },
       "label": "Customer RA key (chart YCOA) — primary revenue-recognition key"
@@ -501,27 +858,28 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
   "raByCompanyCode": [
     {
       "bukrs": "1710",
-      "count": 142,
+      "count": 248,
       "keys": {
-        "Y00001": 108,
+        "Y00001": 214,
         "YM1205": 6,
         "Y00005": 4,
         "000001": 24
       },
       "levels": {
-        "L2": 115,
+        "L2": 221,
         "L1": 25,
         "L3": 2
       }
     },
     {
-      "bukrs": "1010",
-      "count": 2,
+      "bukrs": "5070",
+      "count": 5,
       "keys": {
-        "Y00001": 2
+        "Y00001": 5
       },
       "levels": {
-        "L2": 2
+        "L2": 4,
+        "L3": 1
       }
     },
     {
@@ -536,14 +894,13 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       }
     },
     {
-      "bukrs": "5070",
-      "count": 5,
+      "bukrs": "1010",
+      "count": 2,
       "keys": {
-        "Y00001": 5
+        "Y00001": 2
       },
       "levels": {
-        "L2": 4,
-        "L3": 1
+        "L2": 2
       }
     }
   ],
@@ -613,6 +970,150 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       ]
     },
     {
+      "project": "H PTO0002201010",
+      "name": "PTO / Leave H-PTO0002201010",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0010101321",
+      "name": "PTO / Leave H-PTO0010101321",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0013010001",
+      "name": "PTO / Leave H-PTO0013010001",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0013010002",
+      "name": "PTO / Leave H-PTO0013010002",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0013010003",
+      "name": "PTO / Leave H-PTO0013010003",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0014010001",
+      "name": "PTO / Leave H-PTO0014010001",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0014010002",
+      "name": "PTO / Leave H-PTO0014010002",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0015001304",
+      "name": "PTO / Leave H-PTO0015001304",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0015010001",
+      "name": "PTO / Leave H-PTO0015010001",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0015010002",
+      "name": "PTO / Leave H-PTO0015010002",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0016010001",
+      "name": "PTO / Leave H-PTO0016010001",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0016010002",
+      "name": "PTO / Leave H-PTO0016010002",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0017101321",
+      "name": "PTO / Leave H-PTO0017101321",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0017101602",
+      "name": "PTO / Leave H-PTO0017101602",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0053000001",
+      "name": "PTO / Leave H-PTO0053000001",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H PTO0053000002",
+      "name": "PTO / Leave H-PTO0053000002",
+      "bukrs": "1710",
+      "wbsCount": 6,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
       "project": "U1RY",
       "name": "Fluor Demo Intercompany PoC -",
       "bukrs": "1710",
@@ -633,6 +1134,15 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
     {
       "project": "H E17800026",
       "name": "UB1Z",
+      "bukrs": "1710",
+      "wbsCount": 4,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H FFA868225",
+      "name": "Falcon Stand-in Attack Weapon",
       "bukrs": "1710",
       "wbsCount": 4,
       "keys": [
@@ -676,8 +1186,35 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       ]
     },
     {
+      "project": "D-0094",
+      "name": "mark test",
+      "bukrs": "1710",
+      "wbsCount": 2,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
       "project": "H EFULLTREA",
       "name": "FULL-TREE-A",
+      "bukrs": "1710",
+      "wbsCount": 2,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H FCSFBSENG",
+      "name": "FBS engine test",
+      "bukrs": "1710",
+      "wbsCount": 2,
+      "keys": [
+        "Y00001"
+      ]
+    },
+    {
+      "project": "H FCSFBSTES",
+      "name": "FBS classrun test",
       "bukrs": "1710",
       "wbsCount": 2,
       "keys": [
@@ -1070,19 +1607,19 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
     {
       "relationship": "Controlling Area → Company Code",
       "via": "TKA02 (assign company code to controlling area)",
-      "count": 5,
+      "count": 14,
       "note": "1:N — one CO area spans many company codes; FI/CO integration on (TKA01-KOKFI)"
     },
     {
       "relationship": "Company Code → Plant",
       "via": "T001K (valuation area) → T001W",
-      "count": 10,
+      "count": 38,
       "note": "Plant assigned to company code through its valuation area"
     },
     {
       "relationship": "Plant → Storage Location",
       "via": "T001L",
-      "count": 31,
+      "count": 74,
       "note": "Inventory-managing sub-locations within a plant"
     },
     {
@@ -1263,6 +1800,10 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
         "name": "Program C PC"
       },
       {
+        "prctr": "M12-MDG01",
+        "name": "MDG demo profit cent"
+      },
+      {
         "prctr": "YB110",
         "name": "Product A"
       },
@@ -1387,102 +1928,102 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
   "costCentersByCompanyCode": {
     "1010": [
       {
-        "kostl": "10101101",
+        "kostl": "0010101101",
         "name": "Financials (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101201",
+        "kostl": "0010101201",
         "name": "Purch &amp; Store 1 (DE)",
         "prctr": "YB700"
       },
       {
-        "kostl": "10101202",
+        "kostl": "0010101202",
         "name": "Purch &amp; Store 2 (DE)",
         "prctr": "YB700"
       },
       {
-        "kostl": "10101301",
+        "kostl": "0010101301",
         "name": "Manufacturing 1 (DE)",
         "prctr": "YB110"
       },
       {
-        "kostl": "10101302",
+        "kostl": "0010101302",
         "name": "Manufacturing 2 (DE)",
         "prctr": "YB111"
       },
       {
-        "kostl": "10101321",
+        "kostl": "0010101321",
         "name": "Services/Consltg(DE)",
         "prctr": "YB111"
       },
       {
-        "kostl": "10101401",
+        "kostl": "0010101401",
         "name": "QM (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101501",
+        "kostl": "0010101501",
         "name": "R&amp;D (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101601",
+        "kostl": "0010101601",
         "name": "Marketing (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101602",
+        "kostl": "0010101602",
         "name": "Sales (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101701",
+        "kostl": "0010101701",
         "name": "Plant &amp; Maint (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101750",
+        "kostl": "0010101750",
         "name": "Build. &amp; Maint (DE)",
         "prctr": "YB900"
       },
       {
-        "kostl": "10101751",
+        "kostl": "0010101751",
         "name": "HR Services (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101752",
+        "kostl": "0010101752",
         "name": "HR Recruitment (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101753",
+        "kostl": "0010101753",
         "name": "IT Services (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101801",
+        "kostl": "0010101801",
         "name": "Other Inc.&amp;Exp (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101901",
+        "kostl": "0010101901",
         "name": "Back Office (DE)",
         "prctr": "YB600"
       },
       {
-        "kostl": "10101902",
+        "kostl": "0010101902",
         "name": "Csltg Unit A (DE)",
         "prctr": "YB101"
       },
       {
-        "kostl": "10101903",
+        "kostl": "0010101903",
         "name": "Csltg Unit B (DE)",
         "prctr": "YB102"
       },
       {
-        "kostl": "10101904",
+        "kostl": "0010101904",
         "name": "Customer Dev (DE)",
         "prctr": "YB103"
       },
@@ -1519,335 +2060,350 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
     ],
     "1500": [
       {
-        "kostl": "15001303",
+        "kostl": "0015001303",
         "name": "Con Field Staff",
         "prctr": "YB110"
       },
       {
-        "kostl": "15001304",
+        "kostl": "0015001304",
         "name": "Con Field Staff",
         "prctr": "YB110"
       }
     ],
     "1710": [
       {
-        "kostl": "11010000",
-        "name": "Fringe AUO",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "11010001",
-        "name": "Fringe Exp",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "12010000",
-        "name": "FAC AUO",
-        "prctr": "SAP-DUMMY"
-      },
-      {
-        "kostl": "12010001",
-        "name": "Bldg Mgmt",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "12010002",
-        "name": "Jan Services",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "12876",
+        "kostl": "0000012876",
         "name": "Quality - UK",
         "prctr": "0121000001"
       },
       {
-        "kostl": "12878",
+        "kostl": "0000012878",
         "name": "Proj Mgmt-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "12881",
+        "kostl": "0000012881",
         "name": "Proj Ctrls-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "12888",
+        "kostl": "0000012888",
         "name": "Piping-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "12889",
+        "kostl": "0000012889",
         "name": "Elect/Ctrl Sys-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "13010000",
-        "name": "ENG AUO",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "13010001",
-        "name": "Mech Engineering",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "13010002",
-        "name": "Elec Engineering",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "13010003",
-        "name": "Eng Mgmt",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "13570",
+        "kostl": "0000013570",
         "name": "HSE - Farnborough",
         "prctr": "0121000001"
       },
       {
-        "kostl": "14010000",
-        "name": "MFG AUO",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "14010001",
-        "name": "Shop Floor Svc",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "14010002",
-        "name": "Mach and Equip",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "14597",
+        "kostl": "0000014597",
         "name": "PDDM-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "14598",
+        "kostl": "0000014598",
         "name": "Proj Info Mgmt-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "14706",
+        "kostl": "0000014706",
         "name": "Mechanical-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "14813",
+        "kostl": "0000014813",
         "name": "Eng Mgmt-Farnborough",
         "prctr": "0121000001"
       },
       {
-        "kostl": "15010000",
-        "name": "MAT AUO",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "15010001",
-        "name": "Purchasing",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "15010002",
-        "name": "Whse Svcs",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "15031",
+        "kostl": "0000015031",
         "name": "SC Mgmt - FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "15033",
+        "kostl": "0000015033",
         "name": "Const Perm-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "16010000",
-        "name": "G&amp;A AUO",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "16010001",
-        "name": "Finance",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "16010002",
-        "name": "Accounting",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "16010003",
-        "name": "Prog Mgmt",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "16010004",
-        "name": "Exec Mgmt",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17100100",
-        "name": "Operated Cost Cntr",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17100200",
-        "name": "Non Op Cost Cntr",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17100300",
-        "name": "Crp Cost Cntr",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101101",
-        "name": "Financials (US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101201",
-        "name": "Purch &amp; Store 1 (US)",
-        "prctr": "YB700"
-      },
-      {
-        "kostl": "17101202",
-        "name": "Purch &amp; Store 2 (US)",
-        "prctr": "YB700"
-      },
-      {
-        "kostl": "17101301",
-        "name": "Manufacturing 1 (US)",
-        "prctr": "YB110"
-      },
-      {
-        "kostl": "17101302",
-        "name": "Manufacturing 2 (US)",
-        "prctr": "YB111"
-      },
-      {
-        "kostl": "17101303",
-        "name": "Con Field Staff",
-        "prctr": "YB110"
-      },
-      {
-        "kostl": "17101304",
-        "name": "Con Field Craft",
-        "prctr": "YB110"
-      },
-      {
-        "kostl": "17101321",
-        "name": "Services/Consltg(US)",
-        "prctr": "YB111"
-      },
-      {
-        "kostl": "17101401",
-        "name": "QM (US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101501",
-        "name": "R&amp;D (US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101601",
-        "name": "Marketing (US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101602",
-        "name": "Sales (US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101701",
-        "name": "Plant &amp; Maint (US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101750",
-        "name": "Build. &amp; Maint (US)",
-        "prctr": "YB900"
-      },
-      {
-        "kostl": "17101751",
-        "name": "HR Services-(US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101752",
-        "name": "HR Recruitment-(US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101753",
-        "name": "IT Services-(US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101801",
-        "name": "Other Inc.&amp;Exp (US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101901",
-        "name": "Back Office-(US)",
-        "prctr": "YB600"
-      },
-      {
-        "kostl": "17101902",
-        "name": "Csltg Unit A (US)",
-        "prctr": "YB101"
-      },
-      {
-        "kostl": "17101903",
-        "name": "Csltg Unit B-(US)",
-        "prctr": "YB102"
-      },
-      {
-        "kostl": "17101904",
-        "name": "Customer Dev-(US)",
-        "prctr": "YB103"
-      },
-      {
-        "kostl": "21143",
+        "kostl": "0000021143",
         "name": "Proj Admin Svcs-FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "2201010",
-        "name": "Mechanical Eng",
-        "prctr": "0121000001"
-      },
-      {
-        "kostl": "23937",
+        "kostl": "0000023937",
         "name": "Contracts Mgmt - FB",
         "prctr": "0121000001"
       },
       {
-        "kostl": "50010001",
+        "kostl": "0002201010",
+        "name": "Mechanical Eng",
+        "prctr": "0121000001"
+      },
+      {
+        "kostl": "0006201010",
+        "name": "Mechanical Eng GB",
+        "prctr": "0121000001"
+      },
+      {
+        "kostl": "0011010000",
+        "name": "Fringe AUO",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0011010001",
+        "name": "Fringe Exp",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0012010000",
+        "name": "FAC AUO",
+        "prctr": "SAP-DUMMY"
+      },
+      {
+        "kostl": "0012010001",
+        "name": "Bldg Mgmt",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0012010002",
+        "name": "Jan Services",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0013010000",
+        "name": "ENG AUO",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0013010001",
+        "name": "Mech Engineering",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0013010002",
+        "name": "Elec Engineering",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0013010003",
+        "name": "Eng Mgmt",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0014010000",
+        "name": "MFG AUO",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0014010001",
+        "name": "Shop Floor Svc",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0014010002",
+        "name": "Mach and Equip",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0015010000",
+        "name": "MAT AUO",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0015010001",
+        "name": "Purchasing",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0015010002",
+        "name": "Whse Svcs",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0016010000",
+        "name": "G&amp;A AUO",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0016010001",
+        "name": "Finance",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0016010002",
+        "name": "Accounting",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0016010003",
+        "name": "Prog Mgmt",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0016010004",
+        "name": "Exec Mgmt",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017100100",
+        "name": "Operated Cost Cntr",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017100200",
+        "name": "Non Op Cost Cntr",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017100300",
+        "name": "Crp Cost Cntr",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101101",
+        "name": "Financials (US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101201",
+        "name": "Purch &amp; Store 1 (US)",
+        "prctr": "YB700"
+      },
+      {
+        "kostl": "0017101202",
+        "name": "Purch &amp; Store 2 (US)",
+        "prctr": "YB700"
+      },
+      {
+        "kostl": "0017101301",
+        "name": "Manufacturing 1 (US)",
+        "prctr": "YB110"
+      },
+      {
+        "kostl": "0017101302",
+        "name": "Manufacturing 2 (US)",
+        "prctr": "YB111"
+      },
+      {
+        "kostl": "0017101303",
+        "name": "Con Field Staff",
+        "prctr": "YB110"
+      },
+      {
+        "kostl": "0017101304",
+        "name": "Con Field Craft",
+        "prctr": "YB110"
+      },
+      {
+        "kostl": "0017101321",
+        "name": "Services/Consltg(US)",
+        "prctr": "YB111"
+      },
+      {
+        "kostl": "0017101401",
+        "name": "QM (US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101501",
+        "name": "R&amp;D (US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101601",
+        "name": "Marketing (US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101602",
+        "name": "Sales (US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101701",
+        "name": "Plant &amp; Maint (US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101750",
+        "name": "Build. &amp; Maint (US)",
+        "prctr": "YB900"
+      },
+      {
+        "kostl": "0017101751",
+        "name": "HR Services-(US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101752",
+        "name": "HR Recruitment-(US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101753",
+        "name": "IT Services-(US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101801",
+        "name": "Other Inc.&amp;Exp (US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101901",
+        "name": "Back Office-(US)",
+        "prctr": "YB600"
+      },
+      {
+        "kostl": "0017101902",
+        "name": "Csltg Unit A (US)",
+        "prctr": "YB101"
+      },
+      {
+        "kostl": "0017101903",
+        "name": "Csltg Unit B-(US)",
+        "prctr": "YB102"
+      },
+      {
+        "kostl": "0017101904",
+        "name": "Customer Dev-(US)",
+        "prctr": "YB103"
+      },
+      {
+        "kostl": "0050010001",
         "name": "HQ",
         "prctr": "0100000001"
       },
       {
-        "kostl": "51000001",
+        "kostl": "0051000001",
         "name": "Corp Fringe",
         "prctr": "0100000001"
       },
       {
-        "kostl": "51000002",
+        "kostl": "0051000002",
         "name": "BCA Fringe",
         "prctr": "0111000001"
       },
       {
-        "kostl": "6201010",
-        "name": "Mechanical Eng GB",
+        "kostl": "17BLK0724A",
+        "name": "Bulk demo A (keyed)",
+        "prctr": "0121000001"
+      },
+      {
+        "kostl": "17BLK0724B",
+        "name": "Bulk demo B (keyed)",
+        "prctr": "0121000001"
+      },
+      {
+        "kostl": "17BLK0724C",
+        "name": "Bulk demo C (xlsx)",
         "prctr": "0121000001"
       },
       {
@@ -2079,71 +2635,44 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
         "kostl": "US10_WM",
         "name": "Warehouse Management",
         "prctr": "US10_PC11"
+      },
+      {
+        "kostl": "WC025747",
+        "name": "MDG Test CC",
+        "prctr": "0121000001"
       }
     ],
     "5070": [
       {
-        "kostl": "51000003",
+        "kostl": "0051000003",
         "name": "BDS Fringe",
         "prctr": "0120000001"
       },
       {
-        "kostl": "53000001",
+        "kostl": "0053000001",
         "name": "BDS Elec Eng",
         "prctr": "0121000002"
       }
     ],
     "6050": [
       {
-        "kostl": "51000004",
+        "kostl": "0051000004",
         "name": "BGS Fringe",
         "prctr": "0132000001"
       },
       {
-        "kostl": "53000000",
+        "kostl": "0053000000",
         "name": "AuO Engineering",
         "prctr": "0132000001"
       },
       {
-        "kostl": "53000002",
+        "kostl": "0053000002",
         "name": "BGS Elec Eng",
         "prctr": "0133000002"
       }
     ]
   },
   "wbsRa": [
-    {
-      "posid": "U1RZ001",
-      "name": "Umicore Pre-Feed Lead Office PBWBS Study",
-      "bukrs": "1010",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "U1RZ"
-    },
-    {
-      "posid": "U1RZ002",
-      "name": "Umicore Pre-Feed Support GB PBWBS Study",
-      "bukrs": "1010",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "U1RZ"
-    },
-    {
-      "posid": "U1RY002",
-      "name": "Umicore Pre-Feed Support GB PBWBS Study",
-      "bukrs": "1500",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "U1RY"
-    },
-    {
-      "posid": "U1RY00201",
-      "name": "Umicore Pre-Feed GB IBWBS Study",
-      "bukrs": "1500",
-      "level": "3",
-      "raKey": "Y00001",
-      "project": "U1RY"
-    },
     {
       "posid": "A000301",
       "name": "Program Management &amp; Governance",
@@ -2409,6 +2938,14 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "project": "D-0006"
     },
     {
+      "posid": "D-0020.01",
+      "name": "Inter Segment Proces Perf Obligation 01",
+      "bukrs": "5070",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "D-0020"
+    },
+    {
       "posid": "D-0021.01",
       "name": "Performance Obligation - RA for W16X364",
       "bukrs": "1710",
@@ -2447,6 +2984,38 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "level": "2",
       "raKey": "Y00001",
       "project": "D-0025"
+    },
+    {
+      "posid": "D-0026.01",
+      "name": "BDS Performance Obligation",
+      "bukrs": "5070",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "D-0026"
+    },
+    {
+      "posid": "D-0026.02",
+      "name": "BGS Performance Obligation",
+      "bukrs": "5070",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "D-0026"
+    },
+    {
+      "posid": "D-00941-01-008",
+      "name": "phase",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "D-0094"
+    },
+    {
+      "posid": "D-00941-01-009",
+      "name": "phase 9",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "D-0094"
     },
     {
       "posid": "D0016.01",
@@ -2521,22 +3090,6 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "project": "H E17800026"
     },
     {
-      "posid": "H E178006410001",
-      "name": "Blue Wave Project",
-      "bukrs": "1710",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "H E17800641"
-    },
-    {
-      "posid": "H E178006410002",
-      "name": "General",
-      "bukrs": "1710",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "H E17800641"
-    },
-    {
       "posid": "H E17800641001",
       "name": "Non-Process Buildings",
       "bukrs": "1710",
@@ -2562,6 +3115,22 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
     },
     {
       "posid": "H E17800641004",
+      "name": "General",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H E17800641"
+    },
+    {
+      "posid": "H E178006410001",
+      "name": "Blue Wave Project",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H E17800641"
+    },
+    {
+      "posid": "H E178006410002",
       "name": "General",
       "bukrs": "1710",
       "level": "2",
@@ -2623,6 +3192,838 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "level": "2",
       "raKey": "Y00001",
       "project": "H F17799200"
+    },
+    {
+      "posid": "H FCSFBSENG0001",
+      "name": "Engineering",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H FCSFBSENG"
+    },
+    {
+      "posid": "H FCSFBSENG0002",
+      "name": "Production",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H FCSFBSENG"
+    },
+    {
+      "posid": "H FCSFBSTES0001",
+      "name": "CLIN 0001 Engineering",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H FCSFBSTES"
+    },
+    {
+      "posid": "H FCSFBSTES0002",
+      "name": "CLIN 0002 Production",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H FCSFBSTES"
+    },
+    {
+      "posid": "H FFA8682250001",
+      "name": "Weapon Design &amp; Development (CPIF)",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H FFA868225"
+    },
+    {
+      "posid": "H FFA8682250002",
+      "name": "Seeker &amp; Guidance Integration (CPIF)",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H FFA868225"
+    },
+    {
+      "posid": "H FFA8682250003",
+      "name": "Data / CDRLs (NSP)",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H FFA868225"
+    },
+    {
+      "posid": "H FFA8682250004",
+      "name": "Delivery Order 1 - LRIP All-Up Rounds (C",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H FFA868225"
+    },
+    {
+      "posid": "H PTO0002201010BRV",
+      "name": "PTO BRV 0002201010",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0002201010"
+    },
+    {
+      "posid": "H PTO0002201010MIL",
+      "name": "PTO MIL 0002201010",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0002201010"
+    },
+    {
+      "posid": "H PTO0002201010VAC",
+      "name": "PTO VAC 0002201010",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0002201010"
+    },
+    {
+      "posid": "H PTO0002201010FMLA",
+      "name": "PTO FMLA 0002201010",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0002201010"
+    },
+    {
+      "posid": "H PTO0002201010JURY",
+      "name": "PTO JURY 0002201010",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0002201010"
+    },
+    {
+      "posid": "H PTO0002201010SICK",
+      "name": "PTO SICK 0002201010",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0002201010"
+    },
+    {
+      "posid": "H PTO0010101321BRV",
+      "name": "PTO BRV 0010101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0010101321"
+    },
+    {
+      "posid": "H PTO0010101321MIL",
+      "name": "PTO MIL 0010101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0010101321"
+    },
+    {
+      "posid": "H PTO0010101321VAC",
+      "name": "PTO VAC 0010101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0010101321"
+    },
+    {
+      "posid": "H PTO0010101321FMLA",
+      "name": "PTO FMLA 0010101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0010101321"
+    },
+    {
+      "posid": "H PTO0010101321JURY",
+      "name": "PTO JURY 0010101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0010101321"
+    },
+    {
+      "posid": "H PTO0010101321SICK",
+      "name": "PTO SICK 0010101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0010101321"
+    },
+    {
+      "posid": "H PTO0013010001BRV",
+      "name": "PTO BRV 0013010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010001"
+    },
+    {
+      "posid": "H PTO0013010001MIL",
+      "name": "PTO MIL 0013010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010001"
+    },
+    {
+      "posid": "H PTO0013010001VAC",
+      "name": "PTO VAC 0013010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010001"
+    },
+    {
+      "posid": "H PTO0013010001FMLA",
+      "name": "PTO FMLA 0013010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010001"
+    },
+    {
+      "posid": "H PTO0013010001JURY",
+      "name": "PTO JURY 0013010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010001"
+    },
+    {
+      "posid": "H PTO0013010001SICK",
+      "name": "PTO SICK 0013010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010001"
+    },
+    {
+      "posid": "H PTO0013010002BRV",
+      "name": "PTO BRV 0013010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010002"
+    },
+    {
+      "posid": "H PTO0013010002MIL",
+      "name": "PTO MIL 0013010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010002"
+    },
+    {
+      "posid": "H PTO0013010002VAC",
+      "name": "PTO VAC 0013010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010002"
+    },
+    {
+      "posid": "H PTO0013010002FMLA",
+      "name": "PTO FMLA 0013010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010002"
+    },
+    {
+      "posid": "H PTO0013010002JURY",
+      "name": "PTO JURY 0013010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010002"
+    },
+    {
+      "posid": "H PTO0013010002SICK",
+      "name": "PTO SICK 0013010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010002"
+    },
+    {
+      "posid": "H PTO0013010003BRV",
+      "name": "PTO BRV 0013010003",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010003"
+    },
+    {
+      "posid": "H PTO0013010003MIL",
+      "name": "PTO MIL 0013010003",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010003"
+    },
+    {
+      "posid": "H PTO0013010003VAC",
+      "name": "PTO VAC 0013010003",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010003"
+    },
+    {
+      "posid": "H PTO0013010003FMLA",
+      "name": "PTO FMLA 0013010003",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010003"
+    },
+    {
+      "posid": "H PTO0013010003JURY",
+      "name": "PTO JURY 0013010003",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010003"
+    },
+    {
+      "posid": "H PTO0013010003SICK",
+      "name": "PTO SICK 0013010003",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0013010003"
+    },
+    {
+      "posid": "H PTO0014010001BRV",
+      "name": "PTO BRV 0014010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010001"
+    },
+    {
+      "posid": "H PTO0014010001MIL",
+      "name": "PTO MIL 0014010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010001"
+    },
+    {
+      "posid": "H PTO0014010001VAC",
+      "name": "PTO VAC 0014010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010001"
+    },
+    {
+      "posid": "H PTO0014010001FMLA",
+      "name": "PTO FMLA 0014010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010001"
+    },
+    {
+      "posid": "H PTO0014010001JURY",
+      "name": "PTO JURY 0014010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010001"
+    },
+    {
+      "posid": "H PTO0014010001SICK",
+      "name": "PTO SICK 0014010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010001"
+    },
+    {
+      "posid": "H PTO0014010002BRV",
+      "name": "PTO BRV 0014010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010002"
+    },
+    {
+      "posid": "H PTO0014010002MIL",
+      "name": "PTO MIL 0014010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010002"
+    },
+    {
+      "posid": "H PTO0014010002VAC",
+      "name": "PTO VAC 0014010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010002"
+    },
+    {
+      "posid": "H PTO0014010002FMLA",
+      "name": "PTO FMLA 0014010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010002"
+    },
+    {
+      "posid": "H PTO0014010002JURY",
+      "name": "PTO JURY 0014010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010002"
+    },
+    {
+      "posid": "H PTO0014010002SICK",
+      "name": "PTO SICK 0014010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0014010002"
+    },
+    {
+      "posid": "H PTO0015001304BRV",
+      "name": "PTO BRV 0015001304",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015001304"
+    },
+    {
+      "posid": "H PTO0015001304MIL",
+      "name": "PTO MIL 0015001304",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015001304"
+    },
+    {
+      "posid": "H PTO0015001304VAC",
+      "name": "PTO VAC 0015001304",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015001304"
+    },
+    {
+      "posid": "H PTO0015001304FMLA",
+      "name": "PTO FMLA 0015001304",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015001304"
+    },
+    {
+      "posid": "H PTO0015001304JURY",
+      "name": "PTO JURY 0015001304",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015001304"
+    },
+    {
+      "posid": "H PTO0015001304SICK",
+      "name": "PTO SICK 0015001304",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015001304"
+    },
+    {
+      "posid": "H PTO0015010001BRV",
+      "name": "PTO BRV 0015010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010001"
+    },
+    {
+      "posid": "H PTO0015010001MIL",
+      "name": "PTO MIL 0015010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010001"
+    },
+    {
+      "posid": "H PTO0015010001VAC",
+      "name": "PTO VAC 0015010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010001"
+    },
+    {
+      "posid": "H PTO0015010001FMLA",
+      "name": "PTO FMLA 0015010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010001"
+    },
+    {
+      "posid": "H PTO0015010001JURY",
+      "name": "PTO JURY 0015010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010001"
+    },
+    {
+      "posid": "H PTO0015010001SICK",
+      "name": "PTO SICK 0015010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010001"
+    },
+    {
+      "posid": "H PTO0015010002BRV",
+      "name": "PTO BRV 0015010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010002"
+    },
+    {
+      "posid": "H PTO0015010002MIL",
+      "name": "PTO MIL 0015010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010002"
+    },
+    {
+      "posid": "H PTO0015010002VAC",
+      "name": "PTO VAC 0015010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010002"
+    },
+    {
+      "posid": "H PTO0015010002FMLA",
+      "name": "PTO FMLA 0015010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010002"
+    },
+    {
+      "posid": "H PTO0015010002JURY",
+      "name": "PTO JURY 0015010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010002"
+    },
+    {
+      "posid": "H PTO0015010002SICK",
+      "name": "PTO SICK 0015010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0015010002"
+    },
+    {
+      "posid": "H PTO0016010001BRV",
+      "name": "PTO BRV 0016010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010001"
+    },
+    {
+      "posid": "H PTO0016010001MIL",
+      "name": "PTO MIL 0016010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010001"
+    },
+    {
+      "posid": "H PTO0016010001VAC",
+      "name": "PTO VAC 0016010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010001"
+    },
+    {
+      "posid": "H PTO0016010001FMLA",
+      "name": "PTO FMLA 0016010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010001"
+    },
+    {
+      "posid": "H PTO0016010001JURY",
+      "name": "PTO JURY 0016010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010001"
+    },
+    {
+      "posid": "H PTO0016010001SICK",
+      "name": "PTO SICK 0016010001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010001"
+    },
+    {
+      "posid": "H PTO0016010002BRV",
+      "name": "PTO BRV 0016010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010002"
+    },
+    {
+      "posid": "H PTO0016010002MIL",
+      "name": "PTO MIL 0016010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010002"
+    },
+    {
+      "posid": "H PTO0016010002VAC",
+      "name": "PTO VAC 0016010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010002"
+    },
+    {
+      "posid": "H PTO0016010002FMLA",
+      "name": "PTO FMLA 0016010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010002"
+    },
+    {
+      "posid": "H PTO0016010002JURY",
+      "name": "PTO JURY 0016010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010002"
+    },
+    {
+      "posid": "H PTO0016010002SICK",
+      "name": "PTO SICK 0016010002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0016010002"
+    },
+    {
+      "posid": "H PTO0017101321BRV",
+      "name": "PTO BRV 0017101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101321"
+    },
+    {
+      "posid": "H PTO0017101321MIL",
+      "name": "PTO MIL 0017101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101321"
+    },
+    {
+      "posid": "H PTO0017101321VAC",
+      "name": "PTO VAC 0017101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101321"
+    },
+    {
+      "posid": "H PTO0017101321FMLA",
+      "name": "PTO FMLA 0017101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101321"
+    },
+    {
+      "posid": "H PTO0017101321JURY",
+      "name": "PTO JURY 0017101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101321"
+    },
+    {
+      "posid": "H PTO0017101321SICK",
+      "name": "PTO SICK 0017101321",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101321"
+    },
+    {
+      "posid": "H PTO0017101602BRV",
+      "name": "PTO BRV 0017101602",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101602"
+    },
+    {
+      "posid": "H PTO0017101602MIL",
+      "name": "PTO MIL 0017101602",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101602"
+    },
+    {
+      "posid": "H PTO0017101602VAC",
+      "name": "PTO VAC 0017101602",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101602"
+    },
+    {
+      "posid": "H PTO0017101602FMLA",
+      "name": "PTO FMLA 0017101602",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101602"
+    },
+    {
+      "posid": "H PTO0017101602JURY",
+      "name": "PTO JURY 0017101602",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101602"
+    },
+    {
+      "posid": "H PTO0017101602SICK",
+      "name": "PTO SICK 0017101602",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0017101602"
+    },
+    {
+      "posid": "H PTO0053000001BRV",
+      "name": "PTO BRV 0053000001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000001"
+    },
+    {
+      "posid": "H PTO0053000001MIL",
+      "name": "PTO MIL 0053000001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000001"
+    },
+    {
+      "posid": "H PTO0053000001VAC",
+      "name": "PTO VAC 0053000001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000001"
+    },
+    {
+      "posid": "H PTO0053000001FMLA",
+      "name": "PTO FMLA 0053000001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000001"
+    },
+    {
+      "posid": "H PTO0053000001JURY",
+      "name": "PTO JURY 0053000001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000001"
+    },
+    {
+      "posid": "H PTO0053000001SICK",
+      "name": "PTO SICK 0053000001",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000001"
+    },
+    {
+      "posid": "H PTO0053000002BRV",
+      "name": "PTO BRV 0053000002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000002"
+    },
+    {
+      "posid": "H PTO0053000002MIL",
+      "name": "PTO MIL 0053000002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000002"
+    },
+    {
+      "posid": "H PTO0053000002VAC",
+      "name": "PTO VAC 0053000002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000002"
+    },
+    {
+      "posid": "H PTO0053000002FMLA",
+      "name": "PTO FMLA 0053000002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000002"
+    },
+    {
+      "posid": "H PTO0053000002JURY",
+      "name": "PTO JURY 0053000002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000002"
+    },
+    {
+      "posid": "H PTO0053000002SICK",
+      "name": "PTO SICK 0053000002",
+      "bukrs": "1710",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "H PTO0053000002"
     },
     {
       "posid": "M12-T1.01",
@@ -3097,6 +4498,22 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "project": "U1CM"
     },
     {
+      "posid": "U1CM002",
+      "name": "Pre-Feed Support Office PBWBS Study",
+      "bukrs": "5070",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "U1CM"
+    },
+    {
+      "posid": "U1CM00201",
+      "name": "Pre-Feed Support IBWBS Study",
+      "bukrs": "5070",
+      "level": "3",
+      "raKey": "Y00001",
+      "project": "U1CM"
+    },
+    {
       "posid": "U1RY 01",
       "name": "Fluor Demo Intercomp Perf Obligation 01",
       "bukrs": "1710",
@@ -3119,6 +4536,38 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "level": "2",
       "raKey": "Y00001",
       "project": "U1RY"
+    },
+    {
+      "posid": "U1RY002",
+      "name": "Umicore Pre-Feed Support GB PBWBS Study",
+      "bukrs": "1500",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "U1RY"
+    },
+    {
+      "posid": "U1RY00201",
+      "name": "Umicore Pre-Feed GB IBWBS Study",
+      "bukrs": "1500",
+      "level": "3",
+      "raKey": "Y00001",
+      "project": "U1RY"
+    },
+    {
+      "posid": "U1RZ001",
+      "name": "Umicore Pre-Feed Lead Office PBWBS Study",
+      "bukrs": "1010",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "U1RZ"
+    },
+    {
+      "posid": "U1RZ002",
+      "name": "Umicore Pre-Feed Support GB PBWBS Study",
+      "bukrs": "1010",
+      "level": "2",
+      "raKey": "Y00001",
+      "project": "U1RZ"
     },
     {
       "posid": "UZ1BW01",
@@ -3279,46 +4728,6 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       "level": "2",
       "raKey": "Y00001",
       "project": "X U1BW"
-    },
-    {
-      "posid": "D-0020.01",
-      "name": "Inter Segment Proces Perf Obligation 01",
-      "bukrs": "5070",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "D-0020"
-    },
-    {
-      "posid": "D-0026.01",
-      "name": "BDS Performance Obligation",
-      "bukrs": "5070",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "D-0026"
-    },
-    {
-      "posid": "D-0026.02",
-      "name": "BGS Performance Obligation",
-      "bukrs": "5070",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "D-0026"
-    },
-    {
-      "posid": "U1CM002",
-      "name": "Pre-Feed Support Office PBWBS Study",
-      "bukrs": "5070",
-      "level": "2",
-      "raKey": "Y00001",
-      "project": "U1CM"
-    },
-    {
-      "posid": "U1CM00201",
-      "name": "Pre-Feed Support IBWBS Study",
-      "bukrs": "5070",
-      "level": "3",
-      "raKey": "Y00001",
-      "project": "U1CM"
     }
   ],
   "profitCenterHierarchy": {
@@ -4437,4 +5846,4 @@ export const SAP_ENTERPRISE_MODEL: SapEnterpriseModel = {
       }
     ]
   }
-} as const
+}
