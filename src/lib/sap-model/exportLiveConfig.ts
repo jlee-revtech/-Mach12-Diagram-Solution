@@ -270,8 +270,9 @@ export async function exportLiveConfigPdf(m: SapEnterpriseModel, hidden?: Readon
   pdf.setLineWidth(1.2)
   pdf.line(M, M + headerH - 26, pageW - M, M + headerH - 26)
 
-  // Diagram
-  pdf.addImage(png, 'PNG', (pageW - width) / 2, M + headerH - 14, width, height)
+  // Diagram — 'FAST' Flate-compresses the embedded image (default 'NONE' stores
+  // the raw bitmap and balloons a diagram this size to ~45 MB).
+  pdf.addImage(png, 'PNG', (pageW - width) / 2, M + headerH - 14, width, height, undefined, 'FAST')
 
   // Footer
   pdf.setFontSize(7.5)
