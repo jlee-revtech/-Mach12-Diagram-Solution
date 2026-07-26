@@ -30,7 +30,7 @@ function edge(source: string, target: string, label?: string, dashed = false): E
 }
 
 // Estimated node height (for overlap-free rank spacing).
-function estHeight(d: OrgNodeData): number {
+export function estHeight(d: OrgNodeData): number {
   let h = 58
   if (d.subtitle) h += 14
   if (d.meta) h += d.meta.length * 14
@@ -94,9 +94,11 @@ export function buildSchemaGraph(m: SapEnterpriseModel): OrgGraph {
 // INSTANCE VIEW — the real A000 tree. Profit & cost centers are nested inside
 // each company code; aggregate nodes carry a drill payload of their values.
 // ─────────────────────────────────────────────────────────────────────────────
-type Tree = { id: string; data: OrgNodeData; children: Tree[] }
+export type InstanceTreeNode = { id: string; data: OrgNodeData; children: InstanceTreeNode[] }
+type Tree = InstanceTreeNode
 
-export function buildInstanceGraph(m: SapEnterpriseModel): OrgGraph {
+// The full (unfiltered) instance tree — also drives the Show/Hide panel.
+export function buildInstanceTree(m: SapEnterpriseModel): Tree {
   const salesByCode = new Map(m.salesOrgs.map((s) => [s.vkorg, s]))
   const purchByCode = new Map(m.purchasingOrgs.map((p) => [p.ekorg, p]))
   const raByCc = new Map(m.raByCompanyCode.map((r) => [r.bukrs, r]))
@@ -176,6 +178,17 @@ export function buildInstanceGraph(m: SapEnterpriseModel): OrgGraph {
       children: [],
     })
   }
+
+  return root
+}
+
+// Drop hidden nodes (a hidden node takes its whole subtree with it).
+function pruneTree(n: Tree, hidden: ReadonlySet<string>): Tree {
+  return { ...n, children: n.children.filter((c) => !hidden.has(c.id)).map((c) => pruneTree(c, hidden)) }
+}
+
+export function buildInstanceGraph(m: SapEnterpriseModel, hidden?: ReadonlySet<string>): OrgGraph {
+  const root = hidden?.size ? pruneTree(buildInstanceTree(m), hidden) : buildInstanceTree(m)
 
   // ── tidy layered layout (overlap-free): leaf-packed x, depth-banded y ──
   const SLOT = 248
