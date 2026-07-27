@@ -311,6 +311,7 @@ export const IP_CATEGORIES = [
   'Supply Chain',
   'Human Resources',
   'Compliance',
+  'Regulatory',
   'Customer',
   'Program Management',
   'Quality',

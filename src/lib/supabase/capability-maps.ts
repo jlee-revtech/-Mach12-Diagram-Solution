@@ -338,13 +338,13 @@ export async function deleteCapabilityOutput(id: string): Promise<void> {
 
 // Resolve, for a set of upstream output ids, the process + map each lives in.
 // Keyed by output id. Powers "⬅ from {process}" provenance on linked inputs.
-export async function resolveInputSources(sourceOutputIds: string[]): Promise<Record<string, SipocLinkSource>> {
+export async function resolveInputSources(sourceOutputIds: string[], anon = false): Promise<Record<string, SipocLinkSource>> {
   const ids = Array.from(new Set(sourceOutputIds.filter(Boolean)))
   if (ids.length === 0) return {}
   const select = 'id,information_product_id,capabilities(id,name,capability_map_id,capability_maps(id,title))'
   const res = await sbFetch(
     `${URL}/rest/v1/capability_outputs?id=in.(${ids.join(',')})&select=${select}`,
-    { headers: headers() }
+    { headers: anon ? anonHeaders() : headers() }
   )
   if (!res.ok) return {}
   const rows = (await res.json()) as Array<{
@@ -372,13 +372,13 @@ export async function resolveInputSources(sourceOutputIds: string[]): Promise<Re
 // Resolve, for a set of output ids in the current map, the downstream inputs
 // (in ANY map) that link back to them. Keyed by output id → list.
 // Powers "➡ feeds {process(es)}" on outputs.
-export async function resolveOutputDownstream(outputIds: string[]): Promise<Record<string, SipocLinkDownstream[]>> {
+export async function resolveOutputDownstream(outputIds: string[], anon = false): Promise<Record<string, SipocLinkDownstream[]>> {
   const ids = Array.from(new Set(outputIds.filter(Boolean)))
   if (ids.length === 0) return {}
   const select = 'id,capability_id,source_output_id,capabilities(id,name,capability_map_id,capability_maps(id,title))'
   const res = await sbFetch(
     `${URL}/rest/v1/capability_inputs?source_output_id=in.(${ids.join(',')})&archived_at=is.null&select=${select}`,
-    { headers: headers() }
+    { headers: anon ? anonHeaders() : headers() }
   )
   if (!res.ok) return {}
   const rows = (await res.json()) as Array<{

@@ -19,17 +19,40 @@ let draggedId: string | null = null
 let draggedLevel: number | null = null
 
 // ─── L3 Functionality chip (draggable + context menu) ───
-function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
+function L3Chip({ node, isSelected, onSelect, onDrop, onReorderL3, allL2s, readOnly }: {
   node: CapabilityTreeNode
   isSelected: boolean
   onSelect: () => void
   onDrop: (dragId: string, targetParentId: string) => void
+  onReorderL3: (dragId: string, targetL3Id: string, above: boolean) => void
   allL2s: { id: string; name: string; parentName: string }[]
   readOnly?: boolean
 }) {
   const lockedBy = useLockHolder(node.id)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [dropPos, setDropPos] = useState<'above' | 'below' | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Accept an L3 dragged onto this chip to reorder it to a chosen position
+  // within the L2 (renumbers sort_order). Only L3 drags are intercepted here;
+  // other drags fall through to the L2 block's reparent drop.
+  const handleL3DragOver = (e: React.DragEvent) => {
+    if (readOnly || draggedLevel !== 3 || draggedId === node.id) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setDropPos(e.clientY < rect.top + rect.height / 2 ? 'above' : 'below')
+  }
+  const handleL3Drop = (e: React.DragEvent) => {
+    if (readOnly || draggedLevel !== 3) return
+    e.preventDefault()
+    e.stopPropagation()
+    const id = e.dataTransfer.getData('text/plain')
+    const above = dropPos !== 'below'
+    setDropPos(null)
+    if (id && id !== node.id) onReorderL3(id, node.id, above)
+  }
 
   useEffect(() => {
     if (!menuOpen) return
@@ -43,7 +66,12 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
   const otherL2s = allL2s.filter(l2 => l2.id !== node.parent_id)
 
   return (
-    <div className="relative group/l3">
+    <div
+      className={`relative group/l3 rounded ${dropPos === 'above' ? 'shadow-[inset_0_2px_0_0_#2563EB]' : ''} ${dropPos === 'below' ? 'shadow-[inset_0_-2px_0_0_#2563EB]' : ''}`}
+      onDragOver={readOnly ? undefined : handleL3DragOver}
+      onDragLeave={readOnly ? undefined : () => setDropPos(null)}
+      onDrop={readOnly ? undefined : handleL3Drop}
+    >
       <div
         draggable={!readOnly}
         onDragStart={readOnly ? undefined : (e) => {
@@ -158,12 +186,13 @@ function L3Chip({ node, isSelected, onSelect, onDrop, allL2s, readOnly }: {
 }
 
 // ─── L2 Capability block (draggable + drop target for L3) ─
-function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, allL2s, readOnly }: {
+function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onReorderL3, onAddL3, allL2s, readOnly }: {
   node: CapabilityTreeNode
   parentColor: string
   selectedId: string | null
   onSelect: (id: string) => void
   onDrop: (dragId: string, targetParentId: string) => void
+  onReorderL3: (dragId: string, targetL3Id: string, above: boolean) => void
   onAddL3: (parentId: string) => void
   allL2s: { id: string; name: string; parentName: string }[]
   readOnly?: boolean
@@ -240,6 +269,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
                 isSelected={selectedId === child.id}
                 onSelect={() => onSelect(child.id)}
                 onDrop={onDrop}
+                onReorderL3={onReorderL3}
                 allL2s={allL2s}
                 readOnly={readOnly}
               />
@@ -251,7 +281,7 @@ function L2Block({ node, parentColor, selectedId, onSelect, onDrop, onAddL3, all
 }
 
 // ─── L1 Core Area column (draggable + drop target) ──────
-function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onRemove, allL2s, readOnly, focusState, onToggleFocus }: {
+function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, onAILoad, onDrop, onReorderL1, onReorderL3, onRemove, allL2s, readOnly, focusState, onToggleFocus }: {
   node: CapabilityTreeNode
   color: string
   index: number
@@ -262,6 +292,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
   onAILoad: (coreAreaId: string, coreAreaName: string) => void
   onDrop: (dragId: string, targetParentId: string) => void
   onReorderL1: (dragId: string, targetIndex: number) => void
+  onReorderL3: (dragId: string, targetL3Id: string, above: boolean) => void
   onRemove: (id: string, name: string, childCount: number) => void
   allL2s: { id: string; name: string; parentName: string }[]
   readOnly?: boolean
@@ -412,6 +443,7 @@ function L1Column({ node, color, index, selectedId, onSelect, onAddL2, onAddL3, 
                 selectedId={selectedId}
                 onSelect={onSelect}
                 onDrop={onDrop}
+                onReorderL3={onReorderL3}
                 onAddL3={onAddL3}
                 allL2s={allL2s}
                 readOnly={readOnly}
@@ -586,6 +618,41 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
     })
   }, [capabilities, updateCapability])
 
+  // ─── Reorder an L3 to a chosen position (drop onto another L3) ──────────
+  // Inserts the dragged L3 above/below the target within the target's L2 and
+  // renumbers sort_order. Works within one L2 (pure reorder) or across L2s
+  // (moves parent + inserts at the chosen slot), unlike the generic handleDrop
+  // which always appends to the end.
+  const handleReorderL3 = useCallback(async (dragId: string, targetL3Id: string, above: boolean) => {
+    const dragged = capabilities.find(c => c.id === dragId)
+    const target = capabilities.find(c => c.id === targetL3Id)
+    if (!dragged || !target || dragId === targetL3Id) return
+    const newParentId = target.parent_id
+    if (!newParentId) return
+
+    // Target's L3 siblings in current order, excluding the dragged item.
+    const siblings = capabilities
+      .filter(c => c.parent_id === newParentId && c.level === 3 && c.id !== dragId)
+      .sort((a, b) => a.sort_order - b.sort_order)
+    const targetIdx = siblings.findIndex(c => c.id === targetL3Id)
+    if (targetIdx < 0) return
+    const insertAt = above ? targetIdx : targetIdx + 1
+    siblings.splice(insertAt, 0, dragged)
+
+    // Persist only what actually changed. The moved row also gets parent/level
+    // corrected when it came from a different L2.
+    const crossParent = dragged.parent_id !== newParentId || dragged.level !== 3
+    for (let i = 0; i < siblings.length; i++) {
+      const c = siblings[i]
+      const isDragged = c.id === dragId
+      if (c.sort_order !== i || (isDragged && crossParent)) {
+        await updateCapability(c.id, isDragged && crossParent
+          ? { sort_order: i, parent_id: newParentId, level: 3 }
+          : { sort_order: i })
+      }
+    }
+  }, [capabilities, updateCapability])
+
   return (
     <div className="space-y-4 min-w-0 w-full">
       {/* Header */}
@@ -679,6 +746,7 @@ export default function CapabilityMapView({ onSelectCapability, onAILoad }: {
               onAILoad={onAILoad || (() => {})}
               onDrop={handleDrop}
               onReorderL1={handleReorderL1}
+              onReorderL3={handleReorderL3}
               onRemove={handleRemoveL1}
               allL2s={allL2s}
               readOnly={readOnly}

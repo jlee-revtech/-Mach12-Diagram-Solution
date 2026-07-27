@@ -1098,6 +1098,15 @@ function CapabilityDetail({ capabilityId, orgId }: { capabilityId: string; orgId
   const router = useRouter()
   const [linkPickerOpen, setLinkPickerOpen] = useState(false)
   const openLinkedProcess = useCallback((mapId: string, capId: string) => {
+    // Same-map link: select the capability directly. A router.push to the same
+    // /capability-map/[id] path only changes the query string, which never
+    // re-fires the ?cap= deep-link effect on that page, so "Open source" looked
+    // dead for links inside one map (the common forecasting-sequence case).
+    const currentMapId = useSIPOCStore.getState().map?.id
+    if (currentMapId && mapId === currentMapId) {
+      useSIPOCStore.getState().setSelectedCapability(capId)
+      return
+    }
     router.push(`/capability-map/${mapId}?cap=${capId}`)
   }, [router])
 

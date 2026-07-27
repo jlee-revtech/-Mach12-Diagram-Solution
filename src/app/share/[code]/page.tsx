@@ -8,6 +8,7 @@ import {
   listCapabilityInputsAnon, listCapabilityOutputsAnon,
   listPersonasAnon, listInformationProductsAnon, listLogicalSystemsAnon, listTagsAnon,
   listSystemDataElementsAnon, listWorkstreamsAnon,
+  resolveInputSources, resolveOutputDownstream,
 } from '@/lib/supabase/capability-maps'
 import type { CapabilityInput, CapabilityOutput } from '@/lib/sipoc/types'
 import SIPOCDrawer from '@/components/sipoc/SIPOCDrawer'
@@ -76,6 +77,26 @@ export default function SharePage({ params }: { params: Promise<{ code: string }
         workstreams,
         loading: false,
       })
+
+      // Resolve SIPOC output → input sequence links so linked inputs render
+      // their upstream-process provenance (and outputs their downstream feeds)
+      // in the read-only view. The authed editor does this via store.loadLinks();
+      // the share page hydrates the store by hand, so resolve over the anon path.
+      const srcIds = Object.values(inputs).flat()
+        .filter(i => !i.archived_at && i.source_output_id)
+        .map(i => i.source_output_id as string)
+      const outIds = Object.values(outputs).flat()
+        .filter(o => !o.archived_at)
+        .map(o => o.id)
+      try {
+        const [sources, downstream] = await Promise.all([
+          resolveInputSources(srcIds, true),
+          resolveOutputDownstream(outIds, true),
+        ])
+        useSIPOCStore.setState({ inputSources: sources, outputDownstream: downstream })
+      } catch (e) {
+        console.error('Failed to resolve SIPOC sequence links for share view:', e)
+      }
 
       // Load comments (anon path)
       useSIPOCStore.getState().loadComments(map.id, true)

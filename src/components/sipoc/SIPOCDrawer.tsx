@@ -244,7 +244,17 @@ function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { i
             ) : (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); router.push(`/capability-map/${source.mapId}?cap=${source.capabilityId}`) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  // Same-map links select directly (a same-path router.push does
+                  // not re-fire the ?cap= deep-link effect); cross-map links navigate.
+                  const currentMapId = useSIPOCStore.getState().map?.id
+                  if (currentMapId && source.mapId === currentMapId) {
+                    useSIPOCStore.getState().setSelectedCapability(source.capabilityId)
+                  } else {
+                    router.push(`/capability-map/${source.mapId}?cap=${source.capabilityId}`)
+                  }
+                }}
                 className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] px-2 py-1 max-w-full hover:bg-indigo-100 transition-colors"
                 title={`Fed by ${source.capabilityName} in ${source.mapTitle}`}
               >
@@ -382,7 +392,15 @@ function OutputLane({ output, onRemove, onClickCard, showDims, capabilityId }: {
               <button
                 key={d.inputId}
                 type="button"
-                onClick={(e) => { e.stopPropagation(); router.push(`/capability-map/${d.mapId}?cap=${d.capabilityId}`) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const currentMapId = useSIPOCStore.getState().map?.id
+                  if (currentMapId && d.mapId === currentMapId) {
+                    useSIPOCStore.getState().setSelectedCapability(d.capabilityId)
+                  } else {
+                    router.push(`/capability-map/${d.mapId}?cap=${d.capabilityId}`)
+                  }
+                }}
                 className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] px-1.5 py-0.5 max-w-[140px] hover:bg-emerald-100 transition-colors"
                 title={`Feeds ${d.capabilityName} in ${d.mapTitle}`}
               >
