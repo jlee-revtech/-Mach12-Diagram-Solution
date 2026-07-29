@@ -587,6 +587,8 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
   const CHIP_H = CHIP_FS + 7 // matches edgeLabelChip height
   const LANE_STEP = CHIP_H + 5 // vertical pitch when edge labels must stack
   const MIN_BAND_GAP = 44 // floor; grows below to fit stacked edge labels
+  const RAIL_LEAD = 18 // clearance from the node area to the first band-skip rail
+  const RAIL_STEP = 16 // horizontal pitch between parallel band-skip rails
 
   // Measure every band's node widths FIRST (node width logic unchanged), then grow
   // the SVG so the widest row fits instead of clipping off the right edge.
@@ -605,11 +607,31 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
   })
 
   const maxRowW = Math.max(0, ...measuredBands.map((b) => b.rowW))
-  const naturalWidth = f.padX * 2 + LABEL_GUTTER + maxRowW
+
+  // Band membership per node label (first occurrence). Needed to classify each
+  // connection as same-band / adjacent / band-skipping BEFORE layout, so a
+  // band-skipping edge can reserve a clear right-side channel to route down
+  // instead of cutting straight through the intermediate bands' boxes.
+  const bandOfLabel = new Map<string, number>()
+  measuredBands.forEach((mb, bi) => {
+    for (const m of mb.measured) if (!bandOfLabel.has(m.name)) bandOfLabel.set(m.name, bi)
+  })
+  const conns = (d.connections ?? []).filter((c) => c && c.from && c.to)
+  const bandSpanOf = (c: (typeof conns)[number]) => {
+    const fa = bandOfLabel.get(String(c.from))
+    const tb = bandOfLabel.get(String(c.to))
+    return fa == null || tb == null ? null : Math.abs(fa - tb)
+  }
+  const skipConns = conns.filter((c) => (bandSpanOf(c) ?? 0) >= 2)
+  // Reserve a right-side channel wide enough for one vertical rail per skip edge.
+  const railZone = skipConns.length ? RAIL_LEAD + skipConns.length * RAIL_STEP : 0
+
+  const naturalWidth = f.padX * 2 + LABEL_GUTTER + maxRowW + railZone
   const width = Math.min(1600, Math.max(requestedWidth, Math.ceil(naturalWidth)))
 
-  const availW = width - f.padX * 2 - LABEL_GUTTER
+  const availW = Math.max(0, width - f.padX * 2 - LABEL_GUTTER - railZone)
   const bandX = f.padX + LABEL_GUTTER
+  const nodeAreaRight = bandX + availW // band-skip rails live to the right of this
 
   // Place node X positions first (independent of Y). Index node-label ->
   // { box, band } for the first occurrence so connections dock to face centers and
@@ -628,12 +650,27 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
     return { label: mb.label, y: 0, nodes }
   })
 
+  // Assign a dedicated vertical rail x to each band-skipping edge, ordered
+  // left-to-right by the source column so parallel rails cross as little as
+  // possible. Rails sit in the reserved zone to the right of every node row, so a
+  // skip edge drops down a clear channel instead of through the middle bands.
+  const railXOf = new Map<(typeof conns)[number], number>()
+  const upperInfo = (c: (typeof conns)[number]) => {
+    const A = nodeInfoByLabel.get(String(c.from))
+    const B = nodeInfoByLabel.get(String(c.to))
+    if (!A || !B) return A ?? B ?? null
+    return A.band <= B.band ? A : B
+  }
+  skipConns
+    .slice()
+    .sort((c1, c2) => (upperInfo(c1)?.box.x ?? 0) - (upperInfo(c2)?.box.x ?? 0))
+    .forEach((c, i) => railXOf.set(c, nodeAreaRight + RAIL_LEAD + i * RAIL_STEP))
+
   // Edge labels: assign every labeled cross-band connection to a horizontal lane in
   // the gap below its UPPER band, so chips never overlap each other or sit on an
   // intermediate band's nodes (skill 2.6 / 3.4). Computed here because it drives how
   // tall the band gap must be. Placement is independent of Y.
   interface Chip { cx: number; w: number; gap: number; lane: number; label: string }
-  const conns = (d.connections ?? []).filter((c) => c && c.from && c.to)
   const chips: Chip[] = []
   for (const c of conns) {
     if (!c.label) continue
@@ -641,7 +678,13 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
     const B = nodeInfoByLabel.get(String(c.to))
     if (!A || !B || A.band === B.band) continue
     const w = Math.min(estTextWidth(String(c.label), CHIP_FS) + 12, Math.max(80, availW))
-    const rawCx = (A.box.x + A.box.w / 2 + B.box.x + B.box.w / 2) / 2
+    const upper = A.band <= B.band ? A : B
+    // Skip edges leave the upper node then jog to the rail, so anchor their label
+    // under the upper node (where the labelled transition is); adjacent edges sit
+    // midway between the two node centers.
+    const rawCx = railXOf.has(c)
+      ? upper.box.x + upper.box.w / 2
+      : (A.box.x + A.box.w / 2 + B.box.x + B.box.w / 2) / 2
     const cx = Math.max(f.padX + w / 2 + 2, Math.min(width - f.padX - w / 2 - 2, rawCx))
     chips.push({ cx, w, gap: Math.min(A.band, B.band), lane: 0, label: String(c.label) })
   }
@@ -698,9 +741,13 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
     })
   })
 
-  // Connectors: orthogonal V-H-V routing between bands. Labels are drawn separately
-  // (below) in their assigned lanes so multiple edges never collide.
+  // Connectors: orthogonal routing that never crosses a node box. Same-band and
+  // adjacent-band edges elbow through the single gap between the two rows;
+  // band-skipping edges detour out to their reserved right-side rail and drop down
+  // that clear channel, so they route AROUND the intermediate bands' boxes rather
+  // than through them. Labels are drawn separately (below) in their lanes.
   const GAP = 6
+  const gapCorridorY = (k: number) => bands[k].y + NODE_H + BAND_GAP / 2 // gap below band k
   for (const c of conns) {
     const A = nodeInfoByLabel.get(String(c.from))
     const B = nodeInfoByLabel.get(String(c.to))
@@ -717,6 +764,26 @@ function renderLayers(d: WorkshopDiagram, requestedWidth: number, f: Frame): Svg
       out += elbowPath(`M ${ax.toFixed(1)} ${ay.toFixed(1)} V ${midY.toFixed(1)} H ${bx.toFixed(1)} V ${(b.y + b.h + GAP).toFixed(1)}`)
       continue
     }
+    const rail = railXOf.get(c)
+    if (rail != null) {
+      // Band-skipping edge: exit the source into the ADJACENT gap, run out to the
+      // rail, drop down the clear channel, then come back in through the gap next
+      // to the target. Every segment stays in a band gap or the reserved rail zone,
+      // so no intermediate box is ever crossed.
+      if (B.band > A.band) {
+        const ay = a.y + a.h
+        const cyA = gapCorridorY(A.band)
+        const cyB = gapCorridorY(B.band - 1)
+        out += elbowPath(`M ${ax.toFixed(1)} ${ay.toFixed(1)} V ${cyA.toFixed(1)} H ${rail.toFixed(1)} V ${cyB.toFixed(1)} H ${bx.toFixed(1)} V ${(b.y - GAP).toFixed(1)}`)
+      } else {
+        const ay = a.y
+        const cyA = gapCorridorY(A.band - 1)
+        const cyB = gapCorridorY(B.band)
+        out += elbowPath(`M ${ax.toFixed(1)} ${ay.toFixed(1)} V ${cyA.toFixed(1)} H ${rail.toFixed(1)} V ${cyB.toFixed(1)} H ${bx.toFixed(1)} V ${(b.y + b.h + GAP).toFixed(1)}`)
+      }
+      continue
+    }
+    // Adjacent bands: single-gap elbow.
     const downward = b.y > a.y
     const ay = downward ? a.y + a.h : a.y
     const by = downward ? b.y : b.y + b.h

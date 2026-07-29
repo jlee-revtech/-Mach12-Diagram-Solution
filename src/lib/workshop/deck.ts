@@ -121,6 +121,12 @@ export function normalizeSectionContent(content: SectionContent): SectionContent
       dataOpportunities: asOpps(c.dataOpportunities),
       technologyOpportunities: asOpps(c.technologyOpportunities),
       ...(Array.isArray(c.diagrams) ? { diagrams: c.diagrams } : {}),
+      // App-level facilitator answers to the assessment/discovery questions,
+      // carried through unchanged (agent-core does not model them). Kept so a
+      // hand-edit or deck render never drops captured responses. Empty entries
+      // are PRESERVED (not filtered) so answers stay index-aligned to questions.
+      ...(Array.isArray(c.assessmentAnswers) ? { assessmentAnswers: (c.assessmentAnswers as unknown[]).map((x) => (x == null ? '' : String(x))) } : {}),
+      ...(Array.isArray(c.discoveryAnswers) ? { discoveryAnswers: (c.discoveryAnswers as unknown[]).map((x) => (x == null ? '' : String(x))) } : {}),
       ...notes,
     } as unknown as SectionContent
   }

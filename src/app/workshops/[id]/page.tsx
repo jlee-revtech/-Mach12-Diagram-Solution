@@ -20,7 +20,7 @@ import { publishWorkshopToDeliverables } from '@/lib/workshop/publishToDeliverab
 import type { WorkshopRecapData } from '@jlee-revtech/agent-core'
 import type { Workstream } from '@/lib/workstream/types'
 import {
-  Archive, ArrowLeft, ChevronDown, ClipboardList, Download, FileText, Info, Link2, Mic,
+  Archive, ArrowLeft, ChevronDown, ClipboardList, Download, Eye, EyeOff, FileText, Info, Link2, Mic,
   MoreHorizontal, Paperclip, Play, Plus, Presentation, RefreshCw, RotateCcw, Settings2,
   Sparkles, Star, Trash2, Upload, X,
 } from 'lucide-react'
@@ -84,6 +84,10 @@ export default function WorkshopRoomPage() {
   // reachable any time from the prep toolbar.
   const [inputsOpen, setInputsOpen] = useState(false)
   const [sectionsMenu, setSectionsMenu] = useState(false)
+  // Client View: hide every AI input / AI reference on the prep page so the room
+  // can be shown to a customer. Content stays visible and hand-editable. Personal
+  // per-browser presentation preference, persisted in localStorage per workshop.
+  const [clientView, setClientView] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const voiceRef = useRef<TranscriptionProvider | null>(null)
   const speakerRef = useRef('')
@@ -113,6 +117,18 @@ export default function WorkshopRoomPage() {
   }, [id])
 
   useEffect(() => { load() }, [load])
+  // Restore the Client View preference for this workshop (per-browser).
+  useEffect(() => {
+    if (!id) return
+    try { setClientView(localStorage.getItem(`workshop-client-view:${id}`) === '1') } catch { /* no localStorage */ }
+  }, [id])
+  const toggleClientView = useCallback(() => {
+    setClientView((v) => {
+      const next = !v
+      try { localStorage.setItem(`workshop-client-view:${id}`, next ? '1' : '0') } catch { /* no localStorage */ }
+      return next
+    })
+  }, [id])
   useEffect(() => { setSpeaker(me) }, [me])
   useEffect(() => { speakerRef.current = speaker }, [speaker])
   useEffect(() => { transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight }) }, [messages, interim])
@@ -638,6 +654,16 @@ export default function WorkshopRoomPage() {
               <div className="flex items-center justify-between gap-2">
                 <div className="text-label uppercase text-text-secondary shrink-0">Sections</div>
                 <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={toggleClientView}
+                    title={clientView ? 'Client View is on: AI inputs and references are hidden. Click to show them.' : 'Client View: hide all AI inputs and references so you can show this to a customer'}
+                    aria-label="Toggle Client View"
+                    aria-pressed={clientView}
+                    className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[11px] font-medium transition-colors ${clientView ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-border bg-white text-text-secondary hover:bg-surface-muted hover:text-text-primary'}`}
+                  >
+                    {clientView ? <EyeOff size={13} /> : <Eye size={13} />}
+                    Client View
+                  </button>
                   <Button
                     variant="secondary" size="sm" iconOnly
                     icon={<Info size={13} />}
@@ -692,10 +718,14 @@ export default function WorkshopRoomPage() {
                           <button onClick={() => { setSectionsMenu(false); setShareOpen(true) }} className={roomMenuItemCls}>
                             <Link2 size={14} className="mt-0.5 shrink-0" /> Share prep (public link)
                           </button>
-                          <div className="my-1 border-t border-border" />
-                          <button onClick={() => { setSectionsMenu(false); generateBrief() }} disabled={busy === 'brief'} className={roomMenuItemCls}>
-                            <RefreshCw size={14} className="mt-0.5 shrink-0" /> {busy === 'brief' ? 'Regenerating brief...' : 'Regenerate brief + agenda'}
-                          </button>
+                          {!clientView && (
+                            <>
+                              <div className="my-1 border-t border-border" />
+                              <button onClick={() => { setSectionsMenu(false); generateBrief() }} disabled={busy === 'brief'} className={roomMenuItemCls}>
+                                <RefreshCw size={14} className="mt-0.5 shrink-0" /> {busy === 'brief' ? 'Regenerating brief...' : 'Regenerate brief + agenda'}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </>
                     )}
@@ -705,7 +735,9 @@ export default function WorkshopRoomPage() {
 
               {/* Workshop-level guidance prompt (047). Persisted to
                   workshops.facilitation_prompt and honored by Regenerate brief,
-                  Regenerate content, and every per-section generate. */}
+                  Regenerate content, and every per-section generate. Hidden in
+                  Client View (it is an AI input). */}
+              {!clientView && (
               <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 space-y-2">
                 <div className="text-[10px] uppercase tracking-wide text-brand-600">Guidance for all content</div>
                 <textarea
@@ -740,13 +772,16 @@ export default function WorkshopRoomPage() {
                   </span>
                 </div>
               </div>
+              )}
 
-              <AttachmentsCard
-                attachments={attachments}
-                busy={busy === 'attach'}
-                onUpload={uploadAttachment}
-                onRemove={removeAttachment}
-              />
+              {!clientView && (
+                <AttachmentsCard
+                  attachments={attachments}
+                  busy={busy === 'attach'}
+                  onUpload={uploadAttachment}
+                  onRemove={removeAttachment}
+                />
+              )}
 
               <div className="space-y-2">
                 {visibleAgenda.map((a, i) => (
@@ -759,12 +794,13 @@ export default function WorkshopRoomPage() {
                     selected={selectedItemId === a.id}
                     onSelect={() => setSelectedItemId(a.id)}
                     isPrimary={!!a.workstream_code && (ws.primary_workstream_codes || []).includes(a.workstream_code)}
+                    clientView={clientView}
                   />
                 ))}
               </div>
 
               {/* Evaluation action (req 5) */}
-              {evaluationItem && (
+              {!clientView && evaluationItem && (
                 <div className="rounded-lg border border-purple-200 bg-purple-50 p-3">
                   <div className="text-body-sm font-medium text-text-primary mb-0.5">Solution Architecture Evaluation</div>
                   <div className="text-[11px] text-text-tertiary mb-2">Synthesizes across the workstream recommendations to reconcile where they diverge. Generate the workstream sections first.</div>
@@ -780,7 +816,7 @@ export default function WorkshopRoomPage() {
               )}
 
               {/* Opportunity Roadmap action (056 assessment archetype) */}
-              {roadmapItem && (
+              {!clientView && roadmapItem && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <div className="text-body-sm font-medium text-text-primary mb-0.5">Opportunity Roadmap</div>
                   <div className="text-[11px] text-text-tertiary mb-2">Reads every assessment section&apos;s process, data, and technology opportunities, detects the dependencies between them, and drafts the sequenced roadmap. Generate the assessment sections first.</div>
@@ -796,7 +832,7 @@ export default function WorkshopRoomPage() {
               )}
 
               {/* Learning Path action (057 training archetype) */}
-              {curriculumItem && (
+              {!clientView && curriculumItem && (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                   <div className="text-body-sm font-medium text-text-primary mb-0.5">Learning Path</div>
                   <div className="text-[11px] text-text-tertiary mb-2">Reads every role&apos;s training modules, detects the prerequisites between them, and sequences a phased learning path with per-role tracks. Generate the training sections first.</div>
@@ -812,7 +848,7 @@ export default function WorkshopRoomPage() {
               )}
 
               {/* Knowledge Check action (057 training archetype) */}
-              {certificationItem && (
+              {!clientView && certificationItem && (
                 <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
                   <div className="text-body-sm font-medium text-text-primary mb-0.5">Knowledge Check</div>
                   <div className="text-[11px] text-text-tertiary mb-2">Builds scenario-based exercises, quiz questions with answer keys, and a competency sign-off checklist grounded in the modules trained. Generate the training sections first.</div>
@@ -827,7 +863,7 @@ export default function WorkshopRoomPage() {
                 </div>
               )}
 
-              {!ws.brief?.objectives?.length && !agenda.length && !ws.brief?.preRead?.trim() && (
+              {!clientView && !ws.brief?.objectives?.length && !agenda.length && !ws.brief?.preRead?.trim() && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px]">
                   <div className="font-medium text-text-primary mb-1">The brief came back empty</div>
                   <div className="text-text-secondary mb-2">No objectives, agenda, or pre-read were returned. This is usually transient (a model hiccup or a missing ANTHROPIC_API_KEY). Regenerate to try again.</div>
@@ -851,6 +887,7 @@ export default function WorkshopRoomPage() {
                   workstream={wsByCode(selectedItem.workstream_code)}
                   content={contentByItem.get(selectedItem.id)}
                   onSaved={reloadContent}
+                  clientView={clientView}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-center">

@@ -11,7 +11,7 @@ import type { AgendaContentRow } from '@/lib/supabase/workshops'
 import { sectionMetaFor, CONTENT_STATUS_META } from './sectionMeta'
 
 export default function SectionCard({
-  item, index, content, workstream, selected, onSelect, isPrimary,
+  item, index, content, workstream, selected, onSelect, isPrimary, clientView,
 }: {
   item: WorkshopAgendaItem
   index: number
@@ -21,6 +21,8 @@ export default function SectionCard({
   onSelect: () => void
   /** 055: this section's workstream is a primary workstream of the workshop. */
   isPrimary?: boolean
+  /** Client View: hide the AI-workflow content-status pill (draft / generating / final). */
+  clientView?: boolean
 }) {
   const meta = sectionMetaFor(item.section_kind)
   const status = content?.status ?? 'empty'
@@ -63,12 +65,14 @@ export default function SectionCard({
           {item.timebox_minutes ? (
             <span className="text-[10px] text-text-tertiary">{item.timebox_minutes}m</span>
           ) : null}
-          <span
-            className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full"
-            style={{ backgroundColor: `${statusMeta.color}1A`, color: statusMeta.color }}
-          >
-            {statusMeta.label}
-          </span>
+          {!clientView && (
+            <span
+              className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+              style={{ backgroundColor: `${statusMeta.color}1A`, color: statusMeta.color }}
+            >
+              {statusMeta.label}
+            </span>
+          )}
         </span>
       </div>
       <div className="font-display text-[12px] text-text-primary leading-snug pl-6">{item.title}</div>

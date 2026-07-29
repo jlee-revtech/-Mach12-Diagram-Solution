@@ -19,9 +19,11 @@ import type { Workstream } from '@/lib/workstream/types'
 import { upsertAgendaContent, type AgendaContentRow } from '@/lib/supabase/workshops'
 import { normalizeSectionContent } from '@/lib/workshop/deck'
 import { hasSynthesis } from '@/lib/workshop/decisionCriteria'
+import { withAssessmentAnswers, type AssessmentAnswers as AssessmentAnswersValue } from '@/lib/workshop/assessmentAnswers'
 import { sectionMetaFor } from './sectionMeta'
 import SectionContentEditor, { type GenerateDiagramFn, type GenerateContentFn } from './SectionContentEditor'
 import SectionContentView from './SectionContentView'
+import AssessmentAnswersPanel from './AssessmentAnswers'
 
 // The persisted section route also echoes version + status onto the result.
 type SectionResult = SectionGenerationResult & { version?: number; status?: string }
@@ -40,7 +42,7 @@ function seedingSteps(gap: KbGap): string[] {
 }
 
 export default function SectionEditor({
-  workshopId, orgId, item, workstream, content, onSaved,
+  workshopId, orgId, item, workstream, content, onSaved, clientView,
 }: {
   workshopId: string
   orgId: string
@@ -50,6 +52,10 @@ export default function SectionEditor({
   // Called with the fresh result after every generate/revise so the parent can
   // reload the content rows (updates the card status pill + evaluation gating).
   onSaved: (result: SectionResult) => void
+  // Client View: hide every AI input / AI reference (generate + regenerate,
+  // prompt boxes, clarifying questions, KB-gap callouts, synthesis triggers,
+  // screenshot capture). The authored content stays visible AND hand-editable.
+  clientView?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [synthesizing, setSynthesizing] = useState(false)
@@ -103,6 +109,17 @@ export default function SectionEditor({
       version: row.version,
       status: row.status,
     }
+  }
+
+  // Persist the facilitator's assessment/discovery answers onto the SAME content
+  // row (app-level fields), then update the local view + notify the parent. Reuses
+  // persistDraft so it goes through the identical upsert path the hand-editor uses.
+  const saveAnswers = async (patch: AssessmentAnswersValue) => {
+    if (!view?.content || view.content.kind !== 'assessment') return
+    const next = withAssessmentAnswers(view.content, patch)
+    const result = await persistDraft(next)
+    setLocal(result)
+    onSaved(result)
   }
 
   // 057: a tool-training screenshot was captured (Playwright route patched the
@@ -323,7 +340,14 @@ export default function SectionEditor({
           </div>
         </div>
         {error && <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
-        <SectionContentEditor value={draft} onChange={setDraft} generateDiagram={generateDiagram} generateContent={generateContent} />
+        {/* Client View keeps hand-editing of text/diagrams but hides the per-field
+            "Generate with AI" boxes (they are gated on the generator being present). */}
+        <SectionContentEditor
+          value={draft}
+          onChange={setDraft}
+          generateDiagram={clientView ? undefined : generateDiagram}
+          generateContent={clientView ? undefined : generateContent}
+        />
         <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-border">
           <SaveStatusPill status={saveStatus} onRetry={retrySave} />
           <Button variant="secondary" size="sm" onClick={revertEditing} disabled={saveStatus === 'saving'}>Revert</Button>
@@ -346,7 +370,7 @@ export default function SectionEditor({
               <span>{meta.icon}</span>{meta.label}
             </span>
             {item.timebox_minutes ? <span className="text-[10px] text-text-tertiary">{item.timebox_minutes}m</span> : null}
-            {view?.version ? <span className="text-[10px] text-text-tertiary font-mono">v{view.version}</span> : null}
+            {!clientView && view?.version ? <span className="text-[10px] text-text-tertiary font-mono">v{view.version}</span> : null}
           </div>
           <h3 className="font-display text-heading-sm text-text-primary leading-snug">{item.title}</h3>
           {item.objective && <p className="text-[11px] text-text-tertiary mt-0.5">{item.objective}</p>}
@@ -366,38 +390,40 @@ export default function SectionEditor({
               Edit
             </Button>
           )}
-          <Button
-            variant="primary" size="sm"
-            onClick={generate}
-            disabled={busy}
-            title={feedback.trim() ? 'Generate honoring your prompt below' : (view?.content ? 'Regenerate this section' : 'Generate this section')}
-          >
-            {busy ? 'Generating...' : view?.content ? 'Regenerate' : 'Generate content'}
-          </Button>
+          {!clientView && (
+            <Button
+              variant="primary" size="sm"
+              onClick={generate}
+              disabled={busy}
+              title={feedback.trim() ? 'Generate honoring your prompt below' : (view?.content ? 'Regenerate this section' : 'Generate this section')}
+            >
+              {busy ? 'Generating...' : view?.content ? 'Regenerate' : 'Generate content'}
+            </Button>
+          )}
         </div>
       </div>
 
-      {item.section_kind === 'evaluation' && (
+      {!clientView && item.section_kind === 'evaluation' && (
         <div className="text-[11px] text-text-tertiary bg-white border border-[#7C3AED]/30 rounded-lg px-3 py-2">
           This section synthesizes across the workstream recommendations. Generate the workstream sections first, then generate this to reconcile where they diverge.
         </div>
       )}
-      {item.section_kind === 'roadmap' && (
+      {!clientView && item.section_kind === 'roadmap' && (
         <div className="text-[11px] text-text-tertiary bg-white border border-[#D97706]/30 rounded-lg px-3 py-2">
-          This section reads every assessment section&apos;s opportunities, detects the dependencies between them, and drafts the sequenced Opportunity Roadmap. Generate the assessment sections first.
+          This section reads every assessment section&apos;s opportunities and the answers captured from the room, detects the dependencies between them, and drafts the sequenced Opportunity Roadmap. Generate the assessment sections first.
         </div>
       )}
-      {item.section_kind === 'training' && (
+      {!clientView && item.section_kind === 'training' && (
         <div className="text-[11px] text-text-tertiary bg-white border border-[#059669]/30 rounded-lg px-3 py-2">
           Builds the training for this role: role context, the business process it runs, the data integrations it depends on, and hands-on tool training grounded in the systems in scope. Add a URL under a tool module&apos;s screenshot to capture the real screen.
         </div>
       )}
-      {item.section_kind === 'curriculum' && (
+      {!clientView && item.section_kind === 'curriculum' && (
         <div className="text-[11px] text-text-tertiary bg-white border border-[#0891B2]/30 rounded-lg px-3 py-2">
           This section reads every role&apos;s training modules, detects the prerequisites between them, and sequences a phased Learning Path with per-role tracks. Generate the training sections first.
         </div>
       )}
-      {item.section_kind === 'certification' && (
+      {!clientView && item.section_kind === 'certification' && (
         <div className="text-[11px] text-text-tertiary bg-white border border-[#7C3AED]/30 rounded-lg px-3 py-2">
           This section builds a Knowledge Check: scenario-based exercises, quiz questions with answer keys, and a competency sign-off checklist grounded in the modules trained. Generate the training sections first.
         </div>
@@ -411,21 +437,29 @@ export default function SectionEditor({
         <>
           <SectionContentView
             content={view.content}
-            capture={item.section_kind === 'training' ? { workshopId, orgId, agendaItemId: item.id, onCaptured: onScreenshotCaptured } : undefined}
+            capture={!clientView && item.section_kind === 'training' ? { workshopId, orgId, agendaItemId: item.id, onCaptured: onScreenshotCaptured } : undefined}
           />
-          {item.section_kind === 'evaluation' && (
+          {/* Assessment sections: capture the room's answers to the questions.
+              Real facilitator input (no AI), so it stays visible in Client View;
+              it feeds the Opportunity Roadmap synthesis. */}
+          {item.section_kind === 'assessment' && (
+            <AssessmentAnswersPanel content={view.content} onSave={saveAnswers} />
+          )}
+          {!clientView && item.section_kind === 'evaluation' && (
             <SynthesizeCriteriaButton content={view.content} busy={synthesizing} onSynthesize={synthesizeCriteria} />
           )}
         </>
       ) : !busy ? (
         <div className="text-[11px] text-text-tertiary bg-white border border-border rounded-lg px-3 py-4 text-center">
-          No content yet. Press <span className="text-brand-600">Generate content</span> to draft this section.
+          {clientView
+            ? 'No content yet for this section.'
+            : <>No content yet. Press <span className="text-brand-600">Generate content</span> to draft this section.</>}
         </div>
       ) : null}
 
       {/* Clarifying questions (req 10) */}
       <AnimatePresence>
-        {view && view.clarifyingQuestions.length > 0 && (
+        {!clientView && view && view.clarifyingQuestions.length > 0 && (
           <motion.div
             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
             className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2.5 overflow-hidden"
@@ -455,7 +489,7 @@ export default function SectionEditor({
       </AnimatePresence>
 
       {/* KB-gap callouts (req 3) */}
-      {view && view.kbGaps.length > 0 && (
+      {!clientView && view && view.kbGaps.length > 0 && (
         <div className="space-y-2">
           {view.kbGaps.map((gap: KbGap, i: number) => (
             <KbGapCallout key={i} gap={gap} workstream={workstream} />
@@ -465,7 +499,9 @@ export default function SectionEditor({
 
       {/* Prompt box (req 9): usable to GENERATE (first draft) and to enrich/revise.
           Available before content exists, so the first generation honors it too.
-          The header Generate button and the button here both submit this prompt. */}
+          The header Generate button and the button here both submit this prompt.
+          Hidden in Client View (it is an AI input). */}
+      {!clientView && (
       <div className="bg-white border border-border rounded-lg shadow-card p-3">
         <div className="text-[10px] uppercase tracking-wide text-text-secondary mb-1.5">
           Prompt: generate or enrich this section, optional
@@ -497,6 +533,7 @@ export default function SectionEditor({
           This section-level prompt is combined with the workshop-level guidance set in the Sections panel.
         </div>
       </div>
+      )}
     </div>
   )
 }

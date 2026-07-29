@@ -6,6 +6,7 @@ import {
   type ClarifyingQuestion, type KbGap, type WorkshopFocus, type KnowledgeClient,
 } from '@jlee-revtech/agent-core'
 import { serverModelDb, assemblePreRead, workstreamName, assembleAttachmentsContext, primaryRoster } from '@/lib/workshop/server'
+import { buildRoadmapAnswersContext } from '@/lib/workshop/assessmentAnswers'
 
 // Generate (or revise) the facilitation content for one agenda section.
 // Branches by section_kind: overview (no grounding), workstream (arch pre-read +
@@ -107,7 +108,8 @@ export async function POST(req: NextRequest) {
     // every section kind.
     const primaries = await primaryRoster(db, orgId, ws as { workstream_codes?: string[] | null; primary_workstream_codes?: string[] | null })
     const primaryCodes = primaries.map((p) => p.code)
-    const attachmentsContext = await assembleAttachmentsContext(db, workshopId)
+    // Reassignable: the roadmap synthesis appends the captured assessment answers.
+    let attachmentsContext = await assembleAttachmentsContext(db, workshopId)
 
     // ─── Grounding, branched by section kind ──────────────────────
     let modelContext: string | undefined
@@ -231,6 +233,28 @@ export async function POST(req: NextRequest) {
       return out
     }
 
+    // Gather every assessment section's captured Q&A answers for the roadmap
+    // synthesis (the facilitator's responses to the assessment/discovery
+    // questions), restricted to the active workstream codes.
+    const gatherAssessmentAnswers = async (codeFilter: Set<string>) => {
+      const { data: rows } = await db
+        .from('workshop_agenda_content')
+        .select('agenda_item_id, section_kind, content, version')
+        .eq('workshop_id', workshopId)
+      const aRows = (rows || []).filter(
+        (r): r is ContentRow =>
+          r.section_kind === 'assessment' && !!r.content && (r.content as SectionContent).kind === 'assessment' &&
+          (!(r.content as AssessmentSectionContent).workstreamCode || codeFilter.has((r.content as AssessmentSectionContent).workstreamCode)),
+      )
+      const entries: { workstreamName?: string; content: SectionContent }[] = []
+      for (const r of aRows) {
+        const c = r.content as AssessmentSectionContent
+        const name = c.workstreamName || (c.workstreamCode ? await workstreamName(db, orgId, c.workstreamCode) : undefined)
+        entries.push({ ...(name ? { workstreamName: name } : {}), content: r.content as SectionContent })
+      }
+      return entries
+    }
+
     // 057: gather every training section's role + modules for the Learning Path
     // and Knowledge Check, restricted to the active workstream codes.
     const gatherModules = async (codeFilter: Set<string>) => {
@@ -307,8 +331,14 @@ export async function POST(req: NextRequest) {
       workstreamDecisions = await gatherDecisions(new Set((ws.workstream_codes as string[] | null) || []), true)
     } else if (sectionKind === 'roadmap') {
       // 056: gather every active assessment section's opportunities for sequencing.
-      const gathered = await gatherOpportunities(new Set((ws.workstream_codes as string[] | null) || []))
+      const activeSet = new Set((ws.workstream_codes as string[] | null) || [])
+      const gathered = await gatherOpportunities(activeSet)
       workstreamOpportunities = gathered.length ? gathered : undefined
+      // Feed the room's captured assessment/discovery answers into the synthesis
+      // as customer grounding (appended to attachmentsContext, which the roadmap
+      // prompt already reads). The roadmap then reflects what the room said.
+      const answersContext = buildRoadmapAnswersContext(await gatherAssessmentAnswers(activeSet))
+      if (answersContext) attachmentsContext = [attachmentsContext, answersContext].filter(Boolean).join('\n\n')
     } else if (sectionKind === 'curriculum' || sectionKind === 'certification') {
       // 057: gather every active training section's modules for the Learning Path
       // (curriculum) and the Knowledge Check (certification).
@@ -354,6 +384,16 @@ export async function POST(req: NextRequest) {
     const priorNotes = (priorContent as unknown as { notesAndConsiderations?: unknown })?.notesAndConsiderations
     if (Array.isArray(priorNotes) && priorNotes.length) {
       (result.content as unknown as { notesAndConsiderations?: unknown[] }).notesAndConsiderations = priorNotes
+    }
+
+    // Carry the app-level assessment/discovery answers through a regenerate of an
+    // assessment section (same reason as notes: agent-core does not model them, so
+    // a regenerate would otherwise wipe the room's captured responses).
+    if (sectionKind === 'assessment') {
+      const prior = priorContent as unknown as { assessmentAnswers?: unknown; discoveryAnswers?: unknown }
+      const target = result.content as unknown as { assessmentAnswers?: unknown[]; discoveryAnswers?: unknown[] }
+      if (Array.isArray(prior?.assessmentAnswers) && prior.assessmentAnswers.length) target.assessmentAnswers = prior.assessmentAnswers
+      if (Array.isArray(prior?.discoveryAnswers) && prior.discoveryAnswers.length) target.discoveryAnswers = prior.discoveryAnswers
     }
 
     // ─── App-side KB-gap injection (PLAN §5 step 7) ────────────────
