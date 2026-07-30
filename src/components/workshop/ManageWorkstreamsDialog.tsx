@@ -51,8 +51,8 @@ export default function ManageWorkstreamsDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[34rem] max-w-[94vw] max-h-[85vh] flex flex-col bg-white rounded-xl shadow-card-hover overflow-hidden">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-[34rem] max-w-[94vw] max-h-[85vh] flex flex-col bg-white rounded-xl shadow-card-hover overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
             <h3 className="text-heading-sm font-display text-text-primary">Workstreams in this workshop</h3>

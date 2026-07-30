@@ -86,6 +86,8 @@ export async function updateWorkshop(
     status: WorkshopStatus; focus_areas: WorkshopFocus[]; workstream_codes: string[]
     primary_workstream_codes: string[]
     systems_in_scope: string[]
+    archetype: WorkshopArchetype
+    duration_minutes: number
     scheduled_at: string | null; started_at: string | null; ended_at: string | null
     brief: WorkshopBriefData | null; recap: unknown; settings: Record<string, unknown>; archived_at: string | null
     facilitation_prompt: string | null

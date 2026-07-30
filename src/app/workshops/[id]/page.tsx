@@ -11,8 +11,8 @@ import {
   listAttachments, deleteAttachment,
   type AgendaContentRow, type WorkshopShare,
 } from '@/lib/supabase/workshops'
-import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType, WorkshopAttachment } from '@/lib/workshop/types'
-import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES, FOCUS_AREAS, ARCHETYPE_OPTIONS } from '@/lib/workshop/types'
+import type { Workshop, WorkshopAgendaItem, WorkshopMessage, WorkshopCapture, CaptureType, WorkshopAttachment, WorkshopArchetype, WorkshopFocus } from '@/lib/workshop/types'
+import { CAPTURE_META, DURATION_OPTIONS, DEFAULT_DURATION_MINUTES, FOCUS_AREAS, ARCHETYPE_OPTIONS, SYSTEMS_IN_SCOPE_OPTIONS } from '@/lib/workshop/types'
 import { createTranscription, type TranscriptionProvider } from '@/lib/workshop/transcription'
 import { exportRecapDocx, exportRecapPptx, exportFacilitationPptx } from '@/lib/workshop/export'
 import { loadFacilitationDeck } from '@/lib/workshop/deck'
@@ -248,6 +248,18 @@ export default function WorkshopRoomPage() {
     setWs((prev) => (prev ? { ...prev, workstream_codes: selectedCodes, primary_workstream_codes: primaryCodes } : prev))
     await load()
   }, [ws, agenda, streams, load])
+
+  // Persist edits to the creation-time inputs from the Inputs & Brief dialog.
+  // The next Generate/Regenerate brief and every section generate read these
+  // (topic/objective/customer/focus from client state; archetype/systems/guidance
+  // are re-read from the workshop row server-side).
+  const saveInputs = useCallback(async (patch: WorkshopInputsPatch) => {
+    if (!ws) return
+    await updateWorkshop(ws.id, patch)
+    setWs((prev) => (prev ? { ...prev, ...patch } : prev))
+    if (patch.duration_minutes != null) setDurationMinutes(patch.duration_minutes)
+    if (patch.facilitation_prompt !== undefined) setFacPrompt(patch.facilitation_prompt || '')
+  }, [ws])
 
   // Persist the workshop-level guidance prompt (047). Threaded server-side as
   // `guidance` into every section generate and the brief; no body change needed
@@ -544,8 +556,11 @@ export default function WorkshopRoomPage() {
           attachments={attachments}
           agenda={visibleAgenda}
           durationMinutes={durationMinutes}
+          clientView={clientView}
           onClose={() => setInputsOpen(false)}
           onStart={() => { setInputsOpen(false); setStatus('live') }}
+          onSaved={saveInputs}
+          onManageWorkstreams={() => { setInputsOpen(false); setManageWsOpen(true) }}
         />
       )}
       {manageWsOpen && (
@@ -597,6 +612,13 @@ export default function WorkshopRoomPage() {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-9 z-20 w-56 rounded-lg border border-border bg-white shadow-dropdown py-1 animate-slide-in-up">
+                  <button onClick={() => { setMenuOpen(false); setInputsOpen(true) }} className={roomMenuItemCls}>
+                    <Info size={14} className="mt-0.5 shrink-0" />
+                    <span>
+                      Workshop inputs &amp; brief
+                      <span className="block text-[10px] text-text-tertiary mt-0.5">Review and edit the setup that drives the prep</span>
+                    </span>
+                  </button>
                   <button onClick={restartThis} disabled={busy === 'restart'} className={roomMenuItemCls}>
                     <RotateCcw size={14} className="mt-0.5 shrink-0" />
                     <span>
@@ -1102,54 +1124,185 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // length, workstreams + primary, guidance, attachments) plus the generated
 // brief itself (objectives, agenda, pre-read, gaps, questions, risks), so the
 // setup is always reachable from the prep view after the brief exists.
-function WorkshopInputsDialog({ ws, streams, attachments, agenda, durationMinutes, onClose, onStart }: {
+// Everything the facilitator entered on the creation screen, editable from prep.
+// Saving persists straight to the workshop row; the next Generate/Regenerate
+// brief and every section generate read the new values. The generated brief
+// stays visible below the form.
+type WorkshopInputsPatch = Partial<{
+  title: string
+  topic: string
+  objective: string
+  customer_name: string
+  archetype: WorkshopArchetype
+  focus_areas: WorkshopFocus[]
+  systems_in_scope: string[]
+  duration_minutes: number
+  facilitation_prompt: string | null
+}>
+
+const dlgInputCls = 'w-full h-8 px-2.5 rounded-lg border border-border bg-surface-input text-[12px] text-text-primary focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none transition-colors'
+
+function WorkshopInputsDialog({ ws, streams, attachments, agenda, durationMinutes, clientView, onClose, onStart, onSaved, onManageWorkstreams }: {
   ws: Workshop
   streams: Workstream[]
   attachments: WorkshopAttachment[]
   agenda: WorkshopAgendaItem[]
   durationMinutes: number
+  clientView: boolean
   onClose: () => void
   onStart: () => void
+  onSaved: (patch: WorkshopInputsPatch) => Promise<void>
+  onManageWorkstreams: () => void
 }) {
-  const archetypeMeta = ARCHETYPE_OPTIONS.find((a) => a.key === (ws.archetype === 'assessment' ? 'assessment' : 'decision'))
-  const durationLabel = DURATION_OPTIONS.find((d) => d.minutes === (ws.duration_minutes || durationMinutes))?.label
-    || `${ws.duration_minutes || durationMinutes} minutes`
+  const normalizedArchetype: WorkshopArchetype = ws.archetype === 'assessment' || ws.archetype === 'training' ? ws.archetype : 'decision'
+  const [title, setTitle] = useState(ws.title)
+  const [customer, setCustomer] = useState(ws.customer_name || '')
+  const [topic, setTopic] = useState(ws.topic || '')
+  const [objective, setObjective] = useState(ws.objective || '')
+  const [archetype, setArchetype] = useState<WorkshopArchetype>(normalizedArchetype)
+  const [focus, setFocus] = useState<WorkshopFocus[]>(ws.focus_areas || [])
+  const [systems, setSystems] = useState<string[]>(ws.systems_in_scope || [])
+  const [customSystem, setCustomSystem] = useState('')
+  const [minutes, setMinutes] = useState<number>(ws.duration_minutes || durationMinutes)
+  const [guidance, setGuidance] = useState(ws.facilitation_prompt || '')
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const primary = new Set(ws.primary_workstream_codes || [])
-  const focusMeta = (ws.focus_areas || []).map((f) => FOCUS_AREAS.find((x) => x.key === f)?.label || f)
-  const guidance = (ws.facilitation_prompt || '').trim()
+  const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x))
+  const dirty =
+    title.trim() !== ws.title ||
+    customer.trim() !== (ws.customer_name || '') ||
+    topic.trim() !== (ws.topic || '') ||
+    objective.trim() !== (ws.objective || '') ||
+    archetype !== normalizedArchetype ||
+    !sameSet(focus, ws.focus_areas || []) ||
+    !sameSet(systems, ws.systems_in_scope || []) ||
+    minutes !== (ws.duration_minutes || durationMinutes) ||
+    (!clientView && guidance.trim() !== (ws.facilitation_prompt || '').trim())
+
+  const toggleIn = <T,>(arr: T[], v: T): T[] => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+  const addSystem = () => {
+    const v = customSystem.trim()
+    if (v && !systems.includes(v)) setSystems((a) => [...a, v])
+    setCustomSystem('')
+  }
+
+  const save = async () => {
+    if (!title.trim()) { setError('Title is required'); return }
+    setBusy(true)
+    setError(null)
+    try {
+      const patch: WorkshopInputsPatch = {
+        title: title.trim(),
+        customer_name: customer.trim(),
+        topic: topic.trim(),
+        objective: objective.trim(),
+        archetype,
+        focus_areas: focus,
+        systems_in_scope: systems,
+        duration_minutes: minutes,
+      }
+      // The guidance field is hidden in Client View; never overwrite it blind.
+      if (!clientView) patch.facilitation_prompt = guidance.trim() || null
+      await onSaved(patch)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Failed to save') }
+    finally { setBusy(false) }
+  }
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[46rem] max-w-[94vw] max-h-[88vh] flex flex-col bg-white rounded-xl shadow-card-hover overflow-hidden">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-[46rem] max-w-[94vw] max-h-[88vh] flex flex-col bg-white rounded-xl shadow-card-hover overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0">
           <div>
             <h3 className="text-heading-sm font-display text-text-primary">Workshop inputs &amp; brief</h3>
-            <div className="text-[11px] text-text-tertiary">The inputs below drive Generate Brief and every section generate. Regenerate after changing them.</div>
+            <div className="text-[11px] text-text-tertiary">The setup from the creation screen, editable here. Saved changes drive the next Regenerate brief and every section generate.</div>
           </div>
           <Button variant="ghost" size="sm" iconOnly icon={<X size={14} />} title="Close" aria-label="Close" onClick={onClose} />
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-          {/* Setup inputs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-            <InputRow label="Workshop type">
-              <div className="text-[12px] text-text-primary font-medium">{archetypeMeta?.label}</div>
-              {archetypeMeta?.blurb && <div className="text-[10px] text-text-tertiary leading-snug mt-0.5">{archetypeMeta.blurb}</div>}
-            </InputRow>
-            <InputRow label="Length"><div className="text-[12px] text-text-primary">{durationLabel}</div></InputRow>
-            <InputRow label="Customer"><div className="text-[12px] text-text-primary">{ws.customer_name || <Missing />}</div></InputRow>
-            <InputRow label="Topic"><div className="text-[12px] text-text-primary">{ws.topic || ws.title}</div></InputRow>
-            <InputRow label="Objective" full>
-              <div className="text-[12px] text-text-primary leading-snug">{ws.objective || <Missing label="None set; the brief was driven by the topic alone" />}</div>
-            </InputRow>
-            <InputRow label="Focus areas" full>
-              {focusMeta.length ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {focusMeta.map((f, i) => <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-brand-50 text-brand-600">{f}</span>)}
+          {error && <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+
+          {/* Setup inputs (editable) */}
+          <div className="space-y-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1.5">Workshop type</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {ARCHETYPE_OPTIONS.map((a) => {
+                  const on = archetype === a.key
+                  return (
+                    <button key={a.key} type="button" onClick={() => setArchetype(a.key)}
+                      className={`text-left rounded-lg border px-3 py-2 transition-colors ${on ? 'border-brand-500 bg-brand-50' : 'border-border hover:bg-surface-muted'}`}>
+                      <div className={`text-[11px] font-medium ${on ? 'text-brand-600' : 'text-text-primary'}`}>{a.label}</div>
+                    </button>
+                  )
+                })}
+              </div>
+              {archetype !== normalizedArchetype && (
+                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2 leading-snug">
+                  Changing the workshop type restructures the agenda. Save, then run Regenerate brief + agenda to rebuild the sections for the new type.
                 </div>
-              ) : <Missing />}
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+              <InputRow label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Workshop title" className={dlgInputCls} /></InputRow>
+              <InputRow label="Customer"><input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="e.g. Vanguard Aerospace" className={dlgInputCls} /></InputRow>
+              <InputRow label="Topic"><input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What the workshop is about" className={dlgInputCls} /></InputRow>
+              <InputRow label="Objective"><input value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="The outcome you want" className={dlgInputCls} /></InputRow>
+              <InputRow label="Focus areas">
+                <div className="flex flex-wrap gap-1.5">
+                  {FOCUS_AREAS.map((f) => {
+                    const on = focus.includes(f.key)
+                    return (
+                      <button key={f.key} type="button" onClick={() => setFocus((a) => toggleIn(a, f.key))} title={f.blurb}
+                        className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors ${on ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'}`}>
+                        {f.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </InputRow>
+              <InputRow label="Length">
+                <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} title="Workshop length" aria-label="Workshop length" className={`${dlgInputCls} appearance-none`}>
+                  {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
+                </select>
+              </InputRow>
+            </div>
+            <InputRow label="Tools / technology in scope" full>
+              <div className="flex flex-wrap gap-1.5">
+                {SYSTEMS_IN_SCOPE_OPTIONS.map((s) => {
+                  const on = systems.includes(s.key)
+                  return (
+                    <button key={s.key} type="button" onClick={() => setSystems((a) => toggleIn(a, s.key))}
+                      className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors ${on ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'}`}>
+                      {s.label}
+                    </button>
+                  )
+                })}
+                {systems.filter((c) => !SYSTEMS_IN_SCOPE_OPTIONS.some((o) => o.key === c)).map((c) => (
+                  <button key={c} type="button" onClick={() => setSystems((a) => a.filter((x) => x !== c))}
+                    className="rounded-full border border-brand-500 bg-brand-50 text-brand-600 px-2.5 py-0.5 text-[10px] font-medium">
+                    {c} ✕
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  value={customSystem}
+                  onChange={(e) => setCustomSystem(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSystem() } }}
+                  placeholder="Add another system (e.g. Kinaxis, Coupa)"
+                  className={`${dlgInputCls} max-w-xs`}
+                />
+                <Button variant="ghost" size="sm" onClick={addSystem}>Add</Button>
+              </div>
             </InputRow>
             <InputRow label="Value streams in the room" full>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {(ws.workstream_codes || []).map((c) => {
                   const s = streams.find((x) => x.code === c)
                   const color = s?.color || '#2563EB'
@@ -1161,13 +1314,31 @@ function WorkshopInputsDialog({ ws, streams, attachments, agenda, durationMinute
                     </span>
                   )
                 })}
+                <button type="button" onClick={onManageWorkstreams}
+                  className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-border text-text-secondary hover:bg-surface-muted hover:text-text-primary transition-colors">
+                  <Settings2 size={10} /> Manage
+                </button>
               </div>
             </InputRow>
-            <InputRow label="Guidance for all content" full>
-              {guidance
-                ? <div className="text-[11px] text-text-secondary leading-snug whitespace-pre-wrap bg-brand-50 border border-brand-200 rounded-lg px-2.5 py-1.5">{guidance}</div>
-                : <Missing label="None set; add it in the Sections panel" />}
-            </InputRow>
+            {!clientView && (
+              <InputRow label="Guidance for all content" full>
+                <textarea
+                  value={guidance}
+                  onChange={(e) => setGuidance(e.target.value)}
+                  rows={2}
+                  placeholder="Tone, emphasis, what to include or avoid. Honored by Regenerate brief, Regenerate content, and each section generate."
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface-input text-[11px] text-text-primary leading-snug focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 focus:outline-none transition-colors resize-y"
+                />
+              </InputRow>
+            )}
+            <div className="flex items-center gap-2">
+              <Button variant="primary" size="sm" onClick={save} loading={busy} disabled={busy || !dirty}>{busy ? 'Saving...' : 'Save inputs'}</Button>
+              {saved && <span className="text-[11px] text-status-green">Saved. Regenerate the brief or sections to apply.</span>}
+              {!saved && dirty && <span className="text-[11px] text-text-tertiary">Unsaved changes</span>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 pt-4 border-t border-border">
             <InputRow label={`Prep attachments (${attachments.length})`} full>
               {attachments.length ? (
                 <ul className="space-y-1">

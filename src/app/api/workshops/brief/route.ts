@@ -100,6 +100,12 @@ export async function POST(req: NextRequest) {
     })
     if (!brief) return json({ error: 'Failed to generate brief' }, 502)
 
+    // The model sometimes echoes a shorthand instead of the exact workstream code
+    // (e.g. "S2P" or "STP" for source-to-pay), which orphans the section: the prep
+    // page hides per-workstream items whose code isn't in the workshop's active
+    // set. Coerce every agenda item's code back to a real one before persisting.
+    const coercedAgenda = coerceAgendaWorkstreamCodes(brief.agenda || [], workstreams.length ? workstreams : codes.map((c) => ({ code: c, name: c })))
+
     // Persist server-side when a workshop id is supplied (org-scoped).
     if (workshopId) {
       const { data: ws } = await db
@@ -112,18 +118,8 @@ export async function POST(req: NextRequest) {
 
       // Replace the agenda, carrying section_kind + workstream_code on each item.
       await db.from('workshop_agenda_items').delete().eq('workshop_id', workshopId)
-      const rows = (brief.agenda || []).map(
-        (
-          it: {
-            title: string
-            objective?: string
-            focusType?: WorkshopFocus
-            timeboxMinutes?: number
-            sectionKind?: SectionKind
-            workstreamCode?: string
-          },
-          i: number,
-        ) => ({
+      const rows = coercedAgenda.map(
+        (it, i: number) => ({
           workshop_id: workshopId,
           sort_order: i,
           title: it.title,
@@ -139,17 +135,93 @@ export async function POST(req: NextRequest) {
         if (insErr) throw new Error(insErr.message)
       }
 
-      // Store the brief + duration on the workshop.
-      const wsUpdate: Record<string, unknown> = { brief, status: 'scheduled' }
+      // Store the brief (with the coerced agenda codes) + duration on the workshop.
+      const wsUpdate: Record<string, unknown> = { brief: { ...brief, agenda: coercedAgenda }, status: 'scheduled' }
       if (durationMinutes != null) wsUpdate.duration_minutes = durationMinutes
       const { error: updErr } = await db.from('workshops').update(wsUpdate).eq('id', workshopId)
       if (updErr) throw new Error(updErr.message)
     }
 
-    return json({ brief, preRead: modelPreRead, persisted: !!workshopId }, 200)
+    return json({ brief: { ...brief, agenda: coercedAgenda }, preRead: modelPreRead, persisted: !!workshopId }, 200)
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'bad request' }, 400)
   }
+}
+
+type BriefAgendaItem = {
+  title: string
+  objective?: string
+  focusType?: WorkshopFocus
+  timeboxMinutes?: number
+  sectionKind?: SectionKind
+  workstreamCode?: string
+}
+
+// Section kinds that carry a per-workstream code (decision / assessment / training).
+const PER_WS_KINDS = new Set<SectionKind>(['workstream', 'assessment', 'training'])
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+// Shorthand forms a model plausibly emits for a workstream: the joined words,
+// the initials ("source-to-pay" -> "stp"), and initials with "to" -> "2" ("s2p"),
+// derived from both the code and the display name (minus any parenthetical).
+function aliasesFor(code: string, name?: string): string[] {
+  const out = new Set<string>()
+  const addForms = (raw: string) => {
+    const words = raw.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+    if (!words.length) return
+    out.add(words.join(''))
+    out.add(words.map((w) => w[0]).join(''))
+    out.add(words.map((w) => (w === 'to' ? '2' : w[0])).join(''))
+  }
+  addForms(code)
+  if (name) addForms(name.split('(')[0])
+  return [...out]
+}
+
+function coerceAgendaWorkstreamCodes(
+  agenda: BriefAgendaItem[],
+  roster: { code: string; name?: string }[],
+): BriefAgendaItem[] {
+  const exact = new Set(roster.map((w) => w.code))
+  // Alias -> code, dropping any alias two workstreams share (e.g. plan-to-produce
+  // and plan-to-perform both shorten to "ptp"/"p2p" - ambiguous, so unusable).
+  const aliasToCode = new Map<string, string>()
+  const ambiguous = new Set<string>()
+  for (const w of roster) {
+    for (const a of aliasesFor(w.code, w.name)) {
+      if (aliasToCode.has(a) && aliasToCode.get(a) !== w.code) ambiguous.add(a)
+      else aliasToCode.set(a, w.code)
+    }
+  }
+  for (const a of ambiguous) aliasToCode.delete(a)
+
+  const items = agenda.map((it) => ({ ...it }))
+  const unmatched: BriefAgendaItem[] = []
+  for (const it of items) {
+    if (!it.workstreamCode || !it.sectionKind || !PER_WS_KINDS.has(it.sectionKind)) continue
+    if (exact.has(it.workstreamCode)) continue
+    const byAlias = aliasToCode.get(norm(it.workstreamCode))
+    if (byAlias) { it.workstreamCode = byAlias; continue }
+    // The titles are usually explicit ("Source-to-Pay Discovery: ..."), so fall
+    // back to finding a workstream named in the item title.
+    const title = norm(it.title || '')
+    const byTitle = roster.find((w) =>
+      (title.includes(norm(w.code)) && norm(w.code).length >= 4) ||
+      (w.name ? title.includes(norm(w.name.split('(')[0])) && norm(w.name.split('(')[0]).length >= 4 : false))
+    if (byTitle) { it.workstreamCode = byTitle.code; continue }
+    unmatched.push(it)
+  }
+  // Last resort: a single leftover item and a single workstream with no section
+  // can only belong together.
+  if (unmatched.length === 1) {
+    const used = new Set(items
+      .filter((i) => i.sectionKind && PER_WS_KINDS.has(i.sectionKind) && i.workstreamCode && exact.has(i.workstreamCode))
+      .map((i) => i.workstreamCode))
+    const free = roster.filter((w) => !used.has(w.code))
+    if (free.length === 1) unmatched[0].workstreamCode = free[0].code
+  }
+  return items
 }
 
 // Coerce any stored/passed archetype value to a known WorkshopArchetype
