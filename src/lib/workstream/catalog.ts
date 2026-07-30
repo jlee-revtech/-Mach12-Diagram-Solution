@@ -94,7 +94,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 4,
     sapModules: ['PP', 'PP-MRP', 'PP-CRP (capacity)', 'PP/DS', 'QM', 'LO-VC', 'PS', 'MM-IM'],
     dassianModules: ['Project Mgmt (EVM)', 'MPIA / BOM cost'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-pp-capacity-planning', 'sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-mmas', 'govcon-dfars-business-systems'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-pp-capacity-planning', 'sap-aatp-order-promising', 'sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-mmas', 'govcon-dfars-business-systems'],
     agentTagline: 'MRP, shop-floor, quality, and production consultant',
   },
   {
@@ -154,7 +154,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 9,
     sapModules: ['SD', 'SD-BIL', 'RAR', 'DP90', 'PS'],
     dassianModules: ['Contracts (CLIN/SLIN/ACRN, mods, DD250)', 'PBP', 'Billing (BIL / DRB)', 'ABS', 'Results Analysis (RAENH)'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'dassian-cost-management', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-pricing-tina', 'govcon-cas-in-sap', 'govcon-dfars-business-systems'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'dassian-cost-management', 'sap-aatp-order-promising', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-pricing-tina', 'govcon-cas-in-sap', 'govcon-dfars-business-systems'],
     agentTagline: 'Capture, contracts, billing, and rev-rec consultant',
     legacyCodes: ['bid-to-win', 'contract-to-closeout'],
   },
