@@ -17,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cod
 
     const { data: rows } = await db
       .from('workshops')
-      .select('id, title, topic, objective, customer_name, duration_minutes, status, brief, settings')
+      .select('id, title, topic, objective, customer_name, duration_minutes, status, brief, settings, workstream_codes')
       .filter('settings->share->>code', 'eq', code)
       .limit(1)
     const ws = (rows || [])[0] as Row | undefined
@@ -29,6 +29,27 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cod
       db.from('workshop_agenda_content').select('agenda_item_id, section_kind, content, status').eq('workshop_id', ws.id),
     ])
 
+    // Mirror the prep view's visibility rule: a per-workstream section whose code
+    // was removed from the workshop is hidden there (kept in the DB), so it must
+    // not leak to external viewers either.
+    const activeCodes = new Set((ws.workstream_codes as string[] | null) || [])
+    const perWsKinds = new Set(['workstream', 'assessment', 'training'])
+    const visibleAgenda = (agenda || []).filter((a) =>
+      !perWsKinds.has(a.section_kind as string) || !a.workstream_code || activeCodes.has(a.workstream_code as string))
+    const visibleIds = new Set(visibleAgenda.map((a) => a.id))
+    const visibleContent = (content || []).filter((c) => visibleIds.has(c.agenda_item_id))
+
+    // The brief JSON carries its own agenda listing; apply the same visibility
+    // rule so a hidden section's title does not surface there.
+    const brief = (ws.brief ?? null) as { agenda?: { sectionKind?: string; workstreamCode?: string }[] } | null
+    const visibleBrief = brief
+      ? {
+          ...brief,
+          agenda: (brief.agenda || []).filter((a) =>
+            !perWsKinds.has(a.sectionKind || '') || !a.workstreamCode || activeCodes.has(a.workstreamCode)),
+        }
+      : null
+
     return json({
       workshop: {
         id: ws.id,
@@ -38,10 +59,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cod
         customer_name: ws.customer_name,
         duration_minutes: ws.duration_minutes,
         status: ws.status,
-        brief: ws.brief ?? null,
+        brief: visibleBrief,
       },
-      agenda: agenda || [],
-      content: content || [],
+      agenda: visibleAgenda,
+      content: visibleContent,
     }, 200)
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'bad request' }, 400)

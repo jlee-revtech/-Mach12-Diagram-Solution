@@ -739,6 +739,18 @@ export default function WorkshopRoomPage() {
                     className="h-8 px-2 rounded-lg border border-border bg-surface-input text-[11px] text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500">
                     {DURATION_OPTIONS.map((d) => <option key={d.minutes} value={d.minutes}>{d.label}</option>)}
                   </select>
+                  <button
+                    onClick={() => setShareOpen(true)}
+                    title={readWorkshopShare(ws)?.enabled
+                      ? 'Public share link is ON. Anyone with the link sees a read-only view of this prep (content only, no AI inputs). Click to copy or turn off.'
+                      : 'Share a public, read-only link to this prep with external audiences (content only, no AI inputs)'}
+                    aria-label="Share prep"
+                    className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[11px] font-medium transition-colors ${readWorkshopShare(ws)?.enabled ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-border bg-white text-text-secondary hover:bg-surface-muted hover:text-text-primary'}`}
+                  >
+                    <Link2 size={13} />
+                    Share
+                    {readWorkshopShare(ws)?.enabled && <span className="inline-block w-1.5 h-1.5 rounded-full bg-status-green" />}
+                  </button>
                   <Button
                     variant="primary" size="sm"
                     icon={<Play size={12} />}
@@ -778,9 +790,6 @@ export default function WorkshopRoomPage() {
                           </button>
                           <button onClick={() => { setSectionsMenu(false); publishToDeliverables() }} disabled={!hasAnyContent || busy === 'publish'} className={roomMenuItemCls}>
                             <FileText size={14} className="mt-0.5 shrink-0" /> {busy === 'publish' ? 'Publishing...' : 'Publish to Deliverables'}
-                          </button>
-                          <button onClick={() => { setSectionsMenu(false); setShareOpen(true) }} className={roomMenuItemCls}>
-                            <Link2 size={14} className="mt-0.5 shrink-0" /> Share prep (public link)
                           </button>
                           {!clientView && (
                             <>

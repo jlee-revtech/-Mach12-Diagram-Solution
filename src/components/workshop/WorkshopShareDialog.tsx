@@ -43,12 +43,12 @@ export default function WorkshopShareDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-[32rem] max-w-[94vw] bg-white rounded-xl shadow-card-hover overflow-hidden">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-[32rem] max-w-[94vw] bg-white rounded-xl shadow-card-hover overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
             <h3 className="text-heading-sm font-display text-text-primary">Share workshop prep</h3>
-            <div className="text-[11px] text-text-tertiary">A public, read-only link to the brief and section content.</div>
+            <div className="text-[11px] text-text-tertiary">A public, read-only link for external audiences: the brief and section content only - no AI inputs, prompts, or hidden sections.</div>
           </div>
           <Button variant="ghost" size="sm" iconOnly icon={<X size={14} />} title="Close" aria-label="Close" onClick={onClose} />
         </div>
