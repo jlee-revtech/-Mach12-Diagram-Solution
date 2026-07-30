@@ -17,6 +17,7 @@ import { createTranscription, type TranscriptionProvider } from '@/lib/workshop/
 import { exportRecapDocx, exportRecapPptx, exportFacilitationPptx } from '@/lib/workshop/export'
 import { loadFacilitationDeck } from '@/lib/workshop/deck'
 import { publishWorkshopToDeliverables } from '@/lib/workshop/publishToDeliverable'
+import { isNetworkDrop, watchForAgendaContent } from '@/lib/workshop/recover'
 import type { WorkshopRecapData } from '@jlee-revtech/agent-core'
 import type { Workstream } from '@/lib/workstream/types'
 import {
@@ -161,13 +162,8 @@ export default function WorkshopRoomPage() {
   const generateBrief = useCallback(async () => {
     if (!ws || !organization) return
     setBusy('brief')
-    try {
-      const res = await fetch('/api/workshops/brief', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workshopId: ws.id, orgId: organization.id, topic: ws.topic || ws.title, objective: ws.objective, customerName: ws.customer_name, workstreamCodes: ws.workstream_codes, focusAreas: ws.focus_areas, durationMinutes }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.brief) throw new Error(data.error || 'Brief generation failed')
+    const prevBrief = JSON.stringify(ws.brief ?? null)
+    const writeParticipants = async () => {
       // Participants are non-critical: never let a failure here block the reload
       // that surfaces the persisted brief + agenda.
       try {
@@ -176,8 +172,39 @@ export default function WorkshopRoomPage() {
           [{ workstream_code: 'enterprise', display_name: 'Enterprise Architect', is_facilitator: true },
            ...roster.map((r) => ({ workstream_code: r.code, display_name: r.name.split('(')[0].trim() }))])
       } catch { /* keep going */ }
+    }
+    try {
+      const res = await fetch('/api/workshops/brief', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workshopId: ws.id, orgId: organization.id, topic: ws.topic || ws.title, objective: ws.objective, customerName: ws.customer_name, workstreamCodes: ws.workstream_codes, focusAreas: ws.focus_areas, durationMinutes }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.brief) throw new Error(data.error || 'Brief generation failed')
+      await writeParticipants()
       await load()
-    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
+    } catch (e) {
+      // A dropped connection here usually means the server is still preparing the
+      // brief; it persists server-side, so watch the workshop row for it to land.
+      if (isNetworkDrop(e)) {
+        const deadline = Date.now() + 4 * 60_000
+        let recovered = false
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 5000))
+          try {
+            const w = await getWorkshop(ws.id)
+            if (w?.brief && JSON.stringify(w.brief) !== prevBrief) { recovered = true; break }
+          } catch { /* transient; keep watching */ }
+        }
+        if (recovered) {
+          await writeParticipants()
+          await load()
+          return
+        }
+        alert('The connection dropped while preparing the brief and no result arrived within 4 minutes. It may still land server-side - reload the page shortly, or generate again.')
+        return
+      }
+      alert(e instanceof Error ? e.message : 'Failed')
+    } finally { setBusy(null) }
   }, [ws, organization, me, roster, durationMinutes, load])
 
   // Save the workshop length from the prep panel (persists duration_minutes).
@@ -319,6 +346,7 @@ export default function WorkshopRoomPage() {
   const runSection = useCallback(async (agendaItemId: string) => {
     if (!ws || !organization) return
     setBusy(`section:${agendaItemId}`)
+    const prevVersion = content.find((c) => c.agenda_item_id === agendaItemId)?.version ?? 0
     try {
       const res = await fetch('/api/workshops/section', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -328,8 +356,22 @@ export default function WorkshopRoomPage() {
       if (!res.ok) throw new Error(data.error || 'Section generation failed')
       setSelectedItemId(agendaItemId)
       await reloadContent()
-    } catch (e) { alert(e instanceof Error ? e.message : 'Failed') } finally { setBusy(null) }
-  }, [ws, organization, reloadContent])
+    } catch (e) {
+      // A dropped connection on a long generate usually means the server is still
+      // writing; watch the content row for the persisted result before failing.
+      if (isNetworkDrop(e)) {
+        const row = await watchForAgendaContent(agendaItemId, prevVersion)
+        if (row?.content) {
+          setSelectedItemId(agendaItemId)
+          await reloadContent()
+          return
+        }
+        alert('The connection dropped while generating and no result arrived within 4 minutes. It may still land server-side - reload the page shortly, or generate again.')
+        return
+      }
+      alert(e instanceof Error ? e.message : 'Failed')
+    } finally { setBusy(null) }
+  }, [ws, organization, content, reloadContent])
 
   // Download the facilitation deck as PPTX. Loads the same normalized slide model
   // the Workshop Experience uses (loadFacilitationDeck), then hands it to the

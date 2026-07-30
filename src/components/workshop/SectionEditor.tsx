@@ -17,6 +17,7 @@ import type {
 import type { WorkshopAgendaItem } from '@/lib/workshop/types'
 import type { Workstream } from '@/lib/workstream/types'
 import { upsertAgendaContent, type AgendaContentRow } from '@/lib/supabase/workshops'
+import { isNetworkDrop, watchForAgendaContent } from '@/lib/workshop/recover'
 import { normalizeSectionContent } from '@/lib/workshop/deck'
 import { hasSynthesis } from '@/lib/workshop/decisionCriteria'
 import { withAssessmentAnswers, type AssessmentAnswers as AssessmentAnswersValue } from '@/lib/workshop/assessmentAnswers'
@@ -59,6 +60,9 @@ export default function SectionEditor({
 }) {
   const [busy, setBusy] = useState(false)
   const [synthesizing, setSynthesizing] = useState(false)
+  // The generate fetch died at the network level but the server is likely still
+  // writing; we are watching the content row for the result.
+  const [recovering, setRecovering] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Local view of the result. Seeded from the loaded row; overwritten on generate.
   const [local, setLocal] = useState<SectionResult | null>(
@@ -176,9 +180,32 @@ export default function SectionEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Build a SectionResult from a freshly read content row (recovery path).
+  const resultFromRow = (row: AgendaContentRow): SectionResult => ({
+    content: row.content as SectionContent,
+    clarifyingQuestions: row.clarifying_questions ?? [],
+    kbGaps: row.kb_gaps ?? [],
+    groundingUsed: false,
+    version: row.version ?? undefined,
+    status: row.status,
+  })
+
+  // If a long generate's connection drops (proxy/VPN idle timeout), the server
+  // keeps writing and persists the result; watch the row instead of failing.
+  const recoverFromDrop = async (prevVersion: number): Promise<SectionResult | null> => {
+    setRecovering(true)
+    try {
+      const row = await watchForAgendaContent(item.id, prevVersion)
+      return row?.content ? resultFromRow(row) : null
+    } finally {
+      setRecovering(false)
+    }
+  }
+
   const call = async (body: Record<string, unknown>): Promise<boolean> => {
     setBusy(true)
     setError(null)
+    const prevVersion = view?.version ?? content?.version ?? 0
     try {
       const res = await fetch('/api/workshops/section', {
         method: 'POST',
@@ -192,6 +219,16 @@ export default function SectionEditor({
       onSaved(result)
       return true
     } catch (e) {
+      if (isNetworkDrop(e)) {
+        const recovered = await recoverFromDrop(prevVersion)
+        if (recovered) {
+          setLocal(recovered)
+          onSaved(recovered)
+          return true
+        }
+        setError('The connection dropped while generating and no result arrived within 4 minutes. It may still land server-side - reopen this section shortly, or generate again.')
+        return false
+      }
       setError(e instanceof Error ? e.message : 'Failed')
       return false
     } finally {
@@ -220,6 +257,7 @@ export default function SectionEditor({
   const synthesizeCriteria = async () => {
     setSynthesizing(true)
     setError(null)
+    const prevVersion = view?.version ?? content?.version ?? 0
     try {
       const res = await fetch('/api/workshops/decision-criteria', {
         method: 'POST',
@@ -239,6 +277,16 @@ export default function SectionEditor({
       setLocal(result)
       onSaved(result)
     } catch (e) {
+      if (isNetworkDrop(e)) {
+        const recovered = await recoverFromDrop(prevVersion)
+        if (recovered) {
+          setLocal(recovered)
+          onSaved(recovered)
+          return
+        }
+        setError('The connection dropped during synthesis and no result arrived within 4 minutes. It may still land server-side - reopen this section shortly, or synthesize again.')
+        return
+      }
       setError(e instanceof Error ? e.message : 'Synthesis failed')
     } finally {
       setSynthesizing(false)
@@ -429,6 +477,12 @@ export default function SectionEditor({
         </div>
       )}
 
+      {recovering && (
+        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <RefreshCw size={12} className="animate-spin shrink-0" />
+          The connection dropped, but the agents are still writing this section server-side - watching for the result...
+        </div>
+      )}
       {error && <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
       {/* Read-only render of the section content (shared with the public share

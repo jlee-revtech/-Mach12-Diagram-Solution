@@ -1,4 +1,7 @@
 import { NextRequest } from 'next/server'
+
+// Long-running LLM generation; allow up to 5 minutes on Vercel.
+export const maxDuration = 300
 import { createClient } from '@supabase/supabase-js'
 
 // Apply a confirmed architecture_change capture to the real model. The change is

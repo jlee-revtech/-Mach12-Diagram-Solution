@@ -1,4 +1,7 @@
 import { NextRequest } from 'next/server'
+
+// Long-running LLM generation; allow up to 5 minutes on Vercel.
+export const maxDuration = 300
 import { generateRecap } from '@jlee-revtech/agent-core'
 import { serverModelDb, loadWorkshopForOrg, recentTranscript } from '@/lib/workshop/server'
 
