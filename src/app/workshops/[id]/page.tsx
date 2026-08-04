@@ -33,6 +33,7 @@ import BriefLoading from '@/components/workshop/BriefLoading'
 import TranscriptUploadDialog from '@/components/workshop/TranscriptUploadDialog'
 import WorkshopShareDialog from '@/components/workshop/WorkshopShareDialog'
 import ManageWorkstreamsDialog from '@/components/workshop/ManageWorkstreamsDialog'
+import WorkshopNotesDialog, { collectWorkshopNotes, countWorkshopNotes } from '@/components/workshop/WorkshopNotesDialog'
 
 interface FacResult {
   say: string; nextQuestion?: string; coverage?: string; advanceAgenda?: boolean; pullSpecialist?: string; gaps?: string[]
@@ -81,6 +82,9 @@ export default function WorkshopRoomPage() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [manageWsOpen, setManageWsOpen] = useState(false)
+  // All Workshop Notes: the central roll-up of every section's Notes &
+  // Considerations + answered room questions, opened from the prep toolbar.
+  const [notesOpen, setNotesOpen] = useState(false)
   // Inputs & Brief dialog: the workshop's driving inputs + the full brief,
   // reachable any time from the prep toolbar.
   const [inputsOpen, setInputsOpen] = useState(false)
@@ -564,6 +568,10 @@ export default function WorkshopRoomPage() {
   // Workstream codes that already have authored content (for the manage dialog).
   const wsCodeByItem = new Map(agenda.map((a) => [a.id, a.workstream_code]))
   const codesWithContent = [...new Set(content.filter((c) => !!c.content).map((c) => wsCodeByItem.get(c.agenda_item_id)).filter((x): x is string => !!x))]
+  // All Workshop Notes roll-up: notes + answered room questions across the
+  // visible sections. Drives the toolbar count badge and the dialog body.
+  const notesEntries = collectWorkshopNotes(visibleAgenda, content)
+  const notesTotal = countWorkshopNotes(notesEntries)
 
   return (
     <div className="min-h-screen bg-surface-muted flex flex-col">
@@ -603,6 +611,14 @@ export default function WorkshopRoomPage() {
           onStart={() => { setInputsOpen(false); setStatus('live') }}
           onSaved={saveInputs}
           onManageWorkstreams={() => { setInputsOpen(false); setManageWsOpen(true) }}
+        />
+      )}
+      {notesOpen && (
+        <WorkshopNotesDialog
+          workshopTitle={ws.title}
+          entries={notesEntries}
+          onClose={() => setNotesOpen(false)}
+          onJump={(itemId) => { setNotesOpen(false); setSelectedItemId(itemId) }}
         />
       )}
       {manageWsOpen && (
@@ -750,6 +766,18 @@ export default function WorkshopRoomPage() {
                     <Link2 size={13} />
                     Share
                     {readWorkshopShare(ws)?.enabled && <span className="inline-block w-1.5 h-1.5 rounded-full bg-status-green" />}
+                  </button>
+                  <button
+                    onClick={() => setNotesOpen(true)}
+                    title={notesTotal > 0
+                      ? `See all ${notesTotal} notes and room answers across the sections in one view`
+                      : 'One view of every Notes & Considerations entry and room answer across the sections (none captured yet)'}
+                    aria-label="All workshop notes"
+                    className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[11px] font-medium transition-colors ${notesTotal > 0 ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-border bg-white text-text-secondary hover:bg-surface-muted hover:text-text-primary'}`}
+                  >
+                    <ClipboardList size={13} />
+                    Notes
+                    {notesTotal > 0 && <span className="text-[10px] font-semibold px-1 rounded-full bg-amber-200/70 text-amber-800 leading-4 min-w-[16px] text-center">{notesTotal}</span>}
                   </button>
                   <Button
                     variant="primary" size="sm"
