@@ -8,8 +8,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardList, Copy, MessageSquare, X } from 'lucide-react'
+import type { SectionContent } from '@jlee-revtech/agent-core'
 import type { WorkshopAgendaItem } from '@/lib/workshop/types'
-import type { AgendaContentRow } from '@/lib/supabase/workshops'
 import { sectionNotes } from '@/lib/workshop/deck'
 import { readAssessmentAnswers } from '@/lib/workshop/assessmentAnswers'
 import { sectionMetaFor } from './sectionMeta'
@@ -38,9 +38,16 @@ function answeredQA(bank: SectionQA['bank'], questions: unknown, answers: string
   return out
 }
 
+// The minimal content-row shape the collector needs: satisfied by the prep
+// view's AgendaContentRow AND the public share API's leaner content rows.
+export interface NotesContentRow {
+  agenda_item_id: string
+  content: SectionContent | null
+}
+
 // Gather every visible section's notes + answered Q&A, in agenda order. Shared
 // by the dialog body and the toolbar count badge so they can never disagree.
-export function collectWorkshopNotes(agenda: WorkshopAgendaItem[], content: AgendaContentRow[]): SectionNotesEntry[] {
+export function collectWorkshopNotes(agenda: WorkshopAgendaItem[], content: NotesContentRow[]): SectionNotesEntry[] {
   const byItem = new Map(content.map((c) => [c.agenda_item_id, c]))
   const entries: SectionNotesEntry[] = []
   for (const item of agenda) {
@@ -90,7 +97,8 @@ export default function WorkshopNotesDialog({ workshopTitle, entries, onClose, o
   workshopTitle: string
   entries: SectionNotesEntry[]
   onClose: () => void
-  // Open a section in the prep editor (closes the dialog).
+  // Navigate to a section (prep: open in the editor; share: scroll to it).
+  // The host closes the dialog inside its handler.
   onJump?: (agendaItemId: string) => void
 }) {
   const [copied, setCopied] = useState(false)
@@ -150,7 +158,7 @@ export default function WorkshopNotesDialog({ workshopTitle, entries, onClose, o
                 <button
                   onClick={onJump ? () => onJump(e.item.id) : undefined}
                   disabled={!onJump}
-                  title={onJump ? 'Open this section in the editor' : undefined}
+                  title={onJump ? 'Jump to this section' : undefined}
                   className={`w-full flex items-center gap-2 px-4 py-2.5 bg-surface-muted border-b border-border text-left ${onJump ? 'hover:bg-brand-50 transition-colors cursor-pointer' : 'cursor-default'}`}
                 >
                   <span className="text-[12px] leading-none" style={{ color: meta.color }}>{meta.icon}</span>

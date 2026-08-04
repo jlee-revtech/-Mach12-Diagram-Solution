@@ -11,11 +11,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Lock } from 'lucide-react'
+import { ClipboardList, Lock } from 'lucide-react'
 import type { SectionContent } from '@jlee-revtech/agent-core'
 import type { WorkshopBriefData, WorkshopAgendaItem, SectionKind } from '@/lib/workshop/types'
 import { sectionMetaFor } from '@/components/workshop/sectionMeta'
 import SectionContentView from '@/components/workshop/SectionContentView'
+import WorkshopNotesDialog, { collectWorkshopNotes, countWorkshopNotes } from '@/components/workshop/WorkshopNotesDialog'
 import CommentAnchor, { CommentsProvider, type ShareComment, type CommentsApi } from '@/components/workshop/CommentAnchor'
 import { LoadingState } from '@/components/common'
 import { Mach12Logo } from '@/components/brand/Mach12Logo'
@@ -35,6 +36,8 @@ export default function WorkshopSharePage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [authorName, setAuthorNameState] = useState('')
+  // All Workshop Notes roll-up (same dialog as prep; read-only here).
+  const [notesOpen, setNotesOpen] = useState(false)
 
   useEffect(() => { try { setAuthorNameState(localStorage.getItem(AUTHOR_KEY) || '') } catch { /* no storage */ } }, [])
   const setAuthorName = useCallback((n: string) => {
@@ -95,10 +98,24 @@ export default function WorkshopSharePage() {
   const contentByItem = new Map(content.map((c) => [c.agenda_item_id, c]))
   const sections = agenda.filter((a) => !!contentByItem.get(a.id)?.content)
   const b = workshop.brief
+  // Notes roll-up across the shared sections (server already filtered hidden ones).
+  const notesEntries = collectWorkshopNotes(agenda, content)
+  const notesTotal = countWorkshopNotes(notesEntries)
 
   return (
     <CommentsProvider value={commentsApi}>
       <div className="min-h-screen bg-surface-muted">
+        {notesOpen && (
+          <WorkshopNotesDialog
+            workshopTitle={workshop.title}
+            entries={notesEntries}
+            onClose={() => setNotesOpen(false)}
+            onJump={(itemId) => {
+              setNotesOpen(false)
+              document.getElementById(`ws-section-${itemId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+          />
+        )}
         {/* Top bar — minimal white read-only chrome */}
         <div className="sticky top-0 z-10 h-14 bg-white border-b border-border flex items-center px-4 gap-3">
           <div className="flex items-center gap-2">
@@ -111,6 +128,18 @@ export default function WorkshopSharePage() {
           </span>
           <span className="text-body-md font-semibold text-text-primary truncate">{workshop.title}</span>
           <div className="flex-1" />
+          {notesTotal > 0 && (
+            <button
+              onClick={() => setNotesOpen(true)}
+              title={`See all ${notesTotal} notes and room answers across the sections in one view`}
+              aria-label="All workshop notes"
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-[11px] font-medium transition-colors shrink-0"
+            >
+              <ClipboardList size={13} />
+              Notes
+              <span className="text-[10px] font-semibold px-1 rounded-full bg-amber-200/70 text-amber-800 leading-4 min-w-[16px] text-center">{notesTotal}</span>
+            </button>
+          )}
           <span className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider shrink-0">
             <Lock size={10} />
             Read-Only
@@ -180,7 +209,7 @@ export default function WorkshopSharePage() {
                 const row = contentByItem.get(a.id)!
                 const meta = sectionMetaFor(a.section_kind)
                 return (
-                  <div key={a.id} className="border-t border-border pt-5">
+                  <div key={a.id} id={`ws-section-${a.id}`} className="border-t border-border pt-5 scroll-mt-20">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: `${meta.color}1A`, color: meta.color }}>
                         <span>{meta.icon}</span>{meta.label}
