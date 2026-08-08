@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { capabilityStatusLabel } from '@/lib/sipoc/types'
+import { capabilityStatusLabel, ipCategoryLabel } from '@/lib/sipoc/types'
 import type {
   Capability,
   CapabilityTreeNode,
@@ -204,7 +204,7 @@ export function exportCapabilityMapWorkbook(opts: {
       sipocRows.push([
         path.l1, path.l2, path.l3, capabilityStatusLabel(h.status), wsLabel(h.workstream_id), 'Input',
         inp.informationProduct.name,
-        inp.informationProduct.category || '',
+        ipCategoryLabel(inp.informationProduct),
         elementsForIP(ip),
         joinSemi((inp.tags || []).map(t => t.name)),
         joinSemi(inp.supplierPersonas.map(p => p.name)),
@@ -219,7 +219,7 @@ export function exportCapabilityMapWorkbook(opts: {
       sipocRows.push([
         path.l1, path.l2, path.l3, capabilityStatusLabel(h.status), wsLabel(h.workstream_id), 'Output',
         out.informationProduct.name,
-        out.informationProduct.category || '',
+        ipCategoryLabel(out.informationProduct),
         elementsForIP(ip),
         joinSemi((out.tags || []).map(t => t.name)),
         joinSemi(out.consumerPersonas.map(p => p.name)),
@@ -297,7 +297,7 @@ export function exportCapabilityMapWorkbook(opts: {
     .forEach(r => {
       ipRows.push([
         r.ip.name,
-        r.ip.category || '',
+        ipCategoryLabel(r.ip),
         elementsForIP(r.ip),
         Array.from(r.producingL3s).sort().join(' | '),
         Array.from(r.consumingL3s).sort().join(' | '),

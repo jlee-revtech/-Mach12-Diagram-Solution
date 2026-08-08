@@ -101,17 +101,20 @@ interface SIPOCState {
   updateOutputSystems: (outputId: string, capabilityId: string, systemIds: string[]) => Promise<void>
 
   // ─── Dimension CRUD (on inputs/outputs) ─────────────────
+  // Dimensions are attributes of the Information Product: every edit is
+  // synced to ALL usages of that IP (inputs + outputs, all maps).
   addDimension: (side: 'input' | 'output', itemId: string, capabilityId: string, name: string) => Promise<void>
   updateDimension: (side: 'input' | 'output', itemId: string, capabilityId: string, dimId: string, updates: Partial<Pick<Dimension, 'name' | 'description'>>) => Promise<void>
   removeDimension: (side: 'input' | 'output', itemId: string, capabilityId: string, dimId: string) => Promise<void>
+  syncDimensionsForIP: (informationProductId: string, dimensions: Dimension[]) => Promise<void>
 
   // ─── Entity pool CRUD (org-scoped) ────────────────────
   addPersona: (orgId: string, data: { name: string; role?: string; color?: string }) => Promise<Persona>
   updatePersona: (id: string, updates: Partial<Pick<Persona, 'name' | 'role' | 'description' | 'color'>>) => Promise<void>
   removePersona: (id: string) => Promise<void>
 
-  addInformationProduct: (orgId: string, data: { name: string; description?: string; category?: string }) => Promise<InformationProduct>
-  updateInformationProduct: (id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category' | 'data_element_ids'>>) => Promise<void>
+  addInformationProduct: (orgId: string, data: { name: string; description?: string; category?: string; categories?: string[] }) => Promise<InformationProduct>
+  updateInformationProduct: (id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category' | 'categories' | 'data_element_ids'>>) => Promise<void>
   removeInformationProduct: (id: string) => Promise<void>
 
   addLogicalSystem: (orgId: string, data: { name: string; system_type?: string; color?: string }) => Promise<LogicalSystem>
@@ -220,19 +223,46 @@ export interface SystemFlow {
   ips: InformationProduct[]
 }
 
+// Dimensions belong to the Information Product, so a new usage seeds them
+// from EVERY loaded usage of that IP — inputs and outputs alike. Linked
+// inputs are excluded (they inherit from their upstream output).
+function mergeIPDimensions(
+  allInputs: Record<string, CapabilityInput[]>,
+  allOutputs: Record<string, CapabilityOutput[]>,
+  informationProductId: string,
+  excludeId: string,
+): { found: boolean; dimensions: Dimension[] } {
+  const dims = new Map<string, Dimension>()
+  let found = false
+  const collect = (row: CapabilityInput | CapabilityOutput) => {
+    if (row.id === excludeId) return
+    if (row.information_product_id !== informationProductId) return
+    if (row.archived_at) return
+    if ('source_output_id' in row && row.source_output_id) return
+    found = true
+    ;(row.dimensions || []).forEach(d => {
+      const key = d.name.trim().toLowerCase()
+      if (!dims.has(key)) dims.set(key, { ...d })
+    })
+  }
+  Object.values(allInputs).forEach(list => list.forEach(collect))
+  Object.values(allOutputs).forEach(list => list.forEach(collect))
+  return { found, dimensions: Array.from(dims.values()) }
+}
+
 // When the same IP is reused on a new capability, seed the new join row's
 // metadata by merging across all other (non-archived) usages of that IP in
 // the loaded map. Union persona/system/tag IDs, dedupe dimensions by name,
 // take the first non-null feeding_system_id.
 function mergeInputUsageMetadata(
   allInputs: Record<string, CapabilityInput[]>,
+  allOutputs: Record<string, CapabilityOutput[]>,
   informationProductId: string,
   excludeInputId: string,
 ): Pick<CapabilityInput, 'supplier_persona_ids' | 'source_system_ids' | 'feeding_system_id' | 'tag_ids' | 'dimensions'> | null {
   const personas = new Set<string>()
   const systems = new Set<string>()
   const tags = new Set<string>()
-  const dims = new Map<string, Dimension>()
   let feeding: string | null = null
   let found = false
   for (const list of Object.values(allInputs)) {
@@ -245,31 +275,28 @@ function mergeInputUsageMetadata(
       ;(row.source_system_ids || []).forEach(id => systems.add(id))
       ;(row.tag_ids || []).forEach(id => tags.add(id))
       if (!feeding && row.feeding_system_id) feeding = row.feeding_system_id
-      ;(row.dimensions || []).forEach(d => {
-        const key = d.name.trim().toLowerCase()
-        if (!dims.has(key)) dims.set(key, { ...d })
-      })
     }
   }
-  if (!found) return null
+  const merged = mergeIPDimensions(allInputs, allOutputs, informationProductId, excludeInputId)
+  if (!found && !merged.found) return null
   return {
     supplier_persona_ids: Array.from(personas),
     source_system_ids: Array.from(systems),
     feeding_system_id: feeding,
     tag_ids: Array.from(tags),
-    dimensions: Array.from(dims.values()),
+    dimensions: merged.dimensions,
   }
 }
 
 function mergeOutputUsageMetadata(
   allOutputs: Record<string, CapabilityOutput[]>,
+  allInputs: Record<string, CapabilityInput[]>,
   informationProductId: string,
   excludeOutputId: string,
 ): Pick<CapabilityOutput, 'consumer_persona_ids' | 'destination_system_ids' | 'tag_ids' | 'dimensions'> | null {
   const personas = new Set<string>()
   const systems = new Set<string>()
   const tags = new Set<string>()
-  const dims = new Map<string, Dimension>()
   let found = false
   for (const list of Object.values(allOutputs)) {
     for (const row of list) {
@@ -280,18 +307,15 @@ function mergeOutputUsageMetadata(
       ;(row.consumer_persona_ids || []).forEach(id => personas.add(id))
       ;(row.destination_system_ids || []).forEach(id => systems.add(id))
       ;(row.tag_ids || []).forEach(id => tags.add(id))
-      ;(row.dimensions || []).forEach(d => {
-        const key = d.name.trim().toLowerCase()
-        if (!dims.has(key)) dims.set(key, { ...d })
-      })
     }
   }
-  if (!found) return null
+  const merged = mergeIPDimensions(allInputs, allOutputs, informationProductId, excludeOutputId)
+  if (!found && !merged.found) return null
   return {
     consumer_persona_ids: Array.from(personas),
     destination_system_ids: Array.from(systems),
     tag_ids: Array.from(tags),
-    dimensions: Array.from(dims.values()),
+    dimensions: merged.dimensions,
   }
 }
 
@@ -578,7 +602,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   addInput: async (capabilityId, informationProductId) => {
     const currentInputs = get().inputs[capabilityId] || []
     const input = await api.createCapabilityInput(capabilityId, informationProductId, currentInputs.length)
-    const merged = mergeInputUsageMetadata(get().inputs, informationProductId, input.id)
+    const merged = mergeInputUsageMetadata(get().inputs, get().outputs, informationProductId, input.id)
     if (merged) {
       await api.updateCapabilityInput(input.id, merged)
       Object.assign(input, merged)
@@ -664,45 +688,43 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
     })
   },
 
+  // Row tags flow through to every same-side usage of the IP (all maps),
+  // so tagging an info product once tags it everywhere it appears.
   updateInputTags: async (inputId, capabilityId, tagIds) => {
-    await api.updateCapabilityInput(inputId, { tag_ids: tagIds })
-    set({
-      inputs: {
-        ...get().inputs,
-        [capabilityId]: (get().inputs[capabilityId] || []).map(i =>
-          i.id === inputId ? { ...i, tag_ids: tagIds } : i
-        ),
-      },
-    })
+    const target = (get().inputs[capabilityId] || []).find(i => i.id === inputId)
+    if (!target) return
+    const ipId = target.information_product_id
+    const inputs: Record<string, CapabilityInput[]> = {}
+    for (const capId of Object.keys(get().inputs)) {
+      inputs[capId] = get().inputs[capId].map(i =>
+        i.information_product_id === ipId ? { ...i, tag_ids: [...tagIds] } : i
+      )
+    }
+    set({ inputs })
+    await api.syncInputTagsByIP(ipId, tagIds)
   },
 
   updateOutputTags: async (outputId, capabilityId, tagIds) => {
-    await api.updateCapabilityOutput(outputId, { tag_ids: tagIds })
-    set({
-      outputs: {
-        ...get().outputs,
-        [capabilityId]: (get().outputs[capabilityId] || []).map(o =>
-          o.id === outputId ? { ...o, tag_ids: tagIds } : o
-        ),
-      },
-    })
+    const target = (get().outputs[capabilityId] || []).find(o => o.id === outputId)
+    if (!target) return
+    const ipId = target.information_product_id
+    const outputs: Record<string, CapabilityOutput[]> = {}
+    for (const capId of Object.keys(get().outputs)) {
+      outputs[capId] = get().outputs[capId].map(o =>
+        o.information_product_id === ipId ? { ...o, tag_ids: [...tagIds] } : o
+      )
+    }
+    set({ outputs })
+    await api.syncOutputTagsByIP(ipId, tagIds)
   },
 
   updateDimensionTags: async (side, itemId, capabilityId, dimId, tagIds) => {
     const key = side === 'input' ? 'inputs' : 'outputs'
     const items = get()[key][capabilityId] || []
-    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
-      item.id === itemId
-        ? { ...item, dimensions: (item.dimensions || []).map(d => d.id === dimId ? { ...d, tag_ids: tagIds } : d) }
-        : item
-    )
-    set({ [key]: { ...get()[key], [capabilityId]: updated } })
-    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
-    if (side === 'input') {
-      await api.updateCapabilityInput(itemId, { dimensions: target?.dimensions })
-    } else {
-      await api.updateCapabilityOutput(itemId, { dimensions: target?.dimensions })
-    }
+    const target = items.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (!target) return
+    const dimensions = (target.dimensions || []).map(d => d.id === dimId ? { ...d, tag_ids: tagIds } : d)
+    await get().syncDimensionsForIP(target.information_product_id, dimensions)
   },
 
   updateInputFeedingSystem: async (inputId, capabilityId, systemId) => {
@@ -722,7 +744,7 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   addOutput: async (capabilityId, informationProductId) => {
     const currentOutputs = get().outputs[capabilityId] || []
     const output = await api.createCapabilityOutput(capabilityId, informationProductId, currentOutputs.length)
-    const merged = mergeOutputUsageMetadata(get().outputs, informationProductId, output.id)
+    const merged = mergeOutputUsageMetadata(get().outputs, get().inputs, informationProductId, output.id)
     if (merged) {
       await api.updateCapabilityOutput(output.id, merged)
       Object.assign(output, merged)
@@ -807,55 +829,63 @@ export const useSIPOCStore = create<SIPOCState>((set, get) => ({
   },
 
   // ─── Dimension CRUD helpers ─────────────────────────────
+  // Dimensions are attributes of the Information Product, not of the single
+  // input/output row they were edited on. Every mutation goes through
+  // syncDimensionsForIP so the change flows to EVERY usage of that IP —
+  // inputs and outputs, in this map and every other map in the org.
+
+  syncDimensionsForIP: async (informationProductId, dimensions) => {
+    const state = get()
+    const inputs: Record<string, CapabilityInput[]> = {}
+    for (const capId of Object.keys(state.inputs)) {
+      inputs[capId] = state.inputs[capId].map(i =>
+        // Linked inputs inherit dims from their upstream output — leave them be.
+        i.information_product_id === informationProductId && !i.source_output_id
+          ? { ...i, dimensions: dimensions.map(d => ({ ...d, tag_ids: d.tag_ids ? [...d.tag_ids] : d.tag_ids })) }
+          : i
+      )
+    }
+    const outputs: Record<string, CapabilityOutput[]> = {}
+    for (const capId of Object.keys(state.outputs)) {
+      outputs[capId] = state.outputs[capId].map(o =>
+        o.information_product_id === informationProductId
+          ? { ...o, dimensions: dimensions.map(d => ({ ...d, tag_ids: d.tag_ids ? [...d.tag_ids] : d.tag_ids })) }
+          : o
+      )
+    }
+    set({ inputs, outputs })
+    await Promise.all([
+      api.syncInputDimensionsByIP(informationProductId, dimensions),
+      api.syncOutputDimensionsByIP(informationProductId, dimensions),
+    ])
+  },
 
   addDimension: async (side, itemId, capabilityId, name) => {
-    const newDim: Dimension = { id: uuid(), name }
     const key = side === 'input' ? 'inputs' : 'outputs'
-    const items = get()[key][capabilityId] || []
-    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
-      item.id === itemId ? { ...item, dimensions: [...(item.dimensions || []), newDim] } : item
-    )
-    set({ [key]: { ...get()[key], [capabilityId]: updated } })
-    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
-    if (side === 'input') {
-      await api.updateCapabilityInput(itemId, { dimensions: target?.dimensions })
-    } else {
-      await api.updateCapabilityOutput(itemId, { dimensions: target?.dimensions })
-    }
+    const target = (get()[key][capabilityId] || []).find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (!target) return
+    // The dimension set is shared across every usage of the IP — a same-name
+    // dimension already present (e.g. re-running AI generate) is a no-op.
+    const dupe = (target.dimensions || []).some(d => d.name.trim().toLowerCase() === name.trim().toLowerCase())
+    if (dupe) return
+    const newDim: Dimension = { id: uuid(), name }
+    await get().syncDimensionsForIP(target.information_product_id, [...(target.dimensions || []), newDim])
   },
 
   updateDimension: async (side, itemId, capabilityId, dimId, updates) => {
     const key = side === 'input' ? 'inputs' : 'outputs'
-    const items = get()[key][capabilityId] || []
-    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
-      item.id === itemId
-        ? { ...item, dimensions: (item.dimensions || []).map(d => d.id === dimId ? { ...d, ...updates } : d) }
-        : item
-    )
-    set({ [key]: { ...get()[key], [capabilityId]: updated } })
-    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
-    if (side === 'input') {
-      await api.updateCapabilityInput(itemId, { dimensions: target?.dimensions })
-    } else {
-      await api.updateCapabilityOutput(itemId, { dimensions: target?.dimensions })
-    }
+    const target = (get()[key][capabilityId] || []).find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (!target) return
+    const dimensions = (target.dimensions || []).map(d => d.id === dimId ? { ...d, ...updates } : d)
+    await get().syncDimensionsForIP(target.information_product_id, dimensions)
   },
 
   removeDimension: async (side, itemId, capabilityId, dimId) => {
     const key = side === 'input' ? 'inputs' : 'outputs'
-    const items = get()[key][capabilityId] || []
-    const updated = items.map((item: CapabilityInput | CapabilityOutput) =>
-      item.id === itemId
-        ? { ...item, dimensions: (item.dimensions || []).filter(d => d.id !== dimId) }
-        : item
-    )
-    set({ [key]: { ...get()[key], [capabilityId]: updated } })
-    const target = updated.find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
-    if (side === 'input') {
-      await api.updateCapabilityInput(itemId, { dimensions: target?.dimensions })
-    } else {
-      await api.updateCapabilityOutput(itemId, { dimensions: target?.dimensions })
-    }
+    const target = (get()[key][capabilityId] || []).find((i: CapabilityInput | CapabilityOutput) => i.id === itemId)
+    if (!target) return
+    const dimensions = (target.dimensions || []).filter(d => d.id !== dimId)
+    await get().syncDimensionsForIP(target.information_product_id, dimensions)
   },
 
   // ─── Entity pool CRUD ─────────────────────────────────

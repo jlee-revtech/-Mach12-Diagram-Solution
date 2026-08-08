@@ -26,6 +26,7 @@ import {
 import { Button } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { HydratedCapability, CapabilityTemplateRow, Persona, LogicalSystem, InformationProduct, Dimension } from '@/lib/sipoc/types'
+import { ipCategoryLabel } from '@/lib/sipoc/types'
 import { exportSIPOCPdf, exportSIPOCExcel, exportSIPOCPptx, exportSIPOCHtml } from '@/lib/export/sipoc'
 import { createCapabilityTemplate } from '@/lib/supabase/capability-maps'
 import { useAuth } from '@/lib/supabase/auth-context'
@@ -309,7 +310,7 @@ function InputLane({ input, onRemove, onClickCard, showDims, capabilityId }: { i
         </button>}
         <IPCard
           name={input.informationProduct.name}
-          category={input.informationProduct.category}
+          category={ipCategoryLabel(input.informationProduct) || undefined}
           dimensions={input.dimensions || []}
           tags={input.tags}
           accent={SIPOC.I.color}
@@ -360,7 +361,7 @@ function OutputLane({ output, onRemove, onClickCard, showDims, capabilityId }: {
         </button>}
         <IPCard
           name={output.informationProduct.name}
-          category={output.informationProduct.category}
+          category={ipCategoryLabel(output.informationProduct) || undefined}
           dimensions={output.dimensions || []}
           tags={output.tags}
           accent={SIPOC.O.color}
@@ -624,14 +625,14 @@ function hydratedToTemplate(cap: HydratedCapability): CapabilityTemplateRow['tem
     capability: { name: cap.name, description: cap.description, features: cap.features || [], level: cap.level, color: cap.color || undefined },
     system: cap.system?.name,
     inputs: cap.inputs.map(inp => ({
-      informationProduct: { name: inp.informationProduct.name, category: inp.informationProduct.category },
+      informationProduct: { name: inp.informationProduct.name, category: inp.informationProduct.category || undefined },
       supplierPersonas: inp.supplierPersonas.map(p => ({ name: p.name, role: p.role, color: p.color })),
       sourceSystems: inp.sourceSystems.map(s => ({ name: s.name, color: s.color })),
       feedingSystem: inp.feedingSystem ? { name: inp.feedingSystem.name, color: inp.feedingSystem.color } : undefined,
       dimensions: (inp.dimensions || []).map(d => ({ name: d.name, description: d.description })),
     })),
     outputs: cap.outputs.map(out => ({
-      informationProduct: { name: out.informationProduct.name, category: out.informationProduct.category },
+      informationProduct: { name: out.informationProduct.name, category: out.informationProduct.category || undefined },
       consumerPersonas: out.consumerPersonas.map(p => ({ name: p.name, role: p.role, color: p.color })),
       destinationSystems: out.destinationSystems.map(s => ({ name: s.name, color: s.color })),
       dimensions: (out.dimensions || []).map(d => ({ name: d.name, description: d.description })),

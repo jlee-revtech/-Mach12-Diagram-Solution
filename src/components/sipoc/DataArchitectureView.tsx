@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { X, ChevronRight, ArrowRight, Network } from 'lucide-react'
 import { Button, EmptyState } from '@/components/common'
 import { useSIPOCStore, type IPLineage, type SystemUsage } from '@/lib/sipoc/store'
+import { ipCategoryLabel } from '@/lib/sipoc/types'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 import NeighborhoodView from './NeighborhoodView'
 import MatrixView from './MatrixView'
@@ -66,7 +67,7 @@ function LineageRow({ lineage }: { lineage: IPLineage }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-body-md font-semibold text-text-primary truncate">{l.ip.name}</span>
-            {l.ip.category && <span className="text-[10px] font-mono text-text-tertiary uppercase">{l.ip.category}</span>}
+            {ipCategoryLabel(l.ip) && <span className="text-[10px] font-mono text-text-tertiary uppercase">{ipCategoryLabel(l.ip)}</span>}
             {l.tags.map(t => <Chip key={t.id} name={t.name} color={t.color} tone="tag" />)}
           </div>
           <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[10px] text-text-tertiary">
@@ -236,7 +237,7 @@ export default function DataArchitectureView({ onClose }: { onClose: () => void 
     const q = filter.toLowerCase()
     return arch.ipLineages.filter(l =>
       l.ip.name.toLowerCase().includes(q) ||
-      (l.ip.category || '').toLowerCase().includes(q) ||
+      ipCategoryLabel(l.ip).toLowerCase().includes(q) ||
       l.tags.some(t => t.name.toLowerCase().includes(q)) ||
       l.sourceSystems.some(s => s.name.toLowerCase().includes(q)) ||
       l.processingSystems.some(s => s.name.toLowerCase().includes(q)) ||

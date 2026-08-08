@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { Button, LoadingState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
+import { ipCategoryLabel } from '@/lib/sipoc/types'
 
 interface Gap {
   type: string
@@ -127,7 +128,7 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
         tags: [...new Set(selectedCap.inputs.flatMap(i => (i.tags || []).map(t => t.name)))],
         inputs: selectedCap.inputs.map(inp => ({
           informationProduct: inp.informationProduct.name,
-          category: inp.informationProduct.category,
+          category: ipCategoryLabel(inp.informationProduct) || undefined,
           supplierPersonas: inp.supplierPersonas.map(p => p.name),
           sourceSystems: inp.sourceSystems.map(s => s.name),
           feedingSystem: inp.feedingSystem?.name,
@@ -136,7 +137,7 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
         })),
         outputs: selectedCap.outputs.map(out => ({
           informationProduct: out.informationProduct.name,
-          category: out.informationProduct.category,
+          category: ipCategoryLabel(out.informationProduct) || undefined,
           consumerPersonas: out.consumerPersonas.map(p => p.name),
           destinationSystems: out.destinationSystems.map(s => s.name),
           dimensions: (out.dimensions || []).map(d => d.name),
@@ -170,14 +171,14 @@ export default function AIAnalyzePanel({ onClose, onImplement }: { onClose: () =
           features: cap.features || [],
           inputs: cap.inputs.map(inp => ({
             informationProduct: inp.informationProduct.name,
-            category: inp.informationProduct.category,
+            category: ipCategoryLabel(inp.informationProduct) || undefined,
             supplierPersonas: inp.supplierPersonas.map(p => p.name),
             sourceSystems: inp.sourceSystems.map(s => s.name),
             dimensions: (inp.dimensions || []).map(d => d.name),
           })),
           outputs: cap.outputs.map(out => ({
             informationProduct: out.informationProduct.name,
-            category: out.informationProduct.category,
+            category: ipCategoryLabel(out.informationProduct) || undefined,
             consumerPersonas: out.consumerPersonas.map(p => p.name),
             dimensions: (out.dimensions || []).map(d => d.name),
           })),

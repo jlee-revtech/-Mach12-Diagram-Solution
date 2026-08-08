@@ -6,7 +6,7 @@ import { Maximize2, Minimize2, Link2, Unlink, ExternalLink, ArrowRight, X } from
 import { Button } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { Persona, InformationProduct, LogicalSystem, Dimension, Tag, OrgOutputRef, SipocLinkSource, CapabilityInput } from '@/lib/sipoc/types'
-import { PERSONA_COLORS, IP_CATEGORIES, TAG_COLORS } from '@/lib/sipoc/types'
+import { PERSONA_COLORS, IP_CATEGORIES, TAG_COLORS, ipCategories, ipCategoryLabel } from '@/lib/sipoc/types'
 import { listOrgOutputsForLinking } from '@/lib/supabase/capability-maps'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 
@@ -49,7 +49,7 @@ function SearchableIPDropdown({ items, onSelect, accent, placeholder }: {
 
   const filtered = items.filter(ip =>
     ip.name.toLowerCase().includes(filter.toLowerCase()) ||
-    (ip.category || '').toLowerCase().includes(filter.toLowerCase())
+    ipCategories(ip).some(c => c.toLowerCase().includes(filter.toLowerCase()))
   )
 
   useEffect(() => {
@@ -101,8 +101,8 @@ function SearchableIPDropdown({ items, onSelect, accent, placeholder }: {
               >
                 <div className="w-1 h-3 rounded-full shrink-0" style={{ backgroundColor: accent }} />
                 <span className="flex-1 truncate">{ip.name}</span>
-                {ip.category && (
-                  <span className="text-[10px] text-text-tertiary font-mono uppercase shrink-0">{ip.category}</span>
+                {ipCategoryLabel(ip) && (
+                  <span className="text-[10px] text-text-tertiary font-mono uppercase shrink-0">{ipCategoryLabel(ip)}</span>
                 )}
               </button>
             )) : (
@@ -1966,9 +1966,8 @@ function EditableRow({
   secondaryLabel,
   secondaryField,
   onSaveSecondary,
-  categoryField,
-  categoryValue,
-  onSaveCategory,
+  categoryValues,
+  onSaveCategories,
   colorOptions,
   onSaveColor,
   children,
@@ -1984,9 +1983,8 @@ function EditableRow({
   secondaryLabel?: string
   secondaryField?: string
   onSaveSecondary?: (value: string) => void
-  categoryField?: string
-  categoryValue?: string
-  onSaveCategory?: (value: string) => void
+  categoryValues?: string[]
+  onSaveCategories?: (values: string[]) => void
   colorOptions?: readonly string[]
   onSaveColor?: (color: string) => void
   children?: React.ReactNode
@@ -1994,19 +1992,23 @@ function EditableRow({
   const isEditing = editingId === id
   const [editName, setEditName] = useState(name)
   const [editSecondary, setEditSecondary] = useState(secondaryField || '')
-  const [editCategory, setEditCategory] = useState(categoryValue || '')
+  const [editCategories, setEditCategories] = useState<string[]>(categoryValues || [])
 
   const startEditing = () => {
     setEditName(name)
     setEditSecondary(secondaryField || '')
-    setEditCategory(categoryValue || '')
+    setEditCategories(categoryValues || [])
     setEditingId(id)
+  }
+
+  const toggleCategory = (c: string) => {
+    setEditCategories(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])
   }
 
   const save = () => {
     if (editName.trim()) onSave(editName.trim())
     if (onSaveSecondary) onSaveSecondary(editSecondary.trim())
-    if (onSaveCategory) onSaveCategory(editCategory)
+    if (onSaveCategories) onSaveCategories(editCategories)
     setEditingId(null)
   }
 
@@ -2034,15 +2036,31 @@ function EditableRow({
             className="w-full bg-surface-input border border-border rounded px-2 py-1 text-body-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-brand-500"
           />
         )}
-        {onSaveCategory && (
-          <select
-            value={editCategory}
-            onChange={e => setEditCategory(e.target.value)}
-            className="w-full bg-surface-input border border-border rounded px-2 py-1 text-body-sm text-text-primary focus:outline-none focus:border-brand-500"
-          >
-            <option value="">No category</option>
-            {IP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+        {onSaveCategories && (
+          <div>
+            <div className="text-[10px] text-text-tertiary uppercase tracking-wider font-mono font-bold mb-1">
+              Categories <span className="normal-case font-normal">(select all that apply)</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {[...IP_CATEGORIES, ...editCategories.filter(c => !(IP_CATEGORIES as readonly string[]).includes(c))].map(c => {
+                const selected = editCategories.includes(c)
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => toggleCategory(c)}
+                    className={`text-[10px] px-1.5 py-0.5 rounded border font-mono uppercase transition-colors ${
+                      selected
+                        ? 'bg-brand-500/10 border-brand-500/60 text-brand-600'
+                        : 'bg-surface-input border-border text-text-tertiary hover:border-border-strong hover:text-text-secondary'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         )}
         {colorOptions && onSaveColor && (
           <div className="flex flex-wrap gap-1">
@@ -2077,12 +2095,12 @@ function EditableRow({
         </svg>
       )}
       <span className="text-body-sm text-text-primary flex-1 truncate">{name}</span>
-      {categoryValue && (
-        <span className="text-[10px] text-text-tertiary bg-surface-muted border border-border rounded px-1 py-0.5 font-mono uppercase">
-          {categoryValue}
+      {(categoryValues || []).map(c => (
+        <span key={c} className="text-[10px] text-text-tertiary bg-surface-muted border border-border rounded px-1 py-0.5 font-mono uppercase">
+          {c}
         </span>
-      )}
-      {secondaryField && !categoryValue && (
+      ))}
+      {secondaryField && !(categoryValues && categoryValues.length > 0) && (
         <span className="text-[10px] text-text-tertiary font-mono">{secondaryField}</span>
       )}
       <button
@@ -2109,7 +2127,7 @@ function IPEntityList({
   informationProducts: InformationProduct[]
   editingId: string | null
   setEditingId: (id: string | null) => void
-  updateInformationProduct: (id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category'>>) => Promise<void>
+  updateInformationProduct: (id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category' | 'categories'>>) => Promise<void>
   removeInformationProduct: (id: string) => Promise<void>
   onAdd: (name: string) => void
 }) {
@@ -2147,9 +2165,9 @@ function IPEntityList({
               name={ip.name}
               editingId={editingId}
               setEditingId={setEditingId}
-              categoryValue={ip.category || ''}
+              categoryValues={ipCategories(ip)}
               onSave={name => updateInformationProduct(ip.id, { name })}
-              onSaveCategory={category => updateInformationProduct(ip.id, { category: category || undefined })}
+              onSaveCategories={categories => updateInformationProduct(ip.id, { categories, category: categories[0] || null })}
               onDelete={() => removeInformationProduct(ip.id)}
             />
           )
@@ -2172,11 +2190,11 @@ function IPEntityList({
                 <path d="M3 4.5h4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
               </svg>
               <span className="text-body-sm text-text-primary flex-1 truncate">{ip.name}</span>
-              {ip.category && (
-                <span className="text-[10px] text-text-tertiary bg-surface-muted border border-border rounded px-1 py-0.5 font-mono uppercase">
-                  {ip.category}
+              {ipCategories(ip).map(c => (
+                <span key={c} className="text-[10px] text-text-tertiary bg-surface-muted border border-border rounded px-1 py-0.5 font-mono uppercase">
+                  {c}
                 </span>
-              )}
+              ))}
               {usedIn.length > 0 && (
                 <span className="text-[10px] text-text-tertiary font-mono">
                   {usedIn.length}x
@@ -2200,7 +2218,7 @@ function IPEntityList({
                   onClick={() => setEditingId(ip.id)}
                   className="text-[10px] font-mono text-brand-600 hover:text-brand-500 uppercase tracking-wider font-bold transition-colors"
                 >
-                  Edit Name / Category
+                  Edit Name / Categories
                 </button>
 
                 {/* Usage */}

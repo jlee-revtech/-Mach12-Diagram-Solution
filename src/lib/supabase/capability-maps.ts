@@ -14,7 +14,9 @@ import type {
   SipocLinkSource,
   SipocLinkDownstream,
   OrgOutputRef,
+  Dimension,
 } from '@/lib/sipoc/types'
+import { ipCategoryLabel } from '@/lib/sipoc/types'
 import type { Workstream } from '@/lib/workstream/types'
 
 import { sbFetch } from './fetch'
@@ -265,6 +267,73 @@ export async function updateCapabilityInput(
   }
 }
 
+// ─── IP-wide flow-through sync ─────────────────────────
+// Dimensions (and row tags) are attributes of the Information Product, so an
+// edit made on one usage must flow to EVERY usage of that IP — across all
+// capabilities and all maps in the org (RLS scopes the PATCH to the caller's
+// org). Linked inputs (source_output_id set) inherit from their upstream
+// output and are skipped for dimensions.
+
+export async function syncInputDimensionsByIP(informationProductId: string, dimensions: Dimension[]): Promise<void> {
+  const res = await sbFetch(
+    `${URL}/rest/v1/capability_inputs?information_product_id=eq.${informationProductId}&source_output_id=is.null`,
+    {
+      method: 'PATCH',
+      headers: { ...headers(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ dimensions }),
+    }
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to sync input dimensions')
+  }
+}
+
+export async function syncOutputDimensionsByIP(informationProductId: string, dimensions: Dimension[]): Promise<void> {
+  const res = await sbFetch(
+    `${URL}/rest/v1/capability_outputs?information_product_id=eq.${informationProductId}`,
+    {
+      method: 'PATCH',
+      headers: { ...headers(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ dimensions }),
+    }
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to sync output dimensions')
+  }
+}
+
+export async function syncInputTagsByIP(informationProductId: string, tagIds: string[]): Promise<void> {
+  const res = await sbFetch(
+    `${URL}/rest/v1/capability_inputs?information_product_id=eq.${informationProductId}`,
+    {
+      method: 'PATCH',
+      headers: { ...headers(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ tag_ids: tagIds }),
+    }
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to sync input tags')
+  }
+}
+
+export async function syncOutputTagsByIP(informationProductId: string, tagIds: string[]): Promise<void> {
+  const res = await sbFetch(
+    `${URL}/rest/v1/capability_outputs?information_product_id=eq.${informationProductId}`,
+    {
+      method: 'PATCH',
+      headers: { ...headers(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ tag_ids: tagIds }),
+    }
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Failed to sync output tags')
+  }
+}
+
 export async function deleteCapabilityInput(id: string): Promise<void> {
   const res = await sbFetch(`${URL}/rest/v1/capability_inputs?id=eq.${id}`, {
     method: 'DELETE',
@@ -407,12 +476,12 @@ export async function resolveOutputDownstream(outputIds: string[], anon = false)
 // picker. RLS restricts capability_outputs to the caller's org, so no explicit
 // org filter is needed.
 export async function listOrgOutputsForLinking(): Promise<OrgOutputRef[]> {
-  const select = 'id,information_product_id,information_products(id,name,category),capabilities!inner(id,name,level,capability_map_id,capability_maps!inner(id,title,archived_at))'
+  const select = 'id,information_product_id,information_products(id,name,category,categories),capabilities!inner(id,name,level,capability_map_id,capability_maps!inner(id,title,archived_at))'
   const url = `${URL}/rest/v1/capability_outputs?archived_at=is.null&select=${select}`
   const rows = await fetchAllPaginated<{
     id: string
     information_product_id: string
-    information_products?: { id: string; name: string; category?: string | null }
+    information_products?: { id: string; name: string; category?: string | null; categories?: string[] }
     capabilities?: { id: string; name: string; level: number; capability_map_id: string; capability_maps?: { id: string; title: string; archived_at?: string | null } }
   }>(url, headers())
   const out: OrgOutputRef[] = []
@@ -427,7 +496,7 @@ export async function listOrgOutputsForLinking(): Promise<OrgOutputRef[]> {
       outputId: r.id,
       informationProductId: r.information_product_id,
       ipName: ip.name,
-      ipCategory: ip.category || undefined,
+      ipCategory: ipCategoryLabel(ip) || undefined,
       capabilityId: cap.id,
       capabilityName: cap.name,
       mapId: map.id,
@@ -489,7 +558,7 @@ export async function listInformationProducts(orgId: string): Promise<Informatio
   )
 }
 
-export async function createInformationProduct(orgId: string, data: { name: string; description?: string; category?: string }): Promise<InformationProduct> {
+export async function createInformationProduct(orgId: string, data: { name: string; description?: string; category?: string; categories?: string[] }): Promise<InformationProduct> {
   const res = await sbFetch(`${URL}/rest/v1/information_products`, {
     method: 'POST',
     headers: { ...headers(), 'Prefer': 'return=representation' },
@@ -500,7 +569,7 @@ export async function createInformationProduct(orgId: string, data: { name: stri
   return Array.isArray(arr) ? arr[0] : arr
 }
 
-export async function updateInformationProduct(id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category' | 'data_element_ids'>>): Promise<void> {
+export async function updateInformationProduct(id: string, updates: Partial<Pick<InformationProduct, 'name' | 'description' | 'category' | 'categories' | 'data_element_ids'>>): Promise<void> {
   const res = await sbFetch(`${URL}/rest/v1/information_products?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },

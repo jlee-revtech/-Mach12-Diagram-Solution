@@ -5,6 +5,7 @@ import { ChevronRight, ChevronDown, Check, Filter, Layers } from 'lucide-react'
 import { EmptyState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
 import type { HydratedCapability, Dimension, Tag, SipocRegion } from '@/lib/sipoc/types'
+import { ipCategoryLabel } from '@/lib/sipoc/types'
 import ArtifactCommentBadge from '@/components/sipoc/ArtifactCommentBadge'
 
 // ─── Column Header ──────────────────────────────────────
@@ -231,7 +232,7 @@ function InputLane({ input, showDimensions, filterTagIds, filterMode, capability
       <div className="w-[170px] shrink-0">
         <IPCard
           name={input.informationProduct.name}
-          category={input.informationProduct.category}
+          category={ipCategoryLabel(input.informationProduct) || undefined}
           dimensions={input.dimensions}
           tags={input.tags}
           filterTagIds={filterTagIds}
@@ -270,7 +271,7 @@ function OutputLane({ output, showDimensions, capabilityId }: {
       <div className="w-[180px] shrink-0">
         <IPCard
           name={output.informationProduct.name}
-          category={output.informationProduct.category}
+          category={ipCategoryLabel(output.informationProduct) || undefined}
           dimensions={output.dimensions}
           tags={output.tags}
           showDimensions={showDimensions}

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { X, Check, Sparkles } from 'lucide-react'
 import { Button, EmptyState, LoadingState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
-import { PERSONA_COLORS } from '@/lib/sipoc/types'
+import { PERSONA_COLORS, ipCategoryLabel } from '@/lib/sipoc/types'
 
 // ─── Types for the AI response ──────────────────────────
 interface AISuggestionInput {
@@ -158,14 +158,14 @@ export default function AIGeneratePanel({
             existingLogicalSystems: logicalSystems.map(s => s.name),
             currentInputs: currentCap?.inputs.map(inp => ({
               informationProduct: inp.informationProduct.name,
-              category: inp.informationProduct.category,
+              category: ipCategoryLabel(inp.informationProduct) || undefined,
               supplierPersonas: inp.supplierPersonas.map(p => p.name),
               sourceSystems: inp.sourceSystems.map(s => s.name),
               dimensions: (inp.dimensions || []).map(d => d.name),
             })) || [],
             currentOutputs: currentCap?.outputs.map(out => ({
               informationProduct: out.informationProduct.name,
-              category: out.informationProduct.category,
+              category: ipCategoryLabel(out.informationProduct) || undefined,
               consumerPersonas: out.consumerPersonas.map(p => p.name),
               dimensions: (out.dimensions || []).map(d => d.name),
             })) || [],

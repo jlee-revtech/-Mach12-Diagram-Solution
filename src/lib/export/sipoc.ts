@@ -2,6 +2,10 @@ import { jsPDF } from 'jspdf'
 import * as XLSX from 'xlsx'
 import PptxGenJS from 'pptxgenjs'
 import type { HydratedCapability } from '@/lib/sipoc/types'
+import { ipCategoryLabel } from '@/lib/sipoc/types'
+
+// Multi-category aware display label ('' when uncategorized)
+const ipCat = (ip: { category?: string | null; categories?: string[] }): string => ipCategoryLabel(ip)
 
 function sanitizeFilename(title: string): string {
   return title.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '_') || 'capability-map'
@@ -282,10 +286,10 @@ export function exportSIPOCPdf(
 
         ipLines.forEach((line: string) => { pdf.text(line, m + 8, y + 14); y += 14 })
         y += 2
-        if (inp.informationProduct.category) {
+        if (ipCat(inp.informationProduct)) {
           pdf.setFontSize(7)
           pdf.setTextColor(...C.muted)
-          pdf.text(inp.informationProduct.category.toUpperCase(), m + 8, y)
+          pdf.text(ipCat(inp.informationProduct).toUpperCase(), m + 8, y)
           y += 10
         }
 
@@ -384,10 +388,10 @@ export function exportSIPOCPdf(
         const ipLines = pdf.splitTextToSize(out.informationProduct.name, cw - 20)
         ipLines.forEach((line: string) => { pdf.text(line, m + 8, y + 14); y += 14 })
         y += 2
-        if (out.informationProduct.category) {
+        if (ipCat(out.informationProduct)) {
           pdf.setFontSize(7)
           pdf.setTextColor(...C.muted)
-          pdf.text(out.informationProduct.category.toUpperCase(), m + 8, y)
+          pdf.text(ipCat(out.informationProduct).toUpperCase(), m + 8, y)
           y += 10
         }
 
@@ -454,7 +458,7 @@ export function exportSIPOCExcel(
   title: string,
   capabilities: HydratedCapability[],
   allPersonas: { id: string; name: string; role?: string; color: string }[],
-  allProducts: { id: string; name: string; category?: string }[],
+  allProducts: { id: string; name: string; category?: string | null; categories?: string[] }[],
   allSystems: { id: string; name: string; system_type?: string }[],
   allWorkstreams: { id: string; code: string; name: string }[] = []
 ): void {
@@ -520,7 +524,7 @@ export function exportSIPOCExcel(
       inputRows.push([
         cap.name,
         inp.informationProduct.name,
-        inp.informationProduct.category || '',
+        ipCat(inp.informationProduct) || '',
         (inp.tags || []).map(t => t.name).join('; '),
         inp.supplierPersonas.map(p => p.name).join('; '),
         inp.sourceSystems.map(s => s.name).join('; '),
@@ -546,7 +550,7 @@ export function exportSIPOCExcel(
       outputRows.push([
         cap.name,
         out.informationProduct.name,
-        out.informationProduct.category || '',
+        ipCat(out.informationProduct) || '',
         out.consumerPersonas.map(p => p.name).join('; '),
         out.destinationSystems.map(s => s.name).join('; '),
         (out.dimensions || []).map(d => d.name).join('; '),
@@ -573,10 +577,10 @@ export function exportSIPOCExcel(
       if ((inp.dimensions || []).length > 0) {
         (inp.dimensions || []).forEach(dim => {
           const dimTags = (dim.tags || []).map(t => t.name).join('; ')
-          detailRows.push([cap.name, ws, feats, 'Input', inp.informationProduct.name, inp.informationProduct.category || '', ipTags, dim.name, dimTags, personas, systems, feed])
+          detailRows.push([cap.name, ws, feats, 'Input', inp.informationProduct.name, ipCat(inp.informationProduct) || '', ipTags, dim.name, dimTags, personas, systems, feed])
         })
       } else {
-        detailRows.push([cap.name, ws, feats, 'Input', inp.informationProduct.name, inp.informationProduct.category || '', ipTags, '', '', personas, systems, feed])
+        detailRows.push([cap.name, ws, feats, 'Input', inp.informationProduct.name, ipCat(inp.informationProduct) || '', ipTags, '', '', personas, systems, feed])
       }
     })
     cap.outputs.forEach(out => {
@@ -584,10 +588,10 @@ export function exportSIPOCExcel(
       const destSys = out.destinationSystems.map(s => s.name).join('; ')
       if ((out.dimensions || []).length > 0) {
         (out.dimensions || []).forEach(dim => {
-          detailRows.push([cap.name, ws, feats, 'Output', out.informationProduct.name, out.informationProduct.category || '', '', dim.name, '', consumers, destSys, ''])
+          detailRows.push([cap.name, ws, feats, 'Output', out.informationProduct.name, ipCat(out.informationProduct) || '', '', dim.name, '', consumers, destSys, ''])
         })
       } else {
-        detailRows.push([cap.name, ws, feats, 'Output', out.informationProduct.name, out.informationProduct.category || '', '', '', '', consumers, destSys, ''])
+        detailRows.push([cap.name, ws, feats, 'Output', out.informationProduct.name, ipCat(out.informationProduct) || '', '', '', '', consumers, destSys, ''])
       }
     })
   })
@@ -607,7 +611,7 @@ export function exportSIPOCExcel(
     const s = allSystems[i]
     registryRows.push([
       p?.name || '', p?.role || '', '',
-      ip?.name || '', ip?.category || '', '',
+      ip?.name || '', ip ? ipCat(ip) : '', '',
       s?.name || '', s?.system_type || '',
     ])
   }
@@ -979,11 +983,11 @@ export function exportSIPOCPptx(
         slide.addShape(pptx.ShapeType.line, { x: siColX[0] + siColW[0] + 0.05, y: arrowY, w: siColX[1] - siColX[0] - siColW[0] - 0.1, h: 0, line: { color: PPTX_COLORS.border, width: 0.8, endArrowType: 'triangle' } })
 
         // Input IP card
-        drawIPCard(slide, siColX[1], laneY, siColW[1], cardH, inp.informationProduct.name, inp.informationProduct.category, dims, PPTX_COLORS.yellow, 9, 6, 6, DIM_LINE_H, 1)
+        drawIPCard(slide, siColX[1], laneY, siColW[1], cardH, inp.informationProduct.name, ipCat(inp.informationProduct), dims, PPTX_COLORS.yellow, 9, 6, 6, DIM_LINE_H, 1)
 
         // Tags on card (below category, above dims)
         if (tags.length > 0) {
-          const tagY = laneY + (inp.informationProduct.category ? 0.38 : 0.28)
+          const tagY = laneY + (ipCat(inp.informationProduct) ? 0.38 : 0.28)
           let tagX = siColX[1] + 0.14
           tags.forEach(t => {
             const tw = Math.min(t.name.length * 0.06 + 0.12, 1.0)
@@ -1072,7 +1076,7 @@ export function exportSIPOCPptx(
         const cardH = CARD_BASE + (dims.length > 0 ? dims.length * DIM_LINE_H + DIM_EXTRA : 0)
 
         // Output IP card
-        drawIPCard(slide, ocColX[0], laneY, ocColW[0], cardH, out.informationProduct.name, out.informationProduct.category, dims, PPTX_COLORS.green, 9, 6, 6, DIM_LINE_H, 1)
+        drawIPCard(slide, ocColX[0], laneY, ocColW[0], cardH, out.informationProduct.name, ipCat(out.informationProduct), dims, PPTX_COLORS.green, 9, 6, 6, DIM_LINE_H, 1)
 
         // Arrow O→C
         const arrowY = laneY + cardH / 2 - 0.02
@@ -1141,8 +1145,8 @@ export function exportSIPOCHtml(
             return `<div class="dim-item">&bull; ${escHtml(d.name)} ${dimTagChips}</div>`
           }).join('')}`
         : ''
-      const catHtml = inp.informationProduct.category
-        ? `<div class="ip-category">${escHtml(inp.informationProduct.category.toUpperCase())}</div>`
+      const catHtml = ipCat(inp.informationProduct)
+        ? `<div class="ip-category">${escHtml(ipCat(inp.informationProduct).toUpperCase())}</div>`
         : ''
 
       return `<div class="lane">
@@ -1177,8 +1181,8 @@ export function exportSIPOCHtml(
       const dimHtml = dims.length > 0
         ? `<div class="dim-divider"></div>${dims.map(d => `<div class="dim-item">&bull; ${escHtml(d)}</div>`).join('')}`
         : ''
-      const catHtml = out.informationProduct.category
-        ? `<div class="ip-category">${escHtml(out.informationProduct.category.toUpperCase())}</div>`
+      const catHtml = ipCat(out.informationProduct)
+        ? `<div class="ip-category">${escHtml(ipCat(out.informationProduct).toUpperCase())}</div>`
         : ''
 
       return `<div class="lane">

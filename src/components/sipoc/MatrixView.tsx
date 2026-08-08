@@ -5,6 +5,7 @@ import { X, ArrowRight } from 'lucide-react'
 import { EmptyState } from '@/components/common'
 import { useSIPOCStore, type SystemEdge } from '@/lib/sipoc/store'
 import type { LogicalSystem } from '@/lib/sipoc/types'
+import { ipCategoryLabel } from '@/lib/sipoc/types'
 import { SYSTEM_TEMPLATES } from '@/lib/diagram/types'
 
 // Light-theme heatmap ramp (brand blue family) + fixed chrome hexes for SVG
@@ -350,7 +351,7 @@ export default function MatrixView() {
                     {l3.ips.map(ip => (
                       <div key={ip.id} className="text-[10px] text-text-secondary">
                         • {ip.name}
-                        {ip.category && <span className="ml-1 text-[10px] text-text-tertiary font-mono uppercase">{ip.category}</span>}
+                        {ipCategoryLabel(ip) && <span className="ml-1 text-[10px] text-text-tertiary font-mono uppercase">{ipCategoryLabel(ip)}</span>}
                       </div>
                     ))}
                   </div>

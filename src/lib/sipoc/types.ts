@@ -19,11 +19,27 @@ export interface InformationProduct {
   organization_id: string
   name: string
   description?: string
-  category?: string
+  // Legacy single category, kept in sync as the FIRST entry of `categories`
+  // so templates / AI flows / older readers keep working.
+  category?: string | null
+  // Source of truth: an IP can belong to multiple categories.
+  categories?: string[]
   data_element_ids?: string[]
   workstream_id?: string | null
   created_at: string
   updated_at: string
+}
+
+// All categories of an IP, falling back to the legacy single `category`
+// for rows created before the multi-category migration (058).
+export function ipCategories(ip: Pick<InformationProduct, 'category' | 'categories'>): string[] {
+  if (ip.categories && ip.categories.length > 0) return ip.categories
+  return ip.category ? [ip.category] : []
+}
+
+// Joined display label ("Financial / Operational"); '' when uncategorized.
+export function ipCategoryLabel(ip: Pick<InformationProduct, 'category' | 'categories'>): string {
+  return ipCategories(ip).join(' / ')
 }
 
 // ─── System Data Elements (org-scoped, reusable on IPs) ─

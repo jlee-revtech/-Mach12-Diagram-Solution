@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react'
 import { X, Download, Sparkles, AlertCircle, Plus } from 'lucide-react'
 import { Button, LoadingState } from '@/components/common'
 import { useSIPOCStore } from '@/lib/sipoc/store'
+import { ipCategoryLabel } from '@/lib/sipoc/types'
 
 interface CapOverview {
   name: string
@@ -90,13 +91,13 @@ function SIPOCFlowDiagram({ mapTitle }: { mapTitle: string }) {
         system: cap.system?.name || null,
         inputs: cap.inputs.map(inp => ({
           informationProduct: inp.informationProduct.name,
-          category: inp.informationProduct.category,
+          category: ipCategoryLabel(inp.informationProduct) || undefined,
           sourceSystems: inp.sourceSystems.map(s => s.name),
           feedingSystem: inp.feeding_system_id ? logicalSystems.find(s => s.id === inp.feeding_system_id)?.name : undefined,
         })),
         outputs: cap.outputs.map(out => ({
           informationProduct: out.informationProduct.name,
-          category: out.informationProduct.category,
+          category: ipCategoryLabel(out.informationProduct) || undefined,
           consumerPersonas: out.consumerPersonas.map(p => p.name),
         })),
       })),
@@ -225,7 +226,7 @@ export default function ExecutiveSummary({ onClose }: { onClose: () => void }) {
         system: cap.system?.name || null,
         inputs: cap.inputs.map(inp => ({
           informationProduct: inp.informationProduct.name,
-          category: inp.informationProduct.category,
+          category: ipCategoryLabel(inp.informationProduct) || undefined,
           supplierPersonas: inp.supplierPersonas.map(p => p.name),
           sourceSystems: inp.sourceSystems.map(s => s.name),
           feedingSystem: inp.feeding_system_id ? logicalSystems.find(s => s.id === inp.feeding_system_id)?.name : undefined,
@@ -233,7 +234,7 @@ export default function ExecutiveSummary({ onClose }: { onClose: () => void }) {
         })),
         outputs: cap.outputs.map(out => ({
           informationProduct: out.informationProduct.name,
-          category: out.informationProduct.category,
+          category: ipCategoryLabel(out.informationProduct) || undefined,
           consumerPersonas: out.consumerPersonas.map(p => p.name),
           dimensions: (out.dimensions || []).map(d => d.name),
         })),
