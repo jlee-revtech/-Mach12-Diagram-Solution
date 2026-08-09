@@ -673,8 +673,9 @@ export async function listPersonaRoleLinks(orgId: string): Promise<PersonaRoleLi
   )
   if (!res.ok) return []
   const rows = await res.json()
-  return rows.map((r: { id: string; persona_id: string; role_id: string; created_at: string }) => ({
+  return rows.map((r: PersonaRoleLink & { personas?: unknown }) => ({
     id: r.id, persona_id: r.persona_id, role_id: r.role_id, created_at: r.created_at,
+    source: r.source, confidence: r.confidence, rationale: r.rationale,
   }))
 }
 
