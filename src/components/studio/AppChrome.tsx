@@ -34,8 +34,9 @@ function usesShell(pathname: string): boolean {
   if (pathname === '/workshops') return true
   if (pathname.startsWith('/workshops/')) return false
 
-  // Process: library, personas, and security roles are shell reference pages;
-  // /process/[id] is the full-canvas process editor.
+  // Process: library, personas, security roles, and the security design studio
+  // (/process/security/design, covered by the /process/security/ prefix below)
+  // are shell reference pages; /process/[id] is the full-canvas process editor.
   if (
     pathname === '/process/library' ||
     pathname.startsWith('/process/library/') ||

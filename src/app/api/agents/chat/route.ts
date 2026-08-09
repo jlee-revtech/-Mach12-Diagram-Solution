@@ -23,6 +23,7 @@ import { sapRealizationFromEnv } from '@/lib/agents/sapRealization'
 import { STUDIO_WRITE_TOOLS, type StudioToolContext } from '@/lib/agents/studioTools'
 import { DELIVERABLE_ENRICH_TOOLS } from '@/lib/agents/deliverableTools'
 import { SECURITY_DESIGN_TOOLS } from '@/lib/agents/securityTools'
+import { SECURITY_STUDIO_TOOLS } from '@/lib/agents/securityDesignTools'
 
 // The Super Consultant agents run on the shared @jlee-revtech/agent-core brain:
 // one loop + one tool belt for both apps. This route wires the diagram app's
@@ -117,6 +118,20 @@ const TOOL_LABELS: Record<string, string> = {
   link_persona_to_roles: 'Linking a persona to security roles',
   unlink_persona_role: 'Unlinking a persona from a security role',
   autodetermine_persona_roles: 'Auto-determining persona-to-role assignments',
+  // Security Design Studio: design advisory
+  start_design_session: 'Opening a security design session',
+  list_design_sessions: 'Reading your security design sessions',
+  capture_design_guidance: 'Capturing grounded security design guidance',
+  propose_design_options: 'Comparing solution design options',
+  record_design_decision: 'Recording the design decision',
+  // Security Design Studio: explore and govern
+  register_governed_system: 'Registering a system to govern',
+  list_governed_systems: 'Reading the systems you govern',
+  explore_governed_system: 'Exploring the system read-only',
+  draft_governance_plan: 'Drafting the governance plan',
+  harmonize_governance_with_sap: 'Harmonizing external roles with your SAP roles',
+  get_governance_plan: 'Reading a governance plan in detail',
+  build_governance_design: 'Generating the security artifacts into the studio',
 }
 
 interface AgentRow {
@@ -161,7 +176,7 @@ function toolsForAgent(isOrchestrator: boolean): AgentTool[] {
       : SOLUTION_ARCHITECT_TOOLS.filter(
           (t) => !['introspect_live_config', 'list_activities', 'compose_config_plan', 'compose_cross_stream_program'].includes(t.name)
         )
-    return [...base, ...STUDIO_WRITE_TOOLS, ...DELIVERABLE_ENRICH_TOOLS, ...SECURITY_DESIGN_TOOLS]
+    return [...base, ...STUDIO_WRITE_TOOLS, ...DELIVERABLE_ENRICH_TOOLS, ...SECURITY_DESIGN_TOOLS, ...SECURITY_STUDIO_TOOLS]
   }
   // Workstream specialists: architecture + knowledge + conformance + documents,
   // plus the live-SAP realization tools when a realization backend is wired.
@@ -173,6 +188,7 @@ function toolsForAgent(isOrchestrator: boolean): AgentTool[] {
     ...STUDIO_WRITE_TOOLS,
     ...DELIVERABLE_ENRICH_TOOLS,
     ...SECURITY_DESIGN_TOOLS,
+    ...SECURITY_STUDIO_TOOLS,
   ]
 }
 
