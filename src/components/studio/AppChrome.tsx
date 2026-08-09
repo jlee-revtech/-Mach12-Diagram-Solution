@@ -34,13 +34,15 @@ function usesShell(pathname: string): boolean {
   if (pathname === '/workshops') return true
   if (pathname.startsWith('/workshops/')) return false
 
-  // Process: library and personas are shell reference pages; /process/[id]
-  // is the full-canvas process editor.
+  // Process: library, personas, and security roles are shell reference pages;
+  // /process/[id] is the full-canvas process editor.
   if (
     pathname === '/process/library' ||
     pathname.startsWith('/process/library/') ||
     pathname === '/process/personas' ||
-    pathname.startsWith('/process/personas/')
+    pathname.startsWith('/process/personas/') ||
+    pathname === '/process/security' ||
+    pathname.startsWith('/process/security/')
   )
     return true
   if (pathname.startsWith('/process')) return false

@@ -22,6 +22,7 @@ import {
 import { sapRealizationFromEnv } from '@/lib/agents/sapRealization'
 import { STUDIO_WRITE_TOOLS, type StudioToolContext } from '@/lib/agents/studioTools'
 import { DELIVERABLE_ENRICH_TOOLS } from '@/lib/agents/deliverableTools'
+import { SECURITY_DESIGN_TOOLS } from '@/lib/agents/securityTools'
 
 // The Super Consultant agents run on the shared @jlee-revtech/agent-core brain:
 // one loop + one tool belt for both apps. This route wires the diagram app's
@@ -105,6 +106,17 @@ const TOOL_LABELS: Record<string, string> = {
   add_section_table: 'Adding a table to the document',
   add_section_visual: 'Drawing a visual for the document',
   add_section_diagram_ref: 'Linking a Data Studio diagram into the document',
+  // Security role design tools
+  list_security_roles: 'Reading your security roles',
+  get_security_role: 'Inspecting a security role in detail',
+  create_security_role: 'Creating a security role',
+  update_security_role: 'Updating a security role',
+  add_role_access: 'Adding SAP access to a security role',
+  remove_role_access: 'Removing SAP access from a security role',
+  set_composite_members: 'Setting the composite role membership',
+  link_persona_to_roles: 'Linking a persona to security roles',
+  unlink_persona_role: 'Unlinking a persona from a security role',
+  autodetermine_persona_roles: 'Auto-determining persona-to-role assignments',
 }
 
 interface AgentRow {
@@ -149,7 +161,7 @@ function toolsForAgent(isOrchestrator: boolean): AgentTool[] {
       : SOLUTION_ARCHITECT_TOOLS.filter(
           (t) => !['introspect_live_config', 'list_activities', 'compose_config_plan', 'compose_cross_stream_program'].includes(t.name)
         )
-    return [...base, ...STUDIO_WRITE_TOOLS, ...DELIVERABLE_ENRICH_TOOLS]
+    return [...base, ...STUDIO_WRITE_TOOLS, ...DELIVERABLE_ENRICH_TOOLS, ...SECURITY_DESIGN_TOOLS]
   }
   // Workstream specialists: architecture + knowledge + conformance + documents,
   // plus the live-SAP realization tools when a realization backend is wired.
@@ -160,6 +172,7 @@ function toolsForAgent(isOrchestrator: boolean): AgentTool[] {
     ...CONSULTANT_TOOLS,
     ...STUDIO_WRITE_TOOLS,
     ...DELIVERABLE_ENRICH_TOOLS,
+    ...SECURITY_DESIGN_TOOLS,
   ]
 }
 

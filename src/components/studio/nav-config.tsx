@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Library,
   Presentation,
+  Shield,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -47,6 +48,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Process Library', href: '/process/library', icon: Library },
       { label: 'Personas', href: '/process/personas', icon: Users },
+      { label: 'Security Roles', href: '/process/security', icon: Shield },
       { label: 'SAP Model', href: '/data/sap-model', icon: Boxes },
       { label: 'Bedrock Catalog', href: '/data/bedrock', icon: Database },
     ],

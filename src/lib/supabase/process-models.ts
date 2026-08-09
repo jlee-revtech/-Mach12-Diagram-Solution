@@ -653,7 +653,7 @@ export async function createProcessRole(orgId: string, data: { name: string; des
   return Array.isArray(arr) ? arr[0] : arr
 }
 
-export async function updateProcessRole(id: string, updates: Partial<Pick<ProcessRole, 'name' | 'description' | 'color'>>): Promise<void> {
+export async function updateProcessRole(id: string, updates: Partial<Pick<ProcessRole, 'name' | 'description' | 'color' | 'sap_role_name' | 'role_type' | 'derived_from' | 'org_levels'>>): Promise<void> {
   const res = await sbFetch(`${URL}/rest/v1/process_roles?id=eq.${id}`, {
     method: 'PATCH', headers: { ...headers(), 'Prefer': 'return=minimal' }, body: JSON.stringify(updates),
   })

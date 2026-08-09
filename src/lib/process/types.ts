@@ -1,5 +1,6 @@
 import type { Node, Edge } from '@xyflow/react'
 import type { LogicalSystem, Persona, HydratedCapability } from '@/lib/sipoc/types'
+import type { SecurityRoleType } from '@/lib/security/types'
 
 // ─── Hierarchy ─────────────────────────────────────────
 // L1 Scenario → L2 Process Group → L3 Process (leaf, owns a BPMN graph)
@@ -210,6 +211,11 @@ export interface ProcessRole {
   description?: string | null
   color?: string | null
   workstream_id?: string | null
+  // ─── SAP security-role design (059) ───
+  sap_role_name?: string | null   // Z*/Y* PFCG role name (stored UPPERCASE)
+  role_type?: SecurityRoleType    // 'single' | 'derived' | 'composite'
+  derived_from?: string | null    // parent role for derived roles
+  org_levels?: string | null      // org-level restrictions (free text)
   created_at: string
   updated_at: string
 }
@@ -218,6 +224,10 @@ export interface PersonaRoleLink {
   id: string
   persona_id: string
   role_id: string
+  // ─── AI-assignment provenance (059) ───
+  source?: 'manual' | 'ai'
+  confidence?: number | null
+  rationale?: string | null
   created_at: string
 }
 

@@ -116,7 +116,7 @@ export default function PersonaCatalog({ orgId }: { orgId: string }) {
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider">Roles:</span>
           {assigned.length === 0 && <span className="text-[11px] text-text-tertiary">none</span>}
           {assigned.map(r => (
-            <span key={r.id} className="group inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: r.color || '#2563EB', borderColor: `${r.color || '#2563EB'}55`, background: `${r.color || '#2563EB'}12` }}>
+            <span key={r.id} title={r.sap_role_name ? `SAP role: ${r.sap_role_name}` : undefined} className="group inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: r.color || '#2563EB', borderColor: `${r.color || '#2563EB'}55`, background: `${r.color || '#2563EB'}12` }}>
               {r.name}
               <button type="button" onClick={() => handleUnlink(p.id, r.id)} aria-label={`Remove ${r.name}`} className="opacity-50 group-hover:opacity-100 hover:text-status-red">
                 <X size={10} />
