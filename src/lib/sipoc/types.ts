@@ -1,6 +1,11 @@
 import type { SystemType } from '@/lib/diagram/types'
 
 // ─── Personas ──────────────────────────────────────────
+// How a persona relates to the value stream it is aligned to: 'primary' = it
+// executes/owns the stream's work; 'stakeholder' = it receives the stream's
+// data, governs it, or feeds it from another stream.
+export type PersonaWorkstreamRole = 'primary' | 'stakeholder'
+
 export interface Persona {
   id: string
   organization_id: string
@@ -9,6 +14,8 @@ export interface Persona {
   description?: string
   color: string
   workstream_id?: string | null
+  workstream_role?: PersonaWorkstreamRole | null
+  workstream_role_note?: string | null
   created_at: string
   updated_at: string
 }

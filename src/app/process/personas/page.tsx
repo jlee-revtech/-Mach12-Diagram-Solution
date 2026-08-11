@@ -23,7 +23,7 @@ export default function ProcessPersonasPage() {
       <PageHeader
         title="Persona Catalog"
         icon={<Users size={24} />}
-        subtitle="Personas are made up of roles (many-to-many). A role can be instantiated as a swimlane in a process model."
+        subtitle="Personas grouped by value stream, each typed as a primary actor or a stakeholder / receiver of the stream's data. Personas are made up of roles (many-to-many), and a role can be instantiated as a swimlane in a process model."
       />
       <PersonaCatalog orgId={organization.id} />
     </div>

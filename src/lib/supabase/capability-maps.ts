@@ -526,7 +526,7 @@ export async function createPersona(orgId: string, data: { name: string; role?: 
   return Array.isArray(arr) ? arr[0] : arr
 }
 
-export async function updatePersona(id: string, updates: Partial<Pick<Persona, 'name' | 'role' | 'description' | 'color'>>): Promise<void> {
+export async function updatePersona(id: string, updates: Partial<Pick<Persona, 'name' | 'role' | 'description' | 'color' | 'workstream_role' | 'workstream_role_note'>>): Promise<void> {
   const res = await sbFetch(`${URL}/rest/v1/personas?id=eq.${id}`, {
     method: 'PATCH',
     headers: { ...headers(), 'Prefer': 'return=minimal' },
