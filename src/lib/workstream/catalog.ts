@@ -142,7 +142,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 8,
     sapModules: ['MM', 'MM-PUR', 'MDG-S', 'Subcontracting', 'MM-IV', 'Ariba', 'FI-AP'],
     dassianModules: ['SCFM', 'Contracts (flowdowns, clause library)', 'PBP'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dfars-business-systems', 'govcon-pricing-tina'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'sap-bp-customer-vendor-create', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dfars-business-systems', 'govcon-pricing-tina'],
     agentTagline: 'Subcontracts, flowdowns, and P2P consultant',
   },
   {
@@ -154,7 +154,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 9,
     sapModules: ['SD', 'SD-BIL', 'RAR', 'DP90', 'PS'],
     dassianModules: ['Contracts (CLIN/SLIN/ACRN, mods, DD250)', 'PBP', 'Billing (BIL / DRB)', 'ABS', 'Results Analysis (RAENH)'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'dassian-cost-management', 'mach12-contract-studio-sync', 'sap-aatp-order-promising', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-pricing-tina', 'govcon-cas-in-sap', 'govcon-dfars-business-systems'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'dassian-cost-management', 'mach12-contract-studio-sync', 'sap-aatp-order-promising', 'sap-bp-customer-vendor-create', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-pricing-tina', 'govcon-cas-in-sap', 'govcon-dfars-business-systems'],
     agentTagline: 'Capture, contracts, billing, and rev-rec consultant',
     legacyCodes: ['bid-to-win', 'contract-to-closeout'],
   },
