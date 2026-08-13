@@ -367,7 +367,7 @@ export default function WorkshopPresentPage() {
             <div
               ref={stageRef}
               className="w-full max-w-[1180px] rounded-2xl shadow-2xl overflow-hidden bg-white"
-              style={{ aspectRatio: '16 / 9' }}
+              style={{ aspectRatio: '16 / 9', containerType: 'inline-size' }}
             >
               <SlideStage slide={slide} />
             </div>
@@ -495,7 +495,7 @@ function DiagramSlide({ slide }: { slide: WorkshopSlide }) {
   const bullets = (slide.bullets ?? []).filter(Boolean)
   return (
     <SlideChrome kicker={slide.subheading}>
-      <h2 className="text-[2.2vw] font-bold mb-[1.5%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
+      <h2 className="text-[2.2cqw] font-bold mb-[1.5%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
       <div className="flex-1 min-h-0 flex items-center justify-center overflow-auto">
         <div className="w-full max-w-[68%]">
           {slide.diagram && <DiagramView diagram={slide.diagram} width={880} />}
@@ -504,7 +504,7 @@ function DiagramSlide({ slide }: { slide: WorkshopSlide }) {
       {bullets.length > 0 && (
         <ul className="mt-[1.5%] space-y-[0.8%]">
           {bullets.map((b, i) => (
-            <li key={i} className="flex items-baseline gap-[1.2%] text-[1.15vw] leading-snug" style={{ color: '#475569' }}>
+            <li key={i} className="flex items-baseline gap-[1.2%] text-[1.15cqw] leading-snug" style={{ color: '#475569' }}>
               <span className="shrink-0" style={{ color: CYAN }}>▸</span><span>{b}</span>
             </li>
           ))}
@@ -517,7 +517,7 @@ function DiagramSlide({ slide }: { slide: WorkshopSlide }) {
 function SlideChrome({ children, kicker }: { children: React.ReactNode; kicker?: string }) {
   return (
     <div className="w-full h-full flex flex-col px-[5%] py-[5%]" style={{ color: DARK }}>
-      {kicker && <div className="text-[1.1vw] uppercase tracking-[0.18em] font-semibold mb-[1.5%]" style={{ color: BLUE }}>{kicker}</div>}
+      {kicker && <div className="text-[1.1cqw] uppercase tracking-[0.18em] font-semibold mb-[1.5%]" style={{ color: BLUE }}>{kicker}</div>}
       {children}
       <div className="mt-auto pt-[2%] flex items-center gap-2">
         <div className="h-1 w-16 rounded-full" style={{ background: `linear-gradient(90deg, ${BLUE}, ${CYAN})` }} />
@@ -530,9 +530,9 @@ function TitleSlide({ slide }: { slide: WorkshopSlide }) {
   return (
     <div className="w-full h-full flex flex-col justify-center px-[7%]" style={{ color: DARK }}>
       <div className="h-1.5 w-24 rounded-full mb-[3%]" style={{ background: `linear-gradient(90deg, ${BLUE}, ${CYAN})` }} />
-      <h1 className="text-[3.8vw] font-bold leading-tight" style={{ color: DARK }}>{slide.heading}</h1>
-      {slide.subheading && <div className="text-[1.6vw] mt-[2%]" style={{ color: BLUE }}>{slide.subheading}</div>}
-      <div className="text-[0.95vw] mt-[4%]" style={{ color: '#475569' }}>Workshop Experience</div>
+      <h1 className="text-[3.8cqw] font-bold leading-tight" style={{ color: DARK }}>{slide.heading}</h1>
+      {slide.subheading && <div className="text-[1.6cqw] mt-[2%]" style={{ color: BLUE }}>{slide.subheading}</div>}
+      <div className="text-[0.95cqw] mt-[4%]" style={{ color: '#475569' }}>Workshop Experience</div>
     </div>
   )
 }
@@ -540,11 +540,11 @@ function TitleSlide({ slide }: { slide: WorkshopSlide }) {
 function AgendaSlide({ slide }: { slide: WorkshopSlide }) {
   return (
     <SlideChrome kicker="Agenda">
-      <h2 className="text-[2.6vw] font-bold mb-[2.5%]" style={{ color: DARK }}>{slide.heading}</h2>
+      <h2 className="text-[2.6cqw] font-bold mb-[2.5%]" style={{ color: DARK }}>{slide.heading}</h2>
       <ol className="space-y-[1.4%]">
         {(slide.bullets ?? []).map((b, i) => (
-          <li key={i} className="flex items-baseline gap-[1.5%] text-[1.5vw]" style={{ color: '#1E293B' }}>
-            <span className="font-bold tabular-nums w-[2.2vw] shrink-0" style={{ color: BLUE }}>{i + 1}.</span>
+          <li key={i} className="flex items-baseline gap-[1.5%] text-[1.5cqw]" style={{ color: '#1E293B' }}>
+            <span className="font-bold tabular-nums w-[2.2cqw] shrink-0" style={{ color: BLUE }}>{i + 1}.</span>
             <span>{b}</span>
           </li>
         ))}
@@ -556,10 +556,10 @@ function AgendaSlide({ slide }: { slide: WorkshopSlide }) {
 function BulletsSlide({ slide }: { slide: WorkshopSlide }) {
   return (
     <SlideChrome kicker={slide.subheading}>
-      <h2 className="text-[2.6vw] font-bold mb-[2.5%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
+      <h2 className="text-[2.6cqw] font-bold mb-[2.5%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
       <ul className="space-y-[1.4%]">
         {(slide.bullets ?? []).map((b, i) => (
-          <li key={i} className="flex items-baseline gap-[1.4%] text-[1.5vw] leading-snug" style={{ color: '#1E293B' }}>
+          <li key={i} className="flex items-baseline gap-[1.4%] text-[1.5cqw] leading-snug" style={{ color: '#1E293B' }}>
             <span className="shrink-0" style={{ color: CYAN }}>▸</span>
             <span>{b}</span>
           </li>
@@ -573,8 +573,8 @@ function ContextSlide({ slide }: { slide: WorkshopSlide }) {
   const body = slide.blocks?.map((b) => b.body).filter(Boolean).join('\n\n') || ''
   return (
     <SlideChrome kicker={slide.subheading}>
-      <h2 className="text-[2.6vw] font-bold mb-[2.5%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
-      <p className="text-[1.5vw] leading-relaxed whitespace-pre-wrap" style={{ color: '#1E293B' }}>{body}</p>
+      <h2 className="text-[2.6cqw] font-bold mb-[2.5%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
+      <p className="text-[1.5cqw] leading-relaxed whitespace-pre-wrap" style={{ color: '#1E293B' }}>{body}</p>
     </SlideChrome>
   )
 }
@@ -583,7 +583,7 @@ function BlocksSlide({ slide }: { slide: WorkshopSlide }) {
   const blocks = slide.blocks ?? []
   return (
     <SlideChrome kicker={slide.subheading}>
-      <h2 className="text-[2.4vw] font-bold mb-[2%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
+      <h2 className="text-[2.4cqw] font-bold mb-[2%] leading-tight" style={{ color: DARK }}>{slide.heading}</h2>
       <div className="flex-1 overflow-hidden">
         <div className="grid grid-cols-2 gap-[2.5%]">
           {blocks.map((b, i) => <SlideBlock key={i} block={b} span={blockSpan(b)} />)}
@@ -615,15 +615,15 @@ function SlideBlock({ block, span }: { block: WorkshopSlideBlock; span: boolean 
       }}
     >
       {block.label && (
-        <div className="text-[1.05vw] uppercase tracking-wide font-semibold mb-[3%]" style={{ color: isRecommendation ? BLUE : '#64748B' }}>
+        <div className="text-[1.05cqw] uppercase tracking-wide font-semibold mb-[3%]" style={{ color: isRecommendation ? BLUE : '#64748B' }}>
           {block.label}
         </div>
       )}
-      {block.body && <p className="text-[1.35vw] leading-relaxed whitespace-pre-wrap" style={{ color: '#1E293B' }}>{block.body}</p>}
+      {block.body && <p className="text-[1.35cqw] leading-relaxed whitespace-pre-wrap" style={{ color: '#1E293B' }}>{block.body}</p>}
       {block.bullets && block.bullets.length > 0 && (
         <ul className="space-y-[3%]">
           {block.bullets.map((t, i) => (
-            <li key={i} className="flex items-baseline gap-[3%] text-[1.25vw] leading-snug" style={{ color: '#1E293B' }}>
+            <li key={i} className="flex items-baseline gap-[3%] text-[1.25cqw] leading-snug" style={{ color: '#1E293B' }}>
               <span className="shrink-0" style={{ color: '#7C3AED' }}>•</span><span>{t}</span>
             </li>
           ))}
@@ -632,24 +632,24 @@ function SlideBlock({ block, span }: { block: WorkshopSlideBlock; span: boolean 
       {(hasPros || hasCons) && (
         <div className="grid grid-cols-2 gap-[4%]">
           <div>
-            <div className="text-[0.95vw] uppercase tracking-wide font-semibold mb-[6%]" style={{ color: '#059669' }}>Pros</div>
+            <div className="text-[0.95cqw] uppercase tracking-wide font-semibold mb-[6%]" style={{ color: '#059669' }}>Pros</div>
             {hasPros ? (
               <ul className="space-y-[6%]">
                 {block.pros!.map((t, i) => (
-                  <li key={i} className="flex items-baseline gap-[6%] text-[1.15vw] leading-snug" style={{ color: '#1E293B' }}><span style={{ color: '#059669' }}>+</span><span>{t}</span></li>
+                  <li key={i} className="flex items-baseline gap-[6%] text-[1.15cqw] leading-snug" style={{ color: '#1E293B' }}><span style={{ color: '#059669' }}>+</span><span>{t}</span></li>
                 ))}
               </ul>
-            ) : <div className="text-[1vw]" style={{ color: '#94A3B8' }}>None</div>}
+            ) : <div className="text-[1cqw]" style={{ color: '#94A3B8' }}>None</div>}
           </div>
           <div>
-            <div className="text-[0.95vw] uppercase tracking-wide font-semibold mb-[6%]" style={{ color: '#DC2626' }}>Cons</div>
+            <div className="text-[0.95cqw] uppercase tracking-wide font-semibold mb-[6%]" style={{ color: '#DC2626' }}>Cons</div>
             {hasCons ? (
               <ul className="space-y-[6%]">
                 {block.cons!.map((t, i) => (
-                  <li key={i} className="flex items-baseline gap-[6%] text-[1.15vw] leading-snug" style={{ color: '#1E293B' }}><span style={{ color: '#DC2626' }}>−</span><span>{t}</span></li>
+                  <li key={i} className="flex items-baseline gap-[6%] text-[1.15cqw] leading-snug" style={{ color: '#1E293B' }}><span style={{ color: '#DC2626' }}>−</span><span>{t}</span></li>
                 ))}
               </ul>
-            ) : <div className="text-[1vw]" style={{ color: '#94A3B8' }}>None</div>}
+            ) : <div className="text-[1cqw]" style={{ color: '#94A3B8' }}>None</div>}
           </div>
         </div>
       )}
