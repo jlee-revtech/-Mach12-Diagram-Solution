@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Download, FileCog, Plus, Trash2, Workflow, X } from 'lucide-react'
-import { SAP_ENTERPRISE_MODEL as MODEL } from '@/lib/sap-model/data'
+import { SAP_ENTERPRISE_MODEL as REFERENCE_MODEL } from '@/lib/sap-model/data'
+import type { SapEnterpriseModel } from '@/lib/sap-model/types'
 import {
   ENTITY_SCHEMAS, ORG_CHANGE_KINDS, agentForKind, existingEntities, buildInstructions,
   type OrgChangeKind, type ChangeOperation, type ChangeItem, type ChangeSet,
@@ -19,7 +20,21 @@ function uid() {
   return 'c' + Math.abs(Date.now() ^ Math.floor(performance.now() * 1000)).toString(36) + Math.random().toString(36).slice(2, 6)
 }
 
-export default function ChangeSetPanel({ orgId, userId }: { orgId: string; userId: string }) {
+/**
+ * `model` is whichever org model is currently on screen - the reference snapshot
+ * or a live pull. Changes are drafted against THAT, so a change set records the
+ * system and pull it was diffed from, and "modify" prefills from real values on
+ * the system being changed rather than from the committed reference.
+ */
+export default function ChangeSetPanel({
+  orgId,
+  userId,
+  model = REFERENCE_MODEL,
+}: {
+  orgId: string
+  userId: string
+  model?: SapEnterpriseModel
+}) {
   const [sets, setSets] = useState<ChangeSet[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
@@ -27,7 +42,7 @@ export default function ChangeSetPanel({ orgId, userId }: { orgId: string; userI
   const [busy, setBusy] = useState(false)
   const [newTitle, setNewTitle] = useState('')
 
-  const targetSystem = { system: MODEL.source.system, client: MODEL.source.client, controllingArea: MODEL.source.controllingArea, pulledOn: MODEL.source.pulledOn }
+  const targetSystem = { system: model.source.system, client: model.source.client, controllingArea: model.source.controllingArea, pulledOn: model.source.pulledOn }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -121,7 +136,7 @@ export default function ChangeSetPanel({ orgId, userId }: { orgId: string; userI
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           {/* Left: add a change + change list */}
           <div className="space-y-4">
-            <ChangeEditor onAdd={addChange} agentLabelFor={agentLabelFor} />
+            <ChangeEditor onAdd={addChange} agentLabelFor={agentLabelFor} model={model} />
             <ChangeList changes={current.changes} onRemove={removeChange} />
           </div>
 
@@ -150,7 +165,7 @@ export default function ChangeSetPanel({ orgId, userId }: { orgId: string; userI
 }
 
 // ── Add-a-change editor ─────────────────────────────────────────────────────
-function ChangeEditor({ onAdd, agentLabelFor }: { onAdd: (c: ChangeItem) => void; agentLabelFor: (k: OrgChangeKind) => { workstreamCode: string; agentLabel: string } }) {
+function ChangeEditor({ onAdd, agentLabelFor, model }: { onAdd: (c: ChangeItem) => void; agentLabelFor: (k: OrgChangeKind) => { workstreamCode: string; agentLabel: string }; model: SapEnterpriseModel }) {
   const [kind, setKind] = useState<OrgChangeKind>('company_code')
   const [op, setOp] = useState<ChangeOperation>('add')
   const [key, setKey] = useState('')
@@ -158,7 +173,7 @@ function ChangeEditor({ onAdd, agentLabelFor }: { onAdd: (c: ChangeItem) => void
   const [from, setFrom] = useState<Record<string, string>>({})
 
   const schema = ENTITY_SCHEMAS[kind]
-  const existing = useMemo(() => existingEntities(MODEL, kind), [kind])
+  const existing = useMemo(() => existingEntities(model, kind), [model, kind])
 
   const reset = () => { setKey(''); setTo({}); setFrom({}) }
   const changeKind = (k: OrgChangeKind) => { setKind(k); reset() }

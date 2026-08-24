@@ -23,7 +23,7 @@ export default function SapModelPage() {
       <PageHeader
         title="SAP Enterprise Data Model"
         icon={<Boxes size={24} />}
-        subtitle="The SAP organizational data model - controlling area, company codes, plants, storage locations, profit & cost centers, sales & purchasing orgs, and the project / WBS structure down to the levels where a Results Analysis key drives revenue recognition. Pulled live from the connected S/4HANA system."
+        subtitle="The SAP organizational data model - controlling area, company codes, plants, storage locations, profit & cost centers, sales & purchasing orgs, and the project / WBS structure down to the levels where a Results Analysis key drives revenue recognition. Hook into an SAP system under Systems and pull its org model straight out of the source."
       />
       <SapModelExplorer orgId={organization.id} userId={user.id} />
     </div>
