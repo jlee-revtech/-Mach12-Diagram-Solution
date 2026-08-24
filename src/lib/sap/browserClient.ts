@@ -10,10 +10,24 @@ import type {
   PullDiagnostic, SapConnectionStatus, SapSystem, SapSystemInput, SnapshotSummary,
 } from './types'
 
+export interface SapDestination {
+  name: string
+  description?: string
+}
+
 export interface SapCapabilities {
   directAvailable: boolean
   bridgeAvailable: boolean
-  destinations: { name: string; description?: string }[]
+  /** Every destination Solution Studio can route to. */
+  destinations: SapDestination[]
+  /** Those not yet registered here - offered as one-click adds. */
+  discoverable: SapDestination[]
+  /** BTP plumbing that is not an ABAP system, reported but not offered. */
+  platformDestinations?: string[]
+  /** Did the bridge answer at all? */
+  bridgeReachable: boolean
+  /** Why discovery came back empty, when it did. */
+  bridgeProblem?: string
 }
 
 export interface PullResult {

@@ -38,6 +38,7 @@ export default function SapSystemsPanel({ orgId, userId, token, onPull, pullingS
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<SapSystem | 'new' | null>(null)
   const [logonFor, setLogonFor] = useState<SapSystem | null>(null)
+  const [addingDestination, setAddingDestination] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setError(null)
@@ -68,6 +69,26 @@ export default function SapSystemsPanel({ orgId, userId, token, onPull, pullingS
     await refresh()
   }
 
+  /** One-click register of a destination Solution Studio already exposes. */
+  async function handleAddDiscovered(dest: { name: string; description?: string }) {
+    setAddingDestination(dest.name)
+    setError(null)
+    try {
+      await createSystem(token, orgId, userId, {
+        name: dest.name,
+        mode: 'bridge',
+        destinationName: dest.name,
+        description: dest.description,
+        language: 'EN',
+      })
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Could not add ${dest.name}.`)
+    } finally {
+      setAddingDestination(null)
+    }
+  }
+
   async function handleDelete(system: SapSystem) {
     if (!confirm(`Remove "${system.name}" from the registry? Stored snapshots are kept.`)) return
     try {
@@ -94,6 +115,12 @@ export default function SapSystemsPanel({ orgId, userId, token, onPull, pullingS
       )}
 
       <CapabilityNote capabilities={capabilities} />
+
+      <DiscoveredSection
+        capabilities={capabilities}
+        adding={addingDestination}
+        onAdd={handleAddDiscovered}
+      />
 
       <div className="flex items-center justify-between">
         <h3 className="text-heading-sm font-display text-text-primary">Registered systems</h3>
@@ -156,6 +183,89 @@ export default function SapSystemsPanel({ orgId, userId, token, onPull, pullingS
         />
       )}
     </div>
+  )
+}
+
+/**
+ * Systems Solution Studio can already reach, offered as one-click adds.
+ *
+ * The point of the section: the systems available over there should show up
+ * here without being retyped. When it comes back empty it says WHY, because
+ * "no systems" and "the relay is down" are indistinguishable otherwise.
+ */
+function DiscoveredSection({
+  capabilities, adding, onAdd,
+}: {
+  capabilities: SapCapabilities | null
+  adding: string | null
+  onAdd: (d: { name: string; description?: string }) => void
+}) {
+  if (!capabilities?.bridgeAvailable) return null
+
+  const { discoverable = [], destinations = [], bridgeReachable, bridgeProblem } = capabilities
+  const allClaimed = destinations.length > 0 && discoverable.length === 0
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h3 className="text-heading-sm font-display text-text-primary">
+          Available through Solution Studio
+        </h3>
+        <StatusBadge size="sm" status={bridgeReachable ? 'Connected' : 'Unavailable'} />
+      </div>
+
+      {discoverable.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {discoverable.map((d) => (
+            <div
+              key={d.name}
+              className="bg-white rounded-lg border-2 border-brand-500/30 shadow-card p-4 flex items-center gap-3"
+            >
+              <span className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-cyan-500 text-white inline-flex items-center justify-center shrink-0">
+                <Cloud size={17} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-display text-heading-sm text-text-primary truncate">{d.name}</h4>
+                <div className="text-[11px] text-text-tertiary truncate">
+                  {d.description || 'BTP destination, routed via Cloud Connector'}
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<Plus size={14} />}
+                loading={adding === d.name}
+                disabled={adding !== null}
+                onClick={() => onAdd(d)}
+              >
+                Add
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {allClaimed && (
+        <p className="text-[11px] text-text-tertiary">
+          All {destinations.length} Solution Studio destination
+          {destinations.length === 1 ? ' is' : 's are'} already registered below.
+        </p>
+      )}
+
+      {discoverable.length === 0 && !allClaimed && (
+        <div className="rounded-lg border border-status-yellow/40 bg-status-yellow-bg px-3 py-2 text-[12px] text-text-secondary">
+          <b className="text-text-primary">No systems came back from Solution Studio.</b>{' '}
+          {bridgeProblem ?? 'The bridge returned an empty list.'}
+        </div>
+      )}
+
+      {(capabilities.platformDestinations?.length ?? 0) > 0 && (
+        <p className="text-[11px] text-text-tertiary">
+          Not listed: {capabilities.platformDestinations!.join(', ')} — BTP platform services
+          rather than ABAP systems.
+        </p>
+      )}
+    </section>
   )
 }
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { bridgeConfigFromEnv, listBridgeDestinations } from '@/lib/sap/bridgeReader'
+import {
+  bridgeConfigFromEnv, isPlatformDestination, listBridgeDestinations,
+} from '@/lib/sap/bridgeReader'
 import { credentialStoreAvailable } from '@/lib/sap/credentialCookie'
 import { createSystem, listSystems, orgClient } from '@/lib/sap/db'
 import type { SapSystemInput } from '@/lib/sap/types'
@@ -20,15 +22,39 @@ export async function GET(req: NextRequest) {
   try {
     const systems = await listSystems(orgClient(req), orgId)
 
+    // Systems Solution Studio can reach. Surfaced as discoverable entries rather
+    // than only as options inside the add form, so the systems already available
+    // over there show up here without being retyped.
     const cfg = bridgeConfigFromEnv()
-    const destinations = cfg ? await listBridgeDestinations(cfg).catch(() => []) : []
+    const discovery = cfg
+      ? await listBridgeDestinations(cfg).catch((err: unknown) => ({
+          destinations: [],
+          reachable: false,
+          problem: err instanceof Error ? err.message : 'Discovery failed.',
+        }))
+      : { destinations: [], reachable: false, problem: undefined }
+
+    // Anything already registered is not offered again.
+    const claimed = new Set(
+      systems
+        .filter((s) => s.mode === 'bridge' && s.destinationName)
+        .map((s) => s.destinationName!.toLowerCase())
+    )
+
+    // Platform plumbing is reported separately rather than offered as a system.
+    const abap = discovery.destinations.filter((d) => !isPlatformDestination(d))
+    const platform = discovery.destinations.filter(isPlatformDestination)
 
     return NextResponse.json({
       systems,
       capabilities: {
         directAvailable: credentialStoreAvailable(),
         bridgeAvailable: cfg !== null,
-        destinations,
+        destinations: abap,
+        discoverable: abap.filter((d) => !claimed.has(d.name.toLowerCase())),
+        platformDestinations: platform.map((d) => d.name),
+        bridgeReachable: discovery.reachable,
+        bridgeProblem: discovery.problem,
       },
     })
   } catch (err) {

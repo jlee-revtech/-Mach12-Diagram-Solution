@@ -123,18 +123,107 @@ export class BridgeSapReader implements SapReader {
   }
 }
 
-/** Ask Solution Studio which destinations it can route to. */
-export async function listBridgeDestinations(
-  cfg: BridgeConfig
-): Promise<{ name: string; description?: string }[]> {
-  const res = await fetch(cfg.url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-realization-secret': cfg.secret },
-    body: JSON.stringify({ op: 'list_destinations' }),
-  })
-  if (!res.ok) return []
+export interface BridgeDiscovery {
+  destinations: { name: string; description?: string }[]
+  /** Did the bridge actually answer? */
+  reachable: boolean
+  /** Why the list is empty, when it is. Shown to the user verbatim. */
+  problem?: string
+}
+
+/**
+ * Ask Solution Studio which destinations it can route to.
+ *
+ * Reports WHY the list is empty rather than swallowing it: "no systems" and
+ * "the relay is down" look identical in the UI otherwise, and they need
+ * completely different fixes.
+ */
+export async function listBridgeDestinations(cfg: BridgeConfig): Promise<BridgeDiscovery> {
+  let res: Response
+  try {
+    res = await fetch(cfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-realization-secret': cfg.secret },
+      body: JSON.stringify({ op: 'list_destinations' }),
+    })
+  } catch (err) {
+    return {
+      destinations: [],
+      reachable: false,
+      problem: `Could not reach Solution Studio at ${hostOf(cfg.url)}: ${
+        err instanceof Error ? err.message : 'request failed'
+      }.`,
+    }
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    return {
+      destinations: [],
+      reachable: false,
+      problem:
+        `Solution Studio rejected the call (HTTP ${res.status}). Either REALIZATION_SHARED_SECRET ` +
+        `differs between the two apps, or /api/sap-bridge is not exempt from its sign-in middleware.`,
+    }
+  }
+  if (res.status === 404) {
+    return {
+      destinations: [],
+      reachable: false,
+      problem:
+        'Solution Studio does not have /api/sap-bridge yet. The deployed build predates the ' +
+        'read-only SAP bridge - redeploy it to Cloud Foundry.',
+    }
+  }
+  if (!res.ok) {
+    return {
+      destinations: [],
+      reachable: false,
+      problem: `Solution Studio returned HTTP ${res.status} from /api/sap-bridge.`,
+    }
+  }
+
   const json = (await res.json().catch(() => ({}))) as {
     destinations?: { name: string; description?: string }[]
   }
-  return Array.isArray(json.destinations) ? json.destinations : []
+  const destinations = Array.isArray(json.destinations) ? json.destinations : []
+  return {
+    destinations,
+    reachable: true,
+    problem: destinations.length
+      ? undefined
+      : 'Solution Studio answered but has no BTP destinations bound - it reports none when it is ' +
+        'not running on Cloud Foundry.',
+  }
+}
+
+/**
+ * BTP subaccounts carry destinations that are platform plumbing, not ABAP
+ * systems - a subaccount routinely exposes the CI/CD backend and the Build Apps
+ * runtime alongside the real S/4 systems. Offering those as "pull an org model
+ * from this" produces a confusing failure several seconds in.
+ *
+ * Deliberately conservative: an exact-name match on the destinations BTP itself
+ * provisions, plus SAP's own "[Do not delete]" marker. Anything unrecognised is
+ * treated as a real system, so a customer's oddly-named S/4 is never hidden.
+ */
+const PLATFORM_DESTINATIONS = new Set(
+  [
+    'cicd-backend',
+    'sap-build-apps-runtime',
+    'sap_process_automation_service',
+    'sap_process_automation_service_user_access',
+  ].map((n) => n.toLowerCase())
+)
+
+export function isPlatformDestination(d: { name: string; description?: string }): boolean {
+  if (PLATFORM_DESTINATIONS.has(d.name.trim().toLowerCase())) return true
+  return /\[\s*do not delete/i.test(d.description ?? '')
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host
+  } catch {
+    return url
+  }
 }
