@@ -27,10 +27,32 @@ export interface Capability {
   scope_decided_at: string | null
   scope_decided_by: string | null
 
+  // ─── Ownership ───
+  // The BUSINESS organization accountable for this capability (Finance, Supply
+  // Chain, …) — a row in cm_responsible_orgs, NOT the tenant organization.
+  responsible_org_id: string | null
+
   // ─── Provenance (set when copied from a base library org) ───
   source_capability_id: string | null
   source_organization_id: string | null
   copied_at: string | null
+}
+
+// ─── Responsible Org ───────────────────────────────────
+// Per-tenant catalog of the business organizations that own capabilities.
+// Named `ResponsibleOrg` rather than `Org` because `organizations` in this
+// schema is the tenant (RevTech, Codan) — a different thing entirely.
+export interface ResponsibleOrg {
+  id: string
+  organization_id: string
+  name: string
+  code: string | null
+  description: string | null
+  color: string | null
+  sort_order: number
+  archived_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface CapabilitySystemLink {

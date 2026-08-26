@@ -3,7 +3,7 @@
 // anon (logged-out) READ of the org's capability list + logical/physical system
 // mappings + value streams, gated by RLS on cm_capability_shares (migration 039).
 
-import type { CapabilityWithSystems, CapabilitySystemLink, Capability } from '@/lib/capmap/types'
+import type { CapabilityWithSystems, CapabilitySystemLink, Capability, ResponsibleOrg } from '@/lib/capmap/types'
 import type { BedrockSystem, BedrockPhysicalSystem, BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import type { Workstream } from '@/lib/workstream/types'
 
@@ -143,6 +143,17 @@ export async function listBedrockCatalogAnon(orgId: string): Promise<BedrockSyst
     ...s,
     physicals: (byParent.get(s.id) || []).sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0) || a.sort_order - b.sort_order),
   }))
+}
+
+// The Responsible Org catalog, so a shared card can name its owner instead of
+// showing nothing. Archived orgs included — they can still hold assignments.
+export async function listResponsibleOrgsAnon(orgId: string): Promise<ResponsibleOrg[]> {
+  const res = await sbFetch(
+    `${URL}/rest/v1/cm_responsible_orgs?organization_id=eq.${orgId}&select=*&order=sort_order.asc,name.asc`,
+    { headers: anonHeaders() }
+  )
+  if (!res.ok) return []
+  return res.json()
 }
 
 export async function listWorkstreamsAnon(orgId: string): Promise<Workstream[]> {

@@ -4,7 +4,7 @@
 // value-stream summary. Used by the "Download" action in CapabilityMapWorkspace.
 
 import * as XLSX from 'xlsx'
-import type { CapabilityWithSystems } from '@/lib/capmap/types'
+import type { CapabilityWithSystems, ResponsibleOrg } from '@/lib/capmap/types'
 import type { Workstream } from '@/lib/workstream/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import { scopeBucket, bucketExportLabel, bucketLabel, fitLabel, SCOPE_BUCKETS, FIT_TYPES } from '@/lib/capmap/scope'
@@ -34,7 +34,12 @@ export function downloadCapabilityMapXlsx(
   workstreams: Workstream[],
   catalog: BedrockSystemWithPhysicals[],
   title = 'Capability Map',
+  respOrgs: ResponsibleOrg[] = [],
 ): void {
+  const respById = new Map(respOrgs.map(o => [o.id, o]))
+  const NO_OWNER = 'No owner'
+  const ownerOf = (c: CapabilityWithSystems) =>
+    (c.responsible_org_id && respById.get(c.responsible_org_id)?.name) || NO_OWNER
   const catById = new Map(catalog.map(c => [c.id, c]))
   const physById = new Map<string, string>()
   for (const c of catalog) for (const p of c.physicals) physById.set(p.id, p.name)
@@ -56,7 +61,7 @@ export function downloadCapabilityMapXlsx(
 
   // ─── Sheet 1: Capabilities ───
   const header = [
-    'Value Stream', 'Capability Group', 'Capability', 'Description',
+    'Value Stream', 'Responsible Org', 'Capability Group', 'Capability', 'Description',
     'Scope', 'Priority', 'Fit', 'Future Phase', 'Scope Note',
     'Source', 'Logical Systems', 'Physical Systems',
   ]
@@ -68,6 +73,7 @@ export function downloadCapabilityMapXlsx(
     const bucket = scopeBucket(c)
     rows.push([
       workstreamLabel(ws),
+      ownerOf(c),
       (c.domain && c.domain.trim()) || UNGROUPED,
       c.name,
       c.description || '',
@@ -87,7 +93,7 @@ export function downloadCapabilityMapXlsx(
   }
   const ws1 = XLSX.utils.aoa_to_sheet(rows)
   ws1['!cols'] = [
-    { wch: 26 }, { wch: 38 }, { wch: 46 }, { wch: 52 },
+    { wch: 26 }, { wch: 24 }, { wch: 38 }, { wch: 46 }, { wch: 52 },
     { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 40 },
     { wch: 10 }, { wch: 28 }, { wch: 30 },
   ]
@@ -168,10 +174,53 @@ export function downloadCapabilityMapXlsx(
   ws3['!cols'] = [{ wch: 34 }, ...SCOPE_BUCKETS.map(() => ({ wch: 20 })), { wch: 10 }]
   boldHeader(ws3, scopeHeader.length)
 
+  // ─── Sheet 4: By Responsible Org (owner x scope) ───
+  // Written only when ownership is actually in use, so the workbook does not
+  // carry an empty sheet for clients who have not assigned owners yet.
+  const anyOwner = sorted.some(c => c.responsible_org_id && respById.has(c.responsible_org_id))
+  let ws4: XLSX.WorkSheet | null = null
+  if (anyOwner) {
+    const ownerHeader = ['Responsible Org', 'Code', ...SCOPE_BUCKETS.map(bucketExportLabel), 'ARICEFW', 'Total']
+    const ownerRows: (string | number)[][] = [ownerHeader]
+    const order = new Map(respOrgs.map((o, i) => [o.id, i]))
+    const groups = new Map<string, CapabilityWithSystems[]>()
+    for (const c of sorted) {
+      const key = c.responsible_org_id && respById.has(c.responsible_org_id) ? c.responsible_org_id : '__none__'
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(c)
+    }
+    const keys = Array.from(groups.keys()).sort((a, b) => {
+      if (a === '__none__') return 1
+      if (b === '__none__') return -1
+      return (order.get(a) ?? 0) - (order.get(b) ?? 0)
+    })
+    for (const k of keys) {
+      const list = groups.get(k)!
+      const o = k === '__none__' ? null : respById.get(k)
+      ownerRows.push([
+        o?.name || NO_OWNER,
+        o?.code || '',
+        ...SCOPE_BUCKETS.map(b => list.filter(c => scopeBucket(c) === b).length),
+        list.filter(c => c.scope === 'in' && c.fit === 'aricefw').length,
+        list.length,
+      ])
+    }
+    ownerRows.push([
+      'Total', '',
+      ...SCOPE_BUCKETS.map(b => sorted.filter(c => scopeBucket(c) === b).length),
+      sorted.filter(c => c.scope === 'in' && c.fit === 'aricefw').length,
+      sorted.length,
+    ])
+    ws4 = XLSX.utils.aoa_to_sheet(ownerRows)
+    ws4['!cols'] = [{ wch: 28 }, { wch: 8 }, ...SCOPE_BUCKETS.map(() => ({ wch: 20 })), { wch: 12 }, { wch: 10 }]
+    boldHeader(ws4, ownerHeader.length)
+  }
+
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws1, 'Capabilities')
   XLSX.utils.book_append_sheet(wb, ws2, 'By Value Stream')
   XLSX.utils.book_append_sheet(wb, ws3, 'Scope Summary')
+  if (ws4) XLSX.utils.book_append_sheet(wb, ws4, 'By Responsible Org')
 
   const stamp = new Date().toISOString().slice(0, 10)
   XLSX.writeFile(wb, `${sanitizeFilename(title)}_${stamp}.xlsx`)

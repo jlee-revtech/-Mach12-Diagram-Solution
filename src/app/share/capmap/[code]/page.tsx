@@ -3,11 +3,12 @@
 import { use, useEffect, useState } from 'react'
 import {
   getCmShareByCode, listCapabilityMapAnon, listBedrockCatalogAnon, listWorkstreamsAnon,
+  listResponsibleOrgsAnon,
 } from '@/lib/supabase/capmap-shares'
 import CapabilityMapShareView from '@/components/capmap/CapabilityMapShareView'
 import { LoadingState } from '@/components/common'
 import { Mach12Logo } from '@/components/brand/Mach12Logo'
-import type { CapabilityWithSystems } from '@/lib/capmap/types'
+import type { CapabilityWithSystems, ResponsibleOrg } from '@/lib/capmap/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import type { Workstream } from '@/lib/workstream/types'
 
@@ -20,6 +21,7 @@ export default function CapmapSharePage({ params }: { params: Promise<{ code: st
   const [caps, setCaps] = useState<CapabilityWithSystems[]>([])
   const [catalog, setCatalog] = useState<BedrockSystemWithPhysicals[]>([])
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
+  const [respOrgs, setRespOrgs] = useState<ResponsibleOrg[]>([])
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
 
   useEffect(() => {
@@ -27,13 +29,15 @@ export default function CapmapSharePage({ params }: { params: Promise<{ code: st
     ;(async () => {
       const share = await getCmShareByCode(code)
       if (!share) { if (!cancelled) setState('invalid'); return }
-      const [c, cat, ws] = await Promise.all([
+      const [c, cat, ws, ro] = await Promise.all([
         listCapabilityMapAnon(share.organization_id),
         listBedrockCatalogAnon(share.organization_id),
         listWorkstreamsAnon(share.organization_id),
+        listResponsibleOrgsAnon(share.organization_id),
       ])
       if (cancelled) return
-      setCaps(c); setCatalog(cat); setWorkstreams(ws); setExpiresAt(share.expires_at); setState('ready')
+      setCaps(c); setCatalog(cat); setWorkstreams(ws); setRespOrgs(ro)
+      setExpiresAt(share.expires_at); setState('ready')
     })()
     return () => { cancelled = true }
   }, [code])
@@ -59,5 +63,5 @@ export default function CapmapSharePage({ params }: { params: Promise<{ code: st
       </div>
     )
   }
-  return <CapabilityMapShareView caps={caps} catalog={catalog} workstreams={workstreams} title="Capability Map" expiresAt={expiresAt} />
+  return <CapabilityMapShareView caps={caps} catalog={catalog} workstreams={workstreams} respOrgs={respOrgs} title="Capability Map" expiresAt={expiresAt} />
 }

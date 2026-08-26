@@ -1,11 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, Building } from 'lucide-react'
 import { Button, EmptyState } from '@/components/common'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
-import type { CapabilityWithSystems } from '@/lib/capmap/types'
+import type { CapabilityWithSystems, ResponsibleOrg } from '@/lib/capmap/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import type { Workstream } from '@/lib/workstream/types'
 import { CapabilityScopeBadge, CapabilityFitBadge } from '@/components/capmap/CapabilityScopeControl'
@@ -23,9 +23,10 @@ const scopeOf = (c: {
 // no add/edit/archive/AI/seed/align — purely a view of the capability list and
 // its value-stream / logical-system / physical-system assignments.
 export default function CapabilityMapShareView({
-  caps, catalog, workstreams, title, expiresAt,
+  caps, catalog, workstreams, respOrgs = [], title, expiresAt,
 }: {
   caps: CapabilityWithSystems[]
+  respOrgs?: ResponsibleOrg[]
   catalog: BedrockSystemWithPhysicals[]
   workstreams: Workstream[]
   title: string
@@ -37,6 +38,7 @@ export default function CapabilityMapShareView({
   const [wsFilter, setWsFilter] = useState<string | null>(null)
 
   const catById = useMemo(() => new Map(catalog.map(c => [c.id, c])), [catalog])
+  const respById = useMemo(() => new Map(respOrgs.map(o => [o.id, o])), [respOrgs])
   const physById = useMemo(() => {
     const m = new Map<string, { name: string; parentId: string }>()
     for (const c of catalog) for (const p of c.physicals) m.set(p.id, { name: p.name, parentId: c.id })
@@ -160,7 +162,7 @@ export default function CapabilityMapShareView({
           <Button
             variant="secondary"
             size="md"
-            onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog, title)}
+            onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog, title, respOrgs)}
             title="Download this capability map as Excel"
             icon={<Download size={14} />}
           >
@@ -229,6 +231,19 @@ export default function CapabilityMapShareView({
                                 </span>
                               </div>
                               {c.description && <p className="text-[11px] text-text-secondary mb-2 line-clamp-2">{c.description}</p>}
+                              {(() => {
+                                const o = c.responsible_org_id ? respById.get(c.responsible_org_id) : null
+                                if (!o) return null
+                                const col = o.color || '#64748B'
+                                return (
+                                  <div className="mb-1.5">
+                                    <span className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: col, borderColor: `${col}55`, background: `${col}12` }}>
+                                      <Building size={9} />
+                                      {o.name}
+                                    </span>
+                                  </div>
+                                )
+                              })()}
                               {renderChips(c)}
                             </div>
                           ))}

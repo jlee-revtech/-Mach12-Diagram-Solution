@@ -16,6 +16,10 @@ import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
 import { createCmCapabilityShare, listCmCapabilityShares, deleteCmCapabilityShare, type CmCapabilityShare } from '@/lib/supabase/capmap-shares'
 import CapabilityAIReviewPanel from '@/components/capmap/CapabilityAIReviewPanel'
 import CopyToOrgDialog from '@/components/capmap/CopyToOrgDialog'
+import ResponsibleOrgDialog from '@/components/capmap/ResponsibleOrgDialog'
+import {
+  listResponsibleOrgs, setCapabilityResponsibleOrg,
+} from '@/lib/supabase/capmap-orgs'
 import CapabilityScopeControl, { CapabilityScopeBadge, CapabilityFitBadge } from '@/components/capmap/CapabilityScopeControl'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
@@ -27,9 +31,9 @@ import {
 } from '@/lib/capmap/scope'
 import {
   Plus, Download, Share2, Sparkles, Wand2, SearchCheck, Lightbulb, LayoutGrid,
-  Archive, ArchiveRestore, Trash2, X, ChevronRight, Check, Copy,
+  Archive, ArchiveRestore, Trash2, X, ChevronRight, Check, Copy, Building,
 } from 'lucide-react'
-import type { CapabilityWithSystems } from '@/lib/capmap/types'
+import type { CapabilityWithSystems, ResponsibleOrg } from '@/lib/capmap/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import type { Workstream } from '@/lib/workstream/types'
 
@@ -53,12 +57,13 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const [caps, setCaps] = useState<CapabilityWithSystems[]>([])
   const [archivedCaps, setArchivedCaps] = useState<CapabilityWithSystems[]>([])
   const [workstreams, setWorkstreams] = useState<Workstream[]>([])
+  const [respOrgs, setRespOrgs] = useState<ResponsibleOrg[]>([])
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
   const [seedingStd, setSeedingStd] = useState(false)
   const [aligning, setAligning] = useState(false)
   const [view, setView] = useState<'board' | 'pivot'>('board')
-  const [slice, setSlice] = useState<'workstream' | 'logical' | 'physical'>('workstream')
+  const [slice, setSlice] = useState<'workstream' | 'responsible' | 'logical' | 'physical'>('workstream')
   const [search, setSearch] = useState('')
   const [wsFilter, setWsFilter] = useState<string | null>(null)
   const [scopeFilter, setScopeFilter] = useState<ScopeBucket | null>(null)
@@ -66,6 +71,8 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [copyOpen, setCopyOpen] = useState(false)
+  const [orgsOpen, setOrgsOpen] = useState(false)
+  const [respFilter, setRespFilter] = useState<string | null>(null)   // org id, or UNASSIGNED
 
   // AI draft modal
   const [aiOpen, setAiOpen] = useState(false)
@@ -92,11 +99,14 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   // unmount any open panel/modal and remount it — e.g. re-running the AI review).
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true)
-    const [c, m, w] = await Promise.all([listBedrockCatalog(orgId), listCapabilityMap(orgId, true), listWorkstreams(orgId)])
+    const [c, m, w, ro] = await Promise.all([
+      listBedrockCatalog(orgId), listCapabilityMap(orgId, true), listWorkstreams(orgId), listResponsibleOrgs(orgId, true),
+    ])
     setCatalog(c)
     setCaps(m.filter(x => !x.archived_at))
     setArchivedCaps(m.filter(x => x.archived_at))
     setWorkstreams(w)
+    setRespOrgs(ro)
     if (!opts?.silent) setLoading(false)
   }, [orgId])
   useEffect(() => { load() }, [load])
@@ -118,6 +128,10 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     return m
   }, [catalog])
   const wsById = useMemo(() => new Map(workstreams.map(w => [w.id, w])), [workstreams])
+  const respById = useMemo(() => new Map(respOrgs.map(o => [o.id, o])), [respOrgs])
+  // Archived orgs stay resolvable (so existing assignments still render a name)
+  // but drop out of the picker.
+  const respPickable = useMemo(() => respOrgs.filter(o => !o.archived_at), [respOrgs])
   const wsByCode = useMemo(() => new Map(workstreams.map(w => [w.code, w])), [workstreams])
 
   const wsName = (id: string | null) => (id && wsById.get(id)?.name) || 'Unaligned'
@@ -130,10 +144,13 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       }
       if (scopeFilter && scopeBucket(scopeOf(c)) !== scopeFilter) return false
       if (fitFilter && (c.scope !== 'in' || (c.fit ?? 'unset') !== fitFilter)) return false
+      if (respFilter) {
+        if (respFilter === UNALIGNED ? !!c.responsible_org_id : c.responsible_org_id !== respFilter) return false
+      }
       if (q && !(`${c.name} ${c.description || ''} ${c.domain || ''} ${wsName(c.workstream_id)}`.toLowerCase().includes(q))) return false
       return true
     })
-  }, [caps, search, wsFilter, scopeFilter, fitFilter, wsById])
+  }, [caps, search, wsFilter, scopeFilter, fitFilter, respFilter, wsById])
 
   // Board groups ordered by workstream sort order, Unaligned last.
   const groups = useMemo(() => {
@@ -149,7 +166,8 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     return ordered
   }, [filtered, workstreams, wsById])
 
-  // Pivot columns by the chosen slice dimension (value stream / logical / physical).
+  // Pivot columns by the chosen slice dimension
+  // (value stream / responsible org / logical / physical).
   const pivotColumns = useMemo(() => {
     type Col = { key: string; label: string; color: string; icon?: string | null; caps: CapabilityWithSystems[] }
     const cols: Col[] = []
@@ -162,6 +180,17 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       }
       for (const w of workstreams) if (byWs.has(w.id)) cols.push({ key: w.id, label: w.name, color: w.color || '#10B981', icon: w.icon, caps: byWs.get(w.id)! })
       if (byWs.has(UNALIGNED)) cols.push({ key: UNALIGNED, label: 'Unaligned', color: '#F59E0B', caps: byWs.get(UNALIGNED)! })
+    } else if (slice === 'responsible') {
+      const byOrg = new Map<string, CapabilityWithSystems[]>()
+      for (const c of filtered) {
+        const key = c.responsible_org_id && respById.has(c.responsible_org_id) ? c.responsible_org_id : UNALIGNED
+        if (!byOrg.has(key)) byOrg.set(key, [])
+        byOrg.get(key)!.push(c)
+      }
+      // Catalog order first (archived orgs included — they can still hold
+      // assignments), then anything with no owner.
+      for (const o of respOrgs) if (byOrg.has(o.id)) cols.push({ key: o.id, label: o.name, color: o.color || '#64748B', caps: byOrg.get(o.id)! })
+      if (byOrg.has(UNALIGNED)) cols.push({ key: UNALIGNED, label: 'No owner', color: '#F59E0B', caps: byOrg.get(UNALIGNED)! })
     } else if (slice === 'logical') {
       for (const s of catalog) {
         const list = filtered.filter(c => c.logicalSystemIds.includes(s.id))
@@ -178,7 +207,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       if (unmapped.length) cols.push({ key: UNALIGNED, label: 'No physical system', color: '#F59E0B', caps: unmapped })
     }
     return cols
-  }, [slice, filtered, catalog, workstreams, wsById])
+  }, [slice, filtered, catalog, workstreams, wsById, respOrgs, respById])
 
   const unalignedCount = useMemo(() => caps.filter(c => !c.workstream_id || !wsById.has(c.workstream_id)).length, [caps, wsById])
 
@@ -195,6 +224,15 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
 
   // Fit only exists on in-scope capabilities, so these count against inScopeCount.
   const inScopeCount = useMemo(() => caps.filter(c => c.scope === 'in').length, [caps])
+
+  const respCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of caps) {
+      const k = c.responsible_org_id && respById.has(c.responsible_org_id) ? c.responsible_org_id : UNALIGNED
+      m.set(k, (m.get(k) || 0) + 1)
+    }
+    return m
+  }, [caps, respById])
   const fitCounts = useMemo(() => {
     const m = new Map<FitFilter, number>()
     for (const c of caps) {
@@ -228,6 +266,11 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const handleSetWorkstream = async (id: string, wsId: string | null) => {
     patchCap(id, c => ({ ...c, workstream_id: wsId }))
     await updateCapability(id, { workstream_id: wsId }).catch(() => load())
+  }
+
+  const handleSetResponsibleOrg = async (id: string, respId: string | null) => {
+    patchCap(id, c => ({ ...c, responsible_org_id: respId }))
+    await setCapabilityResponsibleOrg(id, respId).catch(() => load())
   }
 
   const handleSetScope = async (id: string, next: Partial<ScopeState>) => {
@@ -531,7 +574,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] uppercase tracking-wider font-mono text-text-tertiary">Slice by</span>
             <div className="flex gap-1 bg-white border border-border rounded-lg p-1">
-              {([['workstream', 'Value Stream'], ['logical', 'Logical System'], ['physical', 'Physical System']] as const).map(([k, label]) => (
+              {([['workstream', 'Value Stream'], ['responsible', 'Responsible Org'], ['logical', 'Logical System'], ['physical', 'Physical System']] as const).map(([k, label]) => (
                 <button key={k} type="button" onClick={() => setSlice(k)} className={`px-2.5 py-1.5 rounded text-body-sm font-medium transition-colors ${slice === k ? 'bg-brand-500 text-white' : 'text-text-secondary hover:bg-surface-muted'}`}>{label}</button>
               ))}
             </div>
@@ -550,7 +593,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           </Button>
         )}
         {caps.length > 0 && (
-          <Button variant="secondary" size="md" onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog)} title="Download the capability map as an Excel workbook" icon={<Download size={14} />}>
+          <Button variant="secondary" size="md" onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog, 'Capability Map', respOrgs)} title="Download the capability map as an Excel workbook" icon={<Download size={14} />}>
             Download
           </Button>
         )}
@@ -587,6 +630,9 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             )}
           </div>
         )}
+        <Button variant="secondary" size="md" onClick={() => setOrgsOpen(true)} title="Maintain the catalog of business organizations that own capabilities" icon={<Building size={14} />}>
+          Responsible Orgs{respPickable.length ? ` (${respPickable.length})` : ''}
+        </Button>
         {caps.length > 0 && (
           <Button variant="secondary" size="md" onClick={() => setCopyOpen(true)} title="Copy this capability library into a client organization, where it can be scoped independently" icon={<Copy size={14} />}>
             Copy to org
@@ -707,6 +753,44 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
         </div>
       )}
 
+      {/* Responsible Org chips */}
+      {respPickable.length > 0 && caps.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-5">
+          <span className="text-[10px] uppercase tracking-wider font-mono text-text-tertiary mr-0.5">Owner</span>
+          <button
+            type="button" onClick={() => setRespFilter(null)}
+            className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${!respFilter ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'}`}
+          >
+            All ({caps.length})
+          </button>
+          {respPickable.map(o => {
+            const n = respCounts.get(o.id) || 0
+            if (!n) return null
+            const on = respFilter === o.id
+            const col = o.color || '#64748B'
+            return (
+              <button
+                key={o.id} type="button" onClick={() => setRespFilter(on ? null : o.id)}
+                className="inline-flex items-center gap-1 text-[11px] rounded-full px-2.5 py-1 border transition-colors"
+                style={on
+                  ? { color: '#fff', background: col, borderColor: col }
+                  : { color: col, background: `${col}12`, borderColor: `${col}55` }}
+              >
+                {o.name}{o.code ? <span className="opacity-60 font-mono">{o.code}</span> : null} ({n})
+              </button>
+            )
+          })}
+          {(respCounts.get(UNALIGNED) || 0) > 0 && (
+            <button
+              type="button" onClick={() => setRespFilter(respFilter === UNALIGNED ? null : UNALIGNED)}
+              className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${respFilter === UNALIGNED ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-border text-text-secondary hover:bg-surface-muted'}`}
+            >
+              No owner ({respCounts.get(UNALIGNED)})
+            </button>
+          )}
+        </div>
+      )}
+
       {caps.length === 0 ? (
         <EmptyState
           variant="dashed"
@@ -774,6 +858,17 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                             </div>
                             {c.description && <p className="text-[11px] text-text-secondary mb-2 line-clamp-2">{c.description}</p>}
                             <div className="flex flex-wrap gap-1">
+                              {(() => {
+                                const o = c.responsible_org_id ? respById.get(c.responsible_org_id) : null
+                                if (!o) return null
+                                const col = o.color || '#64748B'
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border" style={{ color: col, borderColor: `${col}55`, background: `${col}12` }} title={`Responsible org: ${o.name}`}>
+                                    <Building size={9} />
+                                    {o.code || o.name}
+                                  </span>
+                                )
+                              })()}
                               {c.logicalSystemIds.length === 0 && c.physicalSystemIds.length === 0 && (
                                 <span className="text-[10px] text-text-tertiary italic">Unmapped</span>
                               )}
@@ -914,6 +1009,29 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                 className="w-full rounded-lg border border-border bg-surface-input px-3 py-2 text-[11px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-none mb-5"
               />
 
+              <h4 className="text-label uppercase text-text-secondary mb-2">Responsible org</h4>
+              <div className="mb-5 flex items-center gap-2">
+                <select
+                  value={selected.responsible_org_id || ''}
+                  onChange={e => handleSetResponsibleOrg(selected.id, e.target.value || null)}
+                  aria-label="Responsible organization"
+                  className="flex-1 h-9 px-2.5 rounded-lg border border-border bg-surface-input text-body-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                >
+                  <option value="">No owner</option>
+                  {respPickable.map(o => (
+                    <option key={o.id} value={o.id}>{o.name}{o.code ? ` (${o.code})` : ''}</option>
+                  ))}
+                  {/* An archived org still shows while it is the current value, so
+                      the field never silently reads as "No owner". */}
+                  {selected.responsible_org_id && respById.get(selected.responsible_org_id)?.archived_at && (
+                    <option value={selected.responsible_org_id}>
+                      {respById.get(selected.responsible_org_id)!.name} (archived)
+                    </option>
+                  )}
+                </select>
+                <Button variant="ghost" size="sm" iconOnly aria-label="Manage responsible organizations" title="Manage the organization catalog" onClick={() => setOrgsOpen(true)} icon={<Building size={15} />} />
+              </div>
+
               <h4 className="text-label uppercase text-text-secondary mb-2">Value stream</h4>
               <div className="mb-5">
                 <WorkstreamPicker orgId={orgId} value={selected.workstream_id} workstreams={workstreams} onChange={(wsId) => handleSetWorkstream(selected.id, wsId)} />
@@ -1048,6 +1166,18 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             )}
           </div>
         </div>
+      )}
+
+      {/* ─── Responsible Org catalog ─── */}
+      {orgsOpen && (
+        <ResponsibleOrgDialog
+          orgId={orgId}
+          userId={userId}
+          orgs={respOrgs}
+          usageCount={respCounts}
+          onClose={() => setOrgsOpen(false)}
+          onChanged={() => load({ silent: true })}
+        />
       )}
 
       {/* ─── Copy this library into a client organization ─── */}
