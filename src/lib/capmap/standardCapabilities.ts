@@ -66,6 +66,17 @@ export const STANDARD_CAPABILITIES: Record<string, CapabilityGroup[]> = {
       ],
     },
     {
+      name: 'Manage Cost Transfers & Adjusting Entries',
+      description: 'Moving cost already booked from one cost object to another under approval, reason coding, timeliness, and an audit trail.',
+      children: [
+        { name: 'Request and Approve Cost Transfers', description: 'Reason-coded request with thresholds and preparer/approver segregation.' },
+        { name: 'Repost Costs Between Contracts and Cost Objects', description: 'Repostings and reallocations across WBS, orders, and cost centers.' },
+        { name: 'Control Transfers Into and Out of Unallowable Cost', description: 'Block and evidence transfers that cross the allowable/unallowable line.' },
+        { name: 'Monitor Transfer Aging and Prior-Period Adjustments', description: 'Timeliness window, prior fiscal year, and post-closeout transfer control.' },
+        { name: 'Evidence the Cost Transfer Audit Trail', description: 'Original-to-transfer document linkage, support pack, and transfer metrics.' },
+      ],
+    },
+    {
       name: 'Settle Project & Contract Costs',
       description: 'WBS/project actuals collection and settlement.',
       children: [
@@ -655,6 +666,7 @@ export const STANDARD_CAPABILITIES: Record<string, CapabilityGroup[]> = {
         { name: 'Transfer CATS to Controlling and Payroll', description: 'CATS transfer to CO/PY.' },
         { name: 'Reconcile Labor Distribution', description: 'Labor distribution reconciliation.' },
         { name: 'Supply Payroll Results for Actual Labor Costing', description: 'Hand wage-type payroll results to the actual labor rate basis used by ALC.' },
+        { name: 'Correct and Retransfer Labor Charges', description: 'Reason-coded timesheet corrections and their re-transfer to Controlling and payroll.' },
       ],
     },
     {
