@@ -2,7 +2,7 @@
 // A business/application capability realized by one or more bedrock systems
 // (Logical Bedrock Systems and/or specific Physical Systems).
 
-import type { CapabilityScope, CapabilityScopePriority } from '@/lib/capmap/scope'
+import type { CapabilityScope, CapabilityScopePriority, CapabilityFit } from '@/lib/capmap/scope'
 
 export interface Capability {
   id: string
@@ -22,6 +22,7 @@ export interface Capability {
   scope: CapabilityScope | null                  // null = not assessed
   scope_priority: CapabilityScopePriority | null // only when scope = 'in'
   future_phase: boolean                          // only when scope = 'out'
+  fit: CapabilityFit | null                      // only when scope = 'in'
   scope_note: string | null
   scope_decided_at: string | null
   scope_decided_by: string | null

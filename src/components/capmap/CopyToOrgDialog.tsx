@@ -36,6 +36,7 @@ export default function CopyToOrgDialog({
   const [target, setTarget] = useState<string>(() => (otherOrgs.length ? otherOrgs[0].id : NEW_ORG))
   const [newOrgName, setNewOrgName] = useState('')
   const [includeSystems, setIncludeSystems] = useState(true)
+  const [includeMembers, setIncludeMembers] = useState(true)
 
   const [preview, setPreview] = useState<CopyPreview | null>(null)
   const [result, setResult] = useState<CopyResult | null>(null)
@@ -53,13 +54,14 @@ export default function CopyToOrgDialog({
   }, [onClose, busy])
 
   // Any change to the target invalidates a preview taken against the old one.
-  useEffect(() => { setPreview(null); setResult(null); setError(null) }, [target, newOrgName, includeSystems])
+  useEffect(() => { setPreview(null); setResult(null); setError(null) }, [target, newOrgName, includeSystems, includeMembers])
 
   const req = useCallback(() => ({
     sourceOrgId,
     ...(isNew ? { newOrgName: newOrgName.trim() } : { targetOrgId: target }),
     includeLogicalSystems: includeSystems,
-  }), [sourceOrgId, isNew, newOrgName, target, includeSystems])
+    includeMembers,
+  }), [sourceOrgId, isNew, newOrgName, target, includeSystems, includeMembers])
 
   const runPreview = useCallback(async () => {
     setBusy(true); setError(null)
@@ -126,6 +128,7 @@ export default function CopyToOrgDialog({
                   {result.workstreamsSeeded > 0 && <li>Seeded {result.workstreamsSeeded} value streams.</li>}
                   {result.systemsSeeded > 0 && <li>Seeded {result.systemsSeeded} logical systems.</li>}
                   {result.systemLinks > 0 && <li>Carried {result.systemLinks} logical system mappings.</li>}
+                  {result.membersAdded > 0 && <li>Gave {result.membersAdded} team {result.membersAdded === 1 ? 'member' : 'members'} access (they will see it after a reload).</li>}
                   {result.skipped > 0 && <li>Skipped {result.skipped} already present.</li>}
                   <li>Every copied capability starts as <strong>Not Assessed</strong> — scope it in {result.targetOrgName}.</li>
                 </ul>
@@ -180,6 +183,18 @@ export default function CopyToOrgDialog({
               </span>
             </label>
 
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input type="checkbox" checked={includeMembers} onChange={e => setIncludeMembers(e.target.checked)} className="mt-0.5 accent-brand-500" />
+              <span className="text-body-sm text-text-primary">
+                Give the {sourceOrgName} team access
+                <span className="block text-[11px] text-text-tertiary mt-0.5">
+                  Without this, {targetLabel} is a solo organization — nobody else can switch into it,
+                  so the copied capabilities are invisible to the rest of the team. Existing members and
+                  their roles are never changed.
+                </span>
+              </span>
+            </label>
+
             {preview && (
               <div className="bg-surface-muted border border-border rounded-lg p-3 text-body-sm">
                 <div className="flex items-center gap-2 text-text-primary font-medium mb-1.5">
@@ -192,6 +207,7 @@ export default function CopyToOrgDialog({
                   <li><strong className="text-text-primary">{preview.willCopy}</strong> capabilities will be copied.</li>
                   {preview.willSkip > 0 && <li>{preview.willSkip} already present and will be left alone (scope decisions untouched).</li>}
                   {includeSystems && <li>{preview.systemLinks} logical system mappings will come across.</li>}
+                  {includeMembers && preview.willAddMembers > 0 && <li>{preview.willAddMembers} team {preview.willAddMembers === 1 ? 'member' : 'members'} will be given access.</li>}
                 </ul>
               </div>
             )}

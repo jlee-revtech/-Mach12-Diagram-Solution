@@ -16,14 +16,14 @@ import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
 import { createCmCapabilityShare, listCmCapabilityShares, deleteCmCapabilityShare, type CmCapabilityShare } from '@/lib/supabase/capmap-shares'
 import CapabilityAIReviewPanel from '@/components/capmap/CapabilityAIReviewPanel'
 import CopyToOrgDialog from '@/components/capmap/CopyToOrgDialog'
-import CapabilityScopeControl, { CapabilityScopeBadge } from '@/components/capmap/CapabilityScopeControl'
+import CapabilityScopeControl, { CapabilityScopeBadge, CapabilityFitBadge } from '@/components/capmap/CapabilityScopeControl'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
 import { Button, EmptyState, LoadingState, backdropClose } from '@/components/common'
 import { useAuth } from '@/lib/supabase/auth-context'
 import {
-  scopeBucket, bucketLabel, BUCKET_COLORS, SCOPE_BUCKETS,
-  type ScopeBucket, type ScopeState,
+  scopeBucket, bucketLabel, fitLabel, BUCKET_COLORS, FIT_COLORS, SCOPE_BUCKETS, FIT_TYPES,
+  type ScopeBucket, type ScopeState, type CapabilityFit,
 } from '@/lib/capmap/scope'
 import {
   Plus, Download, Share2, Sparkles, Wand2, SearchCheck, Lightbulb, LayoutGrid,
@@ -35,9 +35,15 @@ import type { Workstream } from '@/lib/workstream/types'
 
 const UNALIGNED = '__unaligned__'
 
-// Pull the scope triple off a capability row.
-const scopeOf = (c: { scope: ScopeState['scope']; scope_priority: ScopeState['scope_priority']; future_phase: boolean }): ScopeState =>
-  ({ scope: c.scope, scope_priority: c.scope_priority, future_phase: !!c.future_phase })
+// Pull the scoping fields off a capability row.
+const scopeOf = (c: {
+  scope: ScopeState['scope']; scope_priority: ScopeState['scope_priority']
+  future_phase: boolean; fit: ScopeState['fit']
+}): ScopeState =>
+  ({ scope: c.scope, scope_priority: c.scope_priority, future_phase: !!c.future_phase, fit: c.fit })
+
+// 'unset' = in scope but fit not yet decided. Out-of-scope rows carry no fit at all.
+type FitFilter = CapabilityFit | 'unset'
 
 interface DraftCap { name: string; workstreamCode: string; domain: string; description: string; systems: string[]; physicalSystemIds: string[]; physicalLabels: string[]; selected: boolean }
 
@@ -56,6 +62,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const [search, setSearch] = useState('')
   const [wsFilter, setWsFilter] = useState<string | null>(null)
   const [scopeFilter, setScopeFilter] = useState<ScopeBucket | null>(null)
+  const [fitFilter, setFitFilter] = useState<FitFilter | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [copyOpen, setCopyOpen] = useState(false)
@@ -122,10 +129,11 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
         if (wsFilter === UNALIGNED ? !!c.workstream_id : c.workstream_id !== wsFilter) return false
       }
       if (scopeFilter && scopeBucket(scopeOf(c)) !== scopeFilter) return false
+      if (fitFilter && (c.scope !== 'in' || (c.fit ?? 'unset') !== fitFilter)) return false
       if (q && !(`${c.name} ${c.description || ''} ${c.domain || ''} ${wsName(c.workstream_id)}`.toLowerCase().includes(q))) return false
       return true
     })
-  }, [caps, search, wsFilter, scopeFilter, wsById])
+  }, [caps, search, wsFilter, scopeFilter, fitFilter, wsById])
 
   // Board groups ordered by workstream sort order, Unaligned last.
   const groups = useMemo(() => {
@@ -184,6 +192,18 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
     return m
   }, [caps])
   const assessedCount = caps.length - (scopeCounts.get('unassessed') || 0)
+
+  // Fit only exists on in-scope capabilities, so these count against inScopeCount.
+  const inScopeCount = useMemo(() => caps.filter(c => c.scope === 'in').length, [caps])
+  const fitCounts = useMemo(() => {
+    const m = new Map<FitFilter, number>()
+    for (const c of caps) {
+      if (c.scope !== 'in') continue
+      const k: FitFilter = c.fit ?? 'unset'
+      m.set(k, (m.get(k) || 0) + 1)
+    }
+    return m
+  }, [caps])
 
   const selected = caps.find(c => c.id === selectedId) || null
 
@@ -648,6 +668,45 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
         </div>
       )}
 
+      {/* Fit chips — only meaningful once something is in scope */}
+      {inScopeCount > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-5">
+          <span className="text-[10px] uppercase tracking-wider font-mono text-text-tertiary mr-0.5">Fit</span>
+          <button
+            type="button" onClick={() => setFitFilter(null)}
+            className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${!fitFilter ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'}`}
+          >
+            All in scope ({inScopeCount})
+          </button>
+          {FIT_TYPES.map(f => {
+            const n = fitCounts.get(f) || 0
+            if (!n) return null
+            const on = fitFilter === f
+            const c = FIT_COLORS[f]
+            return (
+              <button
+                key={f} type="button" onClick={() => setFitFilter(on ? null : f)}
+                className="text-[11px] rounded-full px-2.5 py-1 border transition-colors"
+                style={on
+                  ? { color: '#fff', background: c.fg, borderColor: c.fg }
+                  : { color: c.fg, background: c.bg, borderColor: c.border }}
+              >
+                {fitLabel(f)} ({n})
+              </button>
+            )
+          })}
+          {(fitCounts.get('unset') || 0) > 0 && (
+            <button
+              type="button" onClick={() => setFitFilter(fitFilter === 'unset' ? null : 'unset')}
+              className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${fitFilter === 'unset' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-border text-text-secondary hover:bg-surface-muted'}`}
+              title="In scope, but the fit has not been decided yet"
+            >
+              Fit not set ({fitCounts.get('unset')})
+            </button>
+          )}
+        </div>
+      )}
+
       {caps.length === 0 ? (
         <EmptyState
           variant="dashed"
@@ -704,7 +763,10 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                           >
                             <div className="flex items-start gap-2 mb-2">
                               <h4 className="text-body-md font-semibold text-text-primary flex-1">{c.name}</h4>
-                              <span className="shrink-0"><CapabilityScopeBadge state={scopeOf(c)} /></span>
+                              <span className="shrink-0 flex items-center gap-1">
+                                <CapabilityFitBadge state={scopeOf(c)} />
+                                <CapabilityScopeBadge state={scopeOf(c)} />
+                              </span>
                               {c.source === 'ai' && <span className="text-[10px] uppercase tracking-wider font-mono text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-0.5 shrink-0">AI</span>}
                               <button type="button" onClick={(e) => handleArchiveCap(c.id, e)} title="Archive capability" className="text-text-tertiary hover:text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                 <Archive size={13} />
@@ -760,6 +822,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                         <div className="text-body-sm font-medium text-text-primary mb-1">{c.name}</div>
                         <div className="flex flex-wrap gap-1">
                           <CapabilityScopeBadge state={scopeOf(c)} size="xs" />
+                          <CapabilityFitBadge state={scopeOf(c)} size="xs" />
                           {slice !== 'workstream' && ws && (
                             <span className="text-[10px] rounded px-1 py-0.5" style={{ color: ws.color || '#10B981', background: `${ws.color || '#10B981'}18` }}>{ws.name}</span>
                           )}

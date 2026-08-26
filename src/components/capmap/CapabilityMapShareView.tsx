@@ -8,13 +8,16 @@ import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
 import type { Workstream } from '@/lib/workstream/types'
-import { CapabilityScopeBadge } from '@/components/capmap/CapabilityScopeControl'
+import { CapabilityScopeBadge, CapabilityFitBadge } from '@/components/capmap/CapabilityScopeControl'
 import type { ScopeState } from '@/lib/capmap/scope'
 
 const UNALIGNED = '__unaligned__'
 
-const scopeOf = (c: { scope: ScopeState['scope']; scope_priority: ScopeState['scope_priority']; future_phase: boolean }): ScopeState =>
-  ({ scope: c.scope, scope_priority: c.scope_priority, future_phase: !!c.future_phase })
+const scopeOf = (c: {
+  scope: ScopeState['scope']; scope_priority: ScopeState['scope_priority']
+  future_phase: boolean; fit: ScopeState['fit']
+}): ScopeState =>
+  ({ scope: c.scope, scope_priority: c.scope_priority, future_phase: !!c.future_phase, fit: c.fit })
 
 // Read-only renderer for a shared Capability Map workspace. Board + pivots only:
 // no add/edit/archive/AI/seed/align — purely a view of the capability list and
@@ -220,7 +223,10 @@ export default function CapabilityMapShareView({
                             <div key={c.id} className="bg-white border border-border rounded-lg shadow-card p-4">
                               <div className="flex items-start gap-2 mb-2">
                                 <h4 className="text-body-md font-semibold text-text-primary flex-1">{c.name}</h4>
-                                <span className="shrink-0"><CapabilityScopeBadge state={scopeOf(c)} /></span>
+                                <span className="shrink-0 flex items-center gap-1">
+                                  <CapabilityFitBadge state={scopeOf(c)} />
+                                  <CapabilityScopeBadge state={scopeOf(c)} />
+                                </span>
                               </div>
                               {c.description && <p className="text-[11px] text-text-secondary mb-2 line-clamp-2">{c.description}</p>}
                               {renderChips(c)}
@@ -259,6 +265,7 @@ export default function CapabilityMapShareView({
                           <div className="text-body-sm font-medium text-text-primary mb-1">{c.name}</div>
                           <div className="flex flex-wrap gap-1">
                             <CapabilityScopeBadge state={scopeOf(c)} size="xs" />
+                            <CapabilityFitBadge state={scopeOf(c)} size="xs" />
                             {slice !== 'workstream' && ws && (
                               <span className="text-[10px] rounded px-1 py-0.5" style={{ color: ws.color || '#10B981', background: `${ws.color || '#10B981'}18` }}>{ws.name}</span>
                             )}

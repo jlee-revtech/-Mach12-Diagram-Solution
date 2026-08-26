@@ -13,6 +13,7 @@ export interface CopyPreview {
   willCopy: number
   willSkip: number
   systemLinks: number
+  willAddMembers: number
 }
 
 export interface CopyResult {
@@ -24,6 +25,7 @@ export interface CopyResult {
   systemLinks: number
   workstreamsSeeded: number
   systemsSeeded: number
+  membersAdded: number
   message?: string
 }
 
@@ -32,6 +34,7 @@ export interface CopyRequest {
   targetOrgId?: string
   newOrgName?: string
   includeLogicalSystems: boolean
+  includeMembers: boolean
 }
 
 function accessToken(): string | null {

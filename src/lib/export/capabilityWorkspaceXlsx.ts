@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
 import type { Workstream } from '@/lib/workstream/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
-import { scopeBucket, bucketExportLabel, bucketLabel, SCOPE_BUCKETS } from '@/lib/capmap/scope'
+import { scopeBucket, bucketExportLabel, bucketLabel, fitLabel, SCOPE_BUCKETS, FIT_TYPES } from '@/lib/capmap/scope'
 
 function sanitizeFilename(title: string): string {
   return title.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '_') || 'capability-map'
@@ -57,7 +57,7 @@ export function downloadCapabilityMapXlsx(
   // ─── Sheet 1: Capabilities ───
   const header = [
     'Value Stream', 'Capability Group', 'Capability', 'Description',
-    'Scope', 'Priority', 'Future Phase', 'Scope Note',
+    'Scope', 'Priority', 'Fit', 'Future Phase', 'Scope Note',
     'Source', 'Logical Systems', 'Physical Systems',
   ]
   const rows: (string | undefined)[][] = [header]
@@ -75,6 +75,9 @@ export function downloadCapabilityMapXlsx(
       // qualifiers, blank where they do not apply, so the sheet filters cleanly.
       c.scope === 'in' ? 'In Scope' : c.scope === 'out' ? 'Out of Scope' : 'Not Assessed',
       c.scope === 'in' ? bucketLabel(bucket) : '',
+      // Fit only exists in scope; blank distinguishes "not applicable" from
+      // "in scope but not yet decided", which reads as Not Set.
+      c.scope === 'in' ? (c.fit ? fitLabel(c.fit) : 'Not Set') : '',
       c.scope === 'out' && c.future_phase ? 'Yes' : '',
       c.scope_note || '',
       c.source === 'ai' ? 'AI' : c.source === 'standard' ? 'Standard' : c.source === 'copied' ? 'Copied' : 'Manual',
@@ -85,7 +88,7 @@ export function downloadCapabilityMapXlsx(
   const ws1 = XLSX.utils.aoa_to_sheet(rows)
   ws1['!cols'] = [
     { wch: 26 }, { wch: 38 }, { wch: 46 }, { wch: 52 },
-    { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 40 },
+    { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 40 },
     { wch: 10 }, { wch: 28 }, { wch: 30 },
   ]
   ws1['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: header.length - 1 } }) }
@@ -135,8 +138,34 @@ export function downloadCapabilityMapXlsx(
     ...SCOPE_BUCKETS.map(b => sorted.filter(c => scopeBucket(c) === b).length),
     sorted.length,
   ])
+  // Fit roll-up sits under the scope table on the same sheet — it answers the
+  // follow-on question ("of what IS in scope, how much needs development?")
+  // and only counts in-scope capabilities.
+  const inScope = sorted.filter(c => c.scope === 'in')
+  scopeRows.push([])
+  scopeRows.push(['Fit (in-scope capabilities only)', ...FIT_TYPES.map(fitLabel), 'Not Set', 'Total'])
+  const fitTally = new Map<string, { label: string; order: number; counts: Map<string, number>; total: number }>()
+  for (const c of inScope) {
+    const ws = c.workstream_id ? wsById.get(c.workstream_id) : null
+    const key = ws ? ws.id : '__unaligned__'
+    if (!fitTally.has(key)) fitTally.set(key, { label: workstreamLabel(ws), order: orderOf(c.workstream_id), counts: new Map(), total: 0 })
+    const e = fitTally.get(key)!
+    const k = c.fit || 'unset'
+    e.counts.set(k, (e.counts.get(k) || 0) + 1)
+    e.total++
+  }
+  for (const e of Array.from(fitTally.values()).sort((a, b) => a.order - b.order)) {
+    scopeRows.push([e.label, ...FIT_TYPES.map(f => e.counts.get(f) || 0), e.counts.get('unset') || 0, e.total])
+  }
+  scopeRows.push([
+    'Total',
+    ...FIT_TYPES.map(f => inScope.filter(c => c.fit === f).length),
+    inScope.filter(c => !c.fit).length,
+    inScope.length,
+  ])
+
   const ws3 = XLSX.utils.aoa_to_sheet(scopeRows)
-  ws3['!cols'] = [{ wch: 30 }, ...SCOPE_BUCKETS.map(() => ({ wch: 20 })), { wch: 10 }]
+  ws3['!cols'] = [{ wch: 34 }, ...SCOPE_BUCKETS.map(() => ({ wch: 20 })), { wch: 10 }]
   boldHeader(ws3, scopeHeader.length)
 
   const wb = XLSX.utils.book_new()

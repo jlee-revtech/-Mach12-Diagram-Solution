@@ -99,7 +99,7 @@ export async function updateCapability(
   id: string,
   updates: Partial<Pick<Capability,
     | 'name' | 'description' | 'domain' | 'workstream_id' | 'color' | 'sort_order' | 'archived_at'
-    | 'scope' | 'scope_priority' | 'future_phase' | 'scope_note'
+    | 'scope' | 'scope_priority' | 'future_phase' | 'fit' | 'scope_note'
     | 'scope_decided_at' | 'scope_decided_by'>>
 ): Promise<void> {
   await fetch(`${URL}/rest/v1/cm_capabilities?id=eq.${id}`, {

@@ -70,10 +70,12 @@ export async function POST(req: NextRequest) {
     targetOrgId?: string
     newOrgName?: string
     includeLogicalSystems?: boolean
+    includeMembers?: boolean
     dryRun?: boolean
   }
   const sourceOrgId = body.sourceOrgId
   const includeLogicalSystems = body.includeLogicalSystems !== false
+  const includeMembers = body.includeMembers !== false
   const dryRun = !!body.dryRun
   if (!sourceOrgId) return json({ error: 'sourceOrgId is required.' }, 400)
 
@@ -111,6 +113,7 @@ export async function POST(req: NextRequest) {
         return json({
           dryRun: true, willCreateOrg: name, targetOrgName: name,
           ...(await previewCounts(db, sourceOrgId, null, includeLogicalSystems)),
+          ...(await previewMembers(db, sourceOrgId, null, includeMembers)),
         })
       }
       const { data: created, error } = await db.from('organizations').insert({ name, slug }).select('id,name').single()
@@ -129,7 +132,33 @@ export async function POST(req: NextRequest) {
   if (targetOrgId === sourceOrgId) return json({ error: 'Source and target organizations are the same.' }, 400)
 
   if (dryRun) {
-    return json({ dryRun: true, targetOrgId, targetOrgName, ...(await previewCounts(db, sourceOrgId, targetOrgId, includeLogicalSystems)) })
+    return json({
+      dryRun: true, targetOrgId, targetOrgName,
+      ...(await previewCounts(db, sourceOrgId, targetOrgId, includeLogicalSystems)),
+      ...(await previewMembers(db, sourceOrgId, targetOrgId, includeMembers)),
+    })
+  }
+
+  // ─── Carry the source org's team across ───
+  // Without this a client org is a solo org: nobody but the caller can switch
+  // into it, so the copied capabilities are invisible to the rest of the team.
+  // ignore-duplicates, never merge — merging on role would demote an existing
+  // admin of the target org to 'member'.
+  let membersAdded = 0
+  if (includeMembers) {
+    const { data: srcMembers } = await db
+      .from('org_members').select('user_id').eq('organization_id', sourceOrgId)
+    const { data: tgtMembers } = await db
+      .from('org_members').select('user_id').eq('organization_id', targetOrgId)
+    const already = new Set((tgtMembers || []).map(m => m.user_id as string))
+    const rows = (srcMembers || [])
+      .map(m => m.user_id as string)
+      .filter(uid => !already.has(uid))
+      .map(uid => ({ user_id: uid, organization_id: targetOrgId, role: 'member' }))
+    if (rows.length) {
+      const { error } = await db.from('org_members').insert(rows)
+      if (!error) membersAdded = rows.length
+    }
   }
 
   // ─── Source capabilities (live only — archived rows are the library's history) ───
@@ -228,7 +257,7 @@ export async function POST(req: NextRequest) {
   if (toCopy.length === 0) {
     return json({
       targetOrgId, targetOrgName, createdOrg,
-      copied: 0, skipped: srcCaps.length, systemLinks: 0, workstreamsSeeded, systemsSeeded,
+      copied: 0, skipped: srcCaps.length, systemLinks: 0, workstreamsSeeded, systemsSeeded, membersAdded,
       message: `${targetOrgName} is already up to date with the base library.`,
     })
   }
@@ -301,8 +330,18 @@ export async function POST(req: NextRequest) {
     targetOrgId, targetOrgName, createdOrg,
     copied: created.length,
     skipped: srcCaps.length - toCopy.length,
-    systemLinks, workstreamsSeeded, systemsSeeded,
+    systemLinks, workstreamsSeeded, systemsSeeded, membersAdded,
   })
+}
+
+// How many of the source org's members do not yet have access to the target.
+async function previewMembers(db: SupabaseClient, sourceOrgId: string, targetOrgId: string | null, includeMembers: boolean) {
+  if (!includeMembers) return { willAddMembers: 0 }
+  const { data: srcMembers } = await db.from('org_members').select('user_id').eq('organization_id', sourceOrgId)
+  if (!targetOrgId) return { willAddMembers: (srcMembers || []).length }
+  const { data: tgtMembers } = await db.from('org_members').select('user_id').eq('organization_id', targetOrgId)
+  const already = new Set((tgtMembers || []).map(m => m.user_id as string))
+  return { willAddMembers: (srcMembers || []).filter(m => !already.has(m.user_id as string)).length }
 }
 
 // What a copy would do, without writing anything.

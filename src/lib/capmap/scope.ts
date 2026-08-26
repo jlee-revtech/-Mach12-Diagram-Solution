@@ -5,17 +5,27 @@
 //
 //   scope = null   Not assessed yet
 //   scope = 'in'   In scope, with a priority: Required | Preferred | Nice to Have
+//                  and a fit: Standard | ARICEFW Required
 //   scope = 'out'  Out of scope, optionally planned for a future phase
 
 export type CapabilityScope = 'in' | 'out'
 export type CapabilityScopePriority = 'required' | 'preferred' | 'nice_to_have'
 
+// How an in-scope capability gets delivered. Orthogonal to priority: a Required
+// capability can be standard, a Nice to Have can need an ARICEFW object.
+//   standard  met by standard SAP configuration
+//   aricefw   needs an Application / Report / Interface / Conversion /
+//             Enhancement / Form / Workflow object — the gap
+export type CapabilityFit = 'standard' | 'aricefw'
+
 export const SCOPE_PRIORITIES: CapabilityScopePriority[] = ['required', 'preferred', 'nice_to_have']
+export const FIT_TYPES: CapabilityFit[] = ['standard', 'aricefw']
 
 export interface ScopeState {
   scope: CapabilityScope | null
   scope_priority: CapabilityScopePriority | null
   future_phase: boolean
+  fit: CapabilityFit | null
 }
 
 // The flattened buckets the board filters and rolls up by. One capability is in
@@ -32,6 +42,17 @@ export function scopeBucket(s: Pick<ScopeState, 'scope' | 'scope_priority' | 'fu
 
 export function priorityLabel(p: CapabilityScopePriority): string {
   return p === 'required' ? 'Required' : p === 'preferred' ? 'Preferred' : 'Nice to Have'
+}
+
+export function fitLabel(f: CapabilityFit): string {
+  return f === 'standard' ? 'Standard' : 'ARICEFW Required'
+}
+
+// Standard is the quiet, expected answer; ARICEFW is the one that costs money,
+// so it carries the warmer colour and is what the board badge surfaces.
+export const FIT_COLORS: Record<CapabilityFit, { fg: string; bg: string; border: string }> = {
+  standard: { fg: '#047857', bg: '#ECFDF5', border: '#6EE7B7' },
+  aricefw:  { fg: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' },
 }
 
 // Short label for a board chip / table cell.
@@ -77,11 +98,15 @@ export function normalizeScope(next: Partial<ScopeState>, prev: ScopeState): Sco
   const scope = next.scope !== undefined ? next.scope : prev.scope
   if (scope === 'in') {
     const p = next.scope_priority !== undefined ? next.scope_priority : prev.scope_priority
-    return { scope: 'in', scope_priority: p ?? 'required', future_phase: false }
+    const fit = next.fit !== undefined ? next.fit : prev.fit
+    // Priority defaults so an in-scope row is never priority-less; fit does NOT
+    // default — an unset fit means "not yet decided", and guessing 'standard'
+    // would silently hide a gap.
+    return { scope: 'in', scope_priority: p ?? 'required', future_phase: false, fit: fit ?? null }
   }
   if (scope === 'out') {
     const f = next.future_phase !== undefined ? next.future_phase : prev.future_phase
-    return { scope: 'out', scope_priority: null, future_phase: !!f }
+    return { scope: 'out', scope_priority: null, future_phase: !!f, fit: null }
   }
-  return { scope: null, scope_priority: null, future_phase: false }
+  return { scope: null, scope_priority: null, future_phase: false, fit: null }
 }
