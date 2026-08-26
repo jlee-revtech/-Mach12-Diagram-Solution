@@ -593,7 +593,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           </Button>
         )}
         {caps.length > 0 && (
-          <Button variant="secondary" size="md" onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog, 'Capability Map', respOrgs)} title="Download the capability map as an Excel workbook" icon={<Download size={14} />}>
+          <Button variant="secondary" size="md" onClick={() => downloadCapabilityMapXlsx(caps, workstreams, catalog, 'Capability Map', respOrgs)} title="Download every capability as an Excel workbook — one row per capability with all dimensions (value stream, owner, scope, priority, fit, systems), a long-format Capability x System sheet for pivoting, and summary roll-ups. Exports the full list, not just the current filter." icon={<Download size={14} />}>
             Download
           </Button>
         )}
