@@ -91,6 +91,14 @@ function relativeTime(iso: string): string {
   return `${months}mo ago`
 }
 
+// ─── Home tabs ─────────────────────────────────────────
+// Mirrored into ?tab= so a refresh (or a shared link) lands on the same tab.
+const HOME_TABS = ['process', 'diagrams', 'capmap', 'sipoc', 'personas'] as const
+type HomeTab = typeof HOME_TABS[number]
+const DEFAULT_TAB: HomeTab = 'process'
+const isHomeTab = (v: string | null): v is HomeTab =>
+  !!v && (HOME_TABS as readonly string[]).includes(v)
+
 export default function Dashboard() {
   const [diagrams, setDiagrams] = useState<DiagramRow[]>([])
   const [capabilityMaps, setCapabilityMaps] = useState<CapabilityMapRow[]>([])
@@ -101,7 +109,15 @@ export default function Dashboard() {
   const [processOutlines, setProcessOutlines] = useState<Record<string, ProcessModelOutline>>({})
   const [capabilityCount, setCapabilityCount] = useState(0)
   const [loadingDiagrams, setLoadingDiagrams] = useState(true)
-  const [activeTab, setActiveTab] = useState<'diagrams' | 'sipoc' | 'process' | 'capmap' | 'personas'>('process')
+  // Seeded from ?tab= so a refresh keeps you on the tab you were working in
+  // rather than dropping you back on Process. Reading window during the initial
+  // client render is safe here: this page renders null until auth resolves
+  // (see the gate below), so server and client agree on that first pass.
+  const [activeTab, setActiveTab] = useState<HomeTab>(() => {
+    if (typeof window === 'undefined') return DEFAULT_TAB
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return isHomeTab(t) ? t : DEFAULT_TAB
+  })
   const router = useRouter()
   const { user, organization, loading } = useAuth()
 
@@ -118,6 +134,16 @@ export default function Dashboard() {
   const [sipocMapId, setSipocMapId] = useState('')
   const [sipocBusy, setSipocBusy] = useState(false)
   const [sipocError, setSipocError] = useState<string | null>(null)
+
+  // Keep ?tab= in step with the active tab. replaceState rather than push: tab
+  // clicks should not pile up history entries the back button has to walk
+  // through to leave the page.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('tab') === activeTab) return
+    url.searchParams.set('tab', activeTab)
+    window.history.replaceState(null, '', url)
+  }, [activeTab])
 
   // Auth gating
   useEffect(() => {
