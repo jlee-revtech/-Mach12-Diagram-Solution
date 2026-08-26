@@ -22,3 +22,5 @@ export { CollapsibleSection } from "./CollapsibleSection";
 
 export { DrillDrawer } from "./DrillDrawer";
 export { DataTable } from "./DataTable";
+
+export { backdropClose } from "./backdropClose";

@@ -6,6 +6,7 @@ import {
   archiveCapability, restoreCapability,
   addCapabilityLogicalSystem, removeCapabilityLogicalSystem,
   addCapabilityPhysicalSystem, removeCapabilityPhysicalSystem, bulkCreateCapabilities,
+  setCapabilityScope, setCapabilityScopeNote,
 } from '@/lib/supabase/capmap'
 import { listBedrockCatalog, seedBedrockSystems } from '@/lib/supabase/bedrock-systems'
 import { listWorkstreams, seedStandardWorkstreams } from '@/lib/supabase/workstreams'
@@ -14,12 +15,19 @@ import { flattenStandardCapabilities } from '@/lib/capmap/standardCapabilities'
 import { downloadCapabilityMapXlsx } from '@/lib/export/capabilityWorkspaceXlsx'
 import { createCmCapabilityShare, listCmCapabilityShares, deleteCmCapabilityShare, type CmCapabilityShare } from '@/lib/supabase/capmap-shares'
 import CapabilityAIReviewPanel from '@/components/capmap/CapabilityAIReviewPanel'
+import CopyToOrgDialog from '@/components/capmap/CopyToOrgDialog'
+import CapabilityScopeControl, { CapabilityScopeBadge } from '@/components/capmap/CapabilityScopeControl'
 import WorkstreamPicker from '@/components/workstream/WorkstreamPicker'
 import { WorkstreamIcon } from '@/components/workstream/WorkstreamIcon'
-import { Button, EmptyState, LoadingState } from '@/components/common'
+import { Button, EmptyState, LoadingState, backdropClose } from '@/components/common'
+import { useAuth } from '@/lib/supabase/auth-context'
+import {
+  scopeBucket, bucketLabel, BUCKET_COLORS, SCOPE_BUCKETS,
+  type ScopeBucket, type ScopeState,
+} from '@/lib/capmap/scope'
 import {
   Plus, Download, Share2, Sparkles, Wand2, SearchCheck, Lightbulb, LayoutGrid,
-  Archive, ArchiveRestore, Trash2, X, ChevronRight, Check,
+  Archive, ArchiveRestore, Trash2, X, ChevronRight, Check, Copy,
 } from 'lucide-react'
 import type { CapabilityWithSystems } from '@/lib/capmap/types'
 import type { BedrockSystemWithPhysicals } from '@/lib/bedrock/types'
@@ -27,9 +35,14 @@ import type { Workstream } from '@/lib/workstream/types'
 
 const UNALIGNED = '__unaligned__'
 
+// Pull the scope triple off a capability row.
+const scopeOf = (c: { scope: ScopeState['scope']; scope_priority: ScopeState['scope_priority']; future_phase: boolean }): ScopeState =>
+  ({ scope: c.scope, scope_priority: c.scope_priority, future_phase: !!c.future_phase })
+
 interface DraftCap { name: string; workstreamCode: string; domain: string; description: string; systems: string[]; physicalSystemIds: string[]; physicalLabels: string[]; selected: boolean }
 
 export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: string; userId: string }) {
+  const { organization } = useAuth()
   const [catalog, setCatalog] = useState<BedrockSystemWithPhysicals[]>([])
   const [caps, setCaps] = useState<CapabilityWithSystems[]>([])
   const [archivedCaps, setArchivedCaps] = useState<CapabilityWithSystems[]>([])
@@ -42,8 +55,10 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const [slice, setSlice] = useState<'workstream' | 'logical' | 'physical'>('workstream')
   const [search, setSearch] = useState('')
   const [wsFilter, setWsFilter] = useState<string | null>(null)
+  const [scopeFilter, setScopeFilter] = useState<ScopeBucket | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [copyOpen, setCopyOpen] = useState(false)
 
   // AI draft modal
   const [aiOpen, setAiOpen] = useState(false)
@@ -106,10 +121,11 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       if (wsFilter) {
         if (wsFilter === UNALIGNED ? !!c.workstream_id : c.workstream_id !== wsFilter) return false
       }
+      if (scopeFilter && scopeBucket(scopeOf(c)) !== scopeFilter) return false
       if (q && !(`${c.name} ${c.description || ''} ${c.domain || ''} ${wsName(c.workstream_id)}`.toLowerCase().includes(q))) return false
       return true
     })
-  }, [caps, search, wsFilter, wsById])
+  }, [caps, search, wsFilter, scopeFilter, wsById])
 
   // Board groups ordered by workstream sort order, Unaligned last.
   const groups = useMemo(() => {
@@ -157,6 +173,18 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   }, [slice, filtered, catalog, workstreams, wsById])
 
   const unalignedCount = useMemo(() => caps.filter(c => !c.workstream_id || !wsById.has(c.workstream_id)).length, [caps, wsById])
+
+  // Every capability lands in exactly one bucket, so these counts sum to caps.length.
+  const scopeCounts = useMemo(() => {
+    const m = new Map<ScopeBucket, number>()
+    for (const c of caps) {
+      const b = scopeBucket(scopeOf(c))
+      m.set(b, (m.get(b) || 0) + 1)
+    }
+    return m
+  }, [caps])
+  const assessedCount = caps.length - (scopeCounts.get('unassessed') || 0)
+
   const selected = caps.find(c => c.id === selectedId) || null
 
   // ─── Optimistic mutators ───
@@ -180,6 +208,21 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
   const handleSetWorkstream = async (id: string, wsId: string | null) => {
     patchCap(id, c => ({ ...c, workstream_id: wsId }))
     await updateCapability(id, { workstream_id: wsId }).catch(() => load())
+  }
+
+  const handleSetScope = async (id: string, next: Partial<ScopeState>) => {
+    const cap = caps.find(c => c.id === id)
+    if (!cap) return
+    // The data layer normalizes (a priority only survives on an in-scope row,
+    // future_phase only on an out one) and returns what it actually persisted.
+    const state = await setCapabilityScope(id, userId, next, scopeOf(cap)).catch(() => null)
+    if (!state) { load(); return }
+    patchCap(id, c => ({ ...c, ...state }))
+  }
+
+  const handleSetScopeNote = async (id: string, note: string) => {
+    patchCap(id, c => ({ ...c, scope_note: note.trim() || null }))
+    await setCapabilityScopeNote(id, note).catch(() => load())
   }
 
   const handleDeleteCap = async (id: string) => {
@@ -524,6 +567,11 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             )}
           </div>
         )}
+        {caps.length > 0 && (
+          <Button variant="secondary" size="md" onClick={() => setCopyOpen(true)} title="Copy this capability library into a client organization, where it can be scoped independently" icon={<Copy size={14} />}>
+            Copy to org
+          </Button>
+        )}
         <Button variant="secondary" size="md" onClick={handleSeedStandard} disabled={seedingStd} title="Seed a standard A&D capability map across every value stream" icon={<LayoutGrid size={14} />}>
           {seedingStd ? 'Seeding…' : 'Seed standard'}
         </Button>
@@ -561,6 +609,41 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
           })}
           {unalignedCount > 0 && (
             <button type="button" onClick={() => setWsFilter(UNALIGNED)} className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${wsFilter === UNALIGNED ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-border text-text-secondary hover:bg-surface-muted'}`}>Unaligned ({unalignedCount})</button>
+          )}
+        </div>
+      )}
+
+      {/* Scope filter chips — one bucket per capability, so these sum to the total */}
+      {caps.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-5">
+          <span className="text-[10px] uppercase tracking-wider font-mono text-text-tertiary mr-0.5">Scope</span>
+          <button
+            type="button" onClick={() => setScopeFilter(null)}
+            className={`text-[11px] rounded-full px-2.5 py-1 border transition-colors ${!scopeFilter ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-border text-text-secondary hover:bg-surface-muted'}`}
+          >
+            All ({caps.length})
+          </button>
+          {SCOPE_BUCKETS.map(b => {
+            const n = scopeCounts.get(b) || 0
+            if (!n) return null
+            const on = scopeFilter === b
+            const c = BUCKET_COLORS[b]
+            return (
+              <button
+                key={b} type="button" onClick={() => setScopeFilter(on ? null : b)}
+                className="text-[11px] rounded-full px-2.5 py-1 border transition-colors"
+                style={on
+                  ? { color: '#fff', background: c.fg, borderColor: c.fg }
+                  : { color: c.fg, background: c.bg, borderColor: c.border }}
+              >
+                {bucketLabel(b)} ({n})
+              </button>
+            )
+          })}
+          {assessedCount > 0 && assessedCount < caps.length && (
+            <span className="text-[10px] text-text-tertiary ml-1">
+              {Math.round((assessedCount / caps.length) * 100)}% assessed
+            </span>
           )}
         </div>
       )}
@@ -621,6 +704,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                           >
                             <div className="flex items-start gap-2 mb-2">
                               <h4 className="text-body-md font-semibold text-text-primary flex-1">{c.name}</h4>
+                              <span className="shrink-0"><CapabilityScopeBadge state={scopeOf(c)} /></span>
                               {c.source === 'ai' && <span className="text-[10px] uppercase tracking-wider font-mono text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-0.5 shrink-0">AI</span>}
                               <button type="button" onClick={(e) => handleArchiveCap(c.id, e)} title="Archive capability" className="text-text-tertiary hover:text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                 <Archive size={13} />
@@ -675,6 +759,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
                       <button key={c.id} type="button" onClick={() => setSelectedId(c.id)} className="w-full text-left bg-white border border-border hover:border-brand-300 rounded-lg px-2.5 py-2 transition-colors">
                         <div className="text-body-sm font-medium text-text-primary mb-1">{c.name}</div>
                         <div className="flex flex-wrap gap-1">
+                          <CapabilityScopeBadge state={scopeOf(c)} size="xs" />
                           {slice !== 'workstream' && ws && (
                             <span className="text-[10px] rounded px-1 py-0.5" style={{ color: ws.color || '#10B981', background: `${ws.color || '#10B981'}18` }}>{ws.name}</span>
                           )}
@@ -724,7 +809,7 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
       {/* ─── Assignment drawer ─── */}
       {selected && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSelectedId(null)} />
+          <div className="fixed inset-0 z-40 bg-black/30" {...backdropClose(() => setSelectedId(null))} />
           <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white border-l border-border shadow-modal animate-slide-in-right flex flex-col">
             <div className="flex items-start gap-2 p-5 border-b border-border">
               <div className="flex-1 min-w-0">
@@ -749,6 +834,23 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             </div>
 
             <div className="p-5 overflow-y-auto flex-1">
+              <h4 className="text-label uppercase text-text-secondary mb-2">Scope</h4>
+              <div className="mb-3">
+                <CapabilityScopeControl
+                  state={scopeOf(selected)}
+                  onChange={(next) => handleSetScope(selected.id, next)}
+                />
+              </div>
+              <textarea
+                value={selected.scope_note || ''}
+                onChange={e => patchCap(selected.id, c => ({ ...c, scope_note: e.target.value }))}
+                onBlur={e => handleSetScopeNote(selected.id, e.target.value)}
+                placeholder="Scope rationale (optional) — why in, why out, what defers it"
+                aria-label="Scope note"
+                rows={2}
+                className="w-full rounded-lg border border-border bg-surface-input px-3 py-2 text-[11px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 resize-none mb-5"
+              />
+
               <h4 className="text-label uppercase text-text-secondary mb-2">Value stream</h4>
               <div className="mb-5">
                 <WorkstreamPicker orgId={orgId} value={selected.workstream_id} workstreams={workstreams} onChange={(wsId) => handleSetWorkstream(selected.id, wsId)} />
@@ -883,6 +985,16 @@ export default function CapabilityMapWorkspace({ orgId, userId }: { orgId: strin
             )}
           </div>
         </div>
+      )}
+
+      {/* ─── Copy this library into a client organization ─── */}
+      {copyOpen && (
+        <CopyToOrgDialog
+          sourceOrgId={orgId}
+          sourceOrgName={organization?.name || 'this organization'}
+          capabilityCount={caps.length}
+          onClose={() => setCopyOpen(false)}
+        />
       )}
     </div>
   )

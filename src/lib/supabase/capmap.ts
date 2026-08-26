@@ -1,4 +1,5 @@
 import type { Capability, CapabilitySystemLink, CapabilityWithSystems } from '@/lib/capmap/types'
+import { normalizeScope, type ScopeState } from '@/lib/capmap/scope'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -96,7 +97,10 @@ export async function createCapability(
 
 export async function updateCapability(
   id: string,
-  updates: Partial<Pick<Capability, 'name' | 'description' | 'domain' | 'workstream_id' | 'color' | 'sort_order' | 'archived_at'>>
+  updates: Partial<Pick<Capability,
+    | 'name' | 'description' | 'domain' | 'workstream_id' | 'color' | 'sort_order' | 'archived_at'
+    | 'scope' | 'scope_priority' | 'future_phase' | 'scope_note'
+    | 'scope_decided_at' | 'scope_decided_by'>>
 ): Promise<void> {
   await fetch(`${URL}/rest/v1/cm_capabilities?id=eq.${id}`, {
     method: 'PATCH',
@@ -118,6 +122,30 @@ export async function archiveCapability(id: string): Promise<void> {
 
 export async function restoreCapability(id: string): Promise<void> {
   return updateCapability(id, { archived_at: null })
+}
+
+// ─── Scoping ───────────────────────────────────────────
+// Writes the whole scope triple at once so the row can never sit in a state the
+// migration-063 check constraints reject (a priority on an out-of-scope row, a
+// future-phase flag on an in-scope one). Returns the normalized state so the
+// caller can patch its optimistic copy with exactly what was persisted.
+export async function setCapabilityScope(
+  id: string,
+  userId: string,
+  next: Partial<ScopeState>,
+  prev: ScopeState
+): Promise<ScopeState> {
+  const state = normalizeScope(next, prev)
+  await updateCapability(id, {
+    ...state,
+    scope_decided_at: state.scope ? new Date().toISOString() : null,
+    scope_decided_by: state.scope && userId ? userId : null,
+  })
+  return state
+}
+
+export async function setCapabilityScopeNote(id: string, note: string): Promise<void> {
+  return updateCapability(id, { scope_note: note.trim() || null })
 }
 
 // ─── Capability ↔ System mappings ──────────────────────

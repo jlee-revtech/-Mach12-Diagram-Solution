@@ -2,6 +2,8 @@
 // A business/application capability realized by one or more bedrock systems
 // (Logical Bedrock Systems and/or specific Physical Systems).
 
+import type { CapabilityScope, CapabilityScopePriority } from '@/lib/capmap/scope'
+
 export interface Capability {
   id: string
   organization_id: string
@@ -11,10 +13,23 @@ export interface Capability {
   workstream_id: string | null   // value stream (workstream) alignment
   color: string | null
   sort_order: number
-  source: string            // 'manual' | 'ai'
+  source: string            // 'manual' | 'ai' | 'standard' | 'copied'
   archived_at: string | null
   created_at: string
   updated_at: string
+
+  // ─── Scoping (per-org assessment; see lib/capmap/scope.ts) ───
+  scope: CapabilityScope | null                  // null = not assessed
+  scope_priority: CapabilityScopePriority | null // only when scope = 'in'
+  future_phase: boolean                          // only when scope = 'out'
+  scope_note: string | null
+  scope_decided_at: string | null
+  scope_decided_by: string | null
+
+  // ─── Provenance (set when copied from a base library org) ───
+  source_capability_id: string | null
+  source_organization_id: string | null
+  copied_at: string | null
 }
 
 export interface CapabilitySystemLink {
