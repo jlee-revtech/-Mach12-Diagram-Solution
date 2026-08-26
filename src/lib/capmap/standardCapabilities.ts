@@ -55,6 +55,17 @@ export const STANDARD_CAPABILITIES: Record<string, CapabilityGroup[]> = {
       ],
     },
     {
+      name: 'Cost Labor at Actual Rates (ALC)',
+      description: 'Payroll-based actual labor costing: employee actual rates, revaluation of standard-priced labor, and actual overhead on direct labor.',
+      children: [
+        { name: 'Derive Employee Actual Labor Rates', description: 'Build time-dependent per-employee hourly rates from annual salary and payroll results.' },
+        { name: 'Price Timesheet Labor at Actual Rates', description: 'Enrich time records at entry so labor posts at the employee actual rate, not the standard activity price.' },
+        { name: 'Revalue Labor from Standard to Actual', description: 'Period-end delta revaluation of confirmed labor to actual cost in Controlling.' },
+        { name: 'Apply Actual Overhead to Direct Labor', description: 'Fringe, overhead, and G&A surcharge on actual labor, credited to the correct pool.' },
+        { name: 'Reconcile Labor Cost to Payroll', description: 'Tie labor distribution and revaluation postings back to the payroll register for DCAA support.' },
+      ],
+    },
+    {
       name: 'Settle Project & Contract Costs',
       description: 'WBS/project actuals collection and settlement.',
       children: [
@@ -613,6 +624,18 @@ export const STANDARD_CAPABILITIES: Record<string, CapabilityGroup[]> = {
         { name: 'Capture Compliant Timekeeping', description: 'Daily, total-time labor recording.' },
         { name: 'Route and Approve Timesheets', description: 'Timesheet approval workflow.' },
         { name: 'Manage Absences and Leave', description: 'Leave requests and balances.' },
+        { name: 'Record Uncompensated Overtime', description: 'Total-time recording of exempt hours worked beyond standard for effective-rate dilution.' },
+      ],
+    },
+    {
+      name: 'Control Labor Charge Authorization (WAM)',
+      description: 'Workforce authorization management: who is authorized to charge which cost object, and the controls that enforce it at time entry.',
+      children: [
+        { name: 'Authorize Employees to Charge Objects', description: 'Maintain the employee/org-unit to WBS, order, and cost center authorization from issued work authorizations.' },
+        { name: 'Generate Timesheet Worklists from Assignments', description: 'Build each employee worklist from their authorizations plus standing indirect codes.' },
+        { name: 'Validate and Reject Unauthorized Charges', description: 'Hard validation at entry and release that rejects any receiver outside the authorization.' },
+        { name: 'End-Date Authorizations on De-Scope and Closure', description: 'Close charging the day scope is removed or the cost object is locked.' },
+        { name: 'Audit Charge Authorization and Exceptions', description: 'Trace any charge back to its authorization and report exceptions and overrides.' },
       ],
     },
     {
@@ -631,6 +654,7 @@ export const STANDARD_CAPABILITIES: Record<string, CapabilityGroup[]> = {
         { name: 'Charge Labor to Projects and WBS', description: 'Charge time to cost objects.' },
         { name: 'Transfer CATS to Controlling and Payroll', description: 'CATS transfer to CO/PY.' },
         { name: 'Reconcile Labor Distribution', description: 'Labor distribution reconciliation.' },
+        { name: 'Supply Payroll Results for Actual Labor Costing', description: 'Hand wage-type payroll results to the actual labor rate basis used by ALC.' },
       ],
     },
     {
