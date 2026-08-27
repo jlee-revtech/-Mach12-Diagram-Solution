@@ -58,7 +58,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 1,
     sapModules: ['FI-GL', 'FI-AA', 'CO-CCA', 'CO-PA', 'CO-PC', 'PS settlement', 'Group Reporting'],
     dassianModules: ['Cost Management (OH, costing sheets, FR)', 'Results Analysis (RAENH rev-rec)'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-labor-costing-alc', 'sap-ad-commercial-defense-structure', 'dassian-results-analysis', 'dassian-cost-management', 'dassian-overhead-springboard', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-cas-in-sap', 'govcon-dcaa-audit-readiness', 'govcon-dfars-business-systems'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-labor-costing-alc', 'sap-ad-commercial-defense-structure', 'dassian-results-analysis', 'dassian-cost-management', 'dassian-overhead-springboard', 'sap-cats-time-recording', 'sap-mro-repair-lifecycle', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-cas-in-sap', 'govcon-dcaa-audit-readiness', 'govcon-dfars-business-systems'],
     agentTagline: 'GL, costing, rates, and rev-rec consultant',
   },
   {
@@ -82,7 +82,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 3,
     sapModules: ['PLM', 'PP-BOM', 'ECM (engineering change)', 'QM (FAI)'],
     dassianModules: [],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-plm-design-to-release-ad', 'vibe-sap-recipes', 'sap-rap-development'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-plm-design-to-release-ad', 'sap-mro-repair-lifecycle', 'vibe-sap-recipes', 'sap-rap-development'],
     agentTagline: 'Requirements, CM, and BOM-release consultant',
   },
   {
@@ -94,7 +94,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 4,
     sapModules: ['PP', 'PP-MRP', 'PP-CRP (capacity)', 'PP/DS', 'QM', 'LO-VC', 'PS', 'MM-IM'],
     dassianModules: ['Project Mgmt (EVM)', 'MPIA / BOM cost'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-pp-capacity-planning', 'sap-aatp-order-promising', 'sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-mmas', 'govcon-dfars-business-systems'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-pp-capacity-planning', 'sap-aatp-order-promising', 'sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'sap-mro-repair-lifecycle', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-mmas', 'govcon-dfars-business-systems'],
     agentTagline: 'MRP, shop-floor, quality, and production consultant',
   },
   {
@@ -106,7 +106,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 5,
     sapModules: ['MM-IM', 'WM / EWM', 'LE (deliveries)', 'Handling Units', 'Batch / Serial', 'Physical Inventory'],
     dassianModules: ['DD250 / ABS'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-mmas', 'govcon-dfars-business-systems'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-ad-commercial-defense-structure', 'sap-data-load-so-to-ps', 'sap-mro-repair-lifecycle', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-mmas', 'govcon-dfars-business-systems'],
     agentTagline: 'Logistics, warehousing, and delivery consultant',
   },
   {
@@ -130,7 +130,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 7,
     sapModules: ['PM / EAM', 'CS', 'PP (refurb)', 'MM'],
     dassianModules: [],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-ad-depot-mro', 'vibe-sap-recipes', 'sap-rap-development'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','sap-ad-depot-mro', 'sap-mro-repair-lifecycle', 'vibe-sap-recipes', 'sap-rap-development'],
     agentTagline: 'Depot/field MRO and installed-base consultant',
   },
   {
@@ -142,7 +142,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 8,
     sapModules: ['MM', 'MM-PUR', 'MDG-S', 'Subcontracting', 'MM-IV', 'Ariba', 'FI-AP'],
     dassianModules: ['SCFM', 'Contracts (flowdowns, clause library)', 'PBP'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'sap-bp-customer-vendor-create', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dfars-business-systems', 'govcon-pricing-tina'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'sap-bp-customer-vendor-create', 'sap-ad-commercial-defense-structure', 'sap-mro-repair-lifecycle', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dfars-business-systems', 'govcon-pricing-tina'],
     agentTagline: 'Subcontracts, flowdowns, and P2P consultant',
   },
   {
@@ -154,7 +154,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 9,
     sapModules: ['SD', 'SD-BIL', 'RAR', 'DP90', 'PS'],
     dassianModules: ['Contracts (CLIN/SLIN/ACRN, mods, DD250)', 'PBP', 'Billing (BIL / DRB)', 'ABS', 'Results Analysis (RAENH)'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'dassian-cost-management', 'mach12-contract-studio-sync', 'sap-aatp-order-promising', 'sap-bp-customer-vendor-create', 'sap-ad-commercial-defense-structure', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-pricing-tina', 'govcon-cas-in-sap', 'govcon-dfars-business-systems'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-contracts', 'dassian-cost-management', 'mach12-contract-studio-sync', 'sap-aatp-order-promising', 'sap-bp-customer-vendor-create', 'sap-ad-commercial-defense-structure', 'sap-mro-repair-lifecycle', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-pricing-tina', 'govcon-cas-in-sap', 'govcon-dfars-business-systems'],
     agentTagline: 'Capture, contracts, billing, and rev-rec consultant',
     legacyCodes: ['bid-to-win', 'contract-to-closeout'],
   },
@@ -167,7 +167,7 @@ export const STANDARD_WORKSTREAMS: StandardWorkstreamDef[] = [
     sortOrder: 10,
     sapModules: ['HCM / SF', 'PT (time)', 'PY (payroll)', 'CATS'],
     dassianModules: ['Labor / role-based costing', 'CATS approval'],
-    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-labor-costing-alc', 'govcon-timekeeping-compliance', 'sap-cats-time-recording', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dcaa-audit-readiness'],
+    knowledgeSourceCodes: ['sap-transport-request-management', 'sap-agent-executor-patterns','dassian-labor-costing-alc', 'govcon-timekeeping-compliance', 'sap-cats-time-recording', 'sap-mro-repair-lifecycle', 'vibe-sap-recipes', 'sap-rap-development', 'govcon-dcaa-audit-readiness'],
     agentTagline: 'Clearances, compliant timekeeping, and payroll consultant',
   },
   // ─── Cross-cutting platform agents (serve every value stream) ─
